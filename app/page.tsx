@@ -45,19 +45,17 @@ export default function Home() {
     const platformFeeKobo = Math.round(calculatedFee * 100)
     const totalPayableKobo = Math.round(totalPayable * 100)
 
-    const { error } = await supabase.from('transactions').insert([
-      {
-        buyer_phone: buyerPhone,
-        item_name: itemName,
-        item_description: itemDescription,
-        item_amount_kobo: itemAmountKobo,
-        platform_fee_kobo: platformFeeKobo,
-        total_payable_kobo: totalPayableKobo,
-        fee_bearer: feeBearer,
-        payment_link_slug: randomSlug,
-        status: 'pending_payment',
-      },
-    ])
+    const { error } = await supabase.from('escrows').insert([
+    {
+      slug: randomSlug,
+      title: itemName,
+      amount: priceNum,
+      buyer_phone: buyerPhone,
+      description: itemDescription,
+      fee_bearer: feeBearer,
+      status: 'pending_payment',
+    }
+  ])
 
     setLoading(false)
     if (error) {
