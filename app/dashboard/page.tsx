@@ -1,43 +1,82 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { ShieldCheck, Copy, ExternalLink, Search, RefreshCw, Lock } from 'lucide-react'
+import { Copy, ExternalLink, RefreshCw, LogOut, Mail, Lock } from 'lucide-react'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 export default function SellerDashboard() {
-  const [searchPhone, setSearchPhone] = useState('')
+  const [user, setUser] = useState<any>(null)
+  const [email, setEmail] = useState('')
+  const [authLoading, setAuthLoading] = useState(false)
+  const [authSent, setAuthSent] = useState(false)
   const [escrows, setEscrows] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
-  const [searched, setSearched] = useState(false)
+  const [loadingEscrows, setLoadingEscrows] = useState(false)
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null)
 
-  const handleSearch = async (e: React.FormEvent) => {
+  useEffect(() => {
+    // Check active session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser(session.user)
+        fetchMerchantEscrows(session.user.email)
+      }
+    })
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser(session.user)
+        fetchMerchantEscrows(session.user.email)
+      } else {
+        setUser(null)
+        setEscrows([])
+      }
+    })
+
+    return () => authListener.subscription.unsubscribe()
+  }, [])
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!searchPhone) return
+    if (!email) return
 
-    setLoading(true)
-    setSearched(true)
+    setAuthLoading(true)
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/dashboard`,
+      },
+    })
 
-    // Clean phone number input for matching
-    const cleanPhone = searchPhone.trim()
+    if (error) {
+      alert(`Login failed: ${error.message}`)
+    } else {
+      setAuthSent(true)
+    }
+    setAuthLoading(false)
+  }
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    setUser(null)
+  }
+
+  const fetchMerchantEscrows = async (userEmail: string | undefined) => {
+    if (!userEmail) return
+    setLoadingEscrows(true)
 
     const { data, error } = await supabase
       .from('escrows')
       .select('*')
-      .or(`buyer_phone.ilike.%${cleanPhone}%,description.ilike.%${cleanPhone}%`)
       .order('created_at', { ascending: false })
 
-    if (error) {
-      alert(`Error fetching links: ${error.message}`)
-      setEscrows([])
-    } else {
-      setEscrows(data || [])
+    if (!error && data) {
+      setEscrows(data)
     }
-    setLoading(false)
+    setLoadingEscrows(false)
   }
 
   const copyLink = (slug: string) => {
@@ -45,6 +84,52 @@ export default function SellerDashboard() {
     navigator.clipboard.writeText(url)
     setCopiedSlug(slug)
     setTimeout(() => setCopiedSlug(null), 2000)
+  }
+
+  if (!user) {
+    return (
+      <main className="min-h-screen bg-[#F8FAFC] text-[#1A1A1A] p-4 flex items-center justify-center">
+        <div className="w-full max-w-md bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+          <div className="text-center space-y-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">
+              Merchant Security
+            </span>
+            <h1 className="text-xl font-bold text-slate-900 mt-2">Seller Dashboard Login</h1>
+            <p className="text-xs text-slate-500">Sign in with your email to access your secure escrow links.</p>
+          </div>
+
+          {authSent ? (
+            <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl text-center space-y-2">
+              <Mail className="w-8 h-8 text-emerald-600 mx-auto" />
+              <h3 className="font-bold text-emerald-900 text-sm">Check your email</h3>
+              <p className="text-xs text-emerald-700">We sent a secure magic login link to <strong>{email}</strong>.</p>
+            </div>
+          ) : (
+            <form onSubmit={handleLogin} className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Email Address</label>
+                <input 
+                  type="email" 
+                  value={email} 
+                  onChange={(e) => setEmail(e.target.value)} 
+                  placeholder="seller@example.com"
+                  required
+                  className="w-full p-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+              <button 
+                type="submit" 
+                disabled={authLoading}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition text-sm flex items-center justify-center gap-2"
+              >
+                {authLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                Send Secure Magic Link
+              </button>
+            </form>
+          )}
+        </div>
+      </main>
+    )
   }
 
   return (
@@ -55,43 +140,40 @@ export default function SellerDashboard() {
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
             <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
-              veriPay Merchant Hub
+              Verified Session
             </span>
             <h1 className="text-xl font-bold text-slate-900 mt-1">Seller Dashboard</h1>
+            <p className="text-xs text-slate-500">{user.email}</p>
           </div>
-          <a href="/" className="text-xs font-semibold text-emerald-600 hover:underline">
-            + Create New Link
-          </a>
+          <button 
+            onClick={handleLogout}
+            className="text-xs font-semibold text-rose-600 hover:bg-rose-50 px-3 py-1.5 rounded-lg transition flex items-center gap-1 border border-rose-200"
+          >
+            <LogOut className="w-3.5 h-3.5" /> Log Out
+          </button>
         </div>
 
-        {/* Search Box */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-          <h2 className="text-sm font-semibold text-slate-700">Find Your Escrow Links</h2>
-          <form onSubmit={handleSearch} className="flex gap-2">
-            <input 
-              type="text" 
-              value={searchPhone} 
-              onChange={(e) => setSearchPhone(e.target.value)} 
-              placeholder="Enter phone number or keyword..."
-              required
-              className="flex-1 p-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
-            <button 
-              type="submit" 
-              disabled={loading}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 rounded-xl transition flex items-center gap-2 text-sm"
-            >
-              {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-              Search
-            </button>
-          </form>
-        </div>
-
-        {/* Results Section */}
+        {/* Escrow List */}
         <div className="space-y-3">
-          {searched && escrows.length === 0 && !loading && (
+          <div className="flex justify-between items-center px-1">
+            <h2 className="text-sm font-bold text-slate-700">Your Escrow Transactions</h2>
+            <button 
+              onClick={() => fetchMerchantEscrows(user.email)} 
+              className="text-xs text-emerald-600 hover:underline flex items-center gap-1"
+            >
+              <RefreshCw className="w-3 h-3" /> Refresh
+            </button>
+          </div>
+
+          {loadingEscrows && (
             <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center text-slate-500 text-sm shadow-sm">
-              No escrow links found matching that search.
+              Loading your escrow records...
+            </div>
+          )}
+
+          {!loadingEscrows && escrows.length === 0 && (
+            <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center text-slate-500 text-sm shadow-sm">
+              No active escrow links found.
             </div>
           )}
 
