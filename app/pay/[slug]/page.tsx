@@ -2,14 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { calculateEscrowFee } from '@/lib/feeCalculator'
+import { calculateEscrowFee, formatCurrency } from '@/lib/feeCalculator'
 import { ShieldCheck, AlertTriangle, CheckCircle, Tag, Lock, Share2, Copy, Check } from 'lucide-react'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const supabase = createClient(supabaseUrl, supabaseKey)
 
-// Dynamic loader for Paystack Inline SDK
 const loadPaystackScript = (): Promise<boolean> => {
   return new Promise((resolve) => {
     if (typeof window !== 'undefined' && (window as any).PaystackPop) {
@@ -75,8 +74,9 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
     )
   }
 
-  const feeDetails = calculateEscrowFee(Number(escrow.amount), appliedPromo)
-  const totalKobo = Math.round(feeDetails.total * 100)
+  const activeCurrency = escrow.currency || 'NGN'
+  const feeDetails = calculateEscrowFee(Number(escrow.amount), activeCurrency, appliedPromo)
+  const totalSubunits = Math.round(feeDetails.total * 100)
 
   const applyPromo = () => {
     if (promoCode.trim().toUpperCase() === 'PROMO3FREE') {
@@ -89,20 +89,20 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
   const handlePayment = async () => {
     const isLoaded = await loadPaystackScript()
     if (!isLoaded) {
-      alert('Failed to load Paystack payment gateway. Please check your network and try again.')
+      alert('Failed to load payment gateway. Please check your network and try again.')
       return
     }
 
-    const paystackPublicKey = "pk_test_a537e794fe3c198af4d21738b4aa88b1cc452520" 
+    const paystackPublicKey = "pk_test_a537e794fe3c198af4d21738b4aa88b1cc452520"
 
     const handler = (window as any).PaystackPop.setup({
       key: paystackPublicKey,
       email: escrow.buyer_email || 'buyer@safelync.app',
-      amount: totalKobo,
-      currency: 'NGN',
-      channels: ['bank_transfer', 'card', 'bank', 'ussd'],
+      amount: totalSubunits,
+      currency: activeCurrency,
+      channels: ['card', 'bank_transfer', 'bank', 'ussd', 'mobile_money'],
       ref: `${escrow.slug}_${Math.floor(Math.random() * 1000000 + 1)}`,
-      callback: async function (response: any) {
+      callback: async function () {
         await supabase
           .from('escrows')
           .update({ status: 'funded', promo_code: appliedPromo })
@@ -112,8 +112,8 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
         alert('Payment successful! Escrow funds are locked safely in trust.')
       },
       onClose: function () {
-        console.log('Payment window closed.')
-      }
+        console.log('Payment modal closed.')
+      },
     })
 
     handler.openIframe()
@@ -128,7 +128,7 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
       .update({
         status: 'disputed',
         dispute_reason: disputeReason,
-        dispute_created_at: new Date().toISOString()
+        dispute_created_at: new Date().toISOString(),
       })
       .eq('slug', escrow.slug)
 
@@ -148,7 +148,6 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
     <main className="min-h-screen bg-slate-100 p-4 flex items-center justify-center">
       <div className="bg-white p-6 rounded-2xl border border-slate-200 w-full max-w-md shadow-md space-y-5">
         
-        {/* Header Badges */}
         <div className="flex items-center justify-between border-b border-slate-200 pb-3">
           <span className="text-[11px] font-extrabold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full flex items-center gap-1 border border-emerald-200">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Escrow Protection Active
@@ -163,26 +162,24 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
           <p className="text-xs text-slate-600 font-medium mt-1">{escrow.description || 'Secured P2P Escrow Transaction'}</p>
         </div>
 
-        {/* Pricing Breakdown */}
         <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2 text-xs">
           <div className="flex justify-between font-medium text-slate-700">
             <span>Item Price</span>
-            <span className="font-bold text-slate-900">₦{Number(escrow.amount).toLocaleString()}</span>
+            <span className="font-bold text-slate-900">{formatCurrency(Number(escrow.amount), activeCurrency)}</span>
           </div>
           <div className="flex justify-between items-center font-medium text-slate-700">
             <span>Escrow Fee</span>
             <span className="font-bold text-emerald-700">
-              {feeDetails.isPromoActive ? '₦0 (Promo Free)' : `₦${feeDetails.actualFee.toLocaleString()}`}
+              {feeDetails.isPromoActive ? '₦0 (Promo Free)' : formatCurrency(feeDetails.actualFee, activeCurrency)}
             </span>
           </div>
 
           <div className="pt-2 border-t border-slate-200 flex justify-between font-black text-base text-slate-900">
             <span>Total Payable</span>
-            <span className="text-emerald-700">₦{feeDetails.total.toLocaleString()}</span>
+            <span className="text-emerald-700">{formatCurrency(feeDetails.total, activeCurrency)}</span>
           </div>
         </div>
 
-        {/* Promo Code Input - Dark High Contrast */}
         {escrow.status === 'pending' && (
           <div className="flex gap-2">
             <input
@@ -201,13 +198,12 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
           </div>
         )}
 
-        {/* Dynamic Action Buttons */}
         {escrow.status === 'pending' && (
           <button
             onClick={handlePayment}
             className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-4 rounded-xl transition shadow-md flex items-center justify-center gap-2 text-sm"
           >
-            <Lock className="w-4 h-4" /> Pay ₦{feeDetails.total.toLocaleString()} Into Secure Vault
+            <Lock className="w-4 h-4" /> Pay {formatCurrency(feeDetails.total, activeCurrency)} Into Secure Vault
           </button>
         )}
 
@@ -256,7 +252,6 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
           </div>
         )}
 
-        {/* Footer Share Options */}
         <div className="pt-3 border-t border-slate-100 flex gap-2">
           <a
             href={whatsappShareUrl}

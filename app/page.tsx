@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { calculateEscrowFee } from '@/lib/feeCalculator'
+import { calculateEscrowFee, SUPPORTED_CURRENCIES, formatCurrency } from '@/lib/feeCalculator'
 import { Shield, Lock, CheckCircle2, Copy, Check, Share2 } from 'lucide-react'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -13,12 +13,13 @@ export default function CreateEscrowPage() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
+  const [currency, setCurrency] = useState('NGN')
   const [buyerPhone, setBuyerPhone] = useState('')
   const [loading, setLoading] = useState(false)
   const [createdSlug, setCreatedSlug] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
-  const feeInfo = calculateEscrowFee(Number(amount))
+  const feeInfo = calculateEscrowFee(Number(amount), currency)
 
   const handleCreateLink = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -30,18 +31,17 @@ export default function CreateEscrowPage() {
     setLoading(true)
     const slug = Math.random().toString(36).substring(2, 9)
 
-    const { error } = await supabase
-      .from('escrows')
-      .insert([
-        {
-          title,
-          description,
-          amount: Number(amount),
-          buyer_phone: buyerPhone,
-          slug,
-          status: 'pending'
-        }
-      ])
+    const { error } = await supabase.from('escrows').insert([
+      {
+        title,
+        description,
+        amount: Number(amount),
+        currency,
+        buyer_phone: buyerPhone,
+        slug,
+        status: 'pending',
+      },
+    ])
 
     setLoading(false)
 
@@ -53,13 +53,13 @@ export default function CreateEscrowPage() {
     setCreatedSlug(slug)
   }
 
-  const generatedUrl = createdSlug 
+  const generatedUrl = createdSlug
     ? `${typeof window !== 'undefined' ? window.location.origin : ''}/pay/${createdSlug}`
     : ''
 
-  const whatsappShareUrl = createdSlug 
+  const whatsappShareUrl = createdSlug
     ? `https://api.whatsapp.com/send?text=${encodeURIComponent(
-        `Hi! Here is your SafeLync escrow payment link for ${title} (₦${Number(amount).toLocaleString()}):\n\n${generatedUrl}\n\nFunds remain safely locked until item delivery!`
+        `Hi! Here is your SafeLync escrow payment link for ${title} (${formatCurrency(           Number(amount),           currency         )}):\n\n${generatedUrl}\n\nFunds remain safely locked until item delivery!`
       )}`
     : ''
 
@@ -73,7 +73,6 @@ export default function CreateEscrowPage() {
     <main className="min-h-screen bg-slate-100 p-4 flex flex-col items-center justify-center">
       <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 p-6 shadow-md space-y-6">
         
-        {/* Header */}
         <div className="text-center space-y-1">
           <div className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-800 px-3 py-1 rounded-full text-xs font-bold border border-emerald-200">
             <Shield className="w-3.5 h-3.5 text-emerald-600" /> SafeLync Protection
@@ -118,32 +117,48 @@ export default function CreateEscrowPage() {
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1">Item Price (₦) *</label>
-              <input
-                type="number"
-                placeholder="e.g. 650000"
-                required
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="w-full p-3.5 text-sm font-semibold text-slate-900 bg-white border border-slate-300 rounded-xl placeholder:text-slate-400 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
-              />
+            <div className="grid grid-cols-3 gap-2">
+              <div className="col-span-1">
+                <label className="block text-xs font-bold text-slate-800 mb-1">Currency</label>
+                <select
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value)}
+                  className="w-full p-3.5 text-xs font-extrabold text-slate-900 bg-white border border-slate-300 rounded-xl focus:outline-none focus:border-emerald-600"
+                >
+                  {Object.keys(SUPPORTED_CURRENCIES).map((code) => (
+                    <option key={code} value={code}>
+                      {code} ({SUPPORTED_CURRENCIES[code].symbol})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="col-span-2">
+                <label className="block text-xs font-bold text-slate-800 mb-1">Item Price *</label>
+                <input
+                  type="number"
+                  placeholder="e.g. 650000"
+                  required
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="w-full p-3.5 text-sm font-semibold text-slate-900 bg-white border border-slate-300 rounded-xl placeholder:text-slate-400 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
+                />
+              </div>
             </div>
 
-            {/* Price Preview Card */}
             {Number(amount) > 0 && (
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs space-y-2">
                 <div className="flex justify-between text-slate-700 font-medium">
                   <span>Item Price:</span>
-                  <span className="font-bold text-slate-900">₦{Number(amount).toLocaleString()}</span>
+                  <span className="font-bold text-slate-900">{formatCurrency(Number(amount), currency)}</span>
                 </div>
                 <div className="flex justify-between text-slate-700 font-medium">
-                  <span>Escrow Fee (2% max ₦5k):</span>
-                  <span className="text-emerald-700 font-bold">₦{feeInfo.actualFee.toLocaleString()}</span>
+                  <span>Escrow Fee (2% capped):</span>
+                  <span className="text-emerald-700 font-bold">{formatCurrency(feeInfo.actualFee, currency)}</span>
                 </div>
                 <div className="flex justify-between font-extrabold text-sm text-slate-900 pt-2 border-t border-slate-200">
                   <span>Total Buyer Pays:</span>
-                  <span className="text-emerald-700">₦{feeInfo.total.toLocaleString()}</span>
+                  <span className="text-emerald-700">{formatCurrency(feeInfo.total, currency)}</span>
                 </div>
               </div>
             )}
@@ -163,7 +178,6 @@ export default function CreateEscrowPage() {
             </button>
           </form>
         ) : (
-          /* Success Screen with WhatsApp & Copy Options */
           <div className="space-y-5 text-center">
             <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto border border-emerald-200">
               <CheckCircle2 className="w-8 h-8" />
