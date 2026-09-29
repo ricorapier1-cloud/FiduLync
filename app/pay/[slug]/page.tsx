@@ -21,7 +21,7 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
     if (!resolvedParams?.slug) return
 
     async function fetchEscrow() {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('escrows')
         .select('*')
         .eq('slug', resolvedParams?.slug)
@@ -53,11 +53,10 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
   const totalKobo = Math.round(feeDetails.total * 100)
 
   const handlePayment = () => {
-    // Check if Paystack script is available or initialize inline payment
-    const paystackPublicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || ''
+    const paystackPublicKey = "pk_test_a537e794fe3c198af4d21738b4aa88b1cc452520" 
     
     if (!(window as any).PaystackPop) {
-      alert('Paystack SDK is loading or missing. Please ensure your public key is configured.')
+      alert('Paystack SDK is still loading. Please try again in a second.')
       return
     }
 
@@ -69,7 +68,6 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
       ref: `${escrow.slug}_${Math.floor((Math.random() * 1000000) + 1)}`,
       callback: function(response: any) {
         alert('Payment successful! Reference: ' + response.reference)
-        // You can update status in supabase here or via webhook
       },
       onClose: function() {
         alert('Payment window closed.')
