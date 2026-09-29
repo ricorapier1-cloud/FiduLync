@@ -3,11 +3,27 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { calculateEscrowFee } from '@/lib/feeCalculator'
-import { ShieldCheck, AlertTriangle, CheckCircle, Tag, Lock } from 'lucide-react'
+import { ShieldCheck, AlertTriangle, CheckCircle, Tag, Lock, Share2, Copy, Check } from 'lucide-react'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const supabase = createClient(supabaseUrl, supabaseKey)
+
+// Dynamic loader for Paystack Inline SDK
+const loadPaystackScript = (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if (typeof window !== 'undefined' && (window as any).PaystackPop) {
+      resolve(true)
+      return
+    }
+    const script = document.createElement('script')
+    script.src = 'https://js.paystack.co/v1/inline.js'
+    script.async = true
+    script.onload = () => resolve(true)
+    script.onerror = () => resolve(false)
+    document.body.appendChild(script)
+  })
+}
 
 export default function BuyerPayPage({ params }: { params: Promise<{ slug: string }> }) {
   const [resolvedParams, setResolvedParams] = useState<{ slug: string } | null>(null)
@@ -17,6 +33,7 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
   const [appliedPromo, setAppliedPromo] = useState('')
   const [disputeReason, setDisputeReason] = useState('')
   const [showDisputeForm, setShowDisputeForm] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     params.then((p) => setResolvedParams(p))
@@ -40,15 +57,19 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
   }, [resolvedParams])
 
   if (loading) {
-    return <div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-500 text-sm">Loading deal details...</div>
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center text-slate-700 font-bold text-sm">
+        Loading deal details...
+      </div>
+    )
   }
 
   if (!escrow) {
     return (
-      <main className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 max-w-sm text-center shadow-sm">
+      <main className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 max-w-sm text-center shadow-md">
           <h2 className="text-lg font-bold text-slate-900 mb-1">Safe Link Not Found</h2>
-          <p className="text-xs text-slate-500">This transaction link does not exist or has expired.</p>
+          <p className="text-xs text-slate-600">This transaction link does not exist or has expired.</p>
         </div>
       </main>
     )
@@ -58,39 +79,44 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
   const totalKobo = Math.round(feeDetails.total * 100)
 
   const applyPromo = () => {
-    if (promoCode.toUpperCase() === 'PROMO3FREE') {
+    if (promoCode.trim().toUpperCase() === 'PROMO3FREE') {
       setAppliedPromo('PROMO3FREE')
     } else {
       alert('Invalid Promo Code')
     }
   }
 
-  const handlePayment = () => {
-    const paystackPublicKey = "pk_test_a537e794fe3c198af4d21738b4aa88b1cc452520" 
-    
-    if (!(window as any).PaystackPop) {
-      alert('Paystack SDK is loading. Please try again in a moment.')
+  const handlePayment = async () => {
+    const isLoaded = await loadPaystackScript()
+    if (!isLoaded) {
+      alert('Failed to load Paystack payment gateway. Please check your network and try again.')
       return
     }
 
+    const paystackPublicKey = "pk_test_a537e794fe3c198af4d21738b4aa88b1cc452520" 
+
     const handler = (window as any).PaystackPop.setup({
       key: paystackPublicKey,
-      email: escrow.buyer_email || 'buyer@veripay.app',
+      email: escrow.buyer_email || 'buyer@safelync.app',
       amount: totalKobo,
       currency: 'NGN',
       channels: ['bank_transfer', 'card', 'bank', 'ussd'],
-      ref: `${escrow.slug}_${Math.floor((Math.random() * 1000000) + 1)}`,
-      callback: async function(response: any) {
+      ref: `${escrow.slug}_${Math.floor(Math.random() * 1000000 + 1)}`,
+      callback: async function (response: any) {
         await supabase
           .from('escrows')
           .update({ status: 'funded', promo_code: appliedPromo })
           .eq('slug', escrow.slug)
-        
+
         setEscrow({ ...escrow, status: 'funded' })
-        alert('Payment successful! Escrow funds locked in trust.')
+        alert('Payment successful! Escrow funds are locked safely in trust.')
+      },
+      onClose: function () {
+        console.log('Payment window closed.')
       }
-    });
-    handler.openIframe();
+    })
+
+    handler.openIframe()
   }
 
   const handleDispute = async (e: React.FormEvent) => {
@@ -99,8 +125,8 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
 
     const { error } = await supabase
       .from('escrows')
-      .update({ 
-        status: 'disputed', 
+      .update({
+        status: 'disputed',
         dispute_reason: disputeReason,
         dispute_created_at: new Date().toISOString()
       })
@@ -109,113 +135,111 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
     if (!error) {
       setEscrow({ ...escrow, status: 'disputed' })
       setShowDisputeForm(false)
-      alert('Dispute logged! Funds are frozen in place for administrative review.')
+      alert('Dispute submitted! Funds are frozen in place for review.')
     }
   }
 
+  const pageUrl = typeof window !== 'undefined' ? window.location.href : ''
+  const whatsappShareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(
+    `Hi! Here is the SafeLync payment link for ${escrow.title}:${pageUrl}`
+  )}`
+
   return (
-    <main className="min-h-screen bg-slate-50 p-4 flex items-center justify-center">
-      <script src="https://js.paystack.co/v1/inline.js" async></script>
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 w-full max-w-md shadow-sm space-y-5">
+    <main className="min-h-screen bg-slate-100 p-4 flex items-center justify-center">
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 w-full max-w-md shadow-md space-y-5">
         
         {/* Header Badges */}
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-            <ShieldCheck className="w-3 h-3" /> Escrow Protection Active
+        <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+          <span className="text-[11px] font-extrabold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full flex items-center gap-1 border border-emerald-200">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Escrow Protection Active
           </span>
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-            Status: <strong className="text-slate-900">{escrow.status || 'pending'}</strong>
+          <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+            Status: <strong className="text-slate-900 font-extrabold">{escrow.status || 'pending'}</strong>
           </span>
         </div>
 
         <div>
-          <h1 className="text-xl font-bold text-slate-900">{escrow.title}</h1>
-          <p className="text-xs text-slate-500 mt-1">{escrow.description || 'Secured P2P Escrow Transaction'}</p>
+          <h1 className="text-2xl font-black text-slate-900">{escrow.title}</h1>
+          <p className="text-xs text-slate-600 font-medium mt-1">{escrow.description || 'Secured P2P Escrow Transaction'}</p>
         </div>
 
         {/* Pricing Breakdown */}
-        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-slate-600">Item Price</span>
-            <span className="font-semibold text-slate-900">₦{Number(escrow.amount).toLocaleString()}</span>
+        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2 text-xs">
+          <div className="flex justify-between font-medium text-slate-700">
+            <span>Item Price</span>
+            <span className="font-bold text-slate-900">₦{Number(escrow.amount).toLocaleString()}</span>
           </div>
-          <div className="flex justify-between items-center">
-            <span className="text-slate-600">Escrow Fee</span>
-            <span className="font-semibold text-emerald-700">
+          <div className="flex justify-between items-center font-medium text-slate-700">
+            <span>Escrow Fee</span>
+            <span className="font-bold text-emerald-700">
               {feeDetails.isPromoActive ? '₦0 (Promo Free)' : `₦${feeDetails.actualFee.toLocaleString()}`}
             </span>
           </div>
-          
-          {feeDetails.isCapped && (
-            <div className="text-[11px] text-emerald-700 bg-emerald-50 p-2 rounded border border-emerald-200">
-              🎉 ₦5,000 Fee Cap Applied! You saved ₦{feeDetails.savings.toLocaleString()}.
-            </div>
-          )}
 
-          <div className="pt-2 border-t border-slate-200 flex justify-between font-bold text-base text-slate-900">
+          <div className="pt-2 border-t border-slate-200 flex justify-between font-black text-base text-slate-900">
             <span>Total Payable</span>
-            <span>₦{feeDetails.total.toLocaleString()}</span>
+            <span className="text-emerald-700">₦{feeDetails.total.toLocaleString()}</span>
           </div>
         </div>
 
-        {/* Promo Code Entry (if pending) */}
+        {/* Promo Code Input - Dark High Contrast */}
         {escrow.status === 'pending' && (
           <div className="flex gap-2">
-            <input 
-              type="text" 
-              placeholder="Promo Code (e.g. PROMO3FREE)" 
+            <input
+              type="text"
+              placeholder="Promo Code (e.g. PROMO3FREE)"
               value={promoCode}
               onChange={(e) => setPromoCode(e.target.value)}
-              className="flex-1 p-2.5 border border-slate-200 rounded-xl text-xs uppercase"
+              className="flex-1 p-3 text-xs font-bold text-slate-900 bg-white border border-slate-300 rounded-xl uppercase placeholder:text-slate-400 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
             />
-            <button 
+            <button
               onClick={applyPromo}
-              className="bg-slate-800 text-white text-xs font-semibold px-3 py-2.5 rounded-xl hover:bg-slate-900 transition flex items-center gap-1"
+              className="bg-slate-900 hover:bg-black text-white text-xs font-bold px-4 py-3 rounded-xl transition flex items-center gap-1 shadow-sm"
             >
               <Tag className="w-3.5 h-3.5" /> Apply
             </button>
           </div>
         )}
 
-        {/* Dynamic Action Buttons based on Ledger State */}
+        {/* Dynamic Action Buttons */}
         {escrow.status === 'pending' && (
-          <button 
+          <button
             onClick={handlePayment}
-            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition shadow-sm flex items-center justify-center gap-2 text-sm"
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-4 rounded-xl transition shadow-md flex items-center justify-center gap-2 text-sm"
           >
             <Lock className="w-4 h-4" /> Pay ₦{feeDetails.total.toLocaleString()} Into Secure Vault
           </button>
         )}
 
         {escrow.status === 'funded' && (
-          <div className="space-y-3 pt-2">
-            <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-center text-xs text-emerald-800 font-medium flex items-center justify-center gap-1.5">
-              <CheckCircle className="w-4 h-4 text-emerald-600" /> Funds Secured in Escrow Vault
+          <div className="space-y-3 pt-1">
+            <div className="bg-emerald-50 border border-emerald-300 p-3.5 rounded-xl text-center text-xs text-emerald-900 font-bold flex items-center justify-center gap-2">
+              <CheckCircle className="w-4 h-4 text-emerald-600" /> Funds Locked Safely in Escrow
             </div>
 
             {!showDisputeForm ? (
-              <button 
+              <button
                 onClick={() => setShowDisputeForm(true)}
-                className="w-full bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold py-2.5 rounded-xl border border-rose-200 text-xs transition flex items-center justify-center gap-1.5"
+                className="w-full bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold py-3 rounded-xl border border-rose-200 text-xs transition flex items-center justify-center gap-1.5"
               >
-                <AlertTriangle className="w-4 h-4" /> Dispute Deal / Issue Problem
+                <AlertTriangle className="w-4 h-4" /> Dispute Deal / Report Problem
               </button>
             ) : (
-              <form onSubmit={handleDispute} className="space-y-2 bg-rose-50 p-3 rounded-xl border border-rose-200">
-                <label className="text-xs font-bold text-rose-900 block">Reason for Dispute</label>
-                <textarea 
-                  value={disputeReason} 
+              <form onSubmit={handleDispute} className="space-y-3 bg-rose-50 p-4 rounded-xl border border-rose-200">
+                <label className="text-xs font-extrabold text-rose-900 block">Reason for Dispute</label>
+                <textarea
+                  value={disputeReason}
                   onChange={(e) => setDisputeReason(e.target.value)}
                   placeholder="Describe the issue with the item or seller..."
                   required
-                  className="w-full p-2 text-xs border border-rose-200 rounded-lg focus:outline-none"
+                  className="w-full p-3 text-xs font-semibold text-slate-900 bg-white border border-rose-300 rounded-lg focus:outline-none placeholder:text-slate-400"
                   rows={3}
                 />
                 <div className="flex gap-2">
-                  <button type="submit" className="flex-1 bg-rose-600 text-white font-bold py-2 rounded-lg text-xs">
-                    Submit Dispute & Freeze Funds
+                  <button type="submit" className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 rounded-lg text-xs transition">
+                    Submit & Freeze Funds
                   </button>
-                  <button type="button" onClick={() => setShowDisputeForm(false)} className="bg-slate-200 text-slate-700 font-semibold px-3 rounded-lg text-xs">
+                  <button type="button" onClick={() => setShowDisputeForm(false)} className="bg-slate-200 text-slate-800 font-bold px-3 rounded-lg text-xs">
                     Cancel
                   </button>
                 </div>
@@ -225,12 +249,35 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
         )}
 
         {escrow.status === 'disputed' && (
-          <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-center space-y-1">
+          <div className="bg-amber-50 border border-amber-300 p-4 rounded-xl text-center space-y-1">
             <AlertTriangle className="w-6 h-6 text-amber-600 mx-auto" />
-            <h4 className="font-bold text-amber-900 text-sm">Deal Under Dispute Review</h4>
-            <p className="text-xs text-amber-700">Funds are frozen safely in escrow. An administrator will review proof from both parties.</p>
+            <h4 className="font-extrabold text-amber-900 text-sm">Deal Under Review</h4>
+            <p className="text-xs text-amber-800 font-medium">Funds are frozen safely. An admin will contact both parties to resolve this issue.</p>
           </div>
         )}
+
+        {/* Footer Share Options */}
+        <div className="pt-3 border-t border-slate-100 flex gap-2">
+          <a
+            href={whatsappShareUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1.5"
+          >
+            <Share2 className="w-3.5 h-3.5" /> Share
+          </a>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(pageUrl)
+              setCopied(true)
+              setTimeout(() => setCopied(false), 2000)
+            }}
+            className="flex-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1.5"
+          >
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+            {copied ? 'Copied' : 'Copy Link'}
+          </button>
+        </div>
 
       </div>
     </main>
