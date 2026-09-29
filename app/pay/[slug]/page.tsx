@@ -44,7 +44,7 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center text-slate-700 font-bold text-sm">
-        Loading deal details...
+        Loading FiduLync transaction...
       </div>
     )
   }
@@ -53,7 +53,7 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
     return (
       <main className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
         <div className="bg-white p-6 rounded-2xl border border-slate-200 max-w-sm text-center shadow-md">
-          <h2 className="text-lg font-bold text-slate-900 mb-1">Safe Link Not Found</h2>
+          <h2 className="text-lg font-bold text-slate-900 mb-1">FiduLync Link Not Found</h2>
           <p className="text-xs text-slate-600">This transaction link does not exist or has expired.</p>
         </div>
       </main>
@@ -79,18 +79,18 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
 
       paystack.newTransaction({
         key: paystackPublicKey,
-        email: escrow.buyer_email || 'buyer@veriPay.app',
+        email: escrow.buyer_email || 'buyer@fidulync.app',
         amount: totalSubunits,
         currency: activeCurrency,
         reference: `${escrow.slug}_${Date.now()}`,
-        onSuccess: async (transaction: any) => {
+        onSuccess: async () => {
           await supabase
             .from('escrows')
             .update({ status: 'funded', promo_code: appliedPromo })
             .eq('slug', escrow.slug)
 
           setEscrow({ ...escrow, status: 'funded' })
-          alert('Payment successful! Escrow funds are locked safely in trust.')
+          alert('Payment successful! Funds are locked safely in FiduLync Vault.')
         },
         onCancel: () => {
           console.log('Payment checkout cancelled.')
@@ -123,7 +123,7 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
 
   const pageUrl = typeof window !== 'undefined' ? window.location.href : ''
   const whatsappShareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(
-    `Hi! Here is the veriPay payment link for ${escrow.title}:${pageUrl}`
+    `Hi! Here is your FiduLync escrow link for ${escrow.title}:${pageUrl}`
   )}`
 
   return (
@@ -132,7 +132,7 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
         
         <div className="flex items-center justify-between border-b border-slate-200 pb-3">
           <span className="text-[11px] font-extrabold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full flex items-center gap-1 border border-emerald-200">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Escrow Protection Active
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> FiduLync Shield
           </span>
           <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
             Status: <strong className="text-slate-900 font-extrabold">{escrow.status || 'pending'}</strong>
@@ -141,7 +141,7 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
 
         <div>
           <h1 className="text-2xl font-black text-slate-900">{escrow.title}</h1>
-          <p className="text-xs text-slate-600 font-medium mt-1">{escrow.description || 'Secured P2P Escrow Transaction'}</p>
+          <p className="text-xs text-slate-600 font-medium mt-1">{escrow.description || 'Secured FiduLync Transaction'}</p>
         </div>
 
         <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2 text-xs">
@@ -150,7 +150,7 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
             <span className="font-bold text-slate-900">{formatCurrency(Number(escrow.amount), activeCurrency)}</span>
           </div>
           <div className="flex justify-between items-center font-medium text-slate-700">
-            <span>Escrow Fee</span>
+            <span>FiduLync Fee</span>
             <span className="font-bold text-emerald-700">
               {feeDetails.isPromoActive ? '₦0 (Promo Free)' : formatCurrency(feeDetails.actualFee, activeCurrency)}
             </span>
@@ -185,14 +185,14 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
             onClick={handlePayment}
             className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-4 rounded-xl transition shadow-md flex items-center justify-center gap-2 text-sm"
           >
-            <Lock className="w-4 h-4" /> Pay {formatCurrency(feeDetails.total, activeCurrency)} Into Secure Vault
+            <Lock className="w-4 h-4" /> Pay {formatCurrency(feeDetails.total, activeCurrency)} Into FiduLync Vault
           </button>
         )}
 
         {escrow.status === 'funded' && (
           <div className="space-y-3 pt-1">
             <div className="bg-emerald-50 border border-emerald-300 p-3.5 rounded-xl text-center text-xs text-emerald-900 font-bold flex items-center justify-center gap-2">
-              <CheckCircle className="w-4 h-4 text-emerald-600" /> Funds Locked Safely in Escrow
+              <CheckCircle className="w-4 h-4 text-emerald-600" /> Funds Locked Safely in FiduLync
             </div>
 
             {!showDisputeForm ? (
@@ -229,7 +229,7 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
         {escrow.status === 'disputed' && (
           <div className="bg-amber-50 border border-amber-300 p-4 rounded-xl text-center space-y-1">
             <AlertTriangle className="w-6 h-6 text-amber-600 mx-auto" />
-            <h4 className="font-extrabold text-amber-900 text-sm">Deal Under Review</h4>
+            <h4 className="font-extrabold text-amber-900 text-sm">Deal Under FiduLync Review</h4>
             <p className="text-xs text-amber-800 font-medium">Funds are frozen safely. An admin will contact both parties to resolve this issue.</p>
           </div>
         )}
