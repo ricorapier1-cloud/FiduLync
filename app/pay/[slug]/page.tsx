@@ -65,6 +65,7 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
       email: 'customer@veripay.app',
       amount: totalKobo,
       currency: 'NGN',
+      channels: ['bank_transfer', 'card', 'bank', 'ussd'],
       ref: `${escrow.slug}_${Math.floor((Math.random() * 1000000) + 1)}`,
       callback: function(response: any) {
         alert('Payment successful! Reference: ' + response.reference)
