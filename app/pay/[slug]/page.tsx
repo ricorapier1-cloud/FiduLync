@@ -62,7 +62,7 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
 
     const handler = (window as any).PaystackPop.setup({
       key: paystackPublicKey,
-      email: escrow.buyer_phone ? `${escrow.buyer_phone.replace(/[^0-9]/g, '')}@veripay.escrow` : 'buyer@veripay.app',
+      email: 'customer@veripay.app',
       amount: totalKobo,
       currency: 'NGN',
       ref: `${escrow.slug}_${Math.floor((Math.random() * 1000000) + 1)}`,
