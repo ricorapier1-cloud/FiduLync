@@ -1,51 +1,86 @@
-import { createClient } from '@supabase/supabase-js';
-import { calculateEscrowFee } from '@/lib/feeCalculator';
+'use client'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { useEffect, useState } from 'react'
+import { createClient } from '@supabase/supabase-js'
+import { calculateEscrowFee } from '@/lib/feeCalculator'
 
-export default async function BuyerPayPage({ params }: { params: Promise<{ slug?: string; id?: string }> | { slug?: string; id?: string } }) {
-  const resolvedParams = await params;
-  const linkSlug = resolvedParams?.slug || resolvedParams?.id || '';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+const supabase = createClient(supabaseUrl, supabaseKey)
 
-  if (!linkSlug) {
-    return (
-      <main className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 max-w-sm text-center shadow-sm">
-          <h2 className="text-lg font-bold text-slate-900 mb-1">Invalid Link</h2>
-          <p className="text-xs text-slate-500">No link key was provided.</p>
-        </div>
-      </main>
-    );
+export default function BuyerPayPage({ params }: { params: Promise<{ slug: string }> }) {
+  const [resolvedParams, setResolvedParams] = useState<{ slug: string } | null>(null)
+  const [escrow, setEscrow] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    params.then((p) => setResolvedParams(p))
+  }, [params])
+
+  useEffect(() => {
+    if (!resolvedParams?.slug) return
+
+    async function fetchEscrow() {
+      const { data, error } = await supabase
+        .from('escrows')
+        .select('*')
+        .eq('slug', resolvedParams?.slug)
+        .maybeSingle()
+
+      if (data) setEscrow(data)
+      setLoading(false)
+    }
+
+    fetchEscrow()
+  }, [resolvedParams])
+
+  if (loading) {
+    return <div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-500">Loading escrow details...</div>
   }
 
-  const { data: escrow, error } = await supabase
-    .from('escrows')
-    .select('*')
-    .eq('slug', linkSlug)
-    .maybeSingle();
-
-  if (error || !escrow) {
+  if (!escrow) {
     return (
       <main className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
         <div className="bg-white p-6 rounded-2xl border border-slate-200 max-w-sm text-center shadow-sm">
           <h2 className="text-lg font-bold text-slate-900 mb-1">Safe Link Not Found</h2>
-          <p className="text-xs text-slate-500 mb-3">
-            Link key <code className="bg-slate-100 px-1 py-0.5 rounded text-emerald-700 font-mono">{linkSlug}</code> does not exist in Supabase.
-          </p>
-          <p className="text-[11px] text-slate-400">
-            Please go back to the home page and create a <strong>new Safe Link</strong>.
-          </p>
+          <p className="text-xs text-slate-500 mb-3">This link does not exist or has expired.</p>
         </div>
       </main>
-    );
+    )
   }
 
-  const feeDetails = calculateEscrowFee(Number(escrow.amount));
+  const feeDetails = calculateEscrowFee(Number(escrow.amount))
+  const totalKobo = Math.round(feeDetails.total * 100)
+
+  const handlePayment = () => {
+    // Check if Paystack script is available or initialize inline payment
+    const paystackPublicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || ''
+    
+    if (!(window as any).PaystackPop) {
+      alert('Paystack SDK is loading or missing. Please ensure your public key is configured.')
+      return
+    }
+
+    const handler = (window as any).PaystackPop.setup({
+      key: paystackPublicKey,
+      email: escrow.buyer_phone ? `${escrow.buyer_phone.replace(/[^0-9]/g, '')}@veripay.escrow` : 'buyer@veripay.app',
+      amount: totalKobo,
+      currency: 'NGN',
+      ref: `${escrow.slug}_${Math.floor((Math.random() * 1000000) + 1)}`,
+      callback: function(response: any) {
+        alert('Payment successful! Reference: ' + response.reference)
+        // You can update status in supabase here or via webhook
+      },
+      onClose: function() {
+        alert('Payment window closed.')
+      }
+    });
+    handler.openIframe();
+  }
 
   return (
     <main className="min-h-screen bg-slate-50 p-4 flex items-center justify-center">
+      <script src="https://js.paystack.co/v1/inline.js" async></script>
       <div className="bg-white p-6 rounded-2xl border border-slate-200 w-full max-w-md shadow-sm space-y-4">
         <div>
           <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
@@ -59,14 +94,13 @@ export default async function BuyerPayPage({ params }: { params: Promise<{ slug?
             <span className="text-slate-600">Item Price</span>
             <span className="font-semibold text-slate-900">₦{Number(escrow.amount).toLocaleString()}</span>
           </div>
-
           <div className="flex justify-between items-center">
             <span className="text-slate-600">Escrow Fee</span>
             <span className="font-semibold text-emerald-700">₦{feeDetails.actualFee.toLocaleString()}</span>
           </div>
-
+          
           {feeDetails.isCapped && (
-            <div className="text-[11px] text-emerald-700 bg-emerald-50 p-2 rounded-lg border border-emerald-200">
+            <div className="text-[11px] text-emerald-700 bg-emerald-50 p-2 rounded border border-emerald-200">
               🎉 ₦5,000 Fee Cap Applied! You saved ₦{feeDetails.savings.toLocaleString()}.
             </div>
           )}
@@ -77,10 +111,13 @@ export default async function BuyerPayPage({ params }: { params: Promise<{ slug?
           </div>
         </div>
 
-        <button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition">
+        <button 
+          onClick={handlePayment}
+          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition shadow-sm"
+        >
           Pay ₦{feeDetails.total.toLocaleString()} Now
         </button>
       </div>
     </main>
-  );
+  )
 }
