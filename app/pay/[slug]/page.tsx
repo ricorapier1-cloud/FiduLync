@@ -4,25 +4,11 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { calculateEscrowFee, formatCurrency } from '@/lib/feeCalculator'
 import { ShieldCheck, AlertTriangle, CheckCircle, Tag, Lock, Share2, Copy, Check } from 'lucide-react'
+import PaystackPop from '@paystack/inline-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const supabase = createClient(supabaseUrl, supabaseKey)
-
-const loadPaystackScript = (): Promise<boolean> => {
-  return new Promise((resolve) => {
-    if (typeof window !== 'undefined' && (window as any).PaystackPop) {
-      resolve(true)
-      return
-    }
-    const script = document.createElement('script')
-    script.src = 'https://js.paystack.co/v1/inline.js'
-    script.async = true
-    script.onload = () => resolve(true)
-    script.onerror = () => resolve(false)
-    document.body.appendChild(script)
-  })
-}
 
 export default function BuyerPayPage({ params }: { params: Promise<{ slug: string }> }) {
   const [resolvedParams, setResolvedParams] = useState<{ slug: string } | null>(null)
@@ -86,37 +72,33 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
     }
   }
 
-  const handlePayment = async () => {
-    const isLoaded = await loadPaystackScript()
-    if (!isLoaded) {
-      alert('Failed to load payment gateway. Please check your network and try again.')
-      return
+  const handlePayment = () => {
+    try {
+      const paystack = new PaystackPop()
+      const paystackPublicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_a537e794fe3c198af4d21738b4aa88b1cc452520"
+
+      paystack.newTransaction({
+        key: paystackPublicKey,
+        email: escrow.buyer_email || 'buyer@veriPay.app',
+        amount: totalSubunits,
+        currency: activeCurrency,
+        reference: `${escrow.slug}_${Date.now()}`,
+        onSuccess: async (transaction: any) => {
+          await supabase
+            .from('escrows')
+            .update({ status: 'funded', promo_code: appliedPromo })
+            .eq('slug', escrow.slug)
+
+          setEscrow({ ...escrow, status: 'funded' })
+          alert('Payment successful! Escrow funds are locked safely in trust.')
+        },
+        onCancel: () => {
+          console.log('Payment checkout cancelled.')
+        },
+      })
+    } catch (err: any) {
+      alert(`Payment popup initialization error: ${err.message}`)
     }
-
-    const paystackPublicKey = "pk_test_a537e794fe3c198af4d21738b4aa88b1cc452520"
-
-    const handler = (window as any).PaystackPop.setup({
-      key: paystackPublicKey,
-      email: escrow.buyer_email || 'buyer@safelync.app',
-      amount: totalSubunits,
-      currency: activeCurrency,
-      channels: ['card', 'bank_transfer', 'bank', 'ussd', 'mobile_money'],
-      ref: `${escrow.slug}_${Math.floor(Math.random() * 1000000 + 1)}`,
-      callback: async function () {
-        await supabase
-          .from('escrows')
-          .update({ status: 'funded', promo_code: appliedPromo })
-          .eq('slug', escrow.slug)
-
-        setEscrow({ ...escrow, status: 'funded' })
-        alert('Payment successful! Escrow funds are locked safely in trust.')
-      },
-      onClose: function () {
-        console.log('Payment modal closed.')
-      },
-    })
-
-    handler.openIframe()
   }
 
   const handleDispute = async (e: React.FormEvent) => {
@@ -141,7 +123,7 @@ export default function BuyerPayPage({ params }: { params: Promise<{ slug: strin
 
   const pageUrl = typeof window !== 'undefined' ? window.location.href : ''
   const whatsappShareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(
-    `Hi! Here is the SafeLync payment link for ${escrow.title}:${pageUrl}`
+    `Hi! Here is the veriPay payment link for ${escrow.title}:${pageUrl}`
   )}`
 
   return (
