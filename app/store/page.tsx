@@ -7,7 +7,7 @@ interface Product {
   name: string
   version: string
   description: string
-  price: number
+  priceUSD: number
   fileSlug: string
   badge: string
 }
@@ -17,19 +17,19 @@ const PRODUCTS: Product[] = [
     id: '1',
     name: 'ERIDAM NEXUS ADAPTIVE PRO',
     version: 'v2.4',
-    description: 'Quantitative MT5 EA with Kaufman Efficiency Ratio filtering, dynamic ATR envelopes, and high-watermark equity shield.',
-    price: 35000,
+    description: 'Quantitative MT5 EA featuring Kaufman Efficiency Ratio filtering, dynamic ATR envelopes, and high-watermark equity shield.',
+    priceUSD: 49,
     fileSlug: 'eridam-nexus-pro',
-    badge: 'Best Seller',
+    badge: 'Flagship EA',
   },
   {
     id: '2',
     name: 'Z-Score Volatility Envelope Indicator',
     version: 'v1.1',
     description: 'Custom MT5 indicator mapping real-time standard deviation breakouts with adaptive ALMA moving average filters.',
-    price: 15000,
+    priceUSD: 25,
     fileSlug: 'zscore-envelope-indicator',
-    badge: 'Popular',
+    badge: 'Popular Indicator',
   },
 ]
 
@@ -48,18 +48,41 @@ export default function StorePage() {
     if (!selectedProduct) return
     setLoading(true)
 
-    // Trigger Paystack Live Checkout API
-    alert(`Initiating checkout for ${selectedProduct.name} (₦${selectedProduct.price.toLocaleString()})`)
-    setLoading(false)
+    try {
+      // Initialize Paystack Checkout with USD Currency
+      const res = await fetch('/api/store/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          mt5Account,
+          productId: selectedProduct.id,
+          amountUSD: selectedProduct.priceUSD,
+          productSlug: selectedProduct.fileSlug,
+        }),
+      })
+
+      const data = await res.json()
+      if (data.authorization_url) {
+        window.location.href = data.authorization_url
+      } else {
+        alert(data.error || 'Checkout initialization failed.')
+      }
+    } catch (err) {
+      console.error('Checkout error:', err)
+      alert('An error occurred during checkout.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
     <main className="min-h-screen bg-slate-950 text-white font-sans p-6">
       <div className="max-w-4xl mx-auto">
         <header className="py-8 border-b border-slate-800 text-center">
-          <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold">AlgoLync Quant Trading</span>
-          <h1 className="text-3xl font-extrabold text-white mt-1">MQL5 EAs & Quantitative Tools</h1>
-          <p className="text-slate-400 text-sm mt-2">Tested algorithmic trading tools with automated instant download.</p>
+          <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold">AlgoLync Quant Suite</span>
+          <h1 className="text-3xl font-extrabold text-white mt-1">MQL5 Trading Systems</h1>
+          <p className="text-slate-400 text-sm mt-2">Institutional-grade MetaTrader 5 tools with automated instant delivery.</p>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
@@ -76,8 +99,8 @@ export default function StorePage() {
 
               <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between">
                 <div>
-                  <span className="text-xs text-slate-400 block">One-time License</span>
-                  <span className="text-xl font-extrabold text-emerald-400">₦{prod.price.toLocaleString()}</span>
+                  <span className="text-xs text-slate-400 block">Single Account License</span>
+                  <span className="text-2xl font-extrabold text-emerald-400">${prod.priceUSD} <span className="text-xs font-normal text-slate-400">USD</span></span>
                 </div>
                 <button
                   onClick={() => handleBuy(prod)}
@@ -94,16 +117,16 @@ export default function StorePage() {
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md relative">
               <button onClick={() => setSelectedProduct(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white text-sm">✕</button>
-              <h3 className="text-lg font-bold text-white">Checkout: {selectedProduct.name}</h3>
-              <p className="text-xs text-emerald-400 font-semibold mb-4">Total: ₦{selectedProduct.price.toLocaleString()}</p>
+              <h3 className="text-lg font-bold text-white">License: {selectedProduct.name}</h3>
+              <p className="text-xs text-emerald-400 font-semibold mb-4">Amount: ${selectedProduct.priceUSD} USD</p>
 
               <form onSubmit={handleCheckout} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold uppercase text-slate-300 mb-1">Your Email (For Receipt & Delivery)</label>
+                  <label className="block text-xs font-bold uppercase text-slate-300 mb-1">Email Address (For File Delivery)</label>
                   <input
                     type="email"
                     required
-                    placeholder="you@example.com"
+                    placeholder="trader@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-emerald-500"
@@ -111,11 +134,11 @@ export default function StorePage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold uppercase text-slate-300 mb-1">MT5 Account Number (For License Locking)</label>
+                  <label className="block text-xs font-bold uppercase text-slate-300 mb-1">MT5 Trading Account Number</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. 50921843"
+                    placeholder="e.g. 849201"
                     value={mt5Account}
                     onChange={(e) => setMt5Account(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-emerald-500"
@@ -127,7 +150,7 @@ export default function StorePage() {
                   disabled={loading}
                   className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl text-sm transition-all"
                 >
-                  {loading ? 'Processing...' : 'Pay with Paystack'}
+                  {loading ? 'Opening Payment Gateway...' : `Pay $${selectedProduct.priceUSD} USD`}
                 </button>
               </form>
             </div>
