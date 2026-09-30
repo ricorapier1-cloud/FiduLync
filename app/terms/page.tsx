@@ -1,45 +1,28 @@
-import Link from 'next/link';
+import Link from 'next/link'
 
 export default function TermsPage() {
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-800">
-      <div className="mx-auto max-w-2xl bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-        <Link href="/" className="text-xs font-semibold text-emerald-700 hover:underline mb-4 inline-block">
-          ← Back to veriPay
-        </Link>
-        <h1 className="text-2xl font-bold text-slate-900 mb-2">Terms of Service & Escrow Rules</h1>
-        <p className="text-xs text-slate-500 mb-6">Last updated: September 2026</p>
+    <main className="min-h-screen bg-slate-50 text-slate-900 px-6 py-12 max-w-4xl mx-auto font-sans">
+      <Link href="/" className="text-emerald-600 font-semibold text-sm hover:underline">← Back to FiduLync</Link>
+      <h1 className="text-3xl font-bold mt-6 mb-2">Terms of Service</h1>
+      <p className="text-sm text-slate-500 mb-8">Last updated: September 30, 2026</p>
 
-        <section className="space-y-6 text-sm leading-relaxed">
-          <div>
-            <h2 className="text-base font-semibold text-slate-900 mb-1">1. How Escrow Works</h2>
-            <p className="text-slate-600">
-              veriPay holds buyer payments securely in escrow until delivered goods or services are inspected and accepted, or until the inspection window expires.
-            </p>
-          </div>
+      <div className="space-y-6 text-slate-700 text-sm leading-relaxed">
+        <section>
+          <h2 className="text-lg font-bold text-slate-900 mb-2">1. Escrow Mechanics</h2>
+          <p>FiduLync acts as a neutral third party holding buyer funds until delivery is verified by the buyer or agreed terms are fulfilled. Once released, funds are non-refundable through the platform.</p>
+        </section>
 
-          <div>
-            <h2 className="text-base font-semibold text-slate-900 mb-1">2. 24-Hour Inspection Window</h2>
-            <p className="text-slate-600">
-              Buyers have 24 hours from confirmed delivery to inspect items. If no dispute is logged within 24 hours, funds automatically release to the seller.
-            </p>
-          </div>
+        <section>
+          <h2 className="text-lg font-bold text-slate-900 mb-2">2. Dispute Resolution</h2>
+          <p>Either party may flag a transaction before release. In the event of a dispute, FiduLync holds funds in escrow until both parties reach an agreement or proof of delivery/non-delivery is provided to support.</p>
+        </section>
 
-          <div>
-            <h2 className="text-base font-semibold text-slate-900 mb-1">3. Dispute Resolution</h2>
-            <p className="text-slate-600">
-              Disputes require unboxing video proof or courier delivery receipts. Decisions are finalized within 48 hours.
-            </p>
-          </div>
-
-          <div>
-            <h2 className="text-base font-semibold text-slate-900 mb-1">4. Escrow Fee Cap</h2>
-            <p className="text-slate-600">
-              veriPay charges standard escrow processing fees, strictly capped at a maximum of ₦5,000 per transaction regardless of transaction size.
-            </p>
-          </div>
+        <section>
+          <h2 className="text-lg font-bold text-slate-900 mb-2">3. Prohibited Transactions</h2>
+          <p>Users agree not to use FiduLync for illegal goods, weapons, fraud, or prohibited financial instruments under applicable federal laws.</p>
         </section>
       </div>
     </main>
-  );
+  )
 }

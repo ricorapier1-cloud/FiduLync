@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import Script from 'next/script'
+import WhatsAppButton from '@/components/WhatsAppButton'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -8,18 +9,11 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'FiduLync | Trust Locked Into Every Link',
   description: 'Secure P2P escrow payment links. Lock funds safely until delivery is confirmed.',
-  keywords: ['escrow', 'payments', 'FiduLync', 'peer to peer', 'secure payments'],
-  authors: [{ name: 'FiduLync Technologies' }],
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
     title: 'FiduLync',
-  },
-  openGraph: {
-    title: 'FiduLync | Trust Locked Into Every Link',
-    description: 'Protect your buyer and seller funds with instant escrow payment links.',
-    siteName: 'FiduLync',
   },
 }
 
@@ -30,8 +24,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={`${inter.className} relative min-h-screen bg-slate-50`}>
         {children}
+        <WhatsAppButton phoneNumber="2348000000000" />
         <Script id="register-sw" strategy="afterInteractive">
           {`
             if ('serviceWorker' in navigator) {
