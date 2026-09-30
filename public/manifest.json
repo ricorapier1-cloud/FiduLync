@@ -2,7 +2,7 @@
   "id": "/",
   "name": "FiduLync",
   "short_name": "FiduLync",
-  "description": "Secure P2P Escrow & Payment Platform",
+  "description": "Secure P2P escrow payment links. Lock funds safely until delivery is confirmed.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -12,7 +12,8 @@
   "theme_color": "#059669",
   "lang": "en",
   "dir": "ltr",
-  "categories": ["finance", "utilities"],
+  "categories": ["finance", "business", "utilities"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icon.png",
@@ -23,15 +24,15 @@
   ],
   "screenshots": [
     {
-      "src": "/icon.png",
-      "sizes": "512x512",
+      "src": "/screenshot-desktop.png",
+      "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "FiduLync Web App"
+      "label": "FiduLync Desktop App"
     },
     {
-      "src": "/icon.png",
-      "sizes": "512x512",
+      "src": "/screenshot-mobile.png",
+      "sizes": "750x1334",
       "type": "image/png",
       "form_factor": "narrow",
       "label": "FiduLync Mobile App"
@@ -39,9 +40,9 @@
   ],
   "shortcuts": [
     {
-      "name": "Create Link",
-      "short_name": "Create",
-      "description": "Create a safe escrow link",
+      "name": "Create Safe Link",
+      "short_name": "Create Link",
+      "description": "Create a new safe escrow link",
       "url": "/",
       "icons": [
         {
