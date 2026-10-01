@@ -3,6 +3,11 @@
 import { useState } from 'react'
 import WhatsAppButton from '@/components/WhatsAppButton'
 
+interface Metric {
+  label: string
+  value: string
+}
+
 interface Product {
   id: string
   name: string
@@ -12,6 +17,7 @@ interface Product {
   fileSlug: string
   demoUrl: string
   badge: string
+  metrics: Metric[]
 }
 
 const PRODUCTS: Product[] = [
@@ -24,6 +30,12 @@ const PRODUCTS: Product[] = [
     fileSlug: 'eridam-nexus-pro',
     demoUrl: '/demos/eridam-nexus-pro-demo.ex5',
     badge: 'Flagship EA',
+    metrics: [
+      { label: 'Historical Win Rate', value: '74.2%' },
+      { label: 'Profit Factor', value: '2.14' },
+      { label: 'Max Drawdown', value: '8.6%' },
+      { label: 'Avg Monthly ROI', value: '+12.4%' },
+    ],
   },
   {
     id: '2',
@@ -34,6 +46,12 @@ const PRODUCTS: Product[] = [
     fileSlug: 'zscore-envelope-indicator',
     demoUrl: '/demos/zscore-envelope-demo.ex5',
     badge: 'Popular Indicator',
+    metrics: [
+      { label: 'Signal Accuracy', value: '81.0%' },
+      { label: 'Timeframes', value: 'M15 - H4' },
+      { label: 'Alert Types', value: 'Push & Sound' },
+      { label: 'Repaint Status', value: 'Zero Repaint' },
+    ],
   },
 ]
 
@@ -103,6 +121,16 @@ export default function StorePage() {
                 </div>
                 <h3 className="text-xl font-bold text-white">{prod.name}</h3>
                 <p className="text-xs text-slate-400 mt-2 leading-relaxed">{prod.description}</p>
+
+                {/* Quantitative Metrics Grid */}
+                <div className="grid grid-cols-2 gap-2 mt-4 p-3 bg-slate-950 border border-slate-800/80 rounded-xl">
+                  {prod.metrics.map((m, idx) => (
+                    <div key={idx} className="flex flex-col">
+                      <span className="text-[10px] text-slate-500 uppercase font-semibold">{m.label}</span>
+                      <span className="text-xs font-bold text-emerald-400 font-mono">{m.value}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="mt-6 pt-4 border-t border-slate-800">
