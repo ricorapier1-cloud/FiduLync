@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import WhatsAppButton from '@/components/WhatsAppButton'
 
 interface Product {
   id: string
@@ -9,6 +10,7 @@ interface Product {
   description: string
   priceUSD: number
   fileSlug: string
+  demoUrl: string
   badge: string
 }
 
@@ -20,6 +22,7 @@ const PRODUCTS: Product[] = [
     description: 'Quantitative MT5 EA featuring Kaufman Efficiency Ratio filtering, dynamic ATR envelopes, and high-watermark equity shield.',
     priceUSD: 49,
     fileSlug: 'eridam-nexus-pro',
+    demoUrl: '/demos/eridam-nexus-pro-demo.ex5',
     badge: 'Flagship EA',
   },
   {
@@ -29,6 +32,7 @@ const PRODUCTS: Product[] = [
     description: 'Custom MT5 indicator mapping real-time standard deviation breakouts with adaptive ALMA moving average filters.',
     priceUSD: 25,
     fileSlug: 'zscore-envelope-indicator',
+    demoUrl: '/demos/zscore-envelope-demo.ex5',
     badge: 'Popular Indicator',
   },
 ]
@@ -39,24 +43,18 @@ export default function StorePage() {
   const [mt5Account, setMt5Account] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const handleBuy = (product: Product) => {
-    setSelectedProduct(product)
-  }
-
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedProduct) return
     setLoading(true)
 
     try {
-      // Initialize Paystack Checkout with USD Currency
       const res = await fetch('/api/store/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
           mt5Account,
-          productId: selectedProduct.id,
           amountUSD: selectedProduct.priceUSD,
           productSlug: selectedProduct.fileSlug,
         }),
@@ -69,7 +67,7 @@ export default function StorePage() {
         alert(data.error || 'Checkout initialization failed.')
       }
     } catch (err) {
-      console.error('Checkout error:', err)
+      console.error(err)
       alert('An error occurred during checkout.')
     } finally {
       setLoading(false)
@@ -77,12 +75,22 @@ export default function StorePage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white font-sans p-6">
+    <main className="min-h-screen bg-slate-950 text-white font-sans p-6 relative">
+      <WhatsAppButton />
+
       <div className="max-w-4xl mx-auto">
         <header className="py-8 border-b border-slate-800 text-center">
           <span className="text-xs uppercase tracking-widest text-emerald-400 font-bold">AlgoLync Quant Suite</span>
           <h1 className="text-3xl font-extrabold text-white mt-1">MQL5 Trading Systems</h1>
           <p className="text-slate-400 text-sm mt-2">Institutional-grade MetaTrader 5 tools with automated instant delivery.</p>
+          
+          <div className="flex justify-center items-center gap-4 mt-4 text-xs text-slate-400 font-medium">
+            <span className="flex items-center gap-1">🔒 256-Bit SSL Encrypted</span>
+            <span>•</span>
+            <span className="flex items-center gap-1">🛡️ Secured by Paystack</span>
+            <span>•</span>
+            <span className="flex items-center gap-1">⚡ Instant File Delivery</span>
+          </div>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
@@ -97,17 +105,29 @@ export default function StorePage() {
                 <p className="text-xs text-slate-400 mt-2 leading-relaxed">{prod.description}</p>
               </div>
 
-              <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between">
-                <div>
-                  <span className="text-xs text-slate-400 block">Single Account License</span>
-                  <span className="text-2xl font-extrabold text-emerald-400">${prod.priceUSD} <span className="text-xs font-normal text-slate-400">USD</span></span>
+              <div className="mt-6 pt-4 border-t border-slate-800">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <span className="text-xs text-slate-400 block">Single Account License</span>
+                    <span className="text-2xl font-extrabold text-emerald-400">${prod.priceUSD} <span className="text-xs font-normal text-slate-400">USD</span></span>
+                  </div>
                 </div>
-                <button
-                  onClick={() => handleBuy(prod)}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2.5 rounded-xl text-xs transition-all"
-                >
-                  Buy & Download
-                </button>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <a
+                    href={prod.demoUrl}
+                    download
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2.5 rounded-xl text-xs transition-all text-center border border-slate-700 flex items-center justify-center gap-1"
+                  >
+                    📥 Try Demo
+                  </a>
+                  <button
+                    onClick={() => setSelectedProduct(prod)}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl text-xs transition-all shadow-lg"
+                  >
+                    Buy License
+                  </button>
+                </div>
               </div>
             </div>
           ))}
@@ -145,12 +165,18 @@ export default function StorePage() {
                   />
                 </div>
 
+                <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-[11px] text-slate-400 space-y-1">
+                  <div className="text-emerald-400 font-semibold">🔒 Protected Checkout</div>
+                  <div>• Automatic license binding to your MT5 account.</div>
+                  <div>• Instant email delivery of compiled `.ex5` file.</div>
+                </div>
+
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl text-sm transition-all"
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 rounded-xl text-sm transition-all shadow-lg"
                 >
-                  {loading ? 'Opening Payment Gateway...' : `Pay $${selectedProduct.priceUSD} USD`}
+                  {loading ? 'Opening Payment Gateway...' : `Pay $${selectedProduct.priceUSD} USD via Paystack`}
                 </button>
               </form>
             </div>
