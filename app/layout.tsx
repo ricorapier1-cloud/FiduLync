@@ -1,19 +1,18 @@
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import Script from 'next/script'
-import WhatsAppButton from '@/components/WhatsAppButton'
 import './globals.css'
-
-const inter = Inter({ subsets: ['latin'] })
+import type { Metadata } from 'next'
+import WhatsAppButton from '@/components/WhatsAppButton'
 
 export const metadata: Metadata = {
-  title: 'FiduLync | Trust Locked Into Every Link',
-  description: 'Secure P2P escrow payment links. Lock funds safely until delivery is confirmed.',
-  manifest: '/manifest.json',
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'default',
-    title: 'FiduLync',
+  metadataBase: new URL('https://dulync.vercel.app'),
+  title: 'veriPay | SafeLync Escrow & AlgoLync Quant Suite',
+  description: 'P2P Escrow protection for social commerce and quantitative MQL5 trading tools.',
+  openGraph: {
+    title: 'veriPay SafeLync Escrow',
+    description: 'Lock payment safely until delivery is confirmed.',
+    url: 'https://dulync.vercel.app',
+    siteName: 'veriPay',
+    locale: 'en_US',
+    type: 'website',
   },
 }
 
@@ -24,20 +23,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${inter.className} relative min-h-screen bg-slate-50`}>
+      <body className="bg-slate-950 text-slate-100 antialiased">
         {children}
-        <WhatsAppButton phoneNumber="2348000000000" />
-        <Script id="register-sw" strategy="afterInteractive">
-          {`
-            if ('serviceWorker' in navigator) {
-              window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js').catch((err) => {
-                  console.error('Service Worker registration failed:', err);
-                });
-              });
-            }
-          `}
-        </Script>
+        <WhatsAppButton phoneNumber="2348037212445" />
       </body>
     </html>
   )
