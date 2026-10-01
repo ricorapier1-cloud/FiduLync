@@ -89,7 +89,7 @@ export default function HomePage() {
             </svg>
           </div>
           <div>
-            <span className="text-lg font-black tracking-tight text-white block leading-none">veriPay</span>
+            <span className="text-lg font-black tracking-tight text-white block leading-none">FiduLync</span>
             <span className="text-[10px] font-semibold text-emerald-400 tracking-wider uppercase">Safe Escrow Protection</span>
           </div>
         </div>
@@ -402,80 +402,10 @@ export default function HomePage() {
       </div>
 
       {/* Modern Footer */}
+      {/* Ensure all container divs closed above this point */}
       <footer className="w-full border-t border-slate-900 py-6 text-center text-xs text-slate-400 z-10">
-        © 2026 veriPay SafeLync. Built for secure social commerce.
+        &copy; 2026 FiduLync. Built for secure social commerce.
       </footer>
     </main>
-  )
-}
-
-          {/* Right Column: Dynamic Live Preview Card */}
-          <div className="lg:col-span-5 space-y-6">
-            <div className="bg-slate-900/60 border border-slate-800/80 rounded-3xl p-6 backdrop-blur-xl space-y-6 sticky top-8">
-              <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Live Deal Summary</span>
-                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[11px] font-semibold">
-                  Escrow Protected
-                </span>
-              </div>
-
-              {/* Item Card Preview */}
-              <div className="space-y-4">
-                <div>
-                  <div className="text-xs text-slate-500 uppercase tracking-wider">Item</div>
-                  <div className="text-lg font-bold text-white mt-0.5">
-                    {itemName || 'Item Name Placeholder'}
-                  </div>
-                  {itemDescription && (
-                    <p className="text-xs text-slate-400 mt-1 line-clamp-2">{itemDescription}</p>
-                  )}
-                </div>
-
-                <div className="bg-slate-950/80 rounded-2xl p-4 border border-slate-800/80 flex items-center justify-between">
-                  <div>
-                    <div className="text-[11px] text-slate-400">Total Amount</div>
-                    <div className="text-2xl font-black text-emerald-400 font-mono">{formattedPrice}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-[11px] text-slate-400">Buyer Phone</div>
-                    <div className="text-xs font-mono text-slate-200">{buyerPhone || 'Not entered'}</div>
-                  </div>
-                </div>
-
-                {sellerAccountNumber && (
-                  <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-3.5 space-y-1">
-                    <div className="text-[10px] font-bold uppercase text-emerald-400">Target Payout Account</div>
-                    <div className="text-xs text-slate-200 font-semibold">{sellerBankName}</div>
-                    <div className="text-xs font-mono text-slate-400">{sellerAccountNumber}</div>
-                  </div>
-                )}
-              </div>
-
-              {/* Security Metrics */}
-              <div className="space-y-2 pt-2 border-t border-slate-800/80 text-xs text-slate-400">
-                <div className="flex items-center gap-2">
-                  <span className="text-emerald-400 font-bold">✓</span>
-                  <span>Funds held safely until delivery is confirmed</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-emerald-400 font-bold">✓</span>
-                  <span>Instant automated transfer to seller account</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-emerald-400 font-bold">✓</span>
-                  <span>24/7 Dispute resolution via WhatsApp</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-      {/* Modern Footer */}
-      <footer className="w-full border-t border-slate-900 py-6 text-center text-xs text-slate-400 z-10">
-        © 2026 veriPay SafeLync. Built for secure social commerce.
-      </footer>
-    </main>
-  )
+  );
 }

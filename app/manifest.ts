@@ -2,8 +2,8 @@ import { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'veriPay SafeLync',
-    short_name: 'veriPay',
+    name: 'FiduLync SafeLync',
+    short_name: 'FiduLync',
     description: 'P2P Escrow Protection and AlgoLync Quant Suite',
     start_url: '/',
     display: 'standalone',

@@ -4,13 +4,13 @@ import WhatsAppButton from '@/components/WhatsAppButton'
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://dulync.vercel.app'),
-  title: 'veriPay | SafeLync Escrow & AlgoLync Quant Suite',
+  title: 'FiduLync | SafeLync Escrow & AlgoLync Quant Suite',
   description: 'P2P Escrow protection for social commerce and quantitative MQL5 trading tools.',
   openGraph: {
-    title: 'veriPay SafeLync Escrow',
+    title: 'FiduLync SafeLync Escrow',
     description: 'Lock payment safely until delivery is confirmed.',
     url: 'https://dulync.vercel.app',
-    siteName: 'veriPay',
+    siteName: 'FiduLync',
     locale: 'en_US',
     type: 'website',
   },
