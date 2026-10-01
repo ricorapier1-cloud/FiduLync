@@ -1,12 +1,19 @@
 'use client'
 
-export default function WhatsAppButton() {
-  const phoneNumber = '2348037212445'
-  const defaultMessage = encodeURIComponent('Hello Eric! I have a question about FiduLync / AlgoLync tools.')
+interface WhatsAppButtonProps {
+  phoneNumber?: string
+  defaultMessage?: string
+}
+
+export default function WhatsAppButton({
+  phoneNumber = '2348037212445',
+  defaultMessage = 'Hello Eric! I have a question about FiduLync / AlgoLync tools.',
+}: WhatsAppButtonProps) {
+  const encodedMessage = encodeURIComponent(defaultMessage)
 
   return (
     <a
-      href={`https://wa.me/${phoneNumber}?text=${defaultMessage}`}
+      href={`https://wa.me/${phoneNumber}?text=${encodedMessage}`}
       target="_blank"
       rel="noopener noreferrer"
       className="fixed bottom-6 right-6 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold p-3.5 rounded-full shadow-2xl z-50 flex items-center justify-center transition-all hover:scale-105 active:scale-95"
