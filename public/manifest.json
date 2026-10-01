@@ -1,25 +1,49 @@
 {
-  "id": "/",
   "name": "FiduLync",
   "short_name": "FiduLync",
-  "description": "Secure P2P escrow payment links. Lock funds safely until delivery is confirmed.",
+  "description": "P2P Escrow Protection and AlgoLync Quant Suite",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "orientation": "any",
-  "background_color": "#ffffff",
-  "theme_color": "#059669",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
   "lang": "en",
   "dir": "ltr",
-  "categories": ["finance", "business", "utilities"],
-  "prefer_related_applications": false,
+  "categories": [
+    "finance",
+    "utilities",
+    "business"
+  ],
+  "display_override": [
+    "standalone",
+    "browser"
+  ],
+  "handle_links": "preferred",
+  "launch_handler": {
+    "client_mode": [
+      "navigate-existing",
+      "auto"
+    ]
+  },
   "icons": [
     {
-      "src": "/icon.png",
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-1024.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
     }
   ],
   "screenshots": [
@@ -27,29 +51,20 @@
       "src": "/screenshot-desktop.png",
       "sizes": "1280x720",
       "type": "image/png",
-      "form_factor": "wide",
-      "label": "FiduLync Desktop App"
+      "form_factor": "wide"
     },
     {
       "src": "/screenshot-mobile.png",
-      "sizes": "750x1334",
+      "sizes": "720x1280",
       "type": "image/png",
-      "form_factor": "narrow",
-      "label": "FiduLync Mobile App"
+      "form_factor": "narrow"
     }
   ],
   "shortcuts": [
     {
-      "name": "Create Safe Link",
-      "short_name": "Create Link",
-      "description": "Create a new safe escrow link",
-      "url": "/",
-      "icons": [
-        {
-          "src": "/icon.png",
-          "sizes": "512x512"
-        }
-      ]
+      "name": "Create Escrow",
+      "short_name": "Escrow",
+      "url": "/api/escrow/create"
     }
   ]
 }

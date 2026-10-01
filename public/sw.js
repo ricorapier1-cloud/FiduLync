@@ -1,25 +1,20 @@
-const CACHE_NAME = 'fidulync-v1';
-const STATIC_ASSETS = ['/', '/manifest.json', '/icon.png'];
-
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
-  );
+const CACHE_NAME = "fidulync-pwa-v1";
+const ASSETS = ["/", "/manifest.json", "/icon-192.png", "/icon-512.png"];
+self.addEventListener("install", (e) => {
+  e.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));
   self.skipWaiting();
 });
-
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
+self.addEventListener("activate", (e) => {
+  e.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.map((key) => key !== CACHE_NAME && caches.delete(key)))
+      Promise.all(keys.map((k) => k !== CACHE_NAME && caches.delete(k)))
     )
   );
   self.clients.claim();
 });
-
-self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
-  event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+self.addEventListener("fetch", (e) => {
+  if (e.request.method !== "GET") return;
+  e.respondWith(
+    caches.match(e.request).then((res) => res || fetch(e.request))
   );
 });

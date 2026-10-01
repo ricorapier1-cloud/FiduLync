@@ -26,7 +26,8 @@ export default function RootLayout({
       <body className="bg-slate-950 text-slate-100 antialiased">
         {children}
         <WhatsAppButton phoneNumber="2348037212445" />
-      </body>
+      <script dangerouslySetInnerHTML={{ __html: `if ('serviceWorker' in navigator) { window.addEventListener('load', function() { navigator.serviceWorker.register('/sw.js'); }); }` }} />
+</body>
     </html>
   )
 }
