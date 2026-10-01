@@ -1,8 +1,8 @@
 'use client'
 
 export default function WhatsAppButton() {
-  const phoneNumber = '2348012345678' // Replace with your actual WhatsApp phone number (with country code)
-  const defaultMessage = encodeURIComponent('Hello! I have a question about FiduLync / AlgoLync tools.')
+  const phoneNumber = '2348037212445'
+  const defaultMessage = encodeURIComponent('Hello Eric! I have a question about FiduLync / AlgoLync tools.')
 
   return (
     <a
