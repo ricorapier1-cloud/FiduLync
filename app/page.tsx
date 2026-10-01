@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 export default function HomePage() {
   const router = useRouter()
@@ -43,6 +44,17 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-4 font-sans">
+      {/* Top Header Navigation */}
+      <nav className="w-full max-w-lg flex justify-between items-center mb-6 px-2">
+        <span className="font-bold text-emerald-400 text-lg tracking-wide">FiduLync</span>
+        <Link 
+          href="/store" 
+          className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-emerald-500/20 transition-all flex items-center gap-1"
+        >
+          📈 AlgoLync Store →
+        </Link>
+      </nav>
+
       <div className="w-full max-w-lg bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-2xl">
         <div className="text-center mb-6">
           <span className="inline-block bg-emerald-500/10 text-emerald-400 text-xs font-semibold px-3 py-1 rounded-full mb-2">
