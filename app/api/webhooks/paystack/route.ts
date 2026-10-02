@@ -3,37 +3,40 @@ import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
 export async function POST(req: Request) {
   try {
     const body = await req.text()
     const signature = req.headers.get('x-paystack-signature')
-    const secret = process.env.PAYSTACK_SECRET_KEY
+    
+    const hash = crypto
+      .createHmac('sha512', process.env.PAYSTACK_SECRET_KEY!)
+      .update(body)
+      .digest('hex')
 
-    // Validate Paystack signature if secret key is present
-    if (secret && signature) {
-      const hash = crypto.createHmac('sha256', secret).update(body).digest('hex')
-      if (hash !== signature) {
-        return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
-      }
+    if (hash !== signature) {
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
     }
 
     const event = JSON.parse(body)
 
     if (event.event === 'charge.success') {
-      const reference = event.data.reference
-      const slug = reference.split('_')[0]
+      const { reference, customer } = event.data
 
-      await supabase
-        .from('escrows')
-        .update({
-          status: 'funded',
+      const { error } = await supabase
+        .from('escrow_transactions')
+        .update({ 
+          status: 'vaulted',
+          buyer_email: customer.email,
           paystack_reference: reference,
+          updated_at: new Date().toISOString()
         })
-        .eq('slug', slug)
+        .eq('paystack_reference', reference)
+
+      if (error) console.error('Error updating escrow status:', error)
     }
 
     return NextResponse.json({ status: 'success' }, { status: 200 })
