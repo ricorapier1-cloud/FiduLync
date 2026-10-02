@@ -205,7 +205,7 @@ export default function HomePage() {
                       <input
                         type="tel"
                         required
-                        placeholder="09117295774"
+                        placeholder="e.g. 08000000000"
                         value={buyerPhone}
                         onChange={(e) => setBuyerPhone(e.target.value)}
                         className="w-full bg-slate-950/70 border border-slate-800 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
@@ -318,7 +318,7 @@ export default function HomePage() {
                       <input
                         type="tel"
                         required
-                        placeholder="08037212445"
+                        placeholder="e.g. 08000000000"
                         value={sellerPhone}
                         onChange={(e) => setSellerPhone(e.target.value)}
                         className="w-full bg-slate-950/70 border border-slate-800 rounded-xl p-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500"
