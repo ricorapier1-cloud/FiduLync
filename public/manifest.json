@@ -1,55 +1,37 @@
 {
-  "name": "FiduLync",
+  "name": "FiduLync Safe Escrow",
   "short_name": "FiduLync",
-  "description": "P2P Escrow Protection and AlgoLync Quant Suite",
-  "start_url": "/",
-  "scope": "/",
+  "description": "Zero Risk Social Commerce and Secure Escrow Infrastructure for Africa.",
+  "id": "/?source=pwa",
+  "start_url": "/?source=pwa",
   "display": "standalone",
-  "orientation": "any",
-  "background_color": "#0f172a",
-  "theme_color": "#0f172a",
-  "lang": "en",
-  "dir": "ltr",
-  "categories": [
-    "finance",
-    "utilities",
-    "business"
-  ],
-  "display_override": [
-    "standalone",
-    "browser"
-  ],
-  "handle_links": "preferred",
+  "display_override": ["window-controls-overlay", "minimal-ui"],
+  "background_color": "#0B1120",
+  "theme_color": "#10B981",
+  "orientation": "portrait-primary",
+  "iarc_rating_id": "e84b072d-71b3-4d3e-86ae-31a8ce4e53b7",
+  "categories": ["finance", "business", "shopping"],
   "launch_handler": {
-    "client_mode": [
-      "navigate-existing",
-      "auto"
-    ]
+    "client_mode": ["navigate-existing", "auto"]
   },
   "icons": [
+    { "src": "/icon-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/maskable-icon.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
     {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-1024.png",
-      "sizes": "1024x1024",
-      "type": "image/png",
-      "purpose": "any"
+      "name": "Create Safe Link",
+      "short_name": "New Link",
+      "description": "Generate a new escrow payment link",
+      "url": "/",
+      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
     }
   ],
   "screenshots": [
     {
       "src": "/screenshot-desktop.png",
-      "sizes": "1280x720",
+      "sizes": "1920x1080",
       "type": "image/png",
       "form_factor": "wide"
     },
@@ -60,11 +42,10 @@
       "form_factor": "narrow"
     }
   ],
-  "shortcuts": [
+  "related_applications": [
     {
-      "name": "Create Escrow",
-      "short_name": "Escrow",
-      "url": "/api/escrow/create"
+      "platform": "webapp",
+      "url": "https://fidulync.vercel.app/manifest.json"
     }
   ]
 }
