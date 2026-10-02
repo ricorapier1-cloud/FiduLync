@@ -1,6 +1,7 @@
 import './globals.css'
 import type { Metadata } from 'next'
 import WhatsAppButton from '@/components/WhatsAppButton'
+import { Analytics } from '@vercel/analytics/next'
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://dulync.vercel.app'),
@@ -26,6 +27,7 @@ export default function RootLayout({
       <body className="bg-slate-950 text-slate-100 antialiased">
         {children}
         <WhatsAppButton phoneNumber="2348037212445" />
+        <Analytics />
       <script dangerouslySetInnerHTML={{ __html: `if ('serviceWorker' in navigator) { window.addEventListener('load', function() { navigator.serviceWorker.register('/sw.js'); }); }` }} />
 </body>
     </html>
