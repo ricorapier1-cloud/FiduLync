@@ -1,6 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 100" fill="none">
-  <rect x="10" y="10" width="80" height="80" rx="20" fill="#059669"/>
-  <path d="M50 25L32 34V48C32 59.5 39.5 70 50 73.5C60.5 70 68 59.5 68 48V34L50 25Z" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M43.5 48L48.5 53L57.5 44" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <text x="110" y="65" font-family="Inter, system-ui, sans-serif" font-weight="900" font-size="44" fill="#0F172A">Fidu<tspan fill="#059669">Lync</tspan></text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 100" fill="none" width="100%" height="100%">
+  <!-- Shield Icon -->
+  <rect x="10" y="10" width="80" height="80" rx="20" fill="#10B981"/>
+  <path d="M50 26C50 26 33 31 33 45C33 59 50 71 50 71C50 71 67 59 67 45C67 31 50 26 50 26Z" stroke="#FFFFFF" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M43 46L48 51L58 41" stroke="#FFFFFF" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- High Contrast Brand Text -->
+  <text x="105" y="65" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="800" font-size="44" letter-spacing="-1">
+    <tspan fill="#FFFFFF">Fidu</tspan><tspan fill="#10B981">Lync</tspan>
+  </text>
 </svg>
