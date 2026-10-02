@@ -29,7 +29,8 @@ export async function POST(request: Request) {
       payout_bank: payoutBank,
       payout_account: payoutAccount,
       status: 'pending',
-      link_id: linkId
+      link_id: linkId,
+      slug: linkId
     }
 
     const { data, error } = await supabase
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, data: data[0], linkId }, { status: 200 })
+    return NextResponse.json({ success: true, data: data[0], linkId, slug: linkId }, { status: 200 })
   } catch (err: any) {
     console.error('Server Handler Error:', err)
     return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 })
