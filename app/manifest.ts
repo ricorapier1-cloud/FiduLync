@@ -9,10 +9,22 @@ export default function manifest(): MetadataRoute.Manifest {
     id: '/',
     scope: '/',
     display: 'standalone',
+    display_override: ['standalone', 'window-controls-overlay'],
     orientation: 'portrait',
     background_color: '#020617',
     theme_color: '#10b981',
+    lang: 'en',
+    dir: 'ltr',
     categories: ['finance', 'shopping', 'utilities'],
+    iarc_rating_id: 'e58c1741-2832-4113-9a3d-368735397451',
+    prefer_related_applications: false,
+    related_applications: [],
+    launch_handler: {
+      client_mode: ['navigate-existing', 'auto'],
+    },
+    scope_extensions: [
+      { origin: 'https://dulync.vercel.app' },
+    ],
     icons: [
       {
         src: '/icon-192.png',
@@ -77,5 +89,5 @@ export default function manifest(): MetadataRoute.Manifest {
         icons: [{ src: '/icon-192.png', sizes: '192x192' }],
       },
     ],
-  }
+  } as any
 }
