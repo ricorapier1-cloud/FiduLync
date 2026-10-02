@@ -21,20 +21,20 @@ export async function POST(request: Request) {
 
     const linkId = Math.random().toString(36).substring(2, 10)
 
+    const payload = {
+      title: title || 'Safe Link Escrow',
+      amount: Number(amount),
+      seller_phone: sellerPhone,
+      buyer_phone: buyerPhone,
+      payout_bank: payoutBank,
+      payout_account: payoutAccount,
+      status: 'pending',
+      link_id: linkId
+    }
+
     const { data, error } = await supabase
       .from('escrows')
-      .insert([
-        {
-          title: title || 'Safe Link Escrow',
-          amount: Number(amount),
-          seller_phone: sellerPhone,
-          buyer_phone: buyerPhone,
-          payout_bank: payoutBank,
-          payout_account: payoutAccount,
-          status: 'pending',
-          link_id: linkId
-        }
-      ])
+      .insert([payload])
       .select()
 
     if (error) {
