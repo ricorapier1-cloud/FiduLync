@@ -1,4 +1,4 @@
-const CACHE_NAME = 'veripay-cache-v2'
+const CACHE_NAME = 'fidulync-cache-v2'
 const urlsToCache = [
   '/',
   '/store',
