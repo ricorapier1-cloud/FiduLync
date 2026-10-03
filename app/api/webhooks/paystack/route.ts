@@ -1,46 +1,46 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
+import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+export const dynamic = 'force-dynamic'
 
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   try {
-    const body = await req.text()
-    const signature = req.headers.get('x-paystack-signature')
+    const textBody = await request.text()
+    const signature = request.headers.get('x-paystack-signature')
+
+    // 1. Verify Paystack Signature
+    const secret = process.env.PAYSTACK_SECRET_KEY || ''
+    const expectedSignature = crypto.createHmac('sha512', secret).update(textBody).digest('hex')
     
-    const hash = crypto
-      .createHmac('sha512', process.env.PAYSTACK_SECRET_KEY!)
-      .update(body)
-      .digest('hex')
-
-    if (hash !== signature) {
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
+    if (signature !== expectedSignature) {
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }
 
-    const event = JSON.parse(body)
+    const event = JSON.parse(textBody)
 
+    // 2. Process Successful Charge
     if (event.event === 'charge.success') {
-      const { reference, customer } = event.data
+      const linkId = event.data.metadata.custom_fields.find((f: any) => f.variable_name === 'link_id')?.value
 
-      const { error } = await supabase
-        .from('escrow_transactions')
-        .update({ 
-          status: 'vaulted',
-          buyer_email: customer.email,
-          paystack_reference: reference,
-          updated_at: new Date().toISOString()
-        })
-        .eq('paystack_reference', reference)
+      if (linkId) {
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+        const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } })
 
-      if (error) console.error('Error updating escrow status:', error)
+        // Update Escrow state from pending -> funded
+        const { error } = await supabase
+          .from('escrows')
+          .update({ status: 'funded' })
+          .eq('link_id', linkId)
+
+        if (error) throw error
+      }
     }
 
-    return NextResponse.json({ status: 'success' }, { status: 200 })
+    return NextResponse.json({ success: true }, { status: 200 })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    console.error('Webhook error:', err)
+    return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 })
   }
 }
