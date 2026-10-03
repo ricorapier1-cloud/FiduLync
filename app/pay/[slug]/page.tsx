@@ -29,31 +29,22 @@ export default function PaymentPage({ params }: { params: { slug: string } }) {
     const paystack = new window.PaystackPop()
     paystack.newTransaction({
       key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY,
-      email: 'buyer@example.com', // In production, prompt for buyer's actual email
-      amount: Number(escrow.amount) * 100, // Paystack expects kobo
+      email: 'buyer@example.com',
+      amount: Number(escrow.amount) * 100,
       currency: 'NGN',
       metadata: {
-        custom_fields: [
-          {
-            display_name: 'FiduLync Escrow ID',
-            variable_name: 'link_id',
-            value: escrow.link_id
-          }
-        ]
+        custom_fields: [{ display_name: 'FiduLync Escrow ID', variable_name: 'link_id', value: escrow.link_id }]
       },
       onSuccess: (transaction: any) => {
-        // Optimistic UI update; actual source of truth will be the webhook
         alert(`Payment successful! Ref: ${transaction.reference}`)
         setEscrow((prev: any) => ({ ...prev, status: 'funded' }))
       },
-      onCancel: () => {
-        alert('Payment cancelled.')
-      }
+      onCancel: () => alert('Payment cancelled.')
     })
   }
 
   const handleConfirmDelivery = async () => {
-    if (!confirm('Are you sure you have received and inspected this item? Once confirmed, funds will be disbursed to the seller instantly.')) return
+    if (!confirm('Confirm you have received and inspected this item? Funds will be disbursed to the seller instantly.')) return
     setUpdating(true)
     try {
       const res = await fetch(`/api/escrow/${params.slug}/status`, {
@@ -62,18 +53,41 @@ export default function PaymentPage({ params }: { params: { slug: string } }) {
         body: JSON.stringify({ status: 'completed' })
       })
       const data = await res.json()
+      if (data.success) setEscrow((prev: any) => ({ ...prev, status: 'completed' }))
+    } catch (err) {
+      alert('Failed to update status.')
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const handleDispute = async () => {
+    const reason = prompt('Please briefly explain the issue (e.g., damaged item, wrong product):')
+    if (!reason) return // User cancelled prompt
+    
+    setUpdating(true)
+    try {
+      const res = await fetch(`/api/escrow/${params.slug}/dispute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason })
+      })
+      const data = await res.json()
       if (data.success) {
-        setEscrow((prev: any) => ({ ...prev, status: 'completed' }))
+        alert('Dispute raised successfully. Funds are frozen until an admin reviews the case.')
+        setEscrow((prev: any) => ({ ...prev, status: 'disputed' }))
+      } else {
+        alert(data.error || 'Failed to raise dispute.')
       }
     } catch (err) {
-      alert('Failed to update status. Please try again.')
+      alert('Failed to process dispute request.')
     } finally {
       setUpdating(false)
     }
   }
 
   if (loading) return <div className="min-h-screen bg-[#0B1120] flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500"></div></div>
-  if (error || !escrow) return <div className="min-h-screen bg-[#0B1120] text-white p-6 flex items-center justify-center"><div className="max-w-md w-full bg-[#111827] border border-red-500/40 p-8 rounded-2xl text-center"><div className="text-4xl mb-4">⚠️</div><h2 className="text-xl font-bold mb-2">Link Unavailable</h2><p className="text-gray-400 text-sm">{error || 'This link has expired.'}</p></div></div>
+  if (error || !escrow) return <div className="min-h-screen bg-[#0B1120] text-white p-6 flex items-center justify-center"><div className="max-w-md w-full bg-[#111827] border border-red-500/40 p-8 rounded-2xl text-center"><div className="text-4xl mb-4">⚠️️</div><h2 className="text-xl font-bold mb-2">Link Unavailable</h2><p className="text-gray-400 text-sm">{error || 'This link has expired.'}</p></div></div>
 
   return (
     <>
@@ -93,17 +107,30 @@ export default function PaymentPage({ params }: { params: { slug: string } }) {
             </div>
             <div className="grid grid-cols-2 gap-3 text-xs bg-[#0B1120]/50 p-3 rounded-xl border border-gray-800/80">
               <div><span className="text-gray-500">Seller Phone:</span> <span className="text-gray-200 font-mono">{escrow.seller_phone || 'N/A'}</span></div>
-              <div><span className="text-gray-500">Status:</span> <span className="text-emerald-400 font-bold uppercase">{escrow.status}</span></div>
+              <div>
+                <span className="text-gray-500">Status:</span> 
+                <span className={`font-bold uppercase ml-1 ${escrow.status === 'disputed' ? 'text-red-500' : 'text-emerald-400'}`}>
+                  {escrow.status}
+                </span>
+              </div>
             </div>
           </div>
+          
           {escrow.status === 'pending' ? (
             <button onClick={handlePayment} className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold py-4 px-6 rounded-xl transition shadow-lg shadow-emerald-500/20 text-center">
               Pay ₦{Number(escrow.amount).toLocaleString()} Safely into Escrow
             </button>
           ) : escrow.status === 'funded' ? (
-            <button onClick={handleConfirmDelivery} disabled={updating} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-6 rounded-xl transition shadow-lg shadow-blue-500/20">
-              {updating ? 'Updating Status...' : 'Confirm Delivery Received'}
-            </button>
+            <div className="space-y-3">
+              <button onClick={handleConfirmDelivery} disabled={updating} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 px-6 rounded-xl transition shadow-lg shadow-blue-500/20">
+                {updating ? 'Updating Status...' : 'Confirm Delivery Received'}
+              </button>
+              <button onClick={handleDispute} disabled={updating} className="w-full bg-red-900/40 hover:bg-red-900/60 text-red-400 border border-red-900 font-bold py-3 px-6 rounded-xl transition">
+                {updating ? 'Processing...' : 'Raise Dispute (Item Damaged / Not Received)'}
+              </button>
+            </div>
+          ) : escrow.status === 'disputed' ? (
+             <div className="p-4 bg-red-950/40 border border-red-500/40 text-red-300 rounded-xl text-center font-semibold text-sm">⚠️ Funds Locked: Dispute Under Admin Review</div>
           ) : (
             <div className="p-4 bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 rounded-xl text-center font-semibold text-sm">✓ Transaction Completed</div>
           )}
