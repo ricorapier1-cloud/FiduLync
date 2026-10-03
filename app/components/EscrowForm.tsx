@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 
@@ -116,7 +116,7 @@ export default function EscrowForm({ buyerPhone, setBuyerPhone, itemName, setIte
   return (
     <form onSubmit={handleCreateLink} className="space-y-5">
       <div>
-        <label className="block text-xs text-gray-400 mb-1 font-bold">BUYER'S WHATSAPP *</label>
+        <label className="block text-xs text-gray-400 mb-1 font-bold">BUYER&apos;S WHATSAPP *</label>
         <input required type="tel" value={buyerPhone} onChange={e => setBuyerPhone(e.target.value)} className="w-full bg-[#0B1120] border border-gray-800 rounded-xl p-3 text-sm focus:border-emerald-500 outline-none transition" placeholder="e.g. +2348000000000" />
       </div>
 
