@@ -6,9 +6,14 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: 'FiduLync',
     description: 'Safe Escrow Infrastructure for Zero Risk Social Commerce.',
     start_url: '/',
+    id: '/?source=pwa',
     display: 'standalone',
+    orientation: 'portrait',
     background_color: '#0B1120',
     theme_color: '#10B981',
+    categories: ['finance', 'business', 'shopping'],
+    prefer_related_applications: false,
+    related_applications: [],
     icons: [
       {
         src: '/icon-192x192.png',
