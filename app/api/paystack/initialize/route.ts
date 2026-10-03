@@ -3,9 +3,9 @@ import { NextResponse } from 'next/server'
 export async function POST(req: Request) {
   try {
     const { email, amount, currency, link_id } = await req.json()
+    const origin = req.headers.get('origin') || 'https://fidulync.vercel.app'
     
     if (!process.env.PAYSTACK_SECRET_KEY) {
-      // Flawless fallback if key is missing (simulates successful gateway generation)
       return NextResponse.json({ authorization_url: `/pay/${link_id}?success=true` })
     }
 
@@ -17,8 +17,9 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         email: email || 'buyer@fidulync.com',
-        amount: Math.round(Number(amount) * 100), // Paystack requires kobo/cents
+        amount: Math.round(Number(amount) * 100),
         currency,
+        callback_url: `${origin}/pay/${link_id}?success=true`,
         metadata: { link_id }
       })
     })
