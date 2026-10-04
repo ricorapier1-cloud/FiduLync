@@ -21,9 +21,8 @@ export default function Navbar({
   const menus = [
     { id: 'home', label: 'Create Link', icon: '⚡' },
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-    { id: 'disputes', label: 'Disputes', icon: '⚖️' },
-    { id: 'faq', label: 'FAQ & Help', icon: '❓' },
-    { id: 'terms', label: 'Legal & Terms', icon: '📜' },
+    { id: 'disputes', label: 'Disputes & Terms', icon: '⚖️' },
+    { id: 'faq', label: 'FAQ', icon: '❓' },
     ...(userRole === 'admin' ? [{ id: 'admin', label: 'Admin Control', icon: '🛡️' }] : [])
   ]
 
@@ -31,7 +30,7 @@ export default function Navbar({
     <nav className="border-b border-gray-800/80 bg-[#070B14]/95 backdrop-blur sticky top-0 z-40">
       <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
         
-        {/* Left: Exact Logo matching Screenshot */}
+        {/* Brand Logo matching screenshot */}
         <div className="flex items-center gap-3 cursor-pointer shrink-0" onClick={() => setActiveView('home')}>
           <div className="w-10 h-10 rounded-2xl bg-[#00c896]/15 border border-[#00c896]/40 flex items-center justify-center text-[#00c896] text-xl shrink-0 shadow-[0_0_15px_rgba(0,200,150,0.15)]">
             🛡️
@@ -46,7 +45,7 @@ export default function Navbar({
           </div>
         </div>
 
-        {/* Right: Exact AlgoLync Store Button matching Screenshot */}
+        {/* Header Right Actions */}
         <div className="flex items-center gap-3">
           <button
             onClick={() => setActiveView('store')}
@@ -68,7 +67,6 @@ export default function Navbar({
             </span>
           </button>
 
-          {/* User Account / Auth Trigger */}
           {userEmail ? (
             <div className="hidden sm:flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-xl px-3 py-1 text-xs">
               <span className="text-gray-300 font-mono text-[11px] truncate max-w-[120px]">{userEmail}</span>
@@ -79,14 +77,23 @@ export default function Navbar({
               onClick={onOpenAuth}
               className="hidden sm:block bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold px-3 py-1.5 rounded-xl text-xs hover:bg-emerald-500/20 transition"
             >
-              Login / Register
+              Sign In
             </button>
           )}
         </div>
       </div>
 
-      {/* Professional Sub-Menu Bar */}
+      {/* Sub-Menu Navigation with Universal Back Button */}
       <div className="max-w-5xl mx-auto px-4 pb-2.5 flex items-center gap-1.5 overflow-x-auto hide-scrollbar">
+        {activeView !== 'home' && (
+          <button
+            onClick={() => setActiveView('home')}
+            className="flex items-center gap-1 bg-red-500/10 border border-red-500/30 text-red-400 px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-red-500/20 transition"
+          >
+            ← Back
+          </button>
+        )}
+
         {menus.map((menu) => (
           <button
             key={menu.id}
