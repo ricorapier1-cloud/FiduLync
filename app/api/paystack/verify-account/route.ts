@@ -1,42 +1,42 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server'
 
-export async function GET(req: NextRequest) {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const accountNumber = searchParams.get('accountNumber')
+  const bankCode = searchParams.get('bankCode')
+
+  if (!accountNumber || !bankCode) {
+    return NextResponse.json({ error: 'Account number and bank code required' }, { status: 400 })
+  }
+
+  const secretKey = process.env.PAYSTACK_SECRET_KEY
+
+  if (!secretKey) {
+    console.error("PAYSTACK_SECRET_KEY is missing in environment variables.")
+    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
+  }
+
   try {
-    const { searchParams } = new URL(req.url);
-    const accountNumber = searchParams.get('accountNumber');
-    const bankCode = searchParams.get('bankCode');
-
-    if (!accountNumber || !bankCode || accountNumber.length !== 10) {
-      return NextResponse.json({ error: 'Valid 10-digit account number and bank code required' }, { status: 400 });
-    }
-
-    const secretKey = process.env.PAYSTACK_SECRET_KEY;
-    if (!secretKey) {
-      return NextResponse.json({ error: 'Paystack Secret Key is missing' }, { status: 500 });
-    }
-
     const paystackRes = await fetch(
-      `https://api.paystack.co/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`,
+      `https://api.paystack.co/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`,
       {
+        method: 'GET',
         headers: {
           Authorization: `Bearer ${secretKey}`,
-          'Content-Type': 'application/json',
         },
-        cache: 'no-store',
+        // Cache control to prevent outdated bank resolutions
+        cache: 'no-store' 
       }
-    );
+    )
 
-    const data = await paystackRes.json();
+    const data = await paystackRes.json()
 
-    if (!data.status) {
-      return NextResponse.json({ error: data.message || 'Account resolution failed' }, { status: 400 });
+    if (data.status) {
+      return NextResponse.json({ accountName: data.data.account_name })
+    } else {
+      return NextResponse.json({ error: data.message || 'Account not found. Check details.' }, { status: 404 })
     }
-
-    return NextResponse.json({
-      accountName: data.data.account_name,
-      accountNumber: data.data.account_number,
-    });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Server error resolving bank account' }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to connect to verification server' }, { status: 500 })
   }
 }
