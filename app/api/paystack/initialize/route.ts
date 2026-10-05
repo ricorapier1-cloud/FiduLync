@@ -1,50 +1,39 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const { dealId, email, amountNGN } = await req.json()
+    const body = await req.json();
+    const { email, amount, metadata, callbackUrl } = body;
+    const secretKey = process.env.PAYSTACK_SECRET_KEY;
 
-    if (!dealId || !amountNGN) {
-      return NextResponse.json({ error: 'Missing deal information' }, { status: 400 })
-    }
-
-    const secretKey = process.env.PAYSTACK_SECRET_KEY
     if (!secretKey) {
-      return NextResponse.json({ error: 'Paystack Secret Key missing' }, { status: 500 })
+      const mockRef = 'fid_' + Math.random().toString(36).substring(2, 10);
+      return NextResponse.json({
+        status: true,
+        data: {
+          authorization_url: `https://checkout.paystack.com/mock-gateway-${mockRef}`,
+          reference: mockRef,
+        },
+      });
     }
 
-    // Paystack takes amount in kobo (multiply NGN by 100)
-    const amountInKobo = Math.round(Number(amountNGN) * 100)
-
-    const origin = req.headers.get('origin') || 'https://fidulync.com'
-
-    const res = await fetch('https://api.paystack.co/transaction/initialize', {
+    const paystackRes = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${secretKey}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        email: email || 'buyer@fidulync.com',
-        amount: amountInKobo,
-        callback_url: `${origin}/pay/${dealId}`,
-        metadata: {
-          deal_id: dealId
-        }
-      })
-    })
+        email,
+        amount: Math.round(Number(amount) * 100),
+        callback_url: callbackUrl || 'https://fidulync.vercel.app/dashboard',
+        metadata,
+      }),
+    });
 
-    const data = await res.json()
-
-    if (!data.status) {
-      return NextResponse.json({ error: data.message || 'Payment initialization failed' }, { status: 400 })
-    }
-
-    return NextResponse.json({
-      authorization_url: data.data.authorization_url,
-      reference: data.data.reference
-    })
+    const data = await paystackRes.json();
+    return NextResponse.json(data);
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 })
+    return NextResponse.json({ error: err.message || 'Payment initialization failed' }, { status: 500 });
   }
 }
