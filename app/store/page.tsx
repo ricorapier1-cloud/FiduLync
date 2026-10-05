@@ -10,14 +10,14 @@ export default function AlgoLyncStorePage() {
   const [isProcessing, setIsProcessing] = useState(false)
 
   const handleDownloadDemo = (fileName: string) => {
-    toast.success(`Starting download: ${fileName}`)
+    toast.success(`Downloading demo file: ${fileName}`)
     window.location.href = `/api/download/demo?file=${encodeURIComponent(fileName)}`
   }
 
   const handlePaystackCheckout = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!email || !mt5Account) {
-      toast.error('Please fill in both Email and MT5 Account Number.')
+      toast.error('Email and MT5 Account number are required.')
       return
     }
 
@@ -28,21 +28,20 @@ export default function AlgoLyncStorePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
-          amount: selectedProduct.priceUSD * 1650,
+          amount: selectedProduct.priceUSD * 1650, // USD to NGN conversion rate
           metadata: { product: selectedProduct.name, mt5Account },
         }),
       })
+
       const data = await res.json()
+
       if (data.data?.authorization_url) {
         window.location.href = data.data.authorization_url
       } else {
-        toast.success('Redirecting to Paystack Gateway...')
-        setTimeout(() => {
-          window.location.href = `https://checkout.paystack.com/mock-${Date.now()}`
-        }, 1200)
+        toast.error(data.error || 'Payment initialization failed. Check API keys.')
       }
     } catch (err) {
-      toast.error('Checkout failed. Please try again.')
+      toast.error('Checkout error. Please try again.')
     } finally {
       setIsProcessing(false)
     }
@@ -52,9 +51,9 @@ export default function AlgoLyncStorePage() {
     <main className="min-h-screen bg-[#070B14] text-white p-4 sm:p-8 font-sans">
       <div className="max-w-4xl mx-auto space-y-6">
         
-        {/* Navigation Bar with Back Button */}
+        {/* Navigation Bar */}
         <div className="flex items-center justify-between border-b border-gray-800 pb-4">
-          <Link href="/" className="inline-flex items-center gap-2 bg-gray-800/80 hover:bg-gray-700 text-emerald-400 font-bold px-4 py-2 rounded-xl text-xs transition border border-gray-700">
+          <Link href="/" className="inline-flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-emerald-400 font-bold px-4 py-2 rounded-xl text-xs transition border border-gray-700">
             ← Back to Home
           </Link>
           <div className="text-right">
@@ -63,25 +62,19 @@ export default function AlgoLyncStorePage() {
           </div>
         </div>
 
-        {/* Store Banner Header */}
+        {/* Store Header */}
         <div className="text-center space-y-3 py-4">
           <div className="inline-block bg-emerald-500/10 text-emerald-400 text-xs font-mono font-bold px-3 py-1 rounded-full border border-emerald-500/30">
             ALGOLYNC QUANT SUITE
           </div>
           <h1 className="text-3xl sm:text-4xl font-black tracking-tight">MQL5 Trading Systems</h1>
-          <p className="text-xs text-gray-400 max-w-md mx-auto">Institutional-grade MetaTrader 5 tools with automated instant file delivery.</p>
-          
-          <div className="flex flex-wrap items-center justify-center gap-4 text-[10px] text-gray-300 font-mono pt-2">
-            <span>🔒 256-Bit SSL Encrypted</span>
-            <span>💳 Secured by Paystack</span>
-            <span>⚡ Instant File Delivery</span>
-          </div>
+          <p className="text-xs text-gray-400 max-w-md mx-auto">Institutional-grade MetaTrader 5 tools with automated instant delivery.</p>
         </div>
 
-        {/* Product Cards */}
+        {/* Products Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           
-          {/* ERIDAM NEXUS ADAPTIVE PRO */}
+          {/* Product 1 */}
           <div className="bg-[#111827] border border-gray-800 rounded-3xl p-6 space-y-6 shadow-xl relative overflow-hidden">
             <div className="flex justify-between items-center">
               <span className="bg-emerald-500/10 text-emerald-400 text-xs font-bold px-3 py-1 rounded-full border border-emerald-500/20">Flagship EA</span>
@@ -116,7 +109,7 @@ export default function AlgoLyncStorePage() {
             </div>
           </div>
 
-          {/* Z-Score Volatility Envelope */}
+          {/* Product 2 */}
           <div className="bg-[#111827] border border-gray-800 rounded-3xl p-6 space-y-6 shadow-xl relative overflow-hidden">
             <div className="flex justify-between items-center">
               <span className="bg-emerald-500/10 text-emerald-400 text-xs font-bold px-3 py-1 rounded-full border border-emerald-500/20">Popular Indicator</span>
@@ -157,7 +150,7 @@ export default function AlgoLyncStorePage() {
       {/* Paystack Checkout Modal */}
       {selectedProduct && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0B1120] border border-gray-800 rounded-3xl p-6 sm:p-8 max-w-sm w-full space-y-5 relative shadow-2xl animate-in zoom-in-95 duration-200">
+          <div className="bg-[#0B1120] border border-gray-800 rounded-3xl p-6 sm:p-8 max-w-sm w-full space-y-5 relative shadow-2xl">
             <button onClick={() => setSelectedProduct(null)} className="absolute top-4 right-4 text-gray-400 hover:text-white text-lg">✕</button>
             
             <div>
@@ -166,7 +159,7 @@ export default function AlgoLyncStorePage() {
             </div>
 
             <form onSubmit={handlePaystackCheckout} className="space-y-4">
-              <div className="space-y-1">
+              <div>
                 <label className="text-[10px] uppercase font-bold text-gray-400">Email Address (For File Delivery)</label>
                 <input 
                   required type="email" placeholder="trader@example.com"
@@ -175,7 +168,7 @@ export default function AlgoLyncStorePage() {
                 />
               </div>
 
-              <div className="space-y-1">
+              <div>
                 <label className="text-[10px] uppercase font-bold text-gray-400">MT5 Trading Account Number</label>
                 <input 
                   required type="text" placeholder="e.g. 849201"
@@ -184,17 +177,11 @@ export default function AlgoLyncStorePage() {
                 />
               </div>
 
-              <div className="bg-[#070B14] p-3 rounded-xl border border-gray-800/80 text-[11px] text-gray-400 space-y-1">
-                <div className="flex items-center gap-1.5 text-emerald-400 font-bold"><span>🔒</span> Protected Checkout</div>
-                <div>• Automatic license binding to your MT5 account.</div>
-                <div>• Instant email delivery of compiled .ex5 file.</div>
-              </div>
-
               <button 
                 type="submit" disabled={isProcessing}
                 className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold py-3.5 rounded-xl text-xs transition shadow-lg shadow-emerald-500/20 disabled:opacity-50"
               >
-                {isProcessing ? 'Initializing Paystack...' : `Pay $${selectedProduct.priceUSD} USD via Paystack`}
+                {isProcessing ? 'Connecting to Paystack...' : `Pay $${selectedProduct.priceUSD} USD via Paystack`}
               </button>
             </form>
           </div>

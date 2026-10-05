@@ -7,33 +7,33 @@ export async function POST(req: NextRequest) {
     const secretKey = process.env.PAYSTACK_SECRET_KEY;
 
     if (!secretKey) {
-      const mockRef = 'fid_' + Math.random().toString(36).substring(2, 10);
-      return NextResponse.json({
-        status: true,
-        data: {
-          authorization_url: `https://checkout.paystack.com/mock-gateway-${mockRef}`,
-          reference: mockRef,
-        },
-      });
+      return NextResponse.json({ error: 'PAYSTACK_SECRET_KEY is not configured' }, { status: 500 });
     }
 
-    const paystackRes = await fetch('https://api.paystack.co/transaction/initialize', {
+    const payload = {
+      email,
+      amount: Math.round(Number(amount) * 100), // Kobo / Cents conversion
+      callback_url: callbackUrl || `${process.env.NEXT_PUBLIC_APP_URL || 'https://fidulync.vercel.app'}/dashboard`,
+      metadata: metadata || {},
+    };
+
+    const response = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${secretKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        email,
-        amount: Math.round(Number(amount) * 100),
-        callback_url: callbackUrl || 'https://fidulync.vercel.app/dashboard',
-        metadata,
-      }),
+      body: JSON.stringify(payload),
     });
 
-    const data = await paystackRes.json();
+    const data = await response.json();
+
+    if (!data.status) {
+      return NextResponse.json({ error: data.message || 'Payment initialization failed' }, { status: 400 });
+    }
+
     return NextResponse.json(data);
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Payment initialization failed' }, { status: 500 });
+    return NextResponse.json({ error: err.message || 'Server Error' }, { status: 500 });
   }
 }

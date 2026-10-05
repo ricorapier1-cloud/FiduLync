@@ -1,32 +1,30 @@
-import { NextResponse } from 'next/server'
-import crypto from 'crypto'
-import { createClient } from '@supabase/supabase-js'
+import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const body = await req.text()
-    const signature = req.headers.get('x-paystack-signature')
-    const secret = process.env.PAYSTACK_SECRET_KEY || ''
-    
-    // Verify the event is genuinely from Paystack
-    const hash = crypto.createHmac('sha512', secret).update(body).digest('hex')
+    const bodyText = await req.text();
+    const signature = req.headers.get('x-paystack-signature');
+    const secretKey = process.env.PAYSTACK_SECRET_KEY || '';
+
+    const hash = crypto.createHmac('sha512', secretKey).update(bodyText).digest('hex');
+
     if (hash !== signature) {
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid Paystack Signature' }, { status: 401 });
     }
 
-    const event = JSON.parse(body)
-    
-    // Automatically update the database when payment succeeds
+    const event = JSON.parse(bodyText);
+
     if (event.event === 'charge.success') {
-      const link_id = event.data.metadata?.link_id
-      if (link_id && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-        const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
-        await supabase.from('deals').update({ status: 'Locked' }).eq('link_id', link_id)
-      }
+      const data = event.data;
+      const metadata = data.metadata;
+      
+      // Update transaction status in your production database here
+      console.log('Payment verified successfully:', data.reference, metadata);
     }
 
-    return NextResponse.json({ received: true })
-  } catch (err) {
-    return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 })
+    return NextResponse.json({ status: 'success' }, { status: 200 });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

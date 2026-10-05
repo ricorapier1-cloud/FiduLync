@@ -1,36 +1,42 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function POST(req: Request) {
+export async function GET(req: NextRequest) {
   try {
-    const { accountNumber, bankCode } = await req.json()
+    const { searchParams } = new URL(req.url);
+    const accountNumber = searchParams.get('accountNumber');
+    const bankCode = searchParams.get('bankCode');
 
-    if (!accountNumber || !bankCode) {
-      return NextResponse.json({ error: 'Account number and bank code required' }, { status: 400 })
+    if (!accountNumber || !bankCode || accountNumber.length !== 10) {
+      return NextResponse.json({ error: 'Valid 10-digit account number and bank code required' }, { status: 400 });
     }
 
-    const secretKey = process.env.PAYSTACK_SECRET_KEY
+    const secretKey = process.env.PAYSTACK_SECRET_KEY;
     if (!secretKey) {
-      return NextResponse.json({ error: 'Paystack Secret Key not configured on server' }, { status: 500 })
+      return NextResponse.json({ error: 'Paystack Secret Key is missing' }, { status: 500 });
     }
 
-    const res = await fetch(
-      `https://api.paystack.co/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`,
+    const paystackRes = await fetch(
+      `https://api.paystack.co/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`,
       {
         headers: {
           Authorization: `Bearer ${secretKey}`,
-          'Content-Type': 'application/json'
-        }
+          'Content-Type': 'application/json',
+        },
+        cache: 'no-store',
       }
-    )
+    );
 
-    const data = await res.json()
+    const data = await paystackRes.json();
 
     if (!data.status) {
-      return NextResponse.json({ error: data.message || 'Account resolution failed' }, { status: 400 })
+      return NextResponse.json({ error: data.message || 'Account resolution failed' }, { status: 400 });
     }
 
-    return NextResponse.json({ account_name: data.data.account_name })
+    return NextResponse.json({
+      accountName: data.data.account_name,
+      accountNumber: data.data.account_number,
+    });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 })
+    return NextResponse.json({ error: err.message || 'Server error resolving bank account' }, { status: 500 });
   }
 }
