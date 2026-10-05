@@ -275,3 +275,130 @@ export default function FidulyncMasterApp() {
     </main>
   )
 }
+
+  useEffect(() => {
+    if (accountNumber.length === 10) {
+      setIsVerifying(true); setAccountName('')
+      fetch(`/api/paystack/verify-account?accountNumber=${accountNumber}&bankCode=${bankCode}`)
+        .then(res => res.json())
+        .then(data => {
+          setIsVerifying(false)
+          if (data.accountName) { setAccountName(data.accountName); toast.success(`Verified: ${data.accountName}`) }
+          else toast.error(data.error || 'Bank account not found.')
+        }).catch(() => { setIsVerifying(false); toast.error('Unable to verify account details') })
+    } else setAccountName('')
+  }, [accountNumber, bankCode])
+
+  const handleCreateDeal = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!agreedTerms || !agreedLiability) return toast.error('You must accept all legal terms and waivers.')
+    if (!accountName) return toast.error('Valid verified bank account required.')
+    
+    const ref = 'FD_' + Math.random().toString(36).substring(2, 10).toUpperCase()
+    setGeneratedLink(`${window.location.origin}/pay/${ref}`)
+    toast.success('Escrow Deal Created Live!')
+  }
+
+  const handleDisputeSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!disputeRef || !disputeReason) return toast.error('Reference and reason are required')
+    toast.success('Dispute submitted for arbitration.')
+    setDisputeRef(''); setDisputeReason(''); setDisputeProof(null)
+  }
+
+  return (
+    <main className="min-h-screen bg-[#070B14] text-white pb-24 font-sans relative">
+      <a href={`https://wa.me/${supportWhatsApp}`} target="_blank" rel="noopener noreferrer" className="fixed bottom-6 right-6 z-50 bg-[#25D366] text-white p-4 rounded-full shadow-[0_0_25px_rgba(37,211,102,0.5)] flex items-center justify-center"><span className="text-2xl">💬</span></a>
+      <nav className="border-b border-gray-800 bg-[#0B1120] sticky top-0 z-40">
+        <div className="max-w-4xl mx-auto px-4 py-3.5 flex justify-between items-center">
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveView('home')}>
+            <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold">🛡️</div>
+            <div><div className="text-lg font-black text-white tracking-tight">FiduLync</div><div className="text-[9px] text-emerald-400 font-mono font-bold tracking-wider">SECURE ESCROW</div></div>
+          </div>
+          <Link href="/store" className="flex items-center gap-2 bg-[#111827] border border-emerald-500/30 hover:border-emerald-500 px-3.5 py-2 rounded-xl text-xs font-bold text-white transition">📈 AlgoLync Store →</Link>
+        </div>
+        <div className="max-w-4xl mx-auto px-4 pb-2.5 flex gap-2 overflow-x-auto text-xs font-bold scrollbar-none">
+          <button onClick={() => setActiveView('home')} className={`px-3.5 py-1.5 rounded-lg ${activeView === 'home' ? 'bg-emerald-500 text-black' : 'bg-[#111827] text-gray-400'}`}>🏠 Create Deal</button>
+          <button onClick={() => setActiveView('dashboard')} className={`px-3.5 py-1.5 rounded-lg ${activeView === 'dashboard' ? 'bg-emerald-500 text-black' : 'bg-[#111827] text-gray-400'}`}>📊 Dashboard</button>
+          <button onClick={() => setActiveView('admin')} className={`px-3.5 py-1.5 rounded-lg ${activeView === 'admin' ? 'bg-emerald-500 text-black' : 'bg-[#111827] text-gray-400'}`}>⚙️ Admin</button>
+          <button onClick={() => setActiveView('disputes')} className={`px-3.5 py-1.5 rounded-lg ${activeView === 'disputes' ? 'bg-emerald-500 text-black' : 'bg-[#111827] text-gray-400'}`}>⚖️ Disputes</button>
+          <button onClick={() => setActiveView('terms')} className={`px-3.5 py-1.5 rounded-lg ${activeView === 'terms' ? 'bg-emerald-500 text-black' : 'bg-[#111827] text-gray-400'}`}>📜 Legal Terms</button>
+        </div>
+      </nav>
+      <div className="max-w-4xl mx-auto px-4 pt-6">
+        {activeView === 'home' && (
+          <div className="space-y-6">
+            {!generatedLink ? (
+              <div className="bg-[#111827] border border-gray-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl">
+                <div><h1 className="text-2xl sm:text-3xl font-black text-white">Create Live Escrow Deal</h1><p className="text-xs text-gray-400 mt-1">Platform acts solely as a technological intermediary.</p></div>
+                <form onSubmit={handleCreateDeal} className="space-y-4">
+                  <div><label className="text-[10px] font-bold uppercase text-gray-400">Buyer's Phone / WhatsApp *</label><input required type="tel" value={buyerPhone} onChange={(e) => setBuyerPhone(e.target.value)} className="w-full bg-[#0B1120] border border-gray-800 rounded-xl p-3 text-xs text-white outline-none" /></div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div><label className="text-[10px] font-bold uppercase text-gray-400">Item Name *</label><input required type="text" value={itemName} onChange={(e) => setItemName(e.target.value)} className="w-full bg-[#0B1120] border border-gray-800 rounded-xl p-3 text-xs text-white outline-none" /></div>
+                    <div><label className="text-[10px] font-bold uppercase text-gray-400">Amount (NGN) *</label><input required type="number" value={itemPrice} onChange={(e) => setItemPrice(e.target.value)} className="w-full bg-[#0B1120] border border-gray-800 rounded-xl p-3 text-xs text-white outline-none font-mono" /></div>
+                  </div>
+                  <div><label className="text-[10px] font-bold uppercase text-gray-400">Item / Service Detailed Description *</label><textarea required rows={3} value={itemDescription} onChange={(e) => setItemDescription(e.target.value)} className="w-full bg-[#0B1120] border border-gray-800 rounded-xl p-3 text-xs text-white outline-none"></textarea></div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-gray-400">Upload Pre-Dispatch Proof / Invoice (Optional)</label>
+                    <div className="mt-1 flex items-center gap-3">
+                      <label className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-xs font-bold cursor-pointer border border-gray-700 transition">Choose File<input type="file" className="hidden" onChange={(e) => setDispatchProof(e.target.files?.[0] || null)} accept="image/*,.pdf" /></label>
+                      <span className="text-[10px] text-gray-500 truncate max-w-[200px]">{dispatchProof ? dispatchProof.name : 'No file selected'}</span>
+                    </div>
+                  </div>
+                  <div className="border-t border-gray-800 pt-4 space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <select value={bankCode} onChange={(e) => setBankCode(e.target.value)} className="w-full bg-[#0B1120] border border-gray-800 rounded-xl p-3 text-xs text-white outline-none">{banks.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}</select>
+                      <input required type="text" maxLength={10} placeholder="10-Digit Account Number" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ''))} className="w-full bg-[#0B1120] border border-gray-800 rounded-xl p-3 text-xs text-white outline-none font-mono" />
+                    </div>
+                    {accountName && <div className="text-xs text-emerald-400 font-bold bg-emerald-500/10 p-2.5 rounded-xl">✓ Verified Name: {accountName}</div>}
+                  </div>
+                  <div className="space-y-3 pt-2 bg-[#0B1120] p-4 rounded-xl border border-red-500/20">
+                    <label className="flex items-start gap-3 cursor-pointer"><input type="checkbox" checked={agreedTerms} onChange={(e) => setAgreedTerms(e.target.checked)} className="mt-0.5 rounded text-emerald-500" /><span className="text-[10px] text-gray-400">I declare this transaction complies with all AML laws.</span></label>
+                    <label className="flex items-start gap-3 cursor-pointer"><input type="checkbox" checked={agreedLiability} onChange={(e) => setAgreedLiability(e.target.checked)} className="mt-0.5 rounded text-emerald-500" /><span className="text-[10px] text-gray-400"><strong>Safe Harbor:</strong> I absolve the platform and admins of all liability.</span></label>
+                  </div>
+                  <button type="submit" className="w-full bg-emerald-500 text-black font-extrabold py-4 rounded-xl text-xs transition">🔒 Generate Legally Bound Escrow Link</button>
+                </form>
+              </div>
+            ) : (
+              <div className="bg-[#111827] border border-emerald-500/30 rounded-3xl p-8 text-center space-y-4">
+                <h2 className="text-xl font-black text-white">Deal Ready</h2>
+                <div className="bg-[#0B1120] p-3 rounded-xl text-emerald-400 font-mono text-xs select-all border border-gray-800 break-all">{generatedLink}</div>
+                <div className="flex gap-3"><button onClick={() => { navigator.clipboard.writeText(generatedLink); toast.success('Copied!'); }} className="flex-1 bg-emerald-500 text-black font-bold py-3 rounded-xl text-xs">Copy</button><button onClick={() => setGeneratedLink('')} className="flex-1 bg-gray-800 text-white font-bold py-3 rounded-xl text-xs">New</button></div>
+              </div>
+            )}
+          </div>
+        )}
+        {activeView === 'dashboard' && <div className="space-y-4"><h2 className="text-xl font-black text-white">Active Transactions</h2><div className="bg-[#111827] border border-gray-800 rounded-2xl p-8 text-center text-xs text-gray-400">No active deals found.</div></div>}
+        
+        {activeView === 'admin' && <div className="space-y-4"><h2 className="text-xl font-black text-white">Platform Governance</h2><div className="bg-[#111827] p-6 rounded-3xl border border-gray-800 text-xs"><div className="grid grid-cols-2 gap-4 text-center"><div className="bg-[#0B1120] p-4 rounded-xl border border-gray-800"><div className="text-gray-400 font-bold text-[10px]">VAULT BALANCE</div><div className="text-emerald-400 font-mono text-lg font-black mt-1">₦0.00</div></div><div className="bg-[#0B1120] p-4 rounded-xl border border-gray-800"><div className="text-gray-400 font-bold text-[10px]">ACTIVE ESCROWS</div><div className="text-white font-mono text-lg font-black mt-1">0</div></div></div></div></div>}
+        
+        {activeView === 'disputes' && (
+          <div className="space-y-4 max-w-lg mx-auto">
+            <h2 className="text-xl font-black text-white">Dispute Portal</h2>
+            <form onSubmit={handleDisputeSubmit} className="bg-[#111827] p-6 rounded-3xl border border-gray-800 space-y-4 text-xs">
+              <div><input required type="text" value={disputeRef} onChange={(e) => setDisputeRef(e.target.value)} placeholder="Ref: FD_X9A2B1" className="w-full bg-[#0B1120] p-3 rounded-xl text-white outline-none border border-gray-800 font-mono" /></div>
+              <div><textarea required rows={3} value={disputeReason} onChange={(e) => setDisputeReason(e.target.value)} placeholder="Reason for dispute..." className="w-full bg-[#0B1120] p-3 rounded-xl text-white outline-none border border-gray-800"></textarea></div>
+              <div className="bg-[#0B1120] p-4 rounded-xl border border-gray-800 border-dashed">
+                <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Upload Evidence *</label>
+                <input required type="file" onChange={(e) => setDisputeProof(e.target.files?.[0] || null)} className="text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:bg-gray-800 file:text-white cursor-pointer w-full" />
+              </div>
+              <button type="submit" className="w-full bg-emerald-500 text-black font-extrabold py-3.5 rounded-xl">Submit Claim</button>
+            </form>
+          </div>
+        )}
+
+        {activeView === 'terms' && (
+          <div className="space-y-4 max-w-3xl mx-auto text-xs pb-10">
+            <h2 className="text-2xl font-black text-white border-b border-gray-800 pb-2">Legal Terms</h2>
+            <div className="bg-[#111827] p-6 rounded-3xl border border-gray-800 text-gray-300 space-y-6">
+              <section><h3 className="text-emerald-400 font-bold mb-2">1. Intermediary Status</h3><p>FiduLync acts solely as software. We assume no liability for the quality, legality, or delivery of goods.</p></section>
+              <section><h3 className="text-emerald-400 font-bold mb-2">2. Full Indemnification</h3><p>Users fully indemnify and hold harmless FiduLync, admins, and affiliates against any claims or chargebacks.</p></section>
+              <section><h3 className="text-emerald-400 font-bold mb-2">3. Anti-Money Laundering</h3><p>Transactions involving illegal goods are prohibited. Funds will be frozen.</p></section>
+              <section><h3 className="text-emerald-400 font-bold mb-2">4. Digital Goods</h3><p>EA files are non-refundable once downloaded. No liability for trading losses.</p></section>
+            </div>
+          </div>
+        )}
+      </div>
+    </main>
+  )
+}

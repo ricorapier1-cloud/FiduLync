@@ -1,30 +1,36 @@
-import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
+import { NextResponse } from 'next/server'
+import crypto from 'crypto'
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const bodyText = await req.text();
-    const signature = req.headers.get('x-paystack-signature');
-    const secretKey = process.env.PAYSTACK_SECRET_KEY || '';
+    const rawBody = await req.text()
+    const signature = req.headers.get('x-paystack-signature')
+    const secret = process.env.PAYSTACK_SECRET_KEY
 
-    const hash = crypto.createHmac('sha512', secretKey).update(bodyText).digest('hex');
-
-    if (hash !== signature) {
-      return NextResponse.json({ error: 'Invalid Paystack Signature' }, { status: 401 });
+    if (!signature || !secret) {
+      return NextResponse.json({ error: 'Unauthorized payload' }, { status: 401 })
     }
 
-    const event = JSON.parse(bodyText);
+    const hash = crypto.createHmac('sha512', secret).update(rawBody).digest('hex')
+    if (hash !== signature) {
+      return NextResponse.json({ error: 'Invalid HMAC signature' }, { status: 400 })
+    }
+
+    const event = JSON.parse(rawBody)
 
     if (event.event === 'charge.success') {
-      const data = event.data;
-      const metadata = data.metadata;
-      
-      // Update transaction status in your production database here
-      console.log('Payment verified successfully:', data.reference, metadata);
+      const { reference, amount, metadata } = event.data
+
+      // Verify event hasn't been processed (Replay Protection)
+      // Check database for existing reference lock here...
+
+      console.log(`Verified payment for reference: ${reference}, Amount: ${amount}`)
+
+      // Update escrow state or deliver EA license server-side
     }
 
-    return NextResponse.json({ status: 'success' }, { status: 200 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ status: 'success' }, { status: 200 })
+  } catch (error) {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
