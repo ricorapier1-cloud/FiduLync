@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     const cleanId = link.split('/pay/').pop()?.split('?')[0]?.trim() || link.trim()
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || ''
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || ''
     const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } })
 
     const { data: escrow, error } = await supabase

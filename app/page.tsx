@@ -1,404 +1,74 @@
-'use client'
-import React, { useState, useEffect } from 'react'
-import Link from 'next/link'
-import toast from 'react-hot-toast'
+'use client';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import AuthModal from '@/components/AuthModal';
+import { supabase } from '@/lib/supabaseClient';
+import { ShieldCheck, TrendingUp, Download, Lock } from 'lucide-react';
 
-export default function FidulyncMasterApp() {
-  const [activeView, setActiveView] = useState<'home' | 'dashboard' | 'admin' | 'disputes' | 'faq' | 'terms'>('home')
-  
-  // Escrow Form States
-  const [buyerPhone, setBuyerPhone] = useState('')
-  const [itemName, setItemName] = useState('')
-  const [itemPrice, setItemPrice] = useState('')
-  const [bankCode, setBankCode] = useState('044')
-  const [accountNumber, setAccountNumber] = useState('')
-  const [accountName, setAccountName] = useState('')
-  const [isVerifying, setIsVerifying] = useState(false)
-  const [agreed, setAgreed] = useState(false)
-  const [generatedLink, setGeneratedLink] = useState('')
+export default function Home() {
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
 
-  // Live Transactions State (Fetched from backend)
-  const [userTransactions, setUserTransactions] = useState<any[]>([])
-
-  const supportWhatsApp = '2348037212445'
-
-  const banks = [
-    { code: '044', name: 'Access Bank' }, { code: '035', name: 'ALAT by Wema' },
-    { code: '050', name: 'Ecobank Nigeria' }, { code: '070', name: 'Fidelity Bank' },
-    { code: '011', name: 'First Bank of Nigeria' }, { code: '214', name: 'FCMB' },
-    { code: '058', name: 'GTBank' }, { code: '50211', name: 'Kuda Bank' },
-    { code: '50515', name: 'Moniepoint MFB' }, { code: '100004', name: 'OPay Digital' },
-    { code: '100033', name: 'PalmPay' }, { code: '076', name: 'Polaris Bank' },
-    { code: '101', name: 'Providus Bank' }, { code: '221', name: 'Stanbic IBTC' },
-    { code: '232', name: 'Sterling Bank' }, { code: '033', name: 'UBA' },
-    { code: '035', name: 'Wema Bank' }, { code: '057', name: 'Zenith Bank' }
-  ]
-
-  // Live Bank Resolution via Paystack NIBSS API
   useEffect(() => {
-    if (accountNumber.length === 10) {
-      setIsVerifying(true)
-      setAccountName('')
-      
-      fetch(`/api/paystack/verify-account?accountNumber=${accountNumber}&bankCode=${bankCode}`)
-        .then((res) => res.json())
-        .then((data) => {
-          setIsVerifying(false)
-          if (data.accountName) {
-            setAccountName(data.accountName)
-            toast.success(`Account Verified: ${data.accountName}`)
-          } else {
-            toast.error(data.error || 'Bank account not found. Check number & bank.')
-          }
-        })
-        .catch(() => {
-          setIsVerifying(false)
-          toast.error('Unable to verify account details')
-        })
-    } else {
-      setAccountName('')
-    }
-  }, [accountNumber, bankCode])
-
-  const handleCreateDeal = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!agreed) { toast.error('Please accept the FiduLync Terms.'); return }
-    if (!accountName) { toast.error('Please provide a valid verified bank account.'); return }
-
-    const ref = 'FD_' + Math.random().toString(36).substring(2, 10).toUpperCase()
-    const dealUrl = `${window.location.origin}/pay/${ref}`
-    
-    setGeneratedLink(dealUrl)
-    toast.success('Escrow Deal Created Live!')
-  }
+    supabase.auth.getSession().then(({ data }) => setUser(data.session?.user));
+  }, []);
 
   return (
-    <main className="min-h-screen bg-[#070B14] text-white pb-24 font-sans relative">
-      
-      {/* Floating WhatsApp Support Button */}
-      <a 
-        href={`https://wa.me/${supportWhatsApp}?text=${encodeURIComponent('Hello FiduLync Support, I need help with an active escrow deal.')}`}
-        target="_blank" rel="noopener noreferrer"
-        className="fixed bottom-6 right-6 z-50 bg-[#25D366] hover:bg-[#1DA851] text-white p-4 rounded-full shadow-[0_0_25px_rgba(37,211,102,0.5)] transition-transform hover:scale-110 flex items-center justify-center"
-      >
-        <span className="text-2xl">💬</span>
-      </a>
-
-      {/* Navigation */}
-      <nav className="border-b border-gray-800 bg-[#0B1120] sticky top-0 z-40">
-        <div className="max-w-4xl mx-auto px-4 py-3.5 flex justify-between items-center">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveView('home')}>
-            <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold">🛡️</div>
-            <div>
-              <div className="text-lg font-black text-white tracking-tight">FiduLync</div>
-              <div className="text-[9px] text-emerald-400 font-mono font-bold tracking-wider">SECURE ESCROW & QUANT</div>
-            </div>
+    <main className="max-w-6xl mx-auto p-6 space-y-12">
+      {/* HEADER */}
+      <header className="flex justify-between items-center py-6 border-b border-gray-800">
+        <div className="flex items-center gap-3">
+          <ShieldCheck size={36} className="text-emerald-500" />
+          <div>
+            <h1 className="text-2xl font-black tracking-tight text-white">FiduLync</h1>
+            <p className="text-xs text-emerald-400 font-medium">SAFE ESCROW PROTECTION</p>
           </div>
-
-          <Link href="/store" className="flex items-center gap-2 bg-[#111827] border border-emerald-500/30 hover:border-emerald-500 px-3.5 py-2 rounded-xl text-xs font-bold text-white transition">
-            📈 AlgoLync Store →
-          </Link>
         </div>
-
-        {/* Dynamic Navigation Bar */}
-        <div className="max-w-4xl mx-auto px-4 pb-2.5 flex gap-2 overflow-x-auto text-xs font-bold scrollbar-none">
-          {activeView !== 'home' && (
-            <button onClick={() => setActiveView('home')} className="bg-gray-800 hover:bg-gray-700 text-emerald-400 px-3 py-1.5 rounded-lg border border-gray-700 transition">
-              ← Back to Main
-            </button>
+        <div className="flex items-center gap-4">
+          {user ? (
+            <Link href="/dashboard"><button className="px-5 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm font-semibold transition">Dashboard</button></Link>
+          ) : (
+            <button onClick={() => setIsAuthOpen(true)} className="px-5 py-2 bg-emerald-500 hover:bg-emerald-600 text-black rounded-lg text-sm font-semibold shadow-[0_0_15px_rgba(16,185,129,0.3)] transition">Login / Register</button>
           )}
-          <button onClick={() => setActiveView('home')} className={`px-3.5 py-1.5 rounded-lg transition ${activeView === 'home' ? 'bg-emerald-500 text-black font-extrabold' : 'bg-[#111827] text-gray-400'}`}>🏠 Create Deal</button>
-          <button onClick={() => setActiveView('dashboard')} className={`px-3.5 py-1.5 rounded-lg transition ${activeView === 'dashboard' ? 'bg-emerald-500 text-black font-extrabold' : 'bg-[#111827] text-gray-400'}`}>📊 Dashboard</button>
-          <button onClick={() => setActiveView('admin')} className={`px-3.5 py-1.5 rounded-lg transition ${activeView === 'admin' ? 'bg-emerald-500 text-black font-extrabold' : 'bg-[#111827] text-gray-400'}`}>⚙️ Admin</button>
-          <button onClick={() => setActiveView('disputes')} className={`px-3.5 py-1.5 rounded-lg transition ${activeView === 'disputes' ? 'bg-emerald-500 text-black font-extrabold' : 'bg-[#111827] text-gray-400'}`}>⚖️ Disputes</button>
-          <button onClick={() => setActiveView('faq')} className={`px-3.5 py-1.5 rounded-lg transition ${activeView === 'faq' ? 'bg-emerald-500 text-black font-extrabold' : 'bg-[#111827] text-gray-400'}`}>❓ FAQ</button>
-          <button onClick={() => setActiveView('terms')} className={`px-3.5 py-1.5 rounded-lg transition ${activeView === 'terms' ? 'bg-emerald-500 text-black font-extrabold' : 'bg-[#111827] text-gray-400'}`}>📜 Legal Terms</button>
         </div>
-      </nav>
+      </header>
 
-      {/* Main Views */}
-      <div className="max-w-4xl mx-auto px-4 pt-6">
+      {/* ALGOLYNC STOREFRONT */}
+      <section className="bg-gradient-to-br from-[#0c141c] to-[#05080c] rounded-3xl border border-gray-800 p-8 shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-8 opacity-10"><TrendingUp size={200} /></div>
+        <h2 className="text-3xl font-bold mb-2 flex items-center gap-3">📈 AlgoLync Quant Store</h2>
+        <p className="text-gray-400 mb-8 max-w-2xl">Institutional-grade MQL5 Expert Advisors. Backtested with 99.9% tick data. Protected by FiduLync Escrow.</p>
         
-        {/* ESCROW DEAL CREATION */}
-        {activeView === 'home' && (
-          <div className="space-y-6">
-            {!generatedLink ? (
-              <div className="bg-[#111827] border border-gray-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl">
-                <div>
-                  <h1 className="text-2xl sm:text-3xl font-black text-white">Create Live Escrow Deal</h1>
-                  <p className="text-xs text-gray-400 mt-1">Lock buyer payment in secure vault until inspection & approval.</p>
-                </div>
-
-                <form onSubmit={handleCreateDeal} className="space-y-4">
-                  <div>
-                    <label className="text-[10px] font-bold uppercase text-gray-400">Buyer's Phone / WhatsApp Number *</label>
-                    <input required type="tel" placeholder="08031234567" value={buyerPhone} onChange={(e) => setBuyerPhone(e.target.value)} className="w-full bg-[#0B1120] border border-gray-800 rounded-xl p-3 text-xs text-white outline-none focus:border-emerald-500" />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[10px] font-bold uppercase text-gray-400">Item or Service Name *</label>
-                      <input required type="text" placeholder="e.g. MQL5 Expert Advisor Setup" value={itemName} onChange={(e) => setItemName(e.target.value)} className="w-full bg-[#0B1120] border border-gray-800 rounded-xl p-3 text-xs text-white outline-none focus:border-emerald-500" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold uppercase text-gray-400">Amount (NGN) *</label>
-                      <input required type="number" placeholder="50000" value={itemPrice} onChange={(e) => setItemPrice(e.target.value)} className="w-full bg-[#0B1120] border border-gray-800 rounded-xl p-3 text-xs text-white outline-none font-mono focus:border-emerald-500" />
-                    </div>
-                  </div>
-
-                  <div className="border-t border-gray-800 pt-4 space-y-4">
-                    <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Seller Payout Account Details</div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <select value={bankCode} onChange={(e) => setBankCode(e.target.value)} className="w-full bg-[#0B1120] border border-gray-800 rounded-xl p-3 text-xs text-white outline-none focus:border-emerald-500">
-                          {banks.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}
-                        </select>
-                      </div>
-                      <div className="relative">
-                        <input required type="text" maxLength={10} placeholder="10-Digit Account Number" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ''))} className="w-full bg-[#0B1120] border border-gray-800 rounded-xl p-3 text-xs text-white outline-none font-mono focus:border-emerald-500" />
-                        {isVerifying && <div className="absolute right-3 top-3.5 w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>}
-                      </div>
-                    </div>
-                    {accountName && <div className="text-xs text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20 p-2.5 rounded-xl">✓ NIBSS Verified Name: {accountName}</div>}
-                  </div>
-
-                  <label className="flex items-center gap-2 cursor-pointer pt-2">
-                    <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="rounded text-emerald-500 accent-emerald-500" />
-                    <span className="text-xs text-gray-400">I accept FiduLync Security Rules and 48-Hour Auto Release terms.</span>
-                  </label>
-
-                  <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold py-4 rounded-xl text-xs transition shadow-lg shadow-emerald-500/20">
-                    🔒 Generate Live Escrow Payment Link
-                  </button>
-                </form>
-              </div>
-            ) : (
-              <div className="bg-[#111827] border border-emerald-500/30 rounded-3xl p-8 text-center space-y-4">
-                <div className="text-4xl">🎉</div>
-                <h2 className="text-xl font-black text-white">Live Escrow Deal Ready</h2>
-                <p className="text-xs text-gray-400">Send this payment link to your buyer:</p>
-                <div className="bg-[#0B1120] p-3 rounded-xl text-emerald-400 font-mono text-xs select-all border border-gray-800 break-all">{generatedLink}</div>
-                <div className="flex gap-3">
-                  <button onClick={() => { navigator.clipboard.writeText(generatedLink); toast.success('Link Copied to Clipboard!'); }} className="flex-1 bg-emerald-500 text-black font-bold py-3 rounded-xl text-xs">Copy Link</button>
-                  <button onClick={() => setGeneratedLink('')} className="flex-1 bg-gray-800 text-gray-300 font-bold py-3 rounded-xl text-xs">Create New Deal</button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* CUSTOMER DASHBOARD */}
-        {activeView === 'dashboard' && (
-          <div className="space-y-4">
-            <h2 className="text-xl font-black text-white">Active Transactions</h2>
-            {userTransactions.length === 0 ? (
-              <div className="bg-[#111827] border border-gray-800 rounded-2xl p-8 text-center text-xs text-gray-400 space-y-2">
-                <div>No active deals found on this device.</div>
-                <button onClick={() => setActiveView('home')} className="text-emerald-400 font-bold underline">Create a new deal now</button>
-              </div>
-            ) : (
-              userTransactions.map((tx, idx) => (
-                <div key={idx} className="bg-[#111827] p-4 rounded-2xl border border-gray-800 flex justify-between items-center text-xs">
-                  <div>
-                    <div className="font-bold text-white">{tx.itemName}</div>
-                    <div className="text-gray-400">Ref: {tx.reference}</div>
-                  </div>
-                  <div className="text-emerald-400 font-mono font-bold">₦{Number(tx.amount).toLocaleString()}</div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {/* ADMIN OVERVIEW */}
-        {activeView === 'admin' && (
-          <div className="space-y-4">
-            <h2 className="text-xl font-black text-white">Platform Governance</h2>
-            <div className="bg-[#111827] p-6 rounded-3xl border border-gray-800 text-xs space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-center">
-                <div className="bg-[#0B1120] p-4 rounded-xl border border-gray-800">
-                  <div className="text-gray-400 font-bold text-[10px] uppercase">Vault Balance</div>
-                  <div className="text-emerald-400 font-mono text-lg font-black mt-1">₦0.00</div>
-                </div>
-                <div className="bg-[#0B1120] p-4 rounded-xl border border-gray-800">
-                  <div className="text-gray-400 font-bold text-[10px] uppercase">Active Escrows</div>
-                  <div className="text-white font-mono text-lg font-black mt-1">0</div>
-                </div>
-              </div>
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* EA Product Card */}
+          <div className="bg-[#111820] border border-gray-700 hover:border-emerald-500/50 transition-all rounded-xl p-6">
+            <h3 className="text-xl font-bold text-white mb-4">Omni-Nexus V4.2</h3>
+            <div className="grid grid-cols-3 gap-2 mb-6">
+              <div className="bg-black/50 p-3 rounded-lg text-center"><p className="text-xs text-gray-400">Profit Factor</p><p className="font-bold text-emerald-400">2.41</p></div>
+              <div className="bg-black/50 p-3 rounded-lg text-center"><p className="text-xs text-gray-400">Max DD</p><p className="font-bold text-red-400">11.2%</p></div>
+              <div className="bg-black/50 p-3 rounded-lg text-center"><p className="text-xs text-gray-400">Win Rate</p><p className="font-bold text-blue-400">76%</p></div>
+            </div>
+            <div className="flex gap-3">
+              <button className="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-3 rounded-lg text-sm font-semibold flex items-center justify-center gap-2"><Download size={16}/> Try Demo</button>
+              <Link href="/create-link" className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-black py-3 rounded-lg text-sm font-bold flex items-center justify-center gap-2 shadow-lg"><Lock size={16}/> Buy License</Link>
             </div>
           </div>
-        )}
+        </div>
+      </section>
 
-        {/* DISPUTE RESOLUTION */}
-        {activeView === 'disputes' && (
-          <div className="space-y-4 max-w-lg mx-auto">
-            <h2 className="text-xl font-black text-white">Dispute & Claims Portal</h2>
-            <div className="bg-[#111827] p-6 rounded-3xl border border-gray-800 space-y-4 text-xs">
-              <div>
-                <label className="text-[10px] font-bold uppercase text-gray-400">Transaction Reference *</label>
-                <input type="text" placeholder="e.g. FD_X9A2B1" className="w-full bg-[#0B1120] p-3 rounded-xl text-white outline-none border border-gray-800 focus:border-emerald-500 font-mono mt-1" />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold uppercase text-gray-400">Reason for Dispute *</label>
-                <textarea rows={3} placeholder="Describe non-delivery, damaged item, or spec mismatch..." className="w-full bg-[#0B1120] p-3 rounded-xl text-white outline-none border border-gray-800 focus:border-emerald-500 mt-1"></textarea>
-              </div>
-              <button onClick={() => toast.success('Dispute Case Logged. Support team notified.')} className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold py-3.5 rounded-xl transition">
-                Submit Claim for Arbitration
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* FAQ */}
-        {activeView === 'faq' && (
-          <div className="space-y-4 max-w-2xl mx-auto text-xs">
-            <h2 className="text-xl font-black text-white">Escrow FAQ</h2>
-            <div className="bg-[#111827] p-4 rounded-2xl border border-gray-800 space-y-2">
-              <div className="font-bold text-emerald-400">How long are funds held in vault?</div>
-              <div className="text-gray-400 leading-relaxed">Funds remain in vault until the buyer confirms inspection, or until the 48-hour auto-release timer expires without a dispute.</div>
-            </div>
-          </div>
-        )}
-
-        {/* TERMS */}
-        {activeView === 'terms' && (
-          <div className="space-y-4 max-w-2xl mx-auto text-xs">
-            <h2 className="text-xl font-black text-white">Legal Agreement</h2>
-            <div className="bg-[#111827] p-6 rounded-3xl border border-gray-800 text-gray-300 leading-relaxed space-y-3">
-              <p>1. <strong>Vault Protection:</strong> Payments made via FiduLync are safeguarded in regulated banking partner accounts.</p>
-              <p>2. <strong>Inspection Period:</strong> Buyers are granted a standard 48-hour inspection window from confirmed item delivery.</p>
-            </div>
-          </div>
-        )}
-
+      {/* QUICK LINKS */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Link href="/create-link" className="bg-[#111820] border border-gray-800 p-6 rounded-xl hover:bg-gray-800 transition-all text-center group">
+          <ShieldCheck className="mx-auto mb-3 text-emerald-500 group-hover:scale-110 transition-transform" size={32}/>
+          <h3 className="font-semibold text-sm">Create Escrow</h3>
+        </Link>
+        <Link href="/disputes" className="bg-[#111820] border border-gray-800 p-6 rounded-xl hover:bg-gray-800 transition-all text-center group">
+          <TrendingUp className="mx-auto mb-3 text-red-400 group-hover:scale-110 transition-transform" size={32}/>
+          <h3 className="font-semibold text-sm">Dispute Center</h3>
+        </Link>
       </div>
+
+      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
     </main>
-  )
-}
-
-  useEffect(() => {
-    if (accountNumber.length === 10) {
-      setIsVerifying(true); setAccountName('')
-      fetch(`/api/paystack/verify-account?accountNumber=${accountNumber}&bankCode=${bankCode}`)
-        .then(res => res.json())
-        .then(data => {
-          setIsVerifying(false)
-          if (data.accountName) { setAccountName(data.accountName); toast.success(`Verified: ${data.accountName}`) }
-          else toast.error(data.error || 'Bank account not found.')
-        }).catch(() => { setIsVerifying(false); toast.error('Unable to verify account details') })
-    } else setAccountName('')
-  }, [accountNumber, bankCode])
-
-  const handleCreateDeal = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!agreedTerms || !agreedLiability) return toast.error('You must accept all legal terms and waivers.')
-    if (!accountName) return toast.error('Valid verified bank account required.')
-    
-    const ref = 'FD_' + Math.random().toString(36).substring(2, 10).toUpperCase()
-    setGeneratedLink(`${window.location.origin}/pay/${ref}`)
-    toast.success('Escrow Deal Created Live!')
-  }
-
-  const handleDisputeSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!disputeRef || !disputeReason) return toast.error('Reference and reason are required')
-    toast.success('Dispute submitted for arbitration.')
-    setDisputeRef(''); setDisputeReason(''); setDisputeProof(null)
-  }
-
-  return (
-    <main className="min-h-screen bg-[#070B14] text-white pb-24 font-sans relative">
-      <a href={`https://wa.me/${supportWhatsApp}`} target="_blank" rel="noopener noreferrer" className="fixed bottom-6 right-6 z-50 bg-[#25D366] text-white p-4 rounded-full shadow-[0_0_25px_rgba(37,211,102,0.5)] flex items-center justify-center"><span className="text-2xl">💬</span></a>
-      <nav className="border-b border-gray-800 bg-[#0B1120] sticky top-0 z-40">
-        <div className="max-w-4xl mx-auto px-4 py-3.5 flex justify-between items-center">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveView('home')}>
-            <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold">🛡️</div>
-            <div><div className="text-lg font-black text-white tracking-tight">FiduLync</div><div className="text-[9px] text-emerald-400 font-mono font-bold tracking-wider">SECURE ESCROW</div></div>
-          </div>
-          <Link href="/store" className="flex items-center gap-2 bg-[#111827] border border-emerald-500/30 hover:border-emerald-500 px-3.5 py-2 rounded-xl text-xs font-bold text-white transition">📈 AlgoLync Store →</Link>
-        </div>
-        <div className="max-w-4xl mx-auto px-4 pb-2.5 flex gap-2 overflow-x-auto text-xs font-bold scrollbar-none">
-          <button onClick={() => setActiveView('home')} className={`px-3.5 py-1.5 rounded-lg ${activeView === 'home' ? 'bg-emerald-500 text-black' : 'bg-[#111827] text-gray-400'}`}>🏠 Create Deal</button>
-          <button onClick={() => setActiveView('dashboard')} className={`px-3.5 py-1.5 rounded-lg ${activeView === 'dashboard' ? 'bg-emerald-500 text-black' : 'bg-[#111827] text-gray-400'}`}>📊 Dashboard</button>
-          <button onClick={() => setActiveView('admin')} className={`px-3.5 py-1.5 rounded-lg ${activeView === 'admin' ? 'bg-emerald-500 text-black' : 'bg-[#111827] text-gray-400'}`}>⚙️ Admin</button>
-          <button onClick={() => setActiveView('disputes')} className={`px-3.5 py-1.5 rounded-lg ${activeView === 'disputes' ? 'bg-emerald-500 text-black' : 'bg-[#111827] text-gray-400'}`}>⚖️ Disputes</button>
-          <button onClick={() => setActiveView('terms')} className={`px-3.5 py-1.5 rounded-lg ${activeView === 'terms' ? 'bg-emerald-500 text-black' : 'bg-[#111827] text-gray-400'}`}>📜 Legal Terms</button>
-        </div>
-      </nav>
-      <div className="max-w-4xl mx-auto px-4 pt-6">
-        {activeView === 'home' && (
-          <div className="space-y-6">
-            {!generatedLink ? (
-              <div className="bg-[#111827] border border-gray-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl">
-                <div><h1 className="text-2xl sm:text-3xl font-black text-white">Create Live Escrow Deal</h1><p className="text-xs text-gray-400 mt-1">Platform acts solely as a technological intermediary.</p></div>
-                <form onSubmit={handleCreateDeal} className="space-y-4">
-                  <div><label className="text-[10px] font-bold uppercase text-gray-400">Buyer's Phone / WhatsApp *</label><input required type="tel" value={buyerPhone} onChange={(e) => setBuyerPhone(e.target.value)} className="w-full bg-[#0B1120] border border-gray-800 rounded-xl p-3 text-xs text-white outline-none" /></div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div><label className="text-[10px] font-bold uppercase text-gray-400">Item Name *</label><input required type="text" value={itemName} onChange={(e) => setItemName(e.target.value)} className="w-full bg-[#0B1120] border border-gray-800 rounded-xl p-3 text-xs text-white outline-none" /></div>
-                    <div><label className="text-[10px] font-bold uppercase text-gray-400">Amount (NGN) *</label><input required type="number" value={itemPrice} onChange={(e) => setItemPrice(e.target.value)} className="w-full bg-[#0B1120] border border-gray-800 rounded-xl p-3 text-xs text-white outline-none font-mono" /></div>
-                  </div>
-                  <div><label className="text-[10px] font-bold uppercase text-gray-400">Item / Service Detailed Description *</label><textarea required rows={3} value={itemDescription} onChange={(e) => setItemDescription(e.target.value)} className="w-full bg-[#0B1120] border border-gray-800 rounded-xl p-3 text-xs text-white outline-none"></textarea></div>
-                  <div>
-                    <label className="text-[10px] font-bold uppercase text-gray-400">Upload Pre-Dispatch Proof / Invoice (Optional)</label>
-                    <div className="mt-1 flex items-center gap-3">
-                      <label className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-xs font-bold cursor-pointer border border-gray-700 transition">Choose File<input type="file" className="hidden" onChange={(e) => setDispatchProof(e.target.files?.[0] || null)} accept="image/*,.pdf" /></label>
-                      <span className="text-[10px] text-gray-500 truncate max-w-[200px]">{dispatchProof ? dispatchProof.name : 'No file selected'}</span>
-                    </div>
-                  </div>
-                  <div className="border-t border-gray-800 pt-4 space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <select value={bankCode} onChange={(e) => setBankCode(e.target.value)} className="w-full bg-[#0B1120] border border-gray-800 rounded-xl p-3 text-xs text-white outline-none">{banks.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}</select>
-                      <input required type="text" maxLength={10} placeholder="10-Digit Account Number" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ''))} className="w-full bg-[#0B1120] border border-gray-800 rounded-xl p-3 text-xs text-white outline-none font-mono" />
-                    </div>
-                    {accountName && <div className="text-xs text-emerald-400 font-bold bg-emerald-500/10 p-2.5 rounded-xl">✓ Verified Name: {accountName}</div>}
-                  </div>
-                  <div className="space-y-3 pt-2 bg-[#0B1120] p-4 rounded-xl border border-red-500/20">
-                    <label className="flex items-start gap-3 cursor-pointer"><input type="checkbox" checked={agreedTerms} onChange={(e) => setAgreedTerms(e.target.checked)} className="mt-0.5 rounded text-emerald-500" /><span className="text-[10px] text-gray-400">I declare this transaction complies with all AML laws.</span></label>
-                    <label className="flex items-start gap-3 cursor-pointer"><input type="checkbox" checked={agreedLiability} onChange={(e) => setAgreedLiability(e.target.checked)} className="mt-0.5 rounded text-emerald-500" /><span className="text-[10px] text-gray-400"><strong>Safe Harbor:</strong> I absolve the platform and admins of all liability.</span></label>
-                  </div>
-                  <button type="submit" className="w-full bg-emerald-500 text-black font-extrabold py-4 rounded-xl text-xs transition">🔒 Generate Legally Bound Escrow Link</button>
-                </form>
-              </div>
-            ) : (
-              <div className="bg-[#111827] border border-emerald-500/30 rounded-3xl p-8 text-center space-y-4">
-                <h2 className="text-xl font-black text-white">Deal Ready</h2>
-                <div className="bg-[#0B1120] p-3 rounded-xl text-emerald-400 font-mono text-xs select-all border border-gray-800 break-all">{generatedLink}</div>
-                <div className="flex gap-3"><button onClick={() => { navigator.clipboard.writeText(generatedLink); toast.success('Copied!'); }} className="flex-1 bg-emerald-500 text-black font-bold py-3 rounded-xl text-xs">Copy</button><button onClick={() => setGeneratedLink('')} className="flex-1 bg-gray-800 text-white font-bold py-3 rounded-xl text-xs">New</button></div>
-              </div>
-            )}
-          </div>
-        )}
-        {activeView === 'dashboard' && <div className="space-y-4"><h2 className="text-xl font-black text-white">Active Transactions</h2><div className="bg-[#111827] border border-gray-800 rounded-2xl p-8 text-center text-xs text-gray-400">No active deals found.</div></div>}
-        
-        {activeView === 'admin' && <div className="space-y-4"><h2 className="text-xl font-black text-white">Platform Governance</h2><div className="bg-[#111827] p-6 rounded-3xl border border-gray-800 text-xs"><div className="grid grid-cols-2 gap-4 text-center"><div className="bg-[#0B1120] p-4 rounded-xl border border-gray-800"><div className="text-gray-400 font-bold text-[10px]">VAULT BALANCE</div><div className="text-emerald-400 font-mono text-lg font-black mt-1">₦0.00</div></div><div className="bg-[#0B1120] p-4 rounded-xl border border-gray-800"><div className="text-gray-400 font-bold text-[10px]">ACTIVE ESCROWS</div><div className="text-white font-mono text-lg font-black mt-1">0</div></div></div></div></div>}
-        
-        {activeView === 'disputes' && (
-          <div className="space-y-4 max-w-lg mx-auto">
-            <h2 className="text-xl font-black text-white">Dispute Portal</h2>
-            <form onSubmit={handleDisputeSubmit} className="bg-[#111827] p-6 rounded-3xl border border-gray-800 space-y-4 text-xs">
-              <div><input required type="text" value={disputeRef} onChange={(e) => setDisputeRef(e.target.value)} placeholder="Ref: FD_X9A2B1" className="w-full bg-[#0B1120] p-3 rounded-xl text-white outline-none border border-gray-800 font-mono" /></div>
-              <div><textarea required rows={3} value={disputeReason} onChange={(e) => setDisputeReason(e.target.value)} placeholder="Reason for dispute..." className="w-full bg-[#0B1120] p-3 rounded-xl text-white outline-none border border-gray-800"></textarea></div>
-              <div className="bg-[#0B1120] p-4 rounded-xl border border-gray-800 border-dashed">
-                <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2">Upload Evidence *</label>
-                <input required type="file" onChange={(e) => setDisputeProof(e.target.files?.[0] || null)} className="text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:bg-gray-800 file:text-white cursor-pointer w-full" />
-              </div>
-              <button type="submit" className="w-full bg-emerald-500 text-black font-extrabold py-3.5 rounded-xl">Submit Claim</button>
-            </form>
-          </div>
-        )}
-
-        {activeView === 'terms' && (
-          <div className="space-y-4 max-w-3xl mx-auto text-xs pb-10">
-            <h2 className="text-2xl font-black text-white border-b border-gray-800 pb-2">Legal Terms</h2>
-            <div className="bg-[#111827] p-6 rounded-3xl border border-gray-800 text-gray-300 space-y-6">
-              <section><h3 className="text-emerald-400 font-bold mb-2">1. Intermediary Status</h3><p>FiduLync acts solely as software. We assume no liability for the quality, legality, or delivery of goods.</p></section>
-              <section><h3 className="text-emerald-400 font-bold mb-2">2. Full Indemnification</h3><p>Users fully indemnify and hold harmless FiduLync, admins, and affiliates against any claims or chargebacks.</p></section>
-              <section><h3 className="text-emerald-400 font-bold mb-2">3. Anti-Money Laundering</h3><p>Transactions involving illegal goods are prohibited. Funds will be frozen.</p></section>
-              <section><h3 className="text-emerald-400 font-bold mb-2">4. Digital Goods</h3><p>EA files are non-refundable once downloaded. No liability for trading losses.</p></section>
-            </div>
-          </div>
-        )}
-      </div>
-    </main>
-  )
+  );
 }

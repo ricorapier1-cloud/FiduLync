@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || ''
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || ''
     const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } })
 
     // If a partnered logistics company (like Sendbox/Fez) flags a package as delivered:
