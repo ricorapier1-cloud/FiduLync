@@ -20,6 +20,13 @@ const links = [
   { href: '/dashboard', label: 'Activity', icon: ArrowUpRight },
 ];
 
+const portfolioLinks = [
+  { href: '#architecture', label: 'Architecture' },
+  { href: '#work', label: 'Case studies' },
+  { href: '#services', label: 'Services' },
+  { href: '#contact', label: 'Contact' },
+];
+
 export default function PlatformShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -32,17 +39,17 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
           <Link className="brand" href="/" aria-label="FiduLync home">
             <span className="brand-mark"><ShieldCheck size={19} strokeWidth={2.2} /></span>
             <span className="brand-copy">
-              <span className="brand-name">fidu<span>lync</span></span>
-              <span className="brand-caption">TRUST, SETTLED.</span>
+              <span className="brand-name">Fidu<span>Lync</span></span>
+              <span className="brand-caption">{isHome ? 'QUANT SYSTEMS ENGINEERING' : 'TRUST, SETTLED.'}</span>
             </span>
           </Link>
 
           <nav className="desktop-nav" aria-label="Main navigation">
-            {links.map(({ href, label }) => (
+            {(isHome ? portfolioLinks : links).map(({ href, label }) => (
               <Link
                 key={href}
                 href={href}
-                className={`nav-link ${pathname === href ? 'nav-link-active' : ''}`}
+                className={`nav-link ${!isHome && pathname === href ? 'nav-link-active' : ''}`}
               >
                 {label}
               </Link>
@@ -55,18 +62,26 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
                 <ArrowLeft size={15} /> <span>Back</span>
               </Link>
             )}
-            <Link className="secure-pill" href="/create-link">
-              <span className="secure-dot" /> New transaction
-            </Link>
-            <button
-              type="button"
-              className="menu-toggle"
-              aria-label={drawerOpen ? 'Close navigation menu' : 'Open navigation menu'}
-              aria-expanded={drawerOpen}
-              onClick={() => setDrawerOpen(!drawerOpen)}
-            >
-              {drawerOpen ? <X size={21} /> : <Menu size={21} />}
-            </button>
+            {isHome ? (
+              <a className="secure-pill portfolio-nav-cta" href="https://wa.me/2348037212445?text=Hello%2C%20I%27d%20like%20to%20discuss%20a%20quant%20systems%20or%20fintech%20project.">
+                Direct inquiry <ArrowUpRight size={14} />
+              </a>
+            ) : (
+              <>
+                <Link className="secure-pill" href="/create-link">
+                  <span className="secure-dot" /> New transaction
+                </Link>
+                <button
+                  type="button"
+                  className="menu-toggle"
+                  aria-label={drawerOpen ? 'Close navigation menu' : 'Open navigation menu'}
+                  aria-expanded={drawerOpen}
+                  onClick={() => setDrawerOpen(!drawerOpen)}
+                >
+                  {drawerOpen ? <X size={21} /> : <Menu size={21} />}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -106,19 +121,21 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
 
       <main className="page-frame">{children}</main>
 
-      <nav className="mobile-tabbar" aria-label="Bottom navigation">
-        {links.slice(0, 4).map(({ href, label, icon: Icon }) => (
-          <Link
-            key={href}
-            href={href}
-            aria-current={pathname === href ? 'page' : undefined}
-            className={`tab-link ${pathname === href ? 'tab-link-active' : ''}`}
-          >
-            <Icon size={19} strokeWidth={pathname === href ? 2.2 : 1.7} />
-            <span>{label === 'Create escrow' ? 'Create' : label === 'Activity' ? 'Activity' : label}</span>
-          </Link>
-        ))}
-      </nav>
+      {!isHome && (
+        <nav className="mobile-tabbar" aria-label="Bottom navigation">
+          {links.slice(0, 4).map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              aria-current={pathname === href ? 'page' : undefined}
+              className={`tab-link ${pathname === href ? 'tab-link-active' : ''}`}
+            >
+              <Icon size={19} strokeWidth={pathname === href ? 2.2 : 1.7} />
+              <span>{label === 'Create escrow' ? 'Create' : label === 'Activity' ? 'Activity' : label}</span>
+            </Link>
+          ))}
+        </nav>
+      )}
     </>
   );
 }
