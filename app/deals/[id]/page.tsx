@@ -2,8 +2,9 @@ import Navbar from '@/components/Navbar';
 import DealChat from '@/components/DealChat';
 import { Shield, Clock, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
-export default function DealPage({ params }: { params: { id: string } }) {
-  const dealId = params.id || 'FD-DEMO';
+export default async function DealPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const dealId = id || 'FD-DEMO';
 
   return (
     <div className="min-h-screen bg-[#070A0F] text-white">

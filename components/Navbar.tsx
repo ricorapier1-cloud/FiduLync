@@ -2,12 +2,12 @@
 import React from 'react'
 
 interface NavbarProps {
-  activeView: string
-  setActiveView: (view: any) => void
-  userRole: 'customer' | 'admin'
-  userEmail: string | null
-  onOpenAuth: () => void
-  onLogout: () => void
+  activeView?: string
+  setActiveView?: (view: string) => void
+  userRole?: string
+  userEmail?: string | null
+  onOpenAuth?: () => void
+  onLogout?: () => void
 }
 
 export default function Navbar({
@@ -18,12 +18,20 @@ export default function Navbar({
   onOpenAuth,
   onLogout
 }: NavbarProps) {
+  const [localActiveView, setLocalActiveView] = React.useState('home')
+  const currentView = activeView ?? localActiveView
+  const changeActiveView = (view: string) => {
+    setLocalActiveView(view)
+    setActiveView?.(view)
+  }
+  const currentUserRole = userRole ?? 'customer'
+
   const menus = [
     { id: 'home', label: 'Create Link', icon: '⚡' },
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
     { id: 'disputes', label: 'Disputes & Terms', icon: '⚖️' },
     { id: 'faq', label: 'FAQ', icon: '❓' },
-    ...(userRole === 'admin' ? [{ id: 'admin', label: 'Admin Control', icon: '🛡️' }] : [])
+    ...(currentUserRole === 'admin' ? [{ id: 'admin', label: 'Admin Control', icon: '🛡️' }] : [])
   ]
 
   return (
@@ -31,7 +39,7 @@ export default function Navbar({
       <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
         
         {/* Brand Logo matching screenshot */}
-        <div className="flex items-center gap-3 cursor-pointer shrink-0" onClick={() => setActiveView('home')}>
+        <div className="flex items-center gap-3 cursor-pointer shrink-0" onClick={() => changeActiveView('home')}>
           <div className="w-10 h-10 rounded-2xl bg-[#00c896]/15 border border-[#00c896]/40 flex items-center justify-center text-[#00c896] text-xl shrink-0 shadow-[0_0_15px_rgba(0,200,150,0.15)]">
             🛡️
           </div>
@@ -48,7 +56,7 @@ export default function Navbar({
         {/* Header Right Actions */}
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setActiveView('store')}
+            onClick={() => changeActiveView('store')}
             className="group relative border border-[#00c896]/50 bg-[#0B171A] hover:bg-[#00c896]/10 px-3.5 py-1.5 rounded-2xl flex items-center gap-2.5 transition-all duration-200 shadow-[0_0_20px_rgba(0,200,150,0.08)] active:scale-95"
           >
             <div className="w-7 h-7 bg-[#162928] rounded-lg border border-[#00c896]/30 flex items-center justify-center text-sm shrink-0">
@@ -70,24 +78,24 @@ export default function Navbar({
           {userEmail ? (
             <div className="hidden sm:flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-xl px-3 py-1 text-xs">
               <span className="text-gray-300 font-mono text-[11px] truncate max-w-[120px]">{userEmail}</span>
-              <button onClick={onLogout} className="text-red-400 hover:text-red-300 font-bold ml-1">Exit</button>
+              {onLogout && <button onClick={onLogout} className="text-red-400 hover:text-red-300 font-bold ml-1">Exit</button>}
             </div>
-          ) : (
+          ) : onOpenAuth ? (
             <button
               onClick={onOpenAuth}
               className="hidden sm:block bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold px-3 py-1.5 rounded-xl text-xs hover:bg-emerald-500/20 transition"
             >
               Sign In
             </button>
-          )}
+          ) : null}
         </div>
       </div>
 
       {/* Sub-Menu Navigation with Universal Back Button */}
       <div className="max-w-5xl mx-auto px-4 pb-2.5 flex items-center gap-1.5 overflow-x-auto hide-scrollbar">
-        {activeView !== 'home' && (
+        {currentView !== 'home' && (
           <button
-            onClick={() => setActiveView('home')}
+            onClick={() => changeActiveView('home')}
             className="flex items-center gap-1 bg-red-500/10 border border-red-500/30 text-red-400 px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-red-500/20 transition"
           >
             ← Back
@@ -97,9 +105,9 @@ export default function Navbar({
         {menus.map((menu) => (
           <button
             key={menu.id}
-            onClick={() => setActiveView(menu.id)}
+            onClick={() => changeActiveView(menu.id)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all duration-200 ${
-              activeView === menu.id
+              currentView === menu.id
                 ? 'bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 shadow-sm'
                 : 'bg-[#111827] border border-gray-800/80 text-gray-400 hover:bg-gray-800 hover:text-white'
             }`}
