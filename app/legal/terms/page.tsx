@@ -1,39 +1,51 @@
-import React from 'react'
-import Link from 'next/link'
+import Link from 'next/link';
+
+const sections = [
+  {
+    title: '1. Deal terms and payment',
+    text: 'A FiduLync deal link records the item or service, amount, fee allocation, seller payout details and inspection period. The platform fee is 1.5% of the deal amount; the creator selects buyer-paid, seller-paid or an approximately equal split. The fee allocation is shown before checkout. Paystack processes the buyer payment, and a deal is marked funded only after a signed provider notification confirms the expected amount and currency.',
+  },
+  {
+    title: '2. Custody and settlement limits',
+    text: 'Payments are processed into the configured merchant Paystack balance. Unless FiduLync separately establishes and discloses a legally compliant custodial arrangement, funds are not held in a segregated or insured trust account. Provider availability, bank rules, account checks and applicable law affect refunds and payouts. Automated bank transfers are currently limited to NGN; other settlement currencies may require a separately agreed manual workflow.',
+  },
+  {
+    title: '3. Inspection and disputes',
+    text: 'A 48-hour inspection window begins after payment confirmation. A party with the private deal link may submit a dispute statement and evidence while the deal is funded. The platform pauses its scheduled settlement workflow when a dispute is accepted. An administrator records a release, refund or split decision with reviewer notes; a provider payout is not complete until the provider confirms it.',
+  },
+  {
+    title: '4. AlgoLync verification and trading risk',
+    text: 'A verification badge identifies a provider source reviewed by an administrator; it does not guarantee accuracy, safety, profitability or future results. Marketplace preview metrics and curves labelled illustrative are examples, not verified account records. Trading foreign exchange, CFDs and leveraged products carries substantial risk. Simulated and historical results do not guarantee future performance.',
+  },
+  {
+    title: '5. Evidence and sensitive information',
+    text: 'Dispute uploads are limited to supported file types and stored in a private evidence bucket. MT5 integration accepts investor credentials only through its authenticated, encrypted server-side flow. Never send passwords, one-time codes, payment-card details or master trading credentials through a deal link, support channel or dispute attachment.',
+  },
+];
 
 export default function TermsPage() {
   return (
-    <main className="min-h-screen bg-[#0B1120] text-white selection:bg-emerald-500/30">
-      <nav className="border-b border-gray-800 bg-[#111827]/80 backdrop-blur sticky top-0 z-50 px-6 py-4 flex justify-between items-center">
-        <Link href="/" className="text-xl font-black tracking-tight flex items-center gap-2">
-          <span>FiduLync</span> <span className="text-emerald-400 font-mono text-xs px-2 py-0.5 bg-emerald-500/10 rounded-full border border-emerald-500/30">Legal & Terms</span>
-        </Link>
-        <Link href="/" className="text-xs font-bold text-gray-300 hover:text-emerald-400 transition">Back to Home</Link>
-      </nav>
-      <div className="max-w-4xl mx-auto px-6 py-16 space-y-8">
-        <div className="space-y-3">
-          <h1 className="text-4xl font-black tracking-tight">Terms of Service & Escrow Agreement</h1>
-          <p className="text-xs text-gray-400">Last updated: October 2026</p>
+    <div className="page-content max-w-4xl">
+      <header className="page-heading">
+        <div>
+          <div className="eyebrow">PLATFORM INFORMATION</div>
+          <h1>FiduLync & AlgoLync terms</h1>
+          <p>Product and payment-service disclosures for use of this platform.</p>
         </div>
-        <div className="space-y-6 text-sm text-gray-300 leading-relaxed bg-[#111827] border border-gray-800 rounded-3xl p-8">
-          <section className="space-y-3">
-            <h2 className="text-lg font-bold text-white">1. Introduction to FiduLync Escrow</h2>
-            <p>FiduLync provides institutional-grade secure escrow services for social commerce and digital assets, including Forex trading robots (EAs), custom MQL5 indicators, and remote services. By generating or paying into a FiduLync Safe Link, both buyer and seller agree to abide by these terms.</p>
+        <span className="mono text-[10px] text-slate-500">Updated November 2026</span>
+      </header>
+      <div className="panel space-y-6 p-5 text-xs leading-6 text-slate-400 sm:p-8">
+        <p className="rounded-xl border border-amber-300/15 bg-amber-200/[0.04] p-4 text-[11px] leading-5 text-amber-100/80">
+          This page is a product disclosure, not legal advice. Platform availability and financial workflows are subject to applicable law and provider terms. Obtain qualified legal and regulatory review before relying on this service for regulated custody or financial activity.
+        </p>
+        {sections.map((section) => (
+          <section key={section.title}>
+            <h2 className="mb-2 text-sm font-semibold text-slate-100">{section.title}</h2>
+            <p>{section.text}</p>
           </section>
-          <section className="space-y-3">
-            <h2 className="text-lg font-bold text-white">2. Funds Locking & Verification</h2>
-            <p>When a buyer completes payment through Paystack, funds are securely locked in the FiduLync Escrow Vault. Sellers are required to deliver the agreed digital product, source code, or MT5 license binding within the stipulated timeframe.</p>
-          </section>
-          <section className="space-y-3">
-            <h2 className="text-lg font-bold text-white">3. Dispute Resolution & Arbitration</h2>
-            <p>If either party encounters an issue regarding code delivery or functionality, a formal dispute can be raised instantly via the FiduLync Disputes portal. Our arbitration team reviews backtest logs, MT5 account binding IDs, and chat agreements to resolve disputes within 24–48 hours.</p>
-          </section>
-          <section className="space-y-3">
-            <h2 className="text-lg font-bold text-white">4. Milestone Payouts & Refunds</h2>
-            <p>For milestone-based projects, funds are released incrementally as each phase is verified and approved by the buyer. Refunds are processed strictly upon successful arbitration rulings or mutual vendor agreement.</p>
-          </section>
-        </div>
+        ))}
+        <p className="border-t border-white/[0.06] pt-5 text-[10px] text-slate-600">Questions about a funded transaction? Use the private deal reference and contact <Link href="/support" className="text-[#51e4c2] underline">support</Link>. To submit transaction evidence, open the <Link href="/disputes" className="text-[#51e4c2] underline">Dispute Vault</Link>.</p>
       </div>
-    </main>
-  )
+    </div>
+  );
 }

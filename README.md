@@ -1,36 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FiduLync · AlgoLync
 
-## Getting Started
+FiduLync provides escrow-backed deal links; AlgoLync presents MetaTrader tools with transparent, source-attributed verification states.
 
-First, run the development server:
+## Local development
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Set the following environment variables in the deployment environment:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Variable | Purpose |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Browser Supabase Auth client |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-only Supabase service access; never expose to the browser |
+| `PAYSTACK_SECRET_KEY` | Server-side checkout, refund and transfer requests |
+| `NEXT_PUBLIC_APP_URL` | Canonical HTTPS application URL used for Paystack callbacks |
+| `CRON_SECRET` | Bearer secret for the scheduled settlement endpoint |
+| `MT5_CREDENTIALS_ENCRYPTION_KEY` | Base64-encoded 32-byte AES-256-GCM key for MT5 investor credentials |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Generate a distinct encryption key for each environment and store it in your deployment secret manager:
 
-## Learn More
+```bash
+openssl rand -base64 32
+```
 
-To learn more about Next.js, take a look at the following resources:
+Never commit environment files, secret values or investor credentials.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Supabase setup
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Apply the migrations in `supabase/migrations/` to a Supabase project with Auth and Storage enabled. The institutional platform migration adds deal fee allocation, inspection deadlines, private dispute evidence, EA listings and provider-review queues, encrypted MT5 integration storage, disbursements, arbitration audit logs and restrictive RLS policies.
 
-## Deploy on Vercel
+The two allowlisted administrator email addresses must have Supabase Auth accounts. The migration assigns their profile role; administrator APIs independently verify the authenticated user, allowlisted email and database role.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Configure the private `dispute-evidence` Storage bucket and ensure the production project has applied the RLS migration before enabling public deal creation.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Payments and settlement
+
+Configure Paystack's webhook URL to `https://<your-domain>/api/paystack/webhook`. Deal funding begins at `/api/escrow/<reference>/fund`; only a signed Paystack charge webhook with the expected currency and amount marks a deal funded. The 48-hour inspection deadline is persisted server-side, and a dispute atomically freezes a funded deal.
+
+`vercel.json` schedules `/api/cron/settlements` hourly. Set `CRON_SECRET` and enable Paystack transfers/refunds before using it. Automated seller bank transfers are currently limited to NGN; unsupported payout currencies remain unsettled and require an explicitly configured provider workflow. Provider transfer completion is reconciled through the Paystack webhook.
+
+## Verification and risk disclosures
+
+Myfxbook and FXBlue submissions are reviewed by an administrator before a listing can be marked verified. MT5 investor credentials are accepted only by the authenticated server endpoint and encrypted with AES-256-GCM; configure the key before accepting those credentials. Sample marketplace metrics and equity curves are explicitly illustrative and are not represented as audited live results.
+
+Trading and escrow services require appropriate legal, financial, identity-verification, fraud-monitoring, incident-response and provider approvals before production use. Provider settlement timing and account eligibility remain subject to Paystack and bank rules.
+
+## Validation
+
+```bash
+npm run lint
+npm run build
+```

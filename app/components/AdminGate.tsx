@@ -1,69 +1,67 @@
-'use client'
-import React, { useState } from 'react'
-import toast from 'react-hot-toast'
+'use client';
+
+import { useCallback, useState } from 'react';
+import type { FormEvent } from 'react';
+import toast from 'react-hot-toast';
+import { supabase } from '@/lib/supabaseClient';
 
 interface AdminGateProps {
-  isUnlocked: boolean
-  onUnlock: () => void
-  children: React.ReactNode
+  isUnlocked: boolean;
+  onUnlock: (accessToken: string) => void;
+  children: React.ReactNode;
 }
 
 export default function AdminGate({ isUnlocked, onUnlock, children }: AdminGateProps) {
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleAdminLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
+  const verifySession = useCallback(async (accessToken: string) => {
+    const response = await fetch('/api/admin/verify', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: 'no-store',
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Administrator access denied.');
+    onUnlock(accessToken);
+  }, [onUnlock]);
 
+  async function handleLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoading(true);
     try {
-      const res = await fetch('/api/admin/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password })
-      })
-
-      const data = await res.json()
-      if (data.success) {
-        toast.success('Admin access granted')
-        onUnlock()
-      } else {
-        toast.error(data.error || 'Access denied')
-      }
-    } catch {
-      toast.error('Failed to verify password')
+      const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (error) throw error;
+      if (!data.session?.access_token) throw new Error('Supabase did not return an authenticated session.');
+      await verifySession(data.session.access_token);
+      toast.success('Administrator access verified.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to verify administrator access.');
     } finally {
-      setLoading(false)
+      setLoading(false);
+      setPassword('');
     }
   }
 
-  if (isUnlocked) return <>{children}</>
+  if (isUnlocked) return <>{children}</>;
 
   return (
-    <div className="bg-[#111827] border border-gray-800 rounded-3xl p-6 sm:p-8 max-w-md mx-auto space-y-4 shadow-2xl text-center">
-      <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-xl font-bold mx-auto">
-        🔒
-      </div>
-      <h2 className="text-xl font-black text-white">Admin Restricted Area</h2>
-      <p className="text-xs text-gray-400">Enter the system administrator password to continue.</p>
-
-      <form onSubmit={handleAdminLogin} className="space-y-4">
-        <input
-          type="password"
-          required
-          placeholder="Enter Admin Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full bg-[#0B1120] border border-gray-800 rounded-xl p-3.5 text-xs text-white outline-none focus:border-emerald-500 font-mono text-center"
-        />
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold py-3.5 rounded-xl text-xs transition disabled:opacity-50"
-        >
-          {loading ? 'Verifying...' : 'Unlock Admin Panel'}
-        </button>
+    <div className="panel mx-auto max-w-md p-6 sm:p-8">
+      <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl border border-emerald-300/15 bg-emerald-300/[0.07] text-[#51e4c2]">⌘</div>
+      <h2 className="mt-4 text-center text-lg font-semibold">Administrator sign-in</h2>
+      <p className="mt-2 text-center text-xs leading-5 text-slate-500">Access is limited to the designated FiduLync administrator accounts. Sign in through Supabase authentication.</p>
+      <form className="mt-6 space-y-4" onSubmit={handleLogin}>
+        <div>
+          <label className="field-label" htmlFor="admin-email">Administrator email</label>
+          <input id="admin-email" className="field-control" type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} />
+        </div>
+        <div>
+          <label className="field-label" htmlFor="admin-password">Password</label>
+          <input id="admin-password" className="field-control" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} />
+        </div>
+        <button className="primary-button w-full" type="submit" disabled={loading}>{loading ? 'Verifying access…' : 'Sign in securely'}</button>
       </form>
+      <p className="mt-4 text-center text-[10px] leading-5 text-slate-600">Administrator role is confirmed server-side. No shared admin password or client-issued access token is used.</p>
     </div>
-  )
+  );
 }

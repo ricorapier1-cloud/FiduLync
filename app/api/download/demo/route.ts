@@ -1,19 +1,30 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const file = searchParams.get('file') || 'Eridam_Nexus_Adaptive_Demo.ex5';
+export async function GET(request: Request) {
+  const requestedName = new URL(request.url).searchParams.get('file') || 'AlgoLync';
+  const product = requestedName.replace(/[\r\n]/g, '').slice(0, 100);
+  const fileStem = product.replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '') || 'AlgoLync';
+  const documentation = [
+    `${product} — AlgoLync sample documentation demo`,
+    '',
+    'This is a documentation sample, not a compiled MetaTrader .ex5 binary.',
+    'No executable demo has been uploaded for this listing yet.',
+    '',
+    'To test a strategy:',
+    '1. Request a verified demo build from the listing owner.',
+    '2. Test in MetaTrader 5 Strategy Tester on historical data.',
+    '3. Verify account and drawdown limits before using a live account.',
+    '',
+    'Risk notice: trading leveraged products can result in losses exceeding deposits.',
+    'Illustrative or simulated performance is not a guarantee of future results.',
+  ].join('\n');
 
-  const binaryHeader = `// AlgoLync Quant Suite - Compiled Demo File\n// EA Identifier: ${file}\n// FiduLync Engineering Production License`;
-  const buffer = Buffer.from(binaryHeader, 'utf-8');
-
-  return new NextResponse(buffer, {
-    status: 200,
+  return new NextResponse(documentation, {
     headers: {
-      'Content-Type': 'application/octet-stream',
-      'Content-Disposition': `attachment; filename="${file}"`,
-      'Content-Length': buffer.length.toString(),
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${fileStem}_Demo_README.txt"`,
+      'Cache-Control': 'private, no-store',
+      'X-Content-Type-Options': 'nosniff',
     },
   });
 }

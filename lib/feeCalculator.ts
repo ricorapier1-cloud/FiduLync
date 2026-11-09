@@ -1,16 +1,15 @@
 export interface CurrencyConfig {
   code: string
   symbol: string
-  maxFee: number
 }
 
 export const SUPPORTED_CURRENCIES: Record<string, CurrencyConfig> = {
-  NGN: { code: 'NGN', symbol: '₦', maxFee: 5000 },
-  USD: { code: 'USD', symbol: '$', maxFee: 10 },
-  GBP: { code: 'GBP', symbol: '£', maxFee: 8 },
-  EUR: { code: 'EUR', symbol: '€', maxFee: 9 },
-  GHS: { code: 'GHS', symbol: '₵', maxFee: 120 },
-  KES: { code: 'KES', symbol: 'KSh', maxFee: 1300 },
+  NGN: { code: 'NGN', symbol: '₦' },
+  USD: { code: 'USD', symbol: '$' },
+  GBP: { code: 'GBP', symbol: '£' },
+  EUR: { code: 'EUR', symbol: '€' },
+  GHS: { code: 'GHS', symbol: '₵' },
+  KES: { code: 'KES', symbol: 'KSh' },
 }
 
 export function formatCurrency(amount: number, currencyCode: string = 'NGN'): string {
@@ -26,10 +25,9 @@ export function formatCurrency(amount: number, currencyCode: string = 'NGN'): st
 export interface FeeBreakdown {
   itemAmount: number
   actualFee: number
-  savings: number
+  buyerFee: number
+  sellerFee: number
   total: number
-  isCapped: boolean
-  isPromoActive: boolean
   currencySymbol: string
   currencyCode: string
 }
@@ -37,36 +35,24 @@ export interface FeeBreakdown {
 export function calculateEscrowFee(
   amount: number,
   currencyCode: string = 'NGN',
-  promoCode?: string
+  feePayer: 'buyer' | 'seller' | 'split' = 'buyer'
 ): FeeBreakdown {
   const itemAmount = Math.max(0, Number(amount) || 0)
   const config = SUPPORTED_CURRENCIES[currencyCode] || SUPPORTED_CURRENCIES.NGN
-
-  if (promoCode && promoCode.trim().toUpperCase() === 'PROMO3FREE') {
-    return {
-      itemAmount,
-      actualFee: 0,
-      savings: Math.min(itemAmount * 0.02, config.maxFee),
-      total: itemAmount,
-      isCapped: false,
-      isPromoActive: true,
-      currencySymbol: config.symbol,
-      currencyCode: config.code,
-    }
-  }
-
-  const rawFee = itemAmount * 0.02
-  const isCapped = rawFee > config.maxFee
-  const actualFee = isCapped ? config.maxFee : rawFee
-  const savings = isCapped ? rawFee - config.maxFee : 0
+  const actualFee = Math.round(itemAmount * 0.015 * 100) / 100
+  const buyerFee = feePayer === 'buyer'
+    ? actualFee
+    : feePayer === 'split'
+      ? Math.floor(actualFee * 100 / 2) / 100
+      : 0
+  const sellerFee = actualFee - buyerFee
 
   return {
     itemAmount,
     actualFee,
-    savings,
-    total: itemAmount + actualFee,
-    isCapped,
-    isPromoActive: false,
+    buyerFee,
+    sellerFee,
+    total: itemAmount + buyerFee,
     currencySymbol: config.symbol,
     currencyCode: config.code,
   }

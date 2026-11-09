@@ -1,47 +1,58 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-export const dynamic = 'force-dynamic'
+import { NextResponse } from 'next/server';
+import { getSupabaseAdmin } from '@/lib/serverSupabase';
 
 export async function POST(request: Request) {
+  let body: Record<string, unknown>;
   try {
-    const { link } = await request.json()
-    if (!link) return NextResponse.json({ error: 'Please provide a valid FiduLync link or Link ID' }, { status: 400 })
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Request body must be valid JSON.' }, { status: 400 });
+  }
 
-    // Extract link_id or slug from URL string if full URL was pasted
-    const cleanId = link.split('/pay/').pop()?.split('?')[0]?.trim() || link.trim()
+  if (typeof body.link !== 'string' || body.link.length > 2000) {
+    return NextResponse.json({ error: 'Please provide a valid FiduLync deal link or reference.' }, { status: 400 });
+  }
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || ''
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || ''
-    const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } })
+  let reference = body.link.trim();
+  try {
+    if (reference.startsWith('http://') || reference.startsWith('https://')) {
+      reference = new URL(reference).pathname.split('/').filter(Boolean).at(-1) || '';
+    }
+  } catch {
+    return NextResponse.json({ error: 'Enter a valid deal reference or URL.' }, { status: 400 });
+  }
 
-    const { data: escrow, error } = await supabase
-      .from('escrows')
-      .select('*')
-      .or(`slug.eq.${cleanId},link_id.eq.${cleanId}`)
-      .single()
+  if (!/^[0-9a-f]{36}$/i.test(reference)) {
+    return NextResponse.json({ verified: false, message: 'This is not a valid FiduLync deal reference.' });
+  }
 
-    if (error || !escrow) {
-      return NextResponse.json({ 
-        verified: false, 
-        message: 'Unverified or Fake Link! This escrow link was not generated on FiduLync servers.' 
-      }, { status: 200 })
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data: deal, error } = await supabase
+      .from('escrow_deals')
+      .select('reference,item_name,title,amount,currency,status,created_at')
+      .eq('reference', reference)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!deal) {
+      return NextResponse.json({ verified: false, message: 'This deal reference is not registered with FiduLync.' });
     }
 
     return NextResponse.json({
       verified: true,
-      message: 'Authentic FiduLync Escrow Link Verified.',
+      message: 'This deal reference is registered with FiduLync.',
       escrow: {
-        id: escrow.link_id,
-        title: escrow.title,
-        amount: escrow.amount,
-        sellerPhone: escrow.seller_phone ? `${escrow.seller_phone.slice(0, 4)}***${escrow.seller_phone.slice(-3)}` : 'Verified Seller',
-        status: escrow.status,
-        createdAt: escrow.created_at
-      }
-    }, { status: 200 })
-
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Server error during verification' }, { status: 500 })
+        id: deal.reference,
+        title: deal.item_name || deal.title,
+        amount: Number(deal.amount),
+        currency: deal.currency,
+        status: deal.status,
+        createdAt: deal.created_at,
+      },
+    });
+  } catch (error) {
+    console.error('Deal verification failed:', error);
+    return NextResponse.json({ error: 'Unable to verify this deal right now.' }, { status: 503 });
   }
 }

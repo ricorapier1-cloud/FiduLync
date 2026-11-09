@@ -1,10 +1,9 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from '@/lib/supabaseClient';
 import { Send, ShieldCheck } from 'lucide-react';
 
 export default function DealChat({ dealId, currentUserId }: { dealId: string; currentUserId: string }) {
-  const supabase = createClientComponentClient();
   const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState('');
 

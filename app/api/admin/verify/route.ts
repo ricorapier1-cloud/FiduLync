@@ -1,16 +1,12 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/serverSupabase';
 
-export async function POST(req: Request) {
-  try {
-    const { password } = await req.json()
-    const adminPassword = process.env.ADMIN_PASSWORD || 'FiduLync37422445$'
+export async function GET(request: Request) {
+  const result = await requireAdmin(request);
+  if ('response' in result) return result.response;
+  return NextResponse.json({ success: true, email: result.user.email });
+}
 
-    if (password === adminPassword) {
-      return NextResponse.json({ success: true, token: 'admin_authenticated_session' })
-    }
-
-    return NextResponse.json({ success: false, error: 'Incorrect Admin Password' }, { status: 401 })
-  } catch (error) {
-    return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 })
-  }
+export async function POST(request: Request) {
+  return GET(request);
 }

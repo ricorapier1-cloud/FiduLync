@@ -1,164 +1,126 @@
-'use client'
-import React, { useState } from 'react'
-import Link from 'next/link'
-import toast from 'react-hot-toast'
+import Link from 'next/link';
+import { ArrowDownToLine, ArrowUpRight, BadgeCheck, ExternalLink, ShieldCheck } from 'lucide-react';
 
-export default function AlgoLyncStorePage() {
-  const [selectedProduct, setSelectedProduct] = useState<any>(null)
-  const [email, setEmail] = useState('')
-  const [mt5Account, setMt5Account] = useState('')
-  const [agreedDigital, setAgreedDigital] = useState(false)
-  const [isProcessing, setIsProcessing] = useState(false)
+const listings = [
+  {
+    name: 'Nexus Adaptive EA',
+    category: 'Expert Advisor · MT5',
+    description: 'Trend-adaptive execution with volatility-aware exposure controls and configurable risk limits.',
+    version: '2.4',
+    price: '$49',
+    metrics: [['Profit factor', '2.14'], ['Max drawdown', '8.6%'], ['Win rate', '74.2%']],
+    curve: '0,93 17,88 33,92 50,73 68,78 84,62 102,68 119,47 136,53 153,31 169,37 187,16 205,24 223,7',
+  },
+  {
+    name: 'Z-Score Envelope',
+    category: 'Indicator · MT5',
+    description: 'Volatility envelope indicator designed to highlight statistical price deviations across timeframes.',
+    version: '1.1',
+    price: '$25',
+    metrics: [['Profit factor', '—'], ['Max drawdown', '—'], ['Win rate', '—']],
+    curve: '0,83 17,69 33,78 50,55 68,62 84,37 102,47 119,27 136,43 153,20 169,30 187,12 205,22 223,8',
+  },
+];
 
-  const handleDownloadDemo = (fileName: string) => {
-    toast.success(`Downloading demo file: ${fileName}`)
-    window.location.href = `/api/download/demo?file=${encodeURIComponent(fileName)}`
-  }
+const providers = ['Myfxbook', 'FXBlue', 'MT5 direct'];
 
-  const handlePaystackCheckout = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!agreedDigital) {
-      toast.error('You must acknowledge the digital goods and risk policy.')
-      return
-    }
-    if (!email || !mt5Account) {
-      toast.error('Email and MT5 Account number are required.')
-      return
-    }
-
-    setIsProcessing(true)
-    try {
-      const res = await fetch('/api/paystack/initialize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          amount: selectedProduct.priceUSD * 1650, 
-          metadata: { product: selectedProduct.name, mt5Account },
-        }),
-      })
-
-      const data = await res.json()
-      if (data.data?.authorization_url) window.location.href = data.data.authorization_url
-      else toast.error(data.error || 'Payment initialization failed.')
-    } catch (err) {
-      toast.error('Checkout error. Please try again.')
-    } finally {
-      setIsProcessing(false)
-    }
-  }
+function EquityCurve({ points, name }: { points: string; name: string }) {
+  const pointList = points.split(' ').map((point) => point.split(',').map(Number));
+  const polygon = `0,100 ${points} 223,100`;
+  const path = pointList.map(([x, y], index) => `${index ? 'L' : 'M'} ${x} ${y}`).join(' ');
 
   return (
-    <main className="min-h-screen bg-[#070B14] text-white p-4 sm:p-8 font-sans flex flex-col">
-      <div className="max-w-4xl mx-auto space-y-6 flex-grow w-full">
-        
-        <div className="flex items-center justify-between border-b border-gray-800 pb-4">
-          <Link href="/" className="inline-flex items-center gap-2 bg-gray-800 text-emerald-400 font-bold px-4 py-2 rounded-xl text-xs transition border border-gray-700">
-            ← Back to Escrow
-          </Link>
-          <div className="text-right">
-            <div className="text-sm font-black text-white">AlgoLync Store</div>
-            <div className="text-[9px] text-emerald-400 font-mono">NON-REFUNDABLE DIGITAL GOODS</div>
-          </div>
+    <svg className="h-[110px] w-full overflow-visible" viewBox="0 0 223 104" role="img" aria-label={`${name} illustrative equity curve`}>
+      <defs>
+        <linearGradient id={`fill-${name.replace(/\W/g, '')}`} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor="#51e4c2" stopOpacity=".22" />
+          <stop offset="100%" stopColor="#51e4c2" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {[25, 50, 75].map((y) => <line key={y} x1="0" x2="223" y1={y} y2={y} stroke="rgba(170,190,195,.10)" strokeDasharray="3 5" />)}
+      <polygon points={polygon} fill={`url(#fill-${name.replace(/\W/g, '')})`} />
+      <path d={path} fill="none" stroke="#51e4c2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export default function AlgoLyncStorePage() {
+  return (
+    <div className="page-content">
+      <header className="page-heading">
+        <div>
+          <div className="eyebrow flex items-center gap-2"><span className="status-dot" /> ALGOLYNC VERIFIED MARKETPLACE</div>
+          <h1>Strategies, with the evidence attached.</h1>
+          <p>Explore MetaTrader systems with transparent risk metrics and clearly attributed verification. Performance figures below are illustrative listing previews, not live account statements.</p>
         </div>
+        <Link className="secondary-button" href="/create-link"><ShieldCheck size={15} /> Buy with escrow</Link>
+      </header>
 
-        <div className="text-center space-y-3 py-4">
-          <div className="inline-block bg-emerald-500/10 text-emerald-400 text-xs font-mono font-bold px-3 py-1 rounded-full border border-emerald-500/30">
-            QUANTITATIVE TRADING SYSTEMS
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">MQL5 Expert Advisors</h1>
-          <p className="text-xs text-gray-400 max-w-md mx-auto">Institutional-grade tools. Past performance does not guarantee future results.</p>
-        </div>
-
-        {/* Product Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-12">
-          
-          {/* ERIDAM NEXUS */}
-          <div className="bg-[#111827] border border-gray-800 rounded-3xl p-6 space-y-6 shadow-xl relative overflow-hidden">
-            <div className="flex justify-between items-center">
-              <span className="bg-emerald-500/10 text-emerald-400 text-xs font-bold px-3 py-1 rounded-full border border-emerald-500/20">Flagship EA</span>
-              <span className="text-xs font-mono text-gray-500">v2.4</span>
-            </div>
-            <div>
-              <h2 className="text-xl font-black text-white">ERIDAM NEXUS ADAPTIVE PRO</h2>
-              <p className="text-xs text-gray-400 mt-2 leading-relaxed">Quantitative MT5 EA featuring Kaufman Efficiency Ratio filtering and dynamic ATR envelopes.</p>
-            </div>
-            <div className="pt-2">
-              <div className="text-xs text-gray-400 font-medium">Single Account License</div>
-              <div className="text-2xl font-black text-white mt-0.5">$49 <span className="text-xs font-normal text-gray-400">USD</span></div>
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => handleDownloadDemo('Eridam_Nexus_Pro_Demo.ex5')} className="flex-1 bg-gray-800 text-white font-bold py-3.5 rounded-xl text-xs border border-gray-700">📥 Try Demo</button>
-              <button onClick={() => setSelectedProduct({ name: 'ERIDAM NEXUS ADAPTIVE PRO', priceUSD: 49 })} className="flex-1 bg-emerald-500 text-black font-extrabold py-3.5 rounded-xl text-xs">Buy License</button>
-            </div>
-          </div>
-
-          {/* Z-SCORE ENVELOPE */}
-          <div className="bg-[#111827] border border-gray-800 rounded-3xl p-6 space-y-6 shadow-xl relative overflow-hidden">
-            <div className="flex justify-between items-center">
-              <span className="bg-emerald-500/10 text-emerald-400 text-xs font-bold px-3 py-1 rounded-full border border-emerald-500/20">Indicator</span>
-              <span className="text-xs font-mono text-gray-500">v1.1</span>
-            </div>
-            <div>
-              <h2 className="text-xl font-black text-white">Z-Score Volatility Envelope</h2>
-              <p className="text-xs text-gray-400 mt-2 leading-relaxed">Custom MT5 indicator mapping standard deviation breakouts with ALMA moving average filters.</p>
-            </div>
-            <div className="pt-2">
-              <div className="text-xs text-gray-400 font-medium">Single Account License</div>
-              <div className="text-2xl font-black text-white mt-0.5">$25 <span className="text-xs font-normal text-gray-400">USD</span></div>
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => handleDownloadDemo('ZScore_Envelope_Demo.ex5')} className="flex-1 bg-gray-800 text-white font-bold py-3.5 rounded-xl text-xs border border-gray-700">📥 Try Demo</button>
-              <button onClick={() => setSelectedProduct({ name: 'Z-Score Volatility Envelope', priceUSD: 25 })} className="flex-1 bg-emerald-500 text-black font-extrabold py-3.5 rounded-xl text-xs">Buy License</button>
-            </div>
-          </div>
-
-        </div>
+      <div className="mb-5 flex flex-wrap items-center gap-2 rounded-xl border border-amber-300/10 bg-amber-200/[0.035] p-3 text-[10px] leading-5 text-amber-100/70">
+        <BadgeCheck size={14} className="shrink-0 text-amber-200" />
+        Listings require independent verification before provider badges can be marked verified. Sample metrics are illustrative and do not represent audited results.
       </div>
 
-      {/* STRICT CFTC/NFA RISK DISCLAIMER FOOTER */}
-      <footer className="w-full bg-[#0B1120] border-t border-gray-800 mt-8 py-8 px-4">
-        <div className="max-w-4xl mx-auto text-[9px] text-gray-500 leading-relaxed space-y-3 text-justify">
-          <p><strong className="text-gray-400">CFTC RULE 4.41 - HYPOTHETICAL OR SIMULATED PERFORMANCE RESULTS HAVE CERTAIN LIMITATIONS.</strong> UNLIKE AN ACTUAL PERFORMANCE RECORD, SIMULATED RESULTS DO NOT REPRESENT ACTUAL TRADING. ALSO, SINCE THE TRADES HAVE NOT BEEN EXECUTED, THE RESULTS MAY HAVE UNDER-OR-OVER COMPENSATED FOR THE IMPACT, IF ANY, OF CERTAIN MARKET FACTORS, SUCH AS LACK OF LIQUIDITY.</p>
-          <p>Trading foreign exchange on margin carries a high level of risk and may not be suitable for all investors. FiduLync, AlgoLync, and its administrators are software developers, not registered financial advisors. All tools provided are for educational and analytical purposes only. You assume full responsibility for your trading activities and hold the platform harmless against any financial losses.</p>
-        </div>
-      </footer>
-
-      {/* Paystack Checkout Modal with Waiver */}
-      {selectedProduct && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0B1120] border border-gray-800 rounded-3xl p-6 sm:p-8 max-w-sm w-full space-y-5 relative shadow-2xl">
-            <button onClick={() => setSelectedProduct(null)} className="absolute top-4 right-4 text-gray-400 hover:text-white text-lg">✕</button>
-            
-            <div>
-              <h3 className="text-lg font-black text-white">License: {selectedProduct.name}</h3>
-              <div className="text-emerald-400 font-mono font-bold text-sm mt-1">Amount: ${selectedProduct.priceUSD} USD</div>
+      <section className="grid gap-4 lg:grid-cols-2" aria-label="Expert advisor listings">
+        {listings.map((listing) => (
+          <article key={listing.name} className="panel overflow-hidden">
+            <div className="border-b border-white/[0.06] p-5 sm:p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="eyebrow">{listing.category}</div>
+                  <h2 className="mt-2 text-xl font-semibold tracking-tight">{listing.name}</h2>
+                </div>
+                <span className="mono rounded-lg border border-white/[0.07] bg-black/15 px-2.5 py-1.5 text-[10px] text-slate-400">v{listing.version}</span>
+              </div>
+              <p className="mt-3 min-h-10 text-xs leading-6 text-slate-400">{listing.description}</p>
+              <div className="mt-4 flex flex-wrap gap-1.5">
+                {providers.map((provider) => (
+                  <span key={provider} className="inline-flex items-center gap-1.5 rounded-full border border-white/[0.07] bg-white/[0.025] px-2.5 py-1 text-[9px] text-slate-400">
+                    <span className="h-1.5 w-1.5 rounded-full bg-slate-500" /> {provider} · pending
+                  </span>
+                ))}
+              </div>
             </div>
 
-            <form onSubmit={handlePaystackCheckout} className="space-y-4">
-              <div>
-                <label className="text-[10px] uppercase font-bold text-gray-400">Email Address (For File Delivery)</label>
-                <input required type="email" placeholder="trader@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-[#070B14] border border-gray-800 rounded-xl p-3 text-xs text-white focus:border-emerald-500 outline-none font-mono" />
+            <div className="px-5 pt-4 sm:px-6">
+              <div className="flex items-center justify-between">
+                <span className="metric-label">EQUITY CURVE · ILLUSTRATIVE</span>
+                <span className="mono text-[9px] text-slate-600">SAMPLE</span>
               </div>
+              <div className="mt-2"><EquityCurve points={listing.curve} name={listing.name} /></div>
+            </div>
 
-              <div>
-                <label className="text-[10px] uppercase font-bold text-gray-400">MT5 Trading Account Number</label>
-                <input required type="text" placeholder="e.g. 849201" value={mt5Account} onChange={(e) => setMt5Account(e.target.value)} className="w-full bg-[#070B14] border border-gray-800 rounded-xl p-3 text-xs text-white focus:border-emerald-500 outline-none font-mono" />
+            <div className="grid grid-cols-3 gap-px border-y border-white/[0.06] bg-white/[0.06]">
+              {listing.metrics.map(([label, value]) => (
+                <div key={label} className="bg-[#0d131a] px-3 py-4 sm:px-5">
+                  <div className="metric-label text-[9px]">{label}</div>
+                  <div className={`mono mt-2 text-sm ${value === '—' ? 'text-slate-500' : 'text-slate-200'}`}>{value}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+              <div><span className="text-xl font-semibold tracking-tight">{listing.price}</span><span className="ml-1.5 text-[10px] text-slate-500">single-account license</span></div>
+              <div className="flex gap-2">
+                <a className="secondary-button flex-1 sm:flex-none" href={`/api/download/demo?file=${encodeURIComponent(listing.name)}`}>
+                  <ArrowDownToLine size={14} /> Demo docs
+                </a>
+                <Link className="primary-button flex-1 sm:flex-none" href="/create-link">Buy <ArrowUpRight size={14} /></Link>
               </div>
+            </div>
+          </article>
+        ))}
+      </section>
 
-              {/* Digital Goods Liability Waiver */}
-              <label className="flex items-start gap-2 cursor-pointer bg-red-500/10 border border-red-500/20 p-3 rounded-xl mt-2">
-                <input type="checkbox" checked={agreedDigital} onChange={(e) => setAgreedDigital(e.target.checked)} className="mt-0.5 rounded text-emerald-500 accent-emerald-500" />
-                <span className="text-[9px] text-gray-300 leading-tight"><strong>Digital Goods Waiver:</strong> I understand that EAs are digital compiled files (`.ex5`). Because source access and account bindings cannot be revoked once issued, <strong>I agree this purchase is 100% NON-REFUNDABLE</strong>. I waive my right to file bank chargebacks for this software.</span>
-              </label>
-
-              <button type="submit" disabled={isProcessing} className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold py-3.5 rounded-xl text-xs disabled:opacity-50 mt-2">
-                {isProcessing ? 'Connecting to Paystack...' : `Pay $${selectedProduct.priceUSD} USD via Paystack`}
-              </button>
-            </form>
-          </div>
+      <section className="panel mt-5 flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+        <div className="flex items-start gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-emerald-300/15 bg-emerald-300/[0.07] text-[#51e4c2]"><ShieldCheck size={17} /></span>
+          <div><h2 className="text-sm font-semibold">How performance is verified</h2><p className="mt-1 max-w-2xl text-[11px] leading-5 text-slate-500">Myfxbook and FXBlue submissions are reviewed by an administrator. MT5 investor credentials, when enabled, must be encrypted server-side and never requested through email or chat.</p></div>
         </div>
-      )}
-    </main>
-  )
+        <Link href="/support" className="secondary-button shrink-0">Verification details <ExternalLink size={13} /></Link>
+      </section>
+
+      <p className="mt-5 text-[10px] leading-5 text-slate-600">Trading involves substantial risk. Simulated or historical performance does not guarantee future results. This marketplace preview does not constitute investment advice.</p>
+    </div>
+  );
 }
