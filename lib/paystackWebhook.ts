@@ -11,12 +11,91 @@ type PaystackEvent = {
     status?: string;
     amount?: number;
     currency?: string;
+    paid_at?: string;
     transaction?: { reference?: string } | string | number;
+    customer?: { email?: string; customer_code?: string };
+    subscription?: { subscription_code?: string; next_payment_date?: string };
+    subscription_code?: string;
   };
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+async function handleMacroSubscriptionEvent(event: PaystackEvent) {
+  const data = event.data;
+  const reference = typeof data?.reference === 'string' ? data.reference : '';
+  const subscriptionCode = data?.subscription?.subscription_code ?? data?.subscription_code;
+  const supabase = getSupabaseAdmin();
+  let lookup = reference.startsWith('macro_')
+    ? await supabase.from('macro_subscriptions')
+      .select('reference,user_id,email,expected_amount,paystack_subscription_code,last_charge_reference')
+      .eq('reference', reference)
+      .maybeSingle()
+    : { data: null, error: null };
+  if (lookup.error) throw lookup.error;
+  if (!lookup.data && subscriptionCode) {
+    lookup = await supabase.from('macro_subscriptions')
+      .select('reference,user_id,email,expected_amount,paystack_subscription_code,last_charge_reference')
+      .eq('paystack_subscription_code', subscriptionCode)
+      .maybeSingle();
+  }
+  if (lookup.error) throw lookup.error;
+  if (!lookup.data) return NextResponse.json({ status: 'ignored' });
+
+  const subscription = lookup.data;
+  if (event.event === 'charge.success') {
+    const customerEmail = data?.customer?.email?.trim().toLowerCase();
+    if (!reference || data?.status !== 'success'
+      || Number(data.amount) !== Number(subscription.expected_amount)
+      || data.currency !== 'NGN'
+      || (customerEmail && customerEmail !== subscription.email.trim().toLowerCase())) {
+      console.error('Paystack VIP charge did not match the stored subscription:', subscription.reference);
+      return NextResponse.json({ error: 'Payment details do not match this subscription.' }, { status: 400 });
+    }
+    if (subscription.last_charge_reference === reference) {
+      return NextResponse.json({ status: 'already_processed' });
+    }
+
+    const now = new Date();
+    const nextPayment = data.subscription?.next_payment_date;
+    const expiresAt = nextPayment && Number.isFinite(Date.parse(nextPayment))
+      ? nextPayment
+      : new Date(now.getTime() + 31 * 24 * 60 * 60 * 1000).toISOString();
+    const { error: subscriptionError } = await supabase.from('macro_subscriptions').update({
+      status: 'active',
+      paystack_subscription_code: subscriptionCode ?? subscription.paystack_subscription_code,
+      paystack_customer_code: data.customer?.customer_code ?? null,
+      last_charge_reference: reference || subscription.reference,
+      activated_at: now.toISOString(),
+      updated_at: now.toISOString(),
+    }).eq('reference', subscription.reference);
+    if (subscriptionError) throw subscriptionError;
+
+    const { error: profileError } = await supabase.from('profiles').update({
+      tier_status: 'vip_active',
+      macro_vip_expires_at: expiresAt,
+    }).eq('id', subscription.user_id);
+    if (profileError) throw profileError;
+    return NextResponse.json({ status: 'success' });
+  }
+
+  if (event.event === 'invoice.payment_failed' || event.event === 'subscription.disable') {
+    const { error: subscriptionError } = await supabase.from('macro_subscriptions').update({
+      status: event.event === 'subscription.disable' ? 'cancelled' : 'past_due',
+      updated_at: new Date().toISOString(),
+    }).eq('reference', subscription.reference);
+    if (subscriptionError) throw subscriptionError;
+    const { error: profileError } = await supabase.from('profiles').update({
+      tier_status: 'free',
+      macro_vip_expires_at: null,
+    }).eq('id', subscription.user_id);
+    if (profileError) throw profileError;
+    return NextResponse.json({ status: 'success' });
+  }
+
+  return NextResponse.json({ status: 'ignored' });
 }
 
 export async function handlePaystackWebhook(request: Request) {
@@ -63,6 +142,16 @@ export async function handlePaystackWebhook(request: Request) {
   }
   const event = payload as PaystackEvent;
   const reference = typeof event.data?.reference === 'string' ? event.data.reference : undefined;
+  const hasMacroSubscriptionCode = typeof event.data?.subscription?.subscription_code === 'string'
+    || typeof event.data?.subscription_code === 'string';
+  if (reference?.startsWith('macro_') || hasMacroSubscriptionCode) {
+    try {
+      return await handleMacroSubscriptionEvent(event);
+    } catch (error) {
+      console.error('Paystack VIP subscription processing failed:', error);
+      return NextResponse.json({ error: 'Subscription processing failed.' }, { status: 503 });
+    }
+  }
   const refundTransaction = event.event === 'refund.processed' || event.event === 'refund.failed'
     ? event.data?.transaction
     : undefined;

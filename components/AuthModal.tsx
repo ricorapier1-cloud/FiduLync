@@ -33,6 +33,23 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean, onClos
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    setIsSubmitting(true);
+    setMessage('');
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin },
+      });
+      if (error) setMessage('Google sign-in is temporarily unavailable. Please try again.');
+    } catch (error) {
+      console.error('Google authentication request failed:', error);
+      setMessage('Google sign-in is temporarily unavailable. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
@@ -46,6 +63,9 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean, onClos
             {isSubmitting ? 'Please wait…' : isLogin ? 'Sign In' : 'Sign Up'}
           </button>
         </form>
+        <button type="button" disabled={isSubmitting} onClick={() => void handleGoogleSignIn()} className="mt-4 w-full rounded-lg border border-gray-700 py-3 font-semibold text-white disabled:opacity-60">
+          Continue with Google
+        </button>
         <button type="button" className="text-gray-400 text-sm mt-4 text-center w-full" onClick={() => { setMessage(''); setIsLogin(!isLogin); }}>
           {isLogin ? "Need an account? Sign Up" : "Have an account? Login"}
         </button>

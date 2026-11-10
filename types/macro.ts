@@ -26,7 +26,8 @@ export type EconomicCatalyst = {
 
 export type MacroSnapshot = {
   asOf: string;
-  source: 'seed' | 'provider';
+  source: 'seed' | 'provider' | 'partial';
+  cotSource?: 'seed' | 'provider';
   currencies: MacroCurrency[];
   cot: CotPosition[];
   catalysts: EconomicCatalyst[];

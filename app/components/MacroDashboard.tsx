@@ -17,6 +17,9 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import type { MacroSnapshot } from '@/types/macro';
+import { supabase } from '@/lib/supabaseClient';
+import AuthModal from '@/components/AuthModal';
+import MacroAccountModal from '@/components/MacroAccountModal';
 
 type MacroDashboardProps = {
   initialSnapshot: MacroSnapshot;
@@ -88,6 +91,10 @@ export default function MacroDashboard({ initialSnapshot, vipEnabled, vipPrice }
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [checkoutMessage, setCheckoutMessage] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [accessToken, setAccessToken] = useState('');
+  const [signedInEmail, setSignedInEmail] = useState('');
+  const [authOpen, setAuthOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const score = calculateBias(snapshot, pair);
   const sortedCatalysts = [...snapshot.catalysts]
     .filter((catalyst) => now === null || Date.parse(catalyst.scheduledAt) >= now)
@@ -136,15 +143,42 @@ export default function MacroDashboard({ initialSnapshot, vipEnabled, vipPrice }
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    void supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!active) return;
+      setAccessToken(session?.access_token ?? '');
+      setSignedInEmail(session?.user.email ?? '');
+      if (session?.user.email) setEmail(session.user.email);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAccessToken(session?.access_token ?? '');
+      setSignedInEmail(session?.user.email ?? '');
+      if (session?.user.email) setEmail(session.user.email);
+    });
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
   async function beginVipCheckout(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setCheckoutMessage('');
     setCheckoutBusy(true);
     try {
-      const response = await fetch('/api/macro/vip', {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token || !session.user.email) {
+        setCheckoutMessage('Sign in before subscribing to the VIP Macro Pass.');
+        setAuthOpen(true);
+        return;
+      }
+      const accountEmail = session.user.email.trim().toLowerCase();
+      setEmail(accountEmail);
+      const response = await fetch('/api/paystack-checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ email: accountEmail }),
       });
       const payload: unknown = await response.json();
       if (!response.ok || !isRecord(payload) || typeof payload.authorizationUrl !== 'string') {
@@ -166,7 +200,7 @@ export default function MacroDashboard({ initialSnapshot, vipEnabled, vipPrice }
     <div className="macro-page">
       <div className="macro-statusline mono">
         <span><span className="macro-pulse" /> MACRO INTELLIGENCE / GLOBAL FX</span>
-        <span className="macro-status-right"><span className="macro-feed-badge">{snapshot.source === 'provider' ? 'PROVIDER FEED' : 'ILLUSTRATIVE SEED'}</span><button type="button" className="macro-refresh" aria-label="Refresh macro data" onClick={() => window.location.reload()}><RefreshCw size={13} className={refreshing ? 'macro-spin' : ''} /> REFRESH</button></span>
+        <span className="macro-status-right"><span className="macro-feed-badge">{snapshot.source === 'provider' ? 'PROVIDER FEED' : snapshot.source === 'partial' ? 'PARTIAL FEED' : 'ILLUSTRATIVE SEED'}</span><button type="button" className="macro-refresh" aria-label="Refresh macro data" onClick={() => window.location.reload()}><RefreshCw size={13} className={refreshing ? 'macro-spin' : ''} /> REFRESH</button><button type="button" className="macro-refresh" onClick={() => accessToken ? setAccountOpen(true) : setAuthOpen(true)}>{accessToken ? 'ACCOUNT' : 'SIGN IN'}</button></span>
       </div>
 
       <section className="macro-intro" aria-labelledby="macro-title">
@@ -177,9 +211,9 @@ export default function MacroDashboard({ initialSnapshot, vipEnabled, vipPrice }
           <a className="macro-intro-action" href="https://wa.me/2348037212445?text=Hello%2C%20I%27d%20like%20to%20automate%20a%20macro%20strategy%20with%20an%20MT5%20Expert%20Advisor." target="_blank" rel="noreferrer"><MessageCircle size={15} /> Automate this strategy <ArrowUpRight size={13} /></a>
         </div>
         <div className="macro-intro-meta mono">
-          <span>SNAPSHOT / {snapshot.source === 'provider' ? 'UPSTREAM' : 'SEED BASELINE'}</span>
+          <span>SNAPSHOT / {snapshot.source === 'provider' ? 'UPSTREAM' : snapshot.source === 'partial' ? 'MIXED INPUTS' : 'SEED BASELINE'}</span>
           <strong>{now ? new Date(now).toISOString().replace('T', ' ').slice(0, 19) + ' UTC' : 'UTC / --:--:--'}</strong>
-          <span className="macro-provenance">{snapshot.source === 'seed' ? 'Illustrative values. Configure a provider for current observations.' : 'Provider payload validated at the platform edge.'}</span>
+          <span className="macro-provenance">{snapshot.source === 'seed' ? 'Illustrative values. Configure a provider for current observations.' : snapshot.source === 'partial' ? 'Some fields are live; remaining values use the seed baseline.' : 'Provider payload validated at the platform edge.'}</span>
         </div>
       </section>
 
@@ -187,7 +221,7 @@ export default function MacroDashboard({ initialSnapshot, vipEnabled, vipPrice }
         <article className="macro-kpi"><span className="macro-kpi-label">POLICY RANGE <span>G10</span></span><strong className="mono">{formatRate(policySpread)}</strong><small>highest to lowest policy rate</small></article>
         <article className="macro-kpi"><span className="macro-kpi-label">CENTRAL BANKS <span>TRACKED</span></span><strong className="mono">{String(currencies.length).padStart(2, '0')} <em>/ 06</em></strong><small>Fed · ECB · BoE · BoJ · RBA · SNB</small></article>
         <article className="macro-kpi"><span className="macro-kpi-label">NEXT CATALYST <span>HIGH IMPACT</span></span><strong className="mono">{sortedCatalysts[0] && now ? formatCountdown(sortedCatalysts[0].scheduledAt, now) : '—'}</strong><small>{sortedCatalysts[0]?.title ?? 'No upcoming event in feed'}</small></article>
-        <article className="macro-kpi macro-kpi-source"><span className="macro-kpi-label">DATA PROVENANCE <span>STATUS</span></span><strong className="macro-source-value"><span className={snapshot.source === 'provider' ? 'macro-source-dot macro-source-live' : 'macro-source-dot'} />{snapshot.source === 'provider' ? 'CONNECTED' : 'SEED MODE'}</strong><small>{refreshing ? 'Checking provider…' : 'External feed is optional'}</small></article>
+        <article className="macro-kpi macro-kpi-source"><span className="macro-kpi-label">DATA PROVENANCE <span>STATUS</span></span><strong className="macro-source-value"><span className={snapshot.source === 'seed' ? 'macro-source-dot' : 'macro-source-dot macro-source-live'} />{snapshot.source === 'provider' ? 'CONNECTED' : snapshot.source === 'partial' ? 'PARTIAL' : 'SEED MODE'}</strong><small>{refreshing ? 'Checking provider…' : 'External feed is optional'}</small></article>
       </section>
 
       <section id="matrix" className="macro-section" aria-labelledby="matrix-title">
@@ -245,7 +279,7 @@ export default function MacroDashboard({ initialSnapshot, vipEnabled, vipPrice }
             {snapshot.cot.map((position) => <div className="macro-cot-row" key={position.market}>
               <strong className="mono">{position.market}</strong><span className={`mono ${position.netContracts >= 0 ? 'macro-positive' : 'macro-negative'}`}>{formatContracts(position.netContracts)}</span><span className={`mono ${position.weeklyChange >= 0 ? 'macro-positive' : 'macro-negative'}`}>{position.weeklyChange > 0 ? '+' : ''}{formatContracts(position.weeklyChange)}</span><div className="macro-extreme"><div className="macro-extreme-track"><span style={{ width: `${position.percentile}%` }} /></div><span className="mono">{position.percentile}%ile</span>{(position.percentile >= 90 || position.percentile <= 10) && <span className="macro-crowded">CROWDED</span>}</div>
             </div>)}
-            <div className="macro-panel-foot"><span>Illustrative net positions; provider should map CFTC legacy/financial futures definitions.</span><span className="mono">POSITIONING ≠ SIGNAL</span></div>
+            <div className="macro-panel-foot"><span>{snapshot.cotSource === 'provider' ? 'COT feed validated; confirm the provider uses consistent CFTC report definitions.' : 'Illustrative net positions; configure a COT provider for current CFTC positioning.'}</span><span className="mono">POSITIONING ≠ SIGNAL</span></div>
           </div>
           <aside className="macro-cot-callout"><div className="macro-callout-icon"><TrendingUp size={18} /></div><span className="eyebrow">CROWDING WATCH</span><h3>Extremes can amplify reversals.</h3><p>High percentiles flag crowded exposure, not a timing trigger. Compare positioning with policy repricing and the catalyst calendar.</p><div className="macro-callout-stat"><span>TOP SEED EXTREME</span><strong className="mono">{snapshot.cot.reduce((highest, current) => current.percentile > highest.percentile ? current : highest, snapshot.cot[0] ?? { market: '—', percentile: 0 }).market} <em>{Math.max(0, ...snapshot.cot.map((position) => position.percentile))}%</em></strong></div></aside>
         </div>
@@ -257,7 +291,7 @@ export default function MacroDashboard({ initialSnapshot, vipEnabled, vipPrice }
         <form className="macro-vip-form" onSubmit={beginVipCheckout}>
           <div className="macro-vip-price"><strong className="mono">₦{new Intl.NumberFormat('en-NG').format(vipPrice)}</strong><span>/ month</span></div>
           <label htmlFor="vip-email">EMAIL FOR SUBSCRIPTION</label>
-          <div className="macro-vip-email"><Mail size={15} /><input id="vip-email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@company.com" /></div>
+          <div className="macro-vip-email"><Mail size={15} /><input id="vip-email" type="email" autoComplete="email" required readOnly={Boolean(signedInEmail)} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@company.com" /></div>
           <button type="submit" className="macro-vip-button" disabled={!vipEnabled || checkoutBusy}>{checkoutBusy ? 'Opening Paystack…' : vipEnabled ? 'Subscribe with Paystack' : 'Checkout not configured'}<ArrowRight size={15} /></button>
           <p className="macro-vip-feedback" role="status">{checkoutMessage || (vipEnabled ? 'Secure checkout · recurring plan' : 'Configure Paystack secret and monthly plan to enable checkout.')}</p>
         </form>
@@ -268,6 +302,8 @@ export default function MacroDashboard({ initialSnapshot, vipEnabled, vipPrice }
         <div className="macro-footer-actions"><a href="mailto:fidulync@gmail.com"><Mail size={15} /> fidulync@gmail.com</a><a href="https://wa.me/2348037212445?text=Hello%2C%20I%27d%20like%20to%20automate%20a%20macro%20strategy%20with%20an%20MT5%20Expert%20Advisor." target="_blank" rel="noreferrer"><MessageCircle size={15} /> Automate this strategy <ArrowUpRight size={13} /></a></div>
         <span className="macro-footer-legal mono">RESEARCH TOOLING / NOT FINANCIAL ADVICE</span>
       </footer>
+      <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} />
+      {accessToken && <MacroAccountModal isOpen={accountOpen} accessToken={accessToken} onClose={() => setAccountOpen(false)} onSignOut={() => { setAccessToken(''); setSignedInEmail(''); }} />}
     </div>
   );
 }
