@@ -17,6 +17,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import type { MacroSnapshot } from '@/types/macro';
+import PaystackPop from '@paystack/inline-js';
 import { supabase } from '@/lib/supabaseClient';
 import AuthModal from '@/components/AuthModal';
 import MacroAccountModal from '@/components/MacroAccountModal';
@@ -181,11 +182,35 @@ export default function MacroDashboard({ initialSnapshot, vipEnabled, vipPrice }
         body: JSON.stringify({ email: accountEmail }),
       });
       const payload: unknown = await response.json();
-      if (!response.ok || !isRecord(payload) || typeof payload.authorizationUrl !== 'string') {
+      if (!response.ok || !isRecord(payload)) {
         const message = isRecord(payload) && typeof payload.error === 'string'
           ? payload.error
           : 'Checkout could not be started. Please try again.';
         setCheckoutMessage(message);
+        return;
+      }
+      if (payload.mode === 'inline'
+        && typeof payload.publicKey === 'string'
+        && typeof payload.reference === 'string'
+        && typeof payload.planCode === 'string'
+        && typeof payload.amount === 'number') {
+        const paystack = new PaystackPop();
+        paystack.newTransaction({
+          key: payload.publicKey,
+          email: accountEmail,
+          amount: payload.amount,
+          currency: 'NGN',
+          planCode: payload.planCode,
+          reference: payload.reference,
+          metadata: { product: 'macro_vip_monthly' },
+          onSuccess: () => setCheckoutMessage('Payment received. Your VIP access will activate after Paystack confirms the charge.'),
+          onCancel: () => setCheckoutMessage('Checkout was cancelled.'),
+          onError: ({ message }) => setCheckoutMessage(message || 'Paystack checkout could not be opened.'),
+        });
+        return;
+      }
+      if (typeof payload.authorizationUrl !== 'string') {
+        setCheckoutMessage('Checkout could not be started. Please try again.');
         return;
       }
       window.location.assign(payload.authorizationUrl);

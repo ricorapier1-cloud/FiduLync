@@ -17,6 +17,7 @@ Set the following environment variables in the deployment environment:
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Browser Supabase Auth client |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only Supabase service access; never expose to the browser |
 | `PAYSTACK_SECRET_KEY` | Server-side checkout, refund and transfer requests |
+| `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | Optional Paystack Inline checkout key; hosted redirect is used if omitted |
 | `PAYSTACK_VIP_PLAN_CODE` | Paystack monthly NGN plan configured for exactly ₦5,000 |
 | `NEXT_PUBLIC_APP_URL` | Optional canonical HTTP(S) URL for metadata and Paystack callbacks; callbacks fall back to the request origin |
 | `CRON_SECRET` | Bearer secret for scheduled settlement and macro-refresh endpoints |

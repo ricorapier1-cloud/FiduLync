@@ -83,6 +83,17 @@ export async function POST(request: Request) {
     });
     if (subscriptionError) throw subscriptionError;
 
+    const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY?.trim() || process.env.PAYSTACK_PUBLIC_KEY?.trim();
+    if (publicKey) {
+      return NextResponse.json({
+        mode: 'inline',
+        publicKey,
+        reference,
+        planCode,
+        amount: expectedAmount,
+      }, { headers: { 'Cache-Control': 'private, no-store, max-age=0' } });
+    }
+
     const origin = process.env.NEXT_PUBLIC_APP_URL?.trim() || new URL(request.url).origin;
     const callbackUrl = new URL('/?vip=success#vip', origin).toString();
     const response = await fetch('https://api.paystack.co/transaction/initialize', {
