@@ -1,20 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Check, Copy, ShieldCheck } from 'lucide-react';
+import Link from 'next/link';
 import toast from 'react-hot-toast';
+import { NIGERIAN_BANKS } from '@/lib/banks';
 import { calculateEscrowFee, formatCurrency } from '@/lib/feeCalculator';
-
-const banks = [
-  ['044', 'Access Bank'],
-  ['058', 'Guaranty Trust Bank'],
-  ['011', 'First Bank'],
-  ['033', 'United Bank for Africa'],
-  ['057', 'Zenith Bank'],
-  ['999992', 'OPay'],
-  ['999991', 'PalmPay'],
-  ['090267', 'Kuda Bank'],
-];
+import { supabase } from '@/lib/supabaseClient';
 
 export default function EscrowForm() {
   const [title, setTitle] = useState('');
@@ -27,6 +19,10 @@ export default function EscrowForm() {
   const [sellerAccountName, setSellerAccountName] = useState('');
   const [sellerAccountNumber, setSellerAccountNumber] = useState('');
   const [sellerBankCode, setSellerBankCode] = useState('044');
+  const [bankLookupStatus, setBankLookupStatus] = useState<'idle' | 'loading' | 'verified' | 'error'>('idle');
+  const [bankLookupError, setBankLookupError] = useState('');
+  const [bankLookupAttempt, setBankLookupAttempt] = useState(0);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [generatedLink, setGeneratedLink] = useState('');
   const [dealReference, setDealReference] = useState('');
@@ -34,13 +30,63 @@ export default function EscrowForm() {
   const price = Number(amount) || 0;
   const fee = useMemo(() => calculateEscrowFee(price, currency, feePayer), [price, currency, feePayer]);
 
+  useEffect(() => {
+    if (!/^\d{10}$/.test(sellerAccountNumber)) return;
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setBankLookupStatus('loading');
+      try {
+        const response = await fetch('/api/verify-bank', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accountNumber: sellerAccountNumber, bankCode: sellerBankCode }),
+          signal: controller.signal,
+        });
+        const payload: unknown = await response.json();
+        const result = payload && typeof payload === 'object'
+          ? payload as Record<string, unknown>
+          : {};
+        if (!response.ok || result.success !== true || typeof result.accountName !== 'string') {
+          throw new Error(typeof result.message === 'string' ? result.message : 'Account verification failed.');
+        }
+        setSellerAccountName(result.accountName);
+        setBankLookupStatus('verified');
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setBankLookupStatus('error');
+        setBankLookupError(error instanceof Error ? error.message : 'Unable to verify this account. Try again.');
+      }
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [sellerAccountNumber, sellerBankCode, bankLookupAttempt]);
+
   async function handleGenerate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!termsAccepted) {
+      toast.error('Accept the Terms of Service before creating a deal.');
+      return;
+    }
+    if (bankLookupStatus !== 'verified') {
+      toast.error('Verify the seller bank account before creating a deal.');
+      return;
+    }
+
     setLoading(true);
     try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw new Error('Unable to validate your account session. Please try again.');
+
       const response = await fetch('/api/escrow/create', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({
           title: title.trim(),
           description: description.trim(),
@@ -49,9 +95,9 @@ export default function EscrowForm() {
           fee_payer: feePayer,
           buyer_phone: buyerPhone.trim(),
           seller_phone: sellerPhone.trim(),
-          seller_account_name: sellerAccountName.trim(),
           seller_account_number: sellerAccountNumber.trim(),
           seller_bank_code: sellerBankCode,
+          terms_accepted: termsAccepted,
         }),
       });
 
@@ -92,7 +138,10 @@ export default function EscrowForm() {
         </div>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row">
           <button type="button" className="primary-button flex-1" onClick={copyLink}><Copy size={15} /> Copy secure link</button>
-          <button type="button" className="secondary-button flex-1" onClick={() => setGeneratedLink('')}>Create another deal</button>
+          <button type="button" className="secondary-button flex-1" onClick={() => {
+            setGeneratedLink('');
+            setTermsAccepted(false);
+          }}>Create another deal</button>
         </div>
         <p className="mt-5 text-center text-[10px] leading-5 text-slate-500">Funds are only considered funded after Paystack confirms payment server-side. Never share banking passwords or one-time passcodes.</p>
       </section>
@@ -157,13 +206,31 @@ export default function EscrowForm() {
             </div>
             <div>
               <label className="field-label" htmlFor="seller-bank">Bank</label>
-              <select id="seller-bank" className="field-control" value={sellerBankCode} onChange={(event) => setSellerBankCode(event.target.value)}>
-                {banks.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+              <select id="seller-bank" className="field-control" value={sellerBankCode} onChange={(event) => {
+                setSellerBankCode(event.target.value);
+                setSellerAccountName('');
+                setBankLookupStatus('idle');
+                setBankLookupError('');
+              }}>
+                {NIGERIAN_BANKS.map(({ code, name }) => <option key={code} value={code}>{name}</option>)}
               </select>
             </div>
             <div>
               <label className="field-label" htmlFor="seller-account-number">Account number</label>
-              <input id="seller-account-number" className="field-control mono" inputMode="numeric" pattern="[0-9]{10}" minLength={10} maxLength={10} required value={sellerAccountNumber} onChange={(event) => setSellerAccountNumber(event.target.value.replace(/\D/g, ''))} placeholder="10 digits" />
+              <input id="seller-account-number" className="field-control mono" inputMode="numeric" pattern="[0-9]{10}" minLength={10} maxLength={10} required value={sellerAccountNumber} onChange={(event) => {
+                setSellerAccountNumber(event.target.value.replace(/\D/g, ''));
+                setSellerAccountName('');
+                setBankLookupStatus('idle');
+                setBankLookupError('');
+              }} placeholder="10 digits" />
+            </div>
+            <div className="sm:col-span-2" aria-live="polite">
+              <label className="field-label" htmlFor="seller-account-name">Verified account holder</label>
+              <input id="seller-account-name" className="field-control" value={sellerAccountName} readOnly placeholder="Enter a 10-digit account number to verify" />
+              {bankLookupStatus === 'loading' && <p role="status" className="mt-2 h-4 animate-pulse rounded bg-white/[0.06] text-[10px] text-slate-400">Verifying account with Paystack…</p>}
+              {bankLookupStatus === 'verified' && <p className="mt-2 text-[10px] text-emerald-200">Bank account verified successfully.</p>}
+              {bankLookupStatus === 'error' && <p role="alert" className="mt-2 text-[10px] text-rose-300">{bankLookupError} Check the details and edit the account number or bank to retry.</p>}
+              {bankLookupStatus === 'error' && <button type="button" className="mt-2 text-[10px] font-semibold text-[#51e4c2] underline underline-offset-2" onClick={() => setBankLookupAttempt((attempt) => attempt + 1)}>Retry verification</button>}
             </div>
             <div>
               <label className="field-label" htmlFor="buyer-phone">Buyer phone <span className="font-normal text-slate-600">(optional)</span></label>
@@ -176,7 +243,21 @@ export default function EscrowForm() {
           </div>
         </div>
 
-        <button className="primary-button w-full" type="submit" disabled={loading}>
+        <div className="flex items-start gap-3 rounded-xl border border-white/[0.07] bg-black/15 p-4">
+          <input
+            id="creator-terms"
+            className="mt-1 h-4 w-4 accent-emerald-300"
+            type="checkbox"
+            required
+            checked={termsAccepted}
+            onChange={(event) => setTermsAccepted(event.target.checked)}
+          />
+          <label htmlFor="creator-terms" className="text-[11px] leading-5 text-slate-400">
+            I have read and agree to the <Link href="/legal/terms" className="text-[#51e4c2] underline underline-offset-2">Terms of Service and Escrow Agreement</Link>, including the disclosed fee, inspection period, and dispute process.
+          </label>
+        </div>
+
+        <button className="primary-button w-full" type="submit" disabled={loading || bankLookupStatus !== 'verified' || !termsAccepted}>
           <ShieldCheck size={16} /> {loading ? 'Creating protected deal…' : 'Create secure payment link'} <ArrowRight size={15} />
         </button>
         <p className="text-[10px] leading-5 text-slate-500">Creating a deal does not move funds. Paystack confirms payment before a deal is marked funded. Disputed funds remain frozen for review.</p>

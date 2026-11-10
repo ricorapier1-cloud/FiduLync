@@ -18,12 +18,20 @@ type Deal = {
   seller_fee: number;
   status: string;
   payment_initiated: boolean;
+  funded_at: string | null;
   inspection_deadline: string | null;
 };
 
-function countdown(deadline: string | null, now: number) {
-  if (!deadline) return 'Starts when funds are confirmed';
-  const remaining = Math.max(0, new Date(deadline).getTime() - now);
+function countdown(deadline: string | null, fundedAt: string | null, now: number) {
+  const parsedDeadline = deadline ? Date.parse(deadline) : Number.NaN;
+  const parsedFundedAt = fundedAt ? Date.parse(fundedAt) : Number.NaN;
+  const resolvedDeadline = Number.isFinite(parsedDeadline)
+    ? parsedDeadline
+    : Number.isFinite(parsedFundedAt)
+      ? parsedFundedAt + 48 * 60 * 60 * 1000
+      : Number.NaN;
+  if (!Number.isFinite(resolvedDeadline)) return 'Inspection deadline unavailable';
+  const remaining = Math.max(0, resolvedDeadline - now);
   const hours = Math.floor(remaining / 3_600_000).toString().padStart(2, '0');
   const minutes = Math.floor((remaining % 3_600_000) / 60_000).toString().padStart(2, '0');
   const seconds = Math.floor((remaining % 60_000) / 1000).toString().padStart(2, '0');
@@ -34,6 +42,7 @@ export default function BuyerCheckout() {
   const { id } = useParams<{ id: string }>();
   const [deal, setDeal] = useState<Deal | null>(null);
   const [email, setEmail] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
@@ -72,13 +81,17 @@ export default function BuyerCheckout() {
   async function fundDeal(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!deal) return;
+    if (!termsAccepted) {
+      setError('Accept the Terms of Service before continuing to payment.');
+      return;
+    }
     setPaying(true);
     setError('');
     try {
       const response = await fetch(`/api/escrow/${encodeURIComponent(deal.reference)}/fund`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, terms_accepted: termsAccepted }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Unable to start checkout.');
@@ -103,7 +116,12 @@ export default function BuyerCheckout() {
         </div>
 
         {loading ? (
-          <div className="p-8 text-center text-xs text-slate-500">Retrieving protected deal terms…</div>
+          <div role="status" aria-label="Loading escrow details" className="space-y-4 p-6 sm:p-8">
+            <span className="sr-only">Retrieving protected deal terms…</span>
+            <div className="h-4 w-2/3 animate-pulse rounded bg-white/[0.07]" />
+            <div className="h-20 animate-pulse rounded-xl bg-white/[0.04]" />
+            <div className="h-10 animate-pulse rounded-xl bg-white/[0.04]" />
+          </div>
         ) : !deal ? (
           <div className="p-6 text-center">
             <AlertCircle className="mx-auto text-rose-300" size={22} />
@@ -126,7 +144,7 @@ export default function BuyerCheckout() {
                 <div className="flex items-center gap-2 text-xs font-semibold text-emerald-100"><CheckCircle2 size={16} className="text-[#51e4c2]" /> Payment confirmed · inspection window active</div>
                 <div className="mt-3 flex items-center justify-between gap-3 text-xs">
                   <span className="flex items-center gap-2 text-slate-400"><Clock3 size={14} /> Inspection window</span>
-                  <span className="mono text-[#51e4c2]">{countdown(deal.inspection_deadline, now)}</span>
+                  <span className="mono text-[#51e4c2]">{countdown(deal.inspection_deadline, deal.funded_at, now)}</span>
                 </div>
                 <p className="mt-3 text-[10px] leading-5 text-slate-500">Open a dispute before the inspection deadline if the delivery does not meet the agreed terms. Disputes freeze settlement.</p>
                 <Link href="/disputes" className="secondary-button mt-3 w-full">Open the Dispute Vault</Link>
@@ -143,8 +161,14 @@ export default function BuyerCheckout() {
                 <label className="field-label" htmlFor="buyer-email">Payment receipt email</label>
                 <input id="buyer-email" className="field-control" type="email" autoComplete="email" maxLength={254} required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" />
                 <p className="text-[10px] leading-5 text-slate-500">Paystack processes the payment securely. FiduLync marks the deal funded only after the signed provider webhook confirms the exact amount.</p>
+                <div className="flex items-start gap-3 rounded-xl border border-white/[0.07] bg-black/15 p-3">
+                  <input id="buyer-terms" className="mt-1 h-4 w-4 accent-emerald-300" type="checkbox" required checked={termsAccepted} onChange={(event) => setTermsAccepted(event.target.checked)} />
+                  <label htmlFor="buyer-terms" className="text-[10px] leading-5 text-slate-400">
+                    I have read and agree to the <Link href="/legal/terms" className="text-[#51e4c2] underline underline-offset-2">Terms of Service and Escrow Agreement</Link>, including the inspection and dispute process.
+                  </label>
+                </div>
                 {error && <p role="alert" className="text-xs text-rose-300">{error}</p>}
-                <button className="primary-button w-full" type="submit" disabled={paying}>
+                <button className="primary-button w-full" type="submit" disabled={paying || !termsAccepted}>
                   <LockKeyhole size={15} /> {paying ? 'Connecting to Paystack…' : 'Pay & start 48-hour inspection'}
                 </button>
               </form>

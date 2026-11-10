@@ -1,19 +1,36 @@
 'use client';
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { supabase } from '../lib/supabaseClient';
 export default function AuthModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLogin, setIsLogin] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState('');
 
-  const handleAuth = async (e: any) => {
+  const handleAuth = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (isLogin) {
-      await supabase.auth.signInWithPassword({ email, password });
-    } else {
-      await supabase.auth.signUp({ email, password });
+    setIsSubmitting(true);
+    setMessage('');
+    try {
+      const { data, error } = isLogin
+        ? await supabase.auth.signInWithPassword({ email: email.trim(), password })
+        : await supabase.auth.signUp({ email: email.trim(), password });
+      if (error) {
+        setMessage('Authentication failed. Check your details and try again.');
+        return;
+      }
+      if (!isLogin && !data.session) {
+        setMessage('Check your email to confirm your account before signing in.');
+        return;
+      }
+      onClose();
+    } catch (error) {
+      console.error('Supabase authentication request failed:', error);
+      setMessage('Authentication is temporarily unavailable. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
-    window.location.reload();
   };
 
   if (!isOpen) return null;
@@ -22,14 +39,17 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean, onClos
       <div className="bg-[#0b1016] border border-emerald-500/30 p-8 rounded-2xl w-full max-w-md shadow-2xl">
         <h2 className="text-2xl font-bold text-white mb-6">{isLogin ? 'Login to FiduLync' : 'Create Account'}</h2>
         <form onSubmit={handleAuth} className="space-y-4">
-          <input type="email" placeholder="Email" required className="w-full bg-[#131b24] text-white p-3 rounded-lg border border-gray-700 focus:border-emerald-500 outline-none" onChange={(e) => setEmail(e.target.value)} />
-          <input type="password" placeholder="Password" required className="w-full bg-[#131b24] text-white p-3 rounded-lg border border-gray-700 focus:border-emerald-500 outline-none" onChange={(e) => setPassword(e.target.value)} />
-          <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 text-black font-bold py-3 rounded-lg transition-all">{isLogin ? 'Sign In' : 'Sign Up'}</button>
+          <input type="email" autoComplete="email" placeholder="Email" required className="w-full bg-[#131b24] text-white p-3 rounded-lg border border-gray-700 focus:border-emerald-500 outline-none" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input type="password" autoComplete={isLogin ? 'current-password' : 'new-password'} minLength={8} placeholder="Password" required className="w-full bg-[#131b24] text-white p-3 rounded-lg border border-gray-700 focus:border-emerald-500 outline-none" value={password} onChange={(e) => setPassword(e.target.value)} />
+          {message && <p className="text-sm text-rose-200" role="alert">{message}</p>}
+          <button type="submit" disabled={isSubmitting} className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-black font-bold py-3 rounded-lg transition-all">
+            {isSubmitting ? 'Please wait…' : isLogin ? 'Sign In' : 'Sign Up'}
+          </button>
         </form>
-        <p className="text-gray-400 text-sm mt-4 text-center cursor-pointer" onClick={() => setIsLogin(!isLogin)}>
+        <button type="button" className="text-gray-400 text-sm mt-4 text-center w-full" onClick={() => { setMessage(''); setIsLogin(!isLogin); }}>
           {isLogin ? "Need an account? Sign Up" : "Have an account? Login"}
-        </p>
-        <button onClick={onClose} className="mt-6 text-red-400 hover:text-red-300 w-full text-center">Cancel</button>
+        </button>
+        <button type="button" onClick={onClose} className="mt-6 text-red-400 hover:text-red-300 w-full text-center">Cancel</button>
       </div>
     </div>
   );

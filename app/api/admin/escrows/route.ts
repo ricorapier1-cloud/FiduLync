@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/serverSupabase';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   const result = await requireAdmin(request);
   if ('response' in result) return result.response;

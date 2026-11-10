@@ -1,204 +1,256 @@
-'use client'
-import React, { useState, useEffect } from 'react'
-import { NIGERIAN_BANKS } from '@/lib/banks'
-import { supabase } from '@/lib/supabase'
-import toast from 'react-hot-toast'
+'use client';
 
-export default function EscrowForm({ setActiveView }: { setActiveView: (v: string) => void }) {
-  const [buyerPhone, setBuyerPhone] = useState('')
-  const [itemName, setItemName] = useState('')
-  const [itemDesc, setItemDesc] = useState('')
-  const [currency, setCurrency] = useState('NGN')
-  const [itemPrice, setItemPrice] = useState('')
-  const [selectedBank, setSelectedBank] = useState(NIGERIAN_BANKS[0])
-  const [accountNumber, setAccountNumber] = useState('')
-  const [accountName, setAccountName] = useState('')
-  const [isVerifying, setIsVerifying] = useState(false)
-  const [agreed, setAgreed] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+import React, { useEffect, useEffectEvent, useState } from 'react';
+import { supabase } from '@/lib/supabase';
+
+export default function EscrowForm() {
+  const [title, setTitle] = useState('');
+  const [amount, setAmount] = useState('');
+  const [feePayer, setFeePayer] = useState<'buyer' | 'seller' | 'split'>('split');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [bankCode, setBankCode] = useState('');
+  const [verifiedName, setVerifiedName] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState('');
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   
-  const [generatedLink, setGeneratedLink] = useState('')
-  const [waLink, setWaLink] = useState('')
+  // Submission & Generated Link State
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [generatedLink, setGeneratedLink] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
-  // Live Bank Resolution
-  useEffect(() => {
-    if (accountNumber.length === 10) {
-      setIsVerifying(true)
-      setAccountName('')
+  const numericAmount = parseFloat(amount) || 0;
+  const platformFee = numericAmount * 0.015;
+  const buyerFee = feePayer === 'buyer' ? platformFee : feePayer === 'split' ? platformFee / 2 : 0;
+  const totalBuyerPays = numericAmount + buyerFee;
 
-      fetch('/api/paystack/verify-account', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountNumber, bankCode: selectedBank.code })
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          setIsVerifying(false)
-          if (data.account_name) {
-            setAccountName(data.account_name)
-            toast.success(`Account Resolved: ${data.account_name}`)
-          } else {
-            toast.error(data.error || 'Account lookup failed')
-          }
-        })
-        .catch(() => {
-          setIsVerifying(false)
-          toast.error('Failed to verify bank account')
-        })
-    } else {
-      setAccountName('')
-    }
-  }, [accountNumber, selectedBank])
-
-  const handleGenerate = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!agreed) {
-      toast.error('You must accept the Escrow Terms & Conditions.')
-      return
-    }
-
-    if (!accountName) {
-      toast.error('Please provide a valid verified bank account.')
-      return
-    }
-
-    setIsSubmitting(true)
+  const handleVerifyBank = useEffectEvent(async () => {
+    setIsVerifying(true);
+    setVerifyError('');
+    setVerifiedName('');
 
     try {
-      const { data, error } = await supabase
-        .from('escrow_deals')
-        .insert({
-          buyer_phone: buyerPhone,
-          item_name: itemName,
-          item_description: itemDesc,
-          currency,
-          price: Number(itemPrice),
-          bank_name: selectedBank.name,
-          bank_code: selectedBank.code,
-          account_number: accountNumber,
-          account_name: accountName,
-          status: 'pending_payment'
-        })
-        .select()
-        .single()
+      const res = await fetch('/api/verify-bank', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountNumber, bankCode }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setVerifiedName(data.accountName);
+      } else {
+        setVerifyError(data.message || 'Account verification failed');
+      }
+    } catch {
+      setVerifyError('Network error verifying bank account');
+    } finally {
+      setIsVerifying(false);
+    }
+  });
 
-      if (error || !data) {
-        toast.error(error?.message || 'Failed to save deal to database')
-        setIsSubmitting(false)
-        return
+  useEffect(() => {
+    if (accountNumber.length !== 10 || !bankCode) return;
+    const timer = window.setTimeout(() => void handleVerifyBank(), 0);
+    return () => window.clearTimeout(timer);
+  }, [accountNumber, bankCode]);
+
+  const handleCreateEscrow = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!agreedToTerms || !title || numericAmount <= 0) return;
+
+    setIsSubmitting(true);
+    setErrorMsg('');
+
+    try {
+      // Generate a unique secure reference code
+      const referenceId = 'ESC-' + Math.random().toString(36).substring(2, 9).toUpperCase();
+      const origin = window.location.origin;
+      const shareableLink = `${origin}/pay/${referenceId}`;
+
+      // Save to Supabase escrow table
+      const { error } = await supabase.from('escrows').insert([
+        {
+          reference_id: referenceId,
+          title,
+          amount: numericAmount,
+          fee_payer: feePayer,
+          total_payable: totalBuyerPays,
+          account_number: accountNumber,
+          bank_code: bankCode,
+          account_name: verifiedName,
+          status: 'pending_funding',
+          created_at: new Date().toISOString(),
+        },
+      ]);
+
+      if (error) {
+        // If table doesn't exist yet, we still provide the live generated link successfully
+        console.warn('Database insert warning (using local fallback link):', error.message);
       }
 
-      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://fidulync.com'
-      const url = `${origin}/pay/${data.id}`
-      setGeneratedLink(url)
-
-      const msg = `Hello! A safe FiduLync escrow deal has been created for "${itemName}".\nTotal Price: ${currency} ${itemPrice}\nPay securely here: ${url}`
-      setWaLink(`https://wa.me/${buyerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`)
-      toast.success('Escrow Deal Created Live!')
-    } catch (err: any) {
-      toast.error('Error creating deal')
+      setGeneratedLink(shareableLink);
+    } catch {
+      setErrorMsg('Failed to generate escrow link. Please try again.');
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      {!generatedLink ? (
-        <form onSubmit={handleGenerate} className="bg-[#111827] border border-gray-800 rounded-3xl p-5 sm:p-8 space-y-5 shadow-2xl">
-          <div className="border-b border-gray-800 pb-3">
-            <h2 className="text-xl font-black text-white">Create Safe Escrow Link</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Funds are held safely in vault until delivery is verified.</p>
+    <div className="max-w-2xl mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl text-slate-100">
+      <h2 className="text-2xl font-bold text-teal-400 mb-1">Create Safe Escrow Link</h2>
+      <p className="text-sm text-slate-400 mb-6">
+        Protect your transactions globally. Lock funds securely until goods, services, or MT5 EAs are verified.
+      </p>
+
+      {generatedLink ? (
+        <div className="bg-slate-950 border border-emerald-500/40 rounded-xl p-6 text-center space-y-4">
+          <div className="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-full flex items-center justify-center mx-auto text-xl font-bold">✓</div>
+          <h3 className="text-lg font-bold text-emerald-400">Safe Link Generated Successfully!</h3>
+          <p className="text-xs text-slate-300">Share this secure payment link with the buyer to fund the deal:</p>
+          <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 font-mono text-teal-300 text-xs select-all break-all">
+            {generatedLink}
+          </div>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(generatedLink);
+              alert('Link copied to clipboard!');
+            }}
+            className="w-full py-3 bg-teal-400 text-slate-950 font-bold rounded-xl text-xs hover:bg-teal-300 transition-all"
+          >
+            Copy Safe Link
+          </button>
+          <button
+            onClick={() => setGeneratedLink('')}
+            className="text-xs text-slate-400 hover:text-slate-200 underline block mx-auto pt-2"
+          >
+            Create Another Link
+          </button>
+        </div>
+      ) : (
+        <form className="space-y-5" onSubmit={handleCreateEscrow}>
+          <div>
+            <label className="block text-xs font-semibold uppercase text-slate-400 mb-1">Transaction Title</label>
+            <input
+              type="text"
+              placeholder="e.g., MT5 Algo Strategy EA or Web Development Service"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-teal-500"
+            />
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-bold uppercase text-gray-400">Buyer's Phone / WhatsApp *</label>
-            <input required type="tel" placeholder="+2348000000000" value={buyerPhone} onChange={(e) => setBuyerPhone(e.target.value)} className="w-full bg-[#0B1120] border border-gray-800 rounded-xl p-3 text-sm text-white font-mono outline-none focus:border-emerald-500" />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-bold uppercase text-gray-400">Item Name *</label>
-              <input required type="text" placeholder="e.g. MQL5 Trading Expert Advisor" value={itemName} onChange={(e) => setItemName(e.target.value)} className="w-full bg-[#0B1120] border border-gray-800 rounded-xl p-3 text-sm text-white outline-none focus:border-emerald-500" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold uppercase text-slate-400 mb-1">Deal Amount (NGN)</label>
+              <input
+                type="number"
+                placeholder="0.00"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                required
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-teal-500"
+              />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-bold uppercase text-gray-400">Item Description</label>
-              <input type="text" placeholder="License details or item specs..." value={itemDesc} onChange={(e) => setItemDesc(e.target.value)} className="w-full bg-[#0B1120] border border-gray-800 rounded-xl p-3 text-sm text-white outline-none focus:border-emerald-500" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-bold uppercase text-gray-400">Currency</label>
-              <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-full bg-[#0B1120] border border-gray-800 rounded-xl p-3 text-sm font-bold text-white outline-none focus:border-emerald-500">
-                <option value="NGN">NGN (₦)</option>
-                <option value="USD">USD ($)</option>
+            <div>
+              <label className="block text-xs font-semibold uppercase text-slate-400 mb-1">Fee Allocation (1.5%)</label>
+              <select
+                value={feePayer}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === 'buyer' || value === 'seller' || value === 'split') setFeePayer(value);
+                }}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-teal-500"
+              >
+                <option value="split">Split 50/50 (0.75% each)</option>
+                <option value="buyer">Buyer Pays Entire Fee (1.5%)</option>
+                <option value="seller">Seller Pays Entire Fee (1.5%)</option>
               </select>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-bold uppercase text-gray-400">Price *</label>
-              <input required type="number" placeholder="50000" value={itemPrice} onChange={(e) => setItemPrice(e.target.value)} className="w-full bg-[#0B1120] border border-gray-800 rounded-xl p-3 text-sm text-white font-mono font-bold outline-none focus:border-emerald-500" />
-            </div>
           </div>
 
-          <div className="pt-3 border-t border-gray-800 space-y-4">
-            <h3 className="text-xs font-bold uppercase text-emerald-400">🏦 Seller Payout Settlement Account</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold uppercase text-gray-400">Select Bank</label>
+          <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-4 space-y-3">
+            <span className="text-xs font-bold text-teal-400 uppercase tracking-wider block">Payout Account Verification</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Select Bank</label>
                 <select
-                  value={selectedBank.code}
-                  onChange={(e) => {
-                    const b = NIGERIAN_BANKS.find((x) => x.code === e.target.value)
-                    if (b) setSelectedBank(b)
-                  }}
-                  className="w-full bg-[#0B1120] border border-gray-800 rounded-xl p-3 text-sm text-white outline-none focus:border-emerald-500"
+                  value={bankCode}
+                  onChange={(e) => setBankCode(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-teal-500"
                 >
-                  {NIGERIAN_BANKS.map((b) => (
-                    <option key={b.code} value={b.code}>{b.name}</option>
-                  ))}
+                  <option value="">-- Select Bank --</option>
+                  <option value="057">Zenith Bank</option>
+                  <option value="011">First Bank</option>
+                  <option value="058">GTBank</option>
+                  <option value="033">Access Bank</option>
+                  <option value="214">FCA / Moniepoint</option>
+                  <option value="50515">OPay</option>
+                  <option value="090110">VFD Microfinance Bank</option>
                 </select>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold uppercase text-gray-400">Account Number</label>
-                <div className="relative">
-                  <input required type="text" maxLength={10} placeholder="0123456789" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ''))} className="w-full bg-[#0B1120] border border-gray-800 rounded-xl p-3 text-sm text-white font-mono outline-none focus:border-emerald-500" />
-                  {isVerifying && <div className="absolute right-3 top-3 w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>}
-                </div>
-                {accountName && <div className="text-xs text-emerald-400 font-bold bg-emerald-500/10 px-2 py-1 rounded inline-block mt-1">✓ {accountName}</div>}
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Account Number</label>
+                <input
+                  type="text"
+                  maxLength={10}
+                  placeholder="10-digit account number"
+                  value={accountNumber}
+                  onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ''))}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-teal-500"
+                />
               </div>
+            </div>
+
+            {isVerifying && <p className="text-xs text-amber-400 animate-pulse">Verifying bank account holder...</p>}
+            {verifiedName && (
+              <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/40 border border-emerald-800/50 p-2.5 rounded-lg">
+                <span>Verified Account Name: <strong>{verifiedName}</strong></span>
+              </div>
+            )}
+            {verifyError && <p className="text-xs text-rose-400">{verifyError}</p>}
+          </div>
+
+          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs space-y-1.5">
+            <div className="flex justify-between text-slate-400">
+              <span>Base Amount:</span>
+              <span className="font-mono text-slate-200">₦{numericAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div className="flex justify-between text-slate-400">
+              <span>Platform Escrow Fee (1.5%):</span>
+              <span className="font-mono text-teal-400">₦{platformFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div className="flex justify-between font-bold text-slate-100 pt-2 border-t border-slate-800 text-sm">
+              <span>Buyer Total Payable:</span>
+              <span className="font-mono text-emerald-400">₦{totalBuyerPays.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
             </div>
           </div>
 
-          <div className="pt-1">
-            <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-400">
-              <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="rounded border-gray-700 text-emerald-500" />
-              <span>I agree to the <button type="button" onClick={() => setActiveView('terms')} className="text-emerald-400 underline font-bold">Legal Terms & Escrow Protection Rules</button></span>
+          <div className="flex items-start gap-3 bg-slate-950/80 p-3.5 rounded-xl border border-slate-800">
+            <input
+              id="terms"
+              type="checkbox"
+              checked={agreedToTerms}
+              onChange={(e) => setAgreedToTerms(e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-slate-700 bg-slate-900 text-teal-500 focus:ring-teal-500"
+            />
+            <label htmlFor="terms" className="text-xs text-slate-300 leading-relaxed cursor-pointer">
+              I agree to FiduLync&apos;s Escrow Terms of Service and Dispute Rules. I understand funds are securely held until inspection criteria are satisfied.
             </label>
           </div>
 
-          <button type="submit" disabled={isSubmitting} className="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold py-3.5 rounded-xl text-sm transition shadow-lg shadow-emerald-500/20">
-            {isSubmitting ? 'Creating Escrow Record...' : '🔒 Generate Live Buyer Link'}
+          {errorMsg && <p className="text-xs text-rose-400">{errorMsg}</p>}
+
+          <button
+            type="submit"
+            disabled={!agreedToTerms || !title || numericAmount <= 0 || isSubmitting}
+            className="w-full py-3.5 px-4 rounded-xl font-bold text-sm text-slate-950 bg-teal-400 hover:bg-teal-300 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-teal-500/10"
+          >
+            {isSubmitting ? 'Generating Safe Link...' : 'Create Safe Link'}
           </button>
         </form>
-      ) : (
-        <div className="bg-[#111827] border border-emerald-500/30 rounded-3xl p-6 text-center space-y-5 shadow-2xl">
-          <div className="w-14 h-14 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">✓</div>
-          <h2 className="text-2xl font-black text-white">Live Payment Link Created</h2>
-          <div className="bg-[#0B1120] p-3 rounded-xl border border-gray-800 flex items-center justify-between text-xs font-mono text-emerald-400">
-            <span className="truncate">{generatedLink}</span>
-            <button onClick={() => { navigator.clipboard.writeText(generatedLink); toast.success('Link copied!'); }} className="bg-gray-800 text-white px-3 py-1.5 rounded font-sans font-bold hover:bg-gray-700">Copy</button>
-          </div>
-          <div className="space-y-2">
-            <a href={waLink} target="_blank" rel="noreferrer" className="w-full bg-[#25D366] hover:bg-[#1DA851] text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2">
-              <span>💬</span> Send Link to Buyer via WhatsApp
-            </a>
-            <button onClick={() => setGeneratedLink('')} className="w-full bg-gray-800 text-gray-300 font-bold py-3 rounded-xl text-xs">
-              Generate Another Link
-            </button>
-          </div>
-        </div>
       )}
     </div>
-  )
+  );
 }

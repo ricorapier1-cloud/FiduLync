@@ -17,7 +17,7 @@ Set the following environment variables in the deployment environment:
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Browser Supabase Auth client |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only Supabase service access; never expose to the browser |
 | `PAYSTACK_SECRET_KEY` | Server-side checkout, refund and transfer requests |
-| `NEXT_PUBLIC_APP_URL` | Canonical HTTPS application URL used for Paystack callbacks |
+| `NEXT_PUBLIC_APP_URL` | Optional canonical HTTP(S) URL for metadata and Paystack callbacks; callbacks fall back to the request origin |
 | `CRON_SECRET` | Bearer secret for the scheduled settlement endpoint |
 | `MT5_CREDENTIALS_ENCRYPTION_KEY` | Base64-encoded 32-byte AES-256-GCM key for MT5 investor credentials |
 
@@ -33,6 +33,8 @@ Never commit environment files, secret values or investor credentials.
 
 Apply the migrations in `supabase/migrations/` to a Supabase project with Auth and Storage enabled. The institutional platform migration adds deal fee allocation, inspection deadlines, private dispute evidence, EA listings and provider-review queues, encrypted MT5 integration storage, disbursements, arbitration audit logs and restrictive RLS policies.
 
+The runtime edge-guard migration normalizes existing 1.5% fee allocations and restores missing 48-hour inspection deadlines for funded, disputed and settling deals.
+
 The two allowlisted administrator email addresses must have Supabase Auth accounts. The migration assigns their profile role; administrator APIs independently verify the authenticated user, allowlisted email and database role.
 
 Configure the private `dispute-evidence` Storage bucket and ensure the production project has applied the RLS migration before enabling public deal creation.
@@ -45,13 +47,16 @@ Configure Paystack's webhook URL to `https://<your-domain>/api/paystack/webhook`
 
 ## Verification and risk disclosures
 
-Myfxbook and FXBlue submissions are reviewed by an administrator before a listing can be marked verified. MT5 investor credentials are accepted only by the authenticated server endpoint and encrypted with AES-256-GCM; configure the key before accepting those credentials. Sample marketplace metrics and equity curves are explicitly illustrative and are not represented as audited live results.
+The AlgoLync marketplace displays published Supabase listings and recorded verification metrics only; no seeded sample performance, simulated quotes or demo download artifacts are served. Myfxbook and FXBlue submissions are reviewed by an administrator before a listing can be marked verified. MT5 investor credentials are accepted only by the authenticated server endpoint and encrypted with AES-256-GCM; configure the key before accepting those credentials. Automated purchase-to-license provisioning is not enabled; the legacy license-verification endpoint returns `410 Gone` rather than claiming licenses exist without a live license data source.
+
+Escrow creation associates an authenticated creator session when one is present. The customer dashboard requires Supabase Auth and reads only deals associated with that user. Apply the escrow creator migration before deploying this version.
 
 Trading and escrow services require appropriate legal, financial, identity-verification, fraud-monitoring, incident-response and provider approvals before production use. Provider settlement timing and account eligibility remain subject to Paystack and bank rules.
 
 ## Validation
 
 ```bash
+npx tsc --noEmit
 npm run lint
 npm run build
 ```

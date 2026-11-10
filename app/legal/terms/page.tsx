@@ -15,7 +15,7 @@ const sections = [
   },
   {
     title: '4. AlgoLync verification and trading risk',
-    text: 'A verification badge identifies a provider source reviewed by an administrator; it does not guarantee accuracy, safety, profitability or future results. Marketplace preview metrics and curves labelled illustrative are examples, not verified account records. Trading foreign exchange, CFDs and leveraged products carries substantial risk. Simulated and historical results do not guarantee future performance.',
+    text: 'A verification badge identifies a provider source reviewed by an administrator; it does not guarantee accuracy, safety, profitability or future results. Marketplace metrics are displayed only when recorded for a published listing. Trading foreign exchange, CFDs and leveraged products carries substantial risk. Historical results do not guarantee future performance.',
   },
   {
     title: '5. Evidence and sensitive information',

@@ -2,10 +2,63 @@
 import { useState } from 'react'
 import Link from 'next/link'
 
+type EscrowDetails = {
+  id: string;
+  title: string;
+  amount: number;
+  currency: string;
+  status: string;
+  createdAt: string;
+};
+
+type VerificationResult = {
+  verified: boolean;
+  message: string;
+  escrow?: EscrowDetails;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function parseVerificationResult(value: unknown): VerificationResult {
+  if (!isRecord(value) || typeof value.verified !== 'boolean' || typeof value.message !== 'string') {
+    throw new Error('The verification service returned an invalid response.');
+  }
+  if (!value.verified) return { verified: false, message: value.message };
+
+  const escrow = value.escrow;
+  if (
+    !isRecord(escrow) ||
+    typeof escrow.id !== 'string' ||
+    typeof escrow.title !== 'string' ||
+    typeof escrow.amount !== 'number' ||
+    !Number.isFinite(escrow.amount) ||
+    typeof escrow.currency !== 'string' ||
+    typeof escrow.status !== 'string' ||
+    typeof escrow.createdAt !== 'string'
+  ) {
+    throw new Error('The verification service returned incomplete escrow details.');
+  }
+
+  return {
+    verified: true,
+    message: value.message,
+    escrow: {
+      id: escrow.id,
+      title: escrow.title,
+      amount: escrow.amount,
+      currency: escrow.currency,
+      status: escrow.status,
+      createdAt: escrow.createdAt,
+    },
+  };
+}
+
 export default function VerifyPage() {
   const [inputLink, setInputLink] = useState('')
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<any>(null)
+  const [result, setResult] = useState<VerificationResult | null>(null)
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -19,9 +72,16 @@ export default function VerifyPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ link: inputLink })
       })
-      const data = await res.json()
-      setResult(data)
-    } catch (err) {
+      const payload: unknown = await res.json()
+      if (!res.ok) {
+        const message = isRecord(payload) && typeof payload.error === 'string'
+          ? payload.error
+          : 'Unable to verify this deal right now.';
+        setResult({ verified: false, message });
+        return;
+      }
+      setResult(parseVerificationResult(payload))
+    } catch {
       setResult({ verified: false, message: 'Verification lookup failed. Check your network connection.' })
     } finally {
       setLoading(false)
@@ -50,7 +110,7 @@ export default function VerifyPage() {
               type="text"
               value={inputLink}
               onChange={(e) => setInputLink(e.target.value)}
-              placeholder="e.g. [https://fidulync.vercel.app/pay/abc12345](https://fidulync.vercel.app/pay/abc12345) or abc12345"
+              placeholder="https://fidulync.com/pay/<deal-reference> or deal reference"
               className="w-full bg-[#1F2937] border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 transition-colors"
               required
             />
@@ -75,13 +135,13 @@ export default function VerifyPage() {
             {result.verified && result.escrow && (
               <div className="bg-[#0B1120] p-4 rounded-lg text-sm space-y-3 border border-emerald-500/20 mb-4">
                 <div className="flex justify-between border-b border-gray-800 pb-2"><span className="text-gray-400">Item:</span><span className="font-semibold text-white">{result.escrow.title}</span></div>
-                <div className="flex justify-between border-b border-gray-800 pb-2"><span className="text-gray-400">Amount:</span><span className="font-semibold text-white">₦{result.escrow.amount.toLocaleString()}</span></div>
-                <div className="flex justify-between"><span className="text-gray-400">Seller Phone:</span><span className="font-semibold text-white">{result.escrow.sellerPhone}</span></div>
+                <div className="flex justify-between border-b border-gray-800 pb-2"><span className="text-gray-400">Amount:</span><span className="font-semibold text-white">{result.escrow.currency} {result.escrow.amount.toLocaleString()}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Status:</span><span className="font-semibold text-white">{result.escrow.status}</span></div>
               </div>
             )}
             
             {result.verified && (
-               <Link className="block text-center w-full bg-white/10 hover:bg-white/20 text-white font-medium py-2 rounded-lg transition" href="{`/pay/${result.escrow.id}`}">
+               <Link className="block text-center w-full bg-white/10 hover:bg-white/20 text-white font-medium py-2 rounded-lg transition" href={`/pay/${encodeURIComponent(result.escrow?.id ?? '')}`}>
                  Proceed to Secure Payment
                </Link>
             )}

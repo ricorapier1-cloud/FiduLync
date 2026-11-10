@@ -1,84 +1,79 @@
-import Navbar from '@/components/Navbar';
-import DealChat from '@/components/DealChat';
-import { Shield, Clock, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import { AlertTriangle, ArrowLeft, Clock, ShieldCheck } from 'lucide-react';
+import { getSupabaseAdmin } from '@/lib/serverSupabase';
+
+const knownStatuses = new Set(['pending', 'funded', 'disputed', 'settling', 'released', 'refunded', 'cancelled']);
 
 export default async function DealPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const dealId = id || 'FD-DEMO';
+  const { data: deal, error } = await getSupabaseAdmin()
+    .from('escrow_deals')
+    .select('reference,item_name,title,description,amount,currency,status,funded_at,inspection_deadline,created_at')
+    .eq('reference', id)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Unable to load escrow deal details:', error);
+    throw new Error('Unable to load this escrow deal.');
+  }
+  if (!deal) notFound();
+
+  const amount = Number(deal.amount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    console.error('Escrow deal has invalid amount data:', deal.reference);
+    throw new Error('Escrow deal details are unavailable.');
+  }
+
+  const status = knownStatuses.has(deal.status) ? deal.status : 'unknown';
+  const inspectionDeadline = deal.inspection_deadline && Number.isFinite(Date.parse(deal.inspection_deadline))
+    ? new Date(deal.inspection_deadline)
+    : null;
 
   return (
-    <div className="min-h-screen bg-[#070A0F] text-white">
-      <Navbar />
-
-      <main className="max-w-7xl mx-auto px-6 py-10 space-y-8">
+    <main className="page-content mx-auto max-w-4xl">
+      <Link href="/dashboard" className="secondary-button mb-8 inline-flex"><ArrowLeft size={15} /> Transaction dashboard</Link>
+      <header className="page-heading">
         <div>
-          <div className="inline-flex items-center gap-2 text-emerald-400 text-xs font-mono font-bold uppercase tracking-widest mb-1">
-            <Shield size={14} /> Active Escrow Workspace
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Deal #{dealId} • Custom EA Development</h1>
+          <div className="eyebrow flex items-center gap-2"><ShieldCheck size={14} /> ESCROW DEAL</div>
+          <h1>{deal.item_name || deal.title || 'Escrow transaction'}</h1>
+          <p className="mono mt-2 text-[11px] text-slate-500">Reference: {deal.reference}</p>
         </div>
+        <span className="rounded-full border border-white/10 px-3 py-1.5 text-[10px] uppercase text-slate-300">{status}</span>
+      </header>
 
-        {/* State Machine Stepper */}
-        <div className="bg-[#111820] border border-gray-800 rounded-2xl p-6 grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-          <div className="space-y-1">
-            <div className="w-8 h-8 rounded-full bg-emerald-500 text-black font-bold mx-auto flex items-center justify-center text-xs">✓</div>
-            <div className="text-xs font-bold text-white">Initiated</div>
-          </div>
-          <div className="space-y-1">
-            <div className="w-8 h-8 rounded-full bg-emerald-500 text-black font-bold mx-auto flex items-center justify-center text-xs">✓</div>
-            <div className="text-xs font-bold text-white">Funded</div>
-          </div>
-          <div className="space-y-1">
-            <div className="w-8 h-8 rounded-full bg-cyan-500 text-black font-bold mx-auto flex items-center justify-center text-xs animate-pulse">3</div>
-            <div className="text-xs font-bold text-cyan-400">Dispatched (48h Clock)</div>
-          </div>
-          <div className="space-y-1 opacity-40">
-            <div className="w-8 h-8 rounded-full bg-gray-800 text-gray-400 font-bold mx-auto flex items-center justify-center text-xs">4</div>
-            <div className="text-xs font-bold text-gray-400">Completed</div>
-          </div>
-        </div>
-
-        <div className="grid lg:grid-cols-12 gap-8">
-          {/* Left Summary Box */}
-          <div className="lg:col-span-5 bg-[#111820] border border-gray-800 rounded-2xl p-6 space-y-6">
-            <div>
-              <span className="text-xs text-gray-500 font-mono">LOCKED ESCROW AMOUNT</span>
-              <div className="text-3xl font-extrabold text-emerald-400 font-mono mt-1">₦450,000.00</div>
+      <section className="mt-5 grid gap-4 md:grid-cols-[1.3fr_1fr]">
+        <article className="panel p-6">
+          <div className="metric-label">ESCROW AMOUNT</div>
+          <p className="mono mt-2 text-3xl font-semibold">{deal.currency} {amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+          <h2 className="mt-7 text-sm font-semibold">Agreed delivery terms</h2>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-400">{deal.description || 'No description was recorded for this deal.'}</p>
+          {inspectionDeadline && (
+            <div className="mt-6 flex items-start gap-3 rounded-xl border border-cyan-300/10 bg-cyan-300/[0.035] p-4 text-sm">
+              <Clock size={16} className="mt-0.5 shrink-0 text-cyan-300" />
+              <div><div className="font-medium">Inspection deadline</div><time className="mt-1 block text-xs text-slate-400" dateTime={inspectionDeadline.toISOString()}>{inspectionDeadline.toLocaleString()}</time></div>
             </div>
+          )}
+        </article>
 
-            <div className="p-4 rounded-xl bg-[#070A0F] border border-cyan-500/30 flex items-center gap-3">
-              <Clock className="text-cyan-400 w-5 h-5 flex-shrink-0" />
-              <div className="text-xs text-cyan-300">
-                Auto-Release Clock: <span className="font-bold font-mono text-white">31h 14m remaining</span>
-              </div>
-            </div>
-
-            <div className="space-y-3 text-xs text-gray-300 border-t border-gray-800/80 pt-4">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Seller:</span>
-                <span className="font-bold text-white">Akinwale (MQL5 Dev)</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Buyer:</span>
-                <span className="font-bold text-white">QuantTrader_Global</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Inspection Window:</span>
-                <span className="font-bold text-emerald-400">48 Hours</span>
-              </div>
-            </div>
-
-            <button className="w-full py-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold text-xs hover:bg-rose-500/20 transition flex items-center justify-center gap-2">
-              <AlertTriangle size={15} /> Freeze &amp; File Defect Dispute
-            </button>
-          </div>
-
-          {/* Right WebSockets Chat Box */}
-          <div className="lg:col-span-7">
-            <DealChat dealId={dealId} currentUserId="user-demo-id" />
-          </div>
-        </div>
-      </main>
-    </div>
+        <aside className="panel flex flex-col gap-4 p-6">
+          <h2 className="font-semibold">Deal actions</h2>
+          {status === 'pending' && (
+            <Link href={`/pay/${encodeURIComponent(deal.reference)}`} className="primary-button">Review and fund deal</Link>
+          )}
+          {status === 'funded' && (
+            <Link href={`/disputes?reference=${encodeURIComponent(deal.reference)}`} className="secondary-button">
+              <AlertTriangle size={14} /> Report a delivery issue
+            </Link>
+          )}
+          <p className="text-xs leading-5 text-slate-500">
+            {deal.funded_at
+              ? `Payment was confirmed on ${new Date(deal.funded_at).toLocaleString()}.`
+              : 'Payment is not confirmed until the payment provider sends a validated server-side event.'}
+          </p>
+          <p className="text-[10px] text-slate-600">Created {new Date(deal.created_at).toLocaleString()}</p>
+        </aside>
+      </section>
+    </main>
   );
 }

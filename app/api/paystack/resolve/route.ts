@@ -1,22 +1,30 @@
 import { NextResponse } from 'next/server';
+import { resolvePaystackBankAccount } from '@/lib/paystackBank';
 
 export async function POST(req: Request) {
+  let body: unknown;
   try {
-    const { account_number, bank_code } = await req.json();
-    const secret = process.env.PAYSTACK_SECRET_KEY;
-
-    const response = await fetch(`https://api.paystack.co/bank/resolve?account_number=${account_number}&bank_code=${bank_code}`, {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${secret}` }
-    });
-
-    const data = await response.json();
-    
-    if (data.status) {
-      return NextResponse.json({ success: true, account_name: data.data.account_name });
-    }
-    return NextResponse.json({ success: false, message: 'Account not found' });
-  } catch (err) {
-    return NextResponse.json({ success: false, message: 'Server error' }, { status: 500 });
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ success: false, message: 'Request body must be valid JSON.' }, { status: 400 });
   }
+
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return NextResponse.json({ success: false, message: 'A valid bank resolution request is required.' }, { status: 400 });
+  }
+
+  const { account_number, bank_code } = body as { account_number?: unknown; bank_code?: unknown };
+  const resolution = await resolvePaystackBankAccount(
+    typeof account_number === 'string' ? account_number : '',
+    typeof bank_code === 'string' ? bank_code : '',
+  );
+  if (!resolution.ok) {
+    return NextResponse.json({ success: false, message: resolution.message }, { status: resolution.status });
+  }
+
+  return NextResponse.json({
+    success: true,
+    account_name: resolution.accountName,
+    account_number: resolution.accountNumber,
+  });
 }

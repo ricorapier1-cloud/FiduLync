@@ -15,6 +15,7 @@ export default function AdminGate({ isUnlocked, onUnlock, children }: AdminGateP
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   const verifySession = useCallback(async (accessToken: string) => {
     const response = await fetch('/api/admin/verify', {
@@ -22,8 +23,14 @@ export default function AdminGate({ isUnlocked, onUnlock, children }: AdminGateP
       cache: 'no-store',
     });
     const result = await response.json();
+    if (response.status === 403) {
+      setAccessDenied(true);
+      await supabase.auth.signOut();
+      return false;
+    }
     if (!response.ok) throw new Error(result.error || 'Administrator access denied.');
     onUnlock(accessToken);
+    return true;
   }, [onUnlock]);
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
@@ -33,8 +40,9 @@ export default function AdminGate({ isUnlocked, onUnlock, children }: AdminGateP
       const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (error) throw error;
       if (!data.session?.access_token) throw new Error('Supabase did not return an authenticated session.');
-      await verifySession(data.session.access_token);
-      toast.success('Administrator access verified.');
+      if (await verifySession(data.session.access_token)) {
+        toast.success('Administrator access verified.');
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to verify administrator access.');
     } finally {
@@ -44,6 +52,16 @@ export default function AdminGate({ isUnlocked, onUnlock, children }: AdminGateP
   }
 
   if (isUnlocked) return <>{children}</>;
+
+  if (accessDenied) {
+    return (
+      <div role="alert" className="panel mx-auto max-w-md p-6 text-center sm:p-8">
+        <h2 className="text-lg font-semibold text-rose-200">403 · Forbidden</h2>
+        <p className="mt-2 text-xs leading-5 text-slate-400">This account is not authorized for the administrator console. Access requires an approved administrator email and role.</p>
+        <button className="secondary-button mx-auto mt-5" type="button" onClick={() => setAccessDenied(false)}>Return to sign in</button>
+      </div>
+    );
+  }
 
   return (
     <div className="panel mx-auto max-w-md p-6 sm:p-8">

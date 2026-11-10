@@ -1,6 +1,9 @@
 import { timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
+import { getPaystackSecretKey } from '@/lib/serverConfig';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
+
+export const dynamic = 'force-dynamic';
 
 function validCronRequest(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -12,13 +15,14 @@ function validCronRequest(request: Request) {
 }
 
 async function paystackRequest(path: string, method: 'GET' | 'POST', payload?: Record<string, unknown>) {
-  const secret = process.env.PAYSTACK_SECRET_KEY;
+  const secret = getPaystackSecretKey();
   if (!secret) throw new Error('Paystack is not configured.');
 
   const response = await fetch(`https://api.paystack.co${path}`, {
     method,
     headers: { Authorization: `Bearer ${secret}`, 'Content-Type': 'application/json' },
     ...(payload ? { body: JSON.stringify(payload) } : {}),
+    signal: AbortSignal.timeout(15_000),
   });
   const result = await response.json();
   if (!response.ok || result.status !== true) throw new Error(result.message || 'Paystack request failed.');
@@ -139,7 +143,7 @@ export async function GET(request: Request) {
   if (!validCronRequest(request)) {
     return NextResponse.json({ error: 'Authorized scheduler access required.' }, { status: 401 });
   }
-  if (!process.env.PAYSTACK_SECRET_KEY) {
+  if (!getPaystackSecretKey()) {
     return NextResponse.json({ error: 'Payment settlement is not configured.' }, { status: 503 });
   }
 

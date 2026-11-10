@@ -1,5 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
+import { normalizeEscrowFees } from '@/lib/feeCalculator';
+import { getPaystackSecretKey } from '@/lib/serverConfig';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
 
 type PaystackEvent = {
@@ -13,35 +15,63 @@ type PaystackEvent = {
   };
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 export async function handlePaystackWebhook(request: Request) {
-  const secret = process.env.PAYSTACK_SECRET_KEY;
+  const secret = getPaystackSecretKey();
   const signature = request.headers.get('x-paystack-signature');
-  if (!secret || !signature || !/^[a-f\d]{128}$/i.test(signature)) {
+  if (!secret) {
+    return NextResponse.json({ error: 'Payment webhook processing is not configured.' }, { status: 503 });
+  }
+  if (!signature || !/^[a-f\d]{128}$/i.test(signature)) {
     return NextResponse.json({ error: 'Invalid webhook signature.' }, { status: 401 });
   }
 
-  const rawBody = await request.text();
+  const maximumBodyBytes = 1_048_576;
+  const contentLength = Number(request.headers.get('content-length'));
+  if (Number.isFinite(contentLength) && contentLength > maximumBodyBytes) {
+    return NextResponse.json({ error: 'Webhook payload is too large.' }, { status: 413 });
+  }
+
+  let rawBody: string;
+  try {
+    rawBody = await request.text();
+  } catch (error) {
+    console.error('Paystack webhook body could not be read:', error);
+    return NextResponse.json({ error: 'Webhook body could not be read.' }, { status: 400 });
+  }
+  if (Buffer.byteLength(rawBody, 'utf8') > maximumBodyBytes) {
+    return NextResponse.json({ error: 'Webhook payload is too large.' }, { status: 413 });
+  }
+
   const digest = createHmac('sha512', secret).update(rawBody).digest('hex');
   if (!timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(digest, 'hex'))) {
     return NextResponse.json({ error: 'Invalid webhook signature.' }, { status: 401 });
   }
 
-  let event: PaystackEvent;
+  let payload: unknown;
   try {
-    event = JSON.parse(rawBody) as PaystackEvent;
+    payload = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ error: 'Invalid webhook body.' }, { status: 400 });
   }
 
-  const reference = event.data?.reference;
+  if (!isRecord(payload) || typeof payload.event !== 'string' || !isRecord(payload.data)) {
+    return NextResponse.json({ error: 'Webhook body must include a valid event and data object.' }, { status: 400 });
+  }
+  const event = payload as PaystackEvent;
+  const reference = typeof event.data?.reference === 'string' ? event.data.reference : undefined;
   const refundTransaction = event.event === 'refund.processed' || event.event === 'refund.failed'
     ? event.data?.transaction
     : undefined;
-  const relatedReference = typeof refundTransaction === 'string'
+  const relatedReferenceValue = typeof refundTransaction === 'string'
     ? refundTransaction
-    : typeof refundTransaction === 'object' && refundTransaction
+    : isRecord(refundTransaction)
       ? refundTransaction.reference
       : undefined;
+  const relatedReference = typeof relatedReferenceValue === 'string' ? relatedReferenceValue : undefined;
   if (!reference?.startsWith('flx_') && !relatedReference?.startsWith('flx_')) {
     return NextResponse.json({ status: 'ignored' });
   }
@@ -52,14 +82,20 @@ export async function handlePaystackWebhook(request: Request) {
     if (event.event === 'charge.success') {
       const { data: deal, error } = await supabase
         .from('escrow_deals')
-        .select('id,amount,currency,buyer_fee,status')
+        .select('id,amount,currency,fee_payer,buyer_fee,status')
         .eq('paystack_reference', reference)
         .maybeSingle();
 
       if (error) throw error;
       if (!deal) return NextResponse.json({ error: 'Escrow payment reference not found.' }, { status: 404 });
 
-      const expectedAmount = Math.round((Number(deal.amount) + Number(deal.buyer_fee)) * 100);
+      const amount = Number(deal.amount);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        console.error('Paystack webhook found invalid escrow terms:', reference);
+        return NextResponse.json({ error: 'Escrow payment terms are unavailable.' }, { status: 503 });
+      }
+      const fees = normalizeEscrowFees(amount, deal.currency, deal.fee_payer, { buyerFee: deal.buyer_fee });
+      const expectedAmount = Math.round(fees.total * 100);
       if (
         event.data?.status !== 'success' ||
         Number(event.data.amount) !== expectedAmount ||
@@ -134,9 +170,10 @@ export async function handlePaystackWebhook(request: Request) {
       const transaction = event.data?.transaction;
       const transactionReference = typeof transaction === 'string'
         ? transaction
-        : typeof transaction === 'object' && transaction
+        : isRecord(transaction) && typeof transaction.reference === 'string'
           ? transaction.reference || reference
           : reference;
+      if (!transactionReference) return NextResponse.json({ status: 'ignored' });
       const { data: deal, error: dealError } = await supabase
         .from('escrow_deals')
         .select('id')

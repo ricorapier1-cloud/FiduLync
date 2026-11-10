@@ -6,8 +6,11 @@ import { usePathname } from 'next/navigation';
 import {
   ArrowLeft,
   ArrowUpRight,
+  CalendarDays,
   ChartNoAxesCombined,
+  Gauge,
   Menu,
+  Radio,
   Shield,
   ShieldCheck,
   X,
@@ -20,32 +23,33 @@ const links = [
   { href: '/dashboard', label: 'Activity', icon: ArrowUpRight },
 ];
 
-const portfolioLinks = [
-  { href: '#architecture', label: 'Architecture' },
-  { href: '#work', label: 'Case studies' },
-  { href: '#services', label: 'Services' },
-  { href: '#contact', label: 'Contact' },
+const macroLinks = [
+  { href: '#matrix', label: 'Macro matrix', icon: ChartNoAxesCombined },
+  { href: '#bias', label: 'Pair bias', icon: Gauge },
+  { href: '#catalysts', label: 'Catalysts', icon: CalendarDays },
+  { href: '#positioning', label: 'Positioning', icon: Radio },
 ];
 
 export default function PlatformShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const isHome = pathname === '/';
+  const drawerLinks = isHome ? macroLinks : links;
 
   return (
     <>
       <header className="topbar">
         <div className="topbar-inner">
-          <Link className="brand" href="/" aria-label="FiduLync home">
+          <Link className="brand" href="/" aria-label={isHome ? 'MacroLync home' : 'FiduLync home'}>
             <span className="brand-mark"><ShieldCheck size={19} strokeWidth={2.2} /></span>
             <span className="brand-copy">
-              <span className="brand-name">Fidu<span>Lync</span></span>
-              <span className="brand-caption">{isHome ? 'QUANT SYSTEMS ENGINEERING' : 'TRUST, SETTLED.'}</span>
+              <span className="brand-name">{isHome ? 'Macro' : 'Fidu'}<span>Lync</span></span>
+              <span className="brand-caption">{isHome ? 'GLOBAL FX INTELLIGENCE' : 'TRUST, SETTLED.'}</span>
             </span>
           </Link>
 
           <nav className="desktop-nav" aria-label="Main navigation">
-            {(isHome ? portfolioLinks : links).map(({ href, label }) => (
+            {(isHome ? macroLinks : links).map(({ href, label }) => (
               <Link
                 key={href}
                 href={href}
@@ -63,25 +67,21 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
               </Link>
             )}
             {isHome ? (
-              <a className="secure-pill portfolio-nav-cta" href="https://wa.me/2348037212445?text=Hello%2C%20I%27d%20like%20to%20discuss%20a%20quant%20systems%20or%20fintech%20project.">
-                Direct inquiry <ArrowUpRight size={14} />
-              </a>
+              <a className="secure-pill portfolio-nav-cta" href="#vip">VIP Macro Pass <ArrowUpRight size={14} /></a>
             ) : (
-              <>
-                <Link className="secure-pill" href="/create-link">
-                  <span className="secure-dot" /> New transaction
-                </Link>
-                <button
-                  type="button"
-                  className="menu-toggle"
-                  aria-label={drawerOpen ? 'Close navigation menu' : 'Open navigation menu'}
-                  aria-expanded={drawerOpen}
-                  onClick={() => setDrawerOpen(!drawerOpen)}
-                >
-                  {drawerOpen ? <X size={21} /> : <Menu size={21} />}
-                </button>
-              </>
+              <Link className="secure-pill" href="/create-link">
+                <span className="secure-dot" /> New transaction
+              </Link>
             )}
+            <button
+              type="button"
+              className="menu-toggle"
+              aria-label={drawerOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={drawerOpen}
+              onClick={() => setDrawerOpen(!drawerOpen)}
+            >
+              {drawerOpen ? <X size={21} /> : <Menu size={21} />}
+            </button>
           </div>
         </div>
       </header>
@@ -94,7 +94,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
             onClick={(event) => event.stopPropagation()}
           >
             <div className="drawer-heading">
-              <span className="eyebrow">PLATFORM</span>
+              <span className="eyebrow">{isHome ? 'MACROLYNC' : 'PLATFORM'}</span>
               <button
                 type="button"
                 className="icon-button"
@@ -104,7 +104,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
                 <X size={18} />
               </button>
             </div>
-            {links.map(({ href, label, icon: Icon }) => (
+            {drawerLinks.map(({ href, label, icon: Icon }) => (
               <Link
                 key={href}
                 href={href}
@@ -114,7 +114,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
                 <Icon size={18} /> {label} <ArrowUpRight size={15} className="drawer-arrow" />
               </Link>
             ))}
-            <div className="drawer-footer">Institutional transaction infrastructure</div>
+            <div className="drawer-footer">{isHome ? 'Global FX macro intelligence' : 'Institutional transaction infrastructure'}</div>
           </nav>
         </div>
       )}

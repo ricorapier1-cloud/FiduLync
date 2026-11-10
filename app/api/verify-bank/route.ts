@@ -1,37 +1,36 @@
 import { NextResponse } from 'next/server';
+import { resolvePaystackBankAccount } from '@/lib/paystackBank';
 
 export async function POST(req: Request) {
+  let body: unknown;
   try {
-    const { accountNumber, bankCode } = await req.json();
-
-    if (!accountNumber || !bankCode) {
-      return NextResponse.json({ success: false, message: 'Account number and bank code are required' }, { status: 400 });
-    }
-
-    const paystackSecret = process.env.PAYSTACK_SECRET_KEY;
-    if (!paystackSecret) {
-      return NextResponse.json({ success: false, message: 'Server configuration error' }, { status: 500 });
-    }
-
-    const response = await fetch(`https://api.paystack.co/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`, {
-      headers: {
-        Authorization: `Bearer ${paystackSecret}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    const data = await response.json();
-
-    if (data.status && data.data) {
-      return NextResponse.json({
-        success: true,
-        accountName: data.data.account_name,
-        accountNumber: data.data.account_number,
-      });
-    }
-
-    return NextResponse.json({ success: false, message: data.message || 'Could not verify account details' }, { status: 400 });
-  } catch (error) {
-    return NextResponse.json({ success: false, message: 'Bank verification service unavailable' }, { status: 500 });
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ success: false, message: 'Request body must be valid JSON.' }, { status: 400 });
   }
+
+  if (!body || typeof body !== 'object') {
+    return NextResponse.json({ success: false, message: 'A valid bank verification request is required.' }, { status: 400 });
+  }
+
+  const { accountNumber, bankCode } = body as { accountNumber?: unknown; bankCode?: unknown };
+  if (
+    typeof accountNumber !== 'string' ||
+    !/^\d{10}$/.test(accountNumber) ||
+    typeof bankCode !== 'string' ||
+    !/^[a-zA-Z0-9]{2,10}$/.test(bankCode)
+  ) {
+    return NextResponse.json({ success: false, message: 'Provide a valid 10-digit account number and bank code.' }, { status: 400 });
+  }
+
+  const resolution = await resolvePaystackBankAccount(accountNumber, bankCode);
+  if (!resolution.ok) {
+    return NextResponse.json({ success: false, message: resolution.message }, { status: resolution.status });
+  }
+
+  return NextResponse.json({
+    success: true,
+    accountName: resolution.accountName,
+    accountNumber: resolution.accountNumber,
+  });
 }

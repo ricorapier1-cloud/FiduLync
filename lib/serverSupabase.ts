@@ -1,15 +1,16 @@
 import 'server-only';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { getSupabaseUrl } from '@/lib/serverConfig';
 
 const adminEmails = new Set(['fidulync@gmail.com', 'ricorapier@yahoo.com']);
 
 export function getSupabaseAdmin(): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = getSupabaseUrl();
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
   if (!url || !serviceRoleKey) {
-    throw new Error('Supabase server credentials are not configured.');
+    throw new Error('Supabase server credentials are missing or invalid.');
   }
 
   return createClient(url, serviceRoleKey, {
@@ -44,6 +45,6 @@ export async function requireAdmin(request: Request) {
     return { supabase, user };
   } catch (error) {
     console.error('Admin authorization failed:', error);
-    return { response: NextResponse.json({ error: 'Unable to verify administrator access.' }, { status: 500 }) };
+    return { response: NextResponse.json({ error: 'Administrator verification is temporarily unavailable.' }, { status: 503 }) };
   }
 }
