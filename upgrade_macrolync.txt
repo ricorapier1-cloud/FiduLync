@@ -1,0 +1,36 @@
+Act as a Principal Fintech Architect and Senior Quantitative Systems Engineer. Upgrade the MacroLync platform into a live, real-time quantitative intelligence terminal powered by resilient zero-cost APIs and Upstash caching.
+
+Execute the following end-to-end upgrades across the repository:
+
+1. Free Real-Time Financial Feeds (/lib/macroEngine.ts):
+   - Replace all remaining seed placeholders with automated live integrations:
+     * Frankfurter API (Zero key required): Fetch European Central Bank FX rates and European currency benchmark valuations.
+     * Finnhub.io (Free 60 calls/min via FINNHUB_API_KEY): Pull live real-time FX ticks (EURUSD, GBPUSD, USDJPY, XAUUSD) and live upcoming tier-1 economic calendar events with consensus vs. actual.
+     * FRED API / St. Louis Fed (via FRED_API_KEY, optional): Fetch official Fed policy rates and latest Core PCE / CPI figures.
+     * CFTC Public Reports: Parse official weekly Commitment of Traders (COT) net non-commercial positioning.
+   - Dynamic Real Yield Engine: Compute live (Policy Rate - Latest Inflation) for G10 currencies.
+   - Turn the top header indicator to a green "Live Feed" status when live feeds connect.
+   - Maintain cached fallbacks so any external network hiccup never throws a 500 error.
+
+2. Upstash Edge Caching Optimization (/lib/redisCache.ts):
+   - Cache live price quotes and technical indicators for 60 seconds.
+   - Cache macroeconomic data and calendar events for 1 hour (3600 seconds).
+   - This ensures your app stays well within free API limits indefinitely, even with hundreds of concurrent users.
+
+3. Owner Admin Access & Subscriber Profiles:
+   - Configure fidulync@gmail.com as the Master Owner account with permanent, free access to all VIP tools and raw MT5 endpoints.
+   - Build a polished /profile route with dark institutional styling and mobile back buttons:
+     * Regular Members: View active VIP Macro Pass status, renewal date, and copy their personal MT5 WebRequest license key.
+     * Master Owner (fidulync@gmail.com): Access the Owner Dashboard tab to view active subscribers, platform revenue metrics, and generated MT5 API keys.
+
+4. Live Paystack VIP Macro Pass Integration:
+   - Wire the VIP Macro Pass checkout button and modal to Paystack using NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY and PAYSTACK_SECRET_KEY.
+   - Set the checkout amount to ₦5,000/month.
+   - On successful payment, automatically activate VIP status and generate the member's MT5 license key.
+
+5. Code Hygiene, Build Verification & Git Sync:
+   - Ensure .env.example contains variable names only (never commit real secret keys or passwords to git).
+   - Verify strict compilation with zero TypeScript errors:
+     npx tsc --noEmit && npm run build
+   - Once build succeeds, push directly to main:
+     gh auth setup-git && git add . && git commit -m "Production Upgrade: Zero-cost live market feeds, Upstash caching, owner dashboard, and Paystack VIP checkout" && git push origin main

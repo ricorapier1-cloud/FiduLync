@@ -444,6 +444,7 @@ button { color: inherit; }
   .menu-toggle { display: inline-flex; }
   .back-link { width: 34px; height: 34px; justify-content: center; border: 1px solid var(--line); border-radius: 9px; }
   .back-link span { display: none; }
+  .sign-in-pill { display: none; }
   .secure-pill { min-height: 34px; padding: 0 9px; font-size: 10px; }
   .page-frame { min-height: calc(100vh - 64px); padding-bottom: 96px; }
   .page-content { width: calc(100% - 32px); padding-top: 27px; }

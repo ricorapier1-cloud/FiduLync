@@ -116,6 +116,10 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes, vipEnab
     const age = now - Date.parse(quote.timestamp);
     return quote.source === 'finnhub' && age >= 0 && age <= 120_000;
   });
+  const liveReferenceAvailable = now !== null && (
+    quotes.some((quote) => quote.source === 'frankfurter')
+    || Object.keys(snapshot.ecbRates ?? {}).length > 0
+  );
   const activePair = pairs.find((item) => item.symbol === pair) ?? pairs[0];
   const baseCurrency = currencies.find((currency) => currency.code === activePair.base);
   const quoteCurrency = currencies.find((currency) => currency.code === activePair.quote);
@@ -256,7 +260,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes, vipEnab
     <div className="macro-page">
       <div className="macro-statusline mono">
         <span><span className={`macro-pulse${liveQuoteAvailable ? ' macro-pulse-live' : ''}`} /> MACRO INTELLIGENCE / GLOBAL FX</span>
-        <span className="macro-status-right"><span className={`macro-feed-badge${liveQuoteAvailable ? ' macro-feed-live' : ''}`}>{liveQuoteAvailable ? 'LIVE FEED' : snapshot.source === 'provider' ? 'PROVIDER FEED' : snapshot.source === 'partial' ? 'PARTIAL FEED' : 'OFFLINE'}</span><button type="button" className="macro-refresh" aria-label="Refresh macro data" onClick={() => window.location.reload()}><RefreshCw size={13} className={refreshing ? 'macro-spin' : ''} /> REFRESH</button><Link href="/profile" className="macro-refresh">PROFILE</Link><button type="button" className="macro-refresh" onClick={() => accessToken ? setAccountOpen(true) : setAuthOpen(true)}>{accessToken ? 'ACCOUNT' : 'SIGN IN'}</button></span>
+        <span className="macro-status-right"><span className={`macro-feed-badge${liveQuoteAvailable || liveReferenceAvailable ? ' macro-feed-live' : ''}`}>{liveQuoteAvailable ? 'LIVE FEED' : liveReferenceAvailable ? 'LIVE REFERENCE FEED' : snapshot.source === 'provider' ? 'PROVIDER FEED' : snapshot.source === 'partial' ? 'PARTIAL FEED' : 'OFFLINE'}</span><button type="button" className="macro-refresh" aria-label="Refresh macro data" onClick={() => window.location.reload()}><RefreshCw size={13} className={refreshing ? 'macro-spin' : ''} /> REFRESH</button><Link href="/profile" className="macro-refresh">PROFILE</Link><button type="button" className="macro-refresh" onClick={() => accessToken ? setAccountOpen(true) : setAuthOpen(true)}>{accessToken ? 'ACCOUNT' : 'SIGN IN'}</button></span>
       </div>
       <div className="macro-quote-strip" aria-label="Live FX quotes">
         {quotes.map((quote) => <span key={quote.symbol} className="macro-quote mono"><strong>{quote.symbol}</strong><b>{quote.price.toFixed(quote.symbol.startsWith('XAU') ? 2 : quote.symbol.endsWith('JPY') ? 3 : 5)}</b><small className={quote.source === 'finnhub' ? 'macro-positive' : ''}>{quote.source === 'finnhub' ? 'LIVE' : 'ECB REF'}</small></span>)}
@@ -271,17 +275,17 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes, vipEnab
           <a className="macro-intro-action" href="https://wa.me/2348037212445?text=Hello%2C%20I%27d%20like%20to%20automate%20a%20macro%20strategy%20with%20an%20MT5%20Expert%20Advisor." target="_blank" rel="noreferrer"><MessageCircle size={15} /> Automate this strategy <ArrowUpRight size={13} /></a>
         </div>
         <div className="macro-intro-meta mono">
-          <span>SNAPSHOT / {snapshot.source === 'provider' ? 'UPSTREAM' : snapshot.source === 'partial' ? 'MIXED INPUTS' : 'OFFLINE'}</span>
+          <span>SNAPSHOT / {liveReferenceAvailable && currencies.length === 0 ? 'ECB REFERENCE' : snapshot.source === 'provider' ? 'UPSTREAM' : snapshot.source === 'partial' ? 'MIXED INPUTS' : 'OFFLINE'}</span>
           <strong>{now ? new Date(now).toISOString().replace('T', ' ').slice(0, 19) + ' UTC' : 'UTC / --:--:--'}</strong>
-          <span className="macro-provenance">{snapshot.source === 'fallback' ? 'No fresh or cached macro observations are available.' : snapshot.source === 'partial' ? 'Only validated live or cached provider fields are displayed.' : 'Provider payload validated at the platform edge.'}</span>
+          <span className="macro-provenance">{liveReferenceAvailable && currencies.length === 0 ? 'ECB reference exchange rates are available; policy observations are not.' : snapshot.source === 'fallback' ? 'No fresh or cached macro observations are available.' : snapshot.source === 'partial' ? 'Only validated live or cached provider fields are displayed.' : 'Provider payload validated at the platform edge.'}</span>
         </div>
       </section>
 
       <section className="macro-kpis" aria-label="Macro overview">
         <article className="macro-kpi"><span className="macro-kpi-label">POLICY RANGE <span>G10</span></span><strong className="mono">{policySpread === null ? '—' : formatRate(policySpread)}</strong><small>highest to lowest available policy rate</small></article>
-        <article className="macro-kpi"><span className="macro-kpi-label">POLICY INPUTS <span>G10</span></span><strong className="mono">{String(currencies.length).padStart(2, '0')} <em>/ 10</em></strong><small>validated live country observations</small></article>
+        <article className="macro-kpi"><span className="macro-kpi-label">POLICY INPUTS <span>G10</span></span><strong className="mono">{currencies.length === 0 ? '—' : String(currencies.length).padStart(2, '0')} <em>/ 10</em></strong><small>{currencies.length === 0 ? 'No validated policy observations available' : 'validated live country observations'}</small></article>
         <article className="macro-kpi"><span className="macro-kpi-label">NEXT CATALYST <span>HIGH IMPACT</span></span><strong className="mono">{sortedCatalysts[0] && now ? formatCountdown(sortedCatalysts[0].scheduledAt, now) : '—'}</strong><small>{sortedCatalysts[0]?.title ?? 'No upcoming event in feed'}</small></article>
-        <article className="macro-kpi macro-kpi-source"><span className="macro-kpi-label">DATA PROVENANCE <span>STATUS</span></span><strong className="macro-source-value"><span className={snapshot.source === 'fallback' ? 'macro-source-dot' : 'macro-source-dot macro-source-live'} />{snapshot.source === 'provider' ? 'CONNECTED' : snapshot.source === 'partial' ? 'PARTIAL' : 'OFFLINE'}</strong><small>{refreshing ? 'Checking provider…' : 'Stale cache used when available'}</small></article>
+        <article className="macro-kpi macro-kpi-source"><span className="macro-kpi-label">DATA PROVENANCE <span>STATUS</span></span><strong className="macro-source-value"><span className={snapshot.source === 'fallback' ? 'macro-source-dot' : 'macro-source-dot macro-source-live'} />{liveReferenceAvailable && currencies.length === 0 ? 'REFERENCE' : snapshot.source === 'provider' ? 'CONNECTED' : snapshot.source === 'partial' ? 'PARTIAL' : 'OFFLINE'}</strong><small>{refreshing ? 'Checking provider…' : 'Stale cache used when available'}</small></article>
       </section>
 
       <section id="matrix" className="macro-section" aria-labelledby="matrix-title">

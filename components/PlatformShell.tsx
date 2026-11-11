@@ -34,6 +34,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const isHome = pathname === '/';
+  const isLogin = pathname === '/login';
   const drawerLinks = isHome ? macroLinks : links;
 
   return (
@@ -61,6 +62,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
           </nav>
 
           <div className="topbar-actions">
+            {!isLogin && <Link className="secure-pill sign-in-pill" href="/login">Sign in</Link>}
             {!isHome && (
               <Link className="back-link" href="/">
                 <ArrowLeft size={15} /> <span>Back</span>
@@ -114,6 +116,15 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
                 <Icon size={18} /> {label} <ArrowUpRight size={15} className="drawer-arrow" />
               </Link>
             ))}
+            {!isLogin && (
+              <Link
+                href="/login"
+                onClick={() => setDrawerOpen(false)}
+                className="drawer-link"
+              >
+                <ShieldCheck size={18} /> Sign in <ArrowUpRight size={15} className="drawer-arrow" />
+              </Link>
+            )}
             <div className="drawer-footer">{isHome ? 'Global FX macro intelligence' : 'Institutional transaction infrastructure'}</div>
           </nav>
         </div>

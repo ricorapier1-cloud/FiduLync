@@ -50,6 +50,8 @@ Apply the migrations in `supabase/migrations/` to a Supabase project with Auth a
 
 Enable Email/Password and Google providers in Supabase Auth and add the deployed site URL to the Auth redirect allowlist. Apply the macro production infrastructure migration to add profile tier/watchlist state and service-role-only subscription, key-hash, and snapshot tables. Public profile state uses `profiles`, keyed to `auth.users`; generated MT5 keys are returned only once and stored as SHA-256 hashes.
 
+Users can sign in or create an account at `/login`. After authentication, users return to a safe same-site `next` path when provided, or to `/dashboard` by default. Google sign-in and email confirmation require the matching deployed redirect URL to be allowlisted in Supabase Auth.
+
 The runtime edge-guard migration normalizes existing 1.5% fee allocations and restores missing 48-hour inspection deadlines for funded, disputed and settling deals.
 
 The two allowlisted administrator email addresses must have Supabase Auth accounts. The migration assigns their profile role; administrator APIs independently verify the authenticated user, allowlisted email and database role.
