@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { getMacroSnapshot, getFundamentalSignal } from '@/lib/macroEngine';
 import { getTechnicalSignal } from '@/lib/technicalEngine';
+import { isMasterOwner } from '@/lib/macroAccess';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
 
 export const dynamic = 'force-dynamic';
@@ -33,13 +34,27 @@ export async function GET(request: Request) {
 
   try {
     const keyHash = createHash('sha256').update(apiKey).digest('hex');
-    const { data: keyRecord, error: keyError } = await getSupabaseAdmin().from('macro_api_keys')
-      .select('id')
+    const supabase = getSupabaseAdmin();
+    const { data: keyRecord, error: keyError } = await supabase.from('macro_api_keys')
+      .select('id,user_id')
       .eq('key_hash', keyHash)
       .is('revoked_at', null)
       .maybeSingle();
     if (keyError) throw keyError;
     if (!keyRecord) return NextResponse.json({ error: 'A valid API key is required.' }, { status: 401 });
+    const { data: authResult, error: authError } = await supabase.auth.admin.getUserById(keyRecord.user_id);
+    if (authError) throw authError;
+    if (!isMasterOwner(authResult.user)) {
+      const { data: profile, error: profileError } = await supabase.from('profiles')
+        .select('tier_status,macro_vip_expires_at')
+        .eq('id', keyRecord.user_id)
+        .maybeSingle();
+      if (profileError) throw profileError;
+      if (profile?.tier_status !== 'vip_active' || !profile.macro_vip_expires_at
+        || Date.parse(profile.macro_vip_expires_at) <= Date.now()) {
+        return NextResponse.json({ error: 'An active VIP Macro Pass is required.' }, { status: 403 });
+      }
+    }
 
     const [snapshot, technical] = await Promise.all([
       getMacroSnapshot(),

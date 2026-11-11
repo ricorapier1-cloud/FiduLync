@@ -190,8 +190,10 @@ export function calculateTechnicalSignal(pair: string, h1: Candle[], h4: Candle[
 export async function getTechnicalSignal(pair: string): Promise<TechnicalSignal> {
   if (!process.env.MARKET_DATA_PROVIDER_URL?.trim()) return unavailableSignal();
   try {
-    const [h1, h4] = await Promise.all([getCandles(pair, 'H1'), getCandles(pair, 'H4')]);
-    return calculateTechnicalSignal(pair, h1, h4);
+    return await getCachedData(`technical:signal:${pair}`, async () => {
+      const [h1, h4] = await Promise.all([getCandles(pair, 'H1'), getCandles(pair, 'H4')]);
+      return calculateTechnicalSignal(pair, h1, h4);
+    }, LIVE_PRICE_TTL_SECONDS);
   } catch (error) {
     console.warn(`Technical data unavailable for ${pair}; execution filters are disabled.`, error);
     return unavailableSignal();

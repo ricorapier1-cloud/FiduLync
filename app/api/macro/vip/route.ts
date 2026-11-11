@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
+import { isMasterOwner } from '@/lib/macroAccess';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,9 @@ export async function POST(request: Request) {
     }
     userEmail = user.email.trim().toLowerCase();
     userId = user.id;
+    if (isMasterOwner(user)) {
+      return NextResponse.json({ error: 'The master owner account has permanent VIP access and does not need checkout.' }, { status: 409 });
+    }
   } catch (error) {
     console.error('VIP checkout could not verify the Supabase session:', error);
     return NextResponse.json({ error: 'Account verification is temporarily unavailable.' }, { status: 503 });
@@ -44,6 +48,25 @@ export async function POST(request: Request) {
   const planCode = process.env.PAYSTACK_VIP_PLAN_CODE?.trim();
   if (!secretKey || !planCode) {
     return NextResponse.json({ error: 'Monthly Paystack checkout is not configured yet.' }, { status: 503 });
+  }
+  const expectedAmount = 500_000;
+  try {
+    const planResponse = await fetch(`https://api.paystack.co/plan/${encodeURIComponent(planCode)}`, {
+      headers: { Authorization: `Bearer ${secretKey}` },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(8_000),
+    });
+    const planPayload: unknown = await planResponse.json();
+    const planData = isRecord(planPayload) && isRecord(planPayload.data) ? planPayload.data : null;
+    if (!planResponse.ok || !isRecord(planPayload) || planPayload.status !== true
+      || !planData || Number(planData.amount) !== expectedAmount || planData.interval !== 'monthly'
+      || planData.currency !== 'NGN') {
+      console.error('Paystack VIP plan is not configured for ₦5,000 monthly billing.');
+      return NextResponse.json({ error: 'The Paystack plan must be configured for ₦5,000 NGN monthly billing.' }, { status: 503 });
+    }
+  } catch (error) {
+    console.error('Paystack VIP plan could not be verified:', error);
+    return NextResponse.json({ error: 'Paystack plan verification is temporarily unavailable.' }, { status: 503 });
   }
 
   try {
@@ -71,7 +94,6 @@ export async function POST(request: Request) {
   }
 
   const reference = `macro_${randomUUID().replaceAll('-', '')}`;
-  const expectedAmount = 500_000;
   try {
     const supabase = getSupabaseAdmin();
     const { error: subscriptionError } = await supabase.from('macro_subscriptions').insert({

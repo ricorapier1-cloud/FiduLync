@@ -1,6 +1,7 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { normalizeEscrowFees } from '@/lib/feeCalculator';
+import { encryptMacroApiKey, generateMacroApiKey } from '@/lib/macroKeys';
 import { getPaystackSecretKey } from '@/lib/serverConfig';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
 
@@ -62,6 +63,35 @@ async function handleMacroSubscriptionEvent(event: PaystackEvent) {
     const expiresAt = nextPayment && Number.isFinite(Date.parse(nextPayment))
       ? nextPayment
       : new Date(paidAt + 31 * 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: activeKey, error: keyLookupError } = await supabase.from('macro_api_keys')
+      .select('id,encrypted_key')
+      .eq('user_id', subscription.user_id)
+      .is('revoked_at', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (keyLookupError) throw keyLookupError;
+    if (!activeKey?.encrypted_key) {
+      const apiKey = generateMacroApiKey();
+      const { data: createdKey, error: keyInsertError } = await supabase.from('macro_api_keys')
+        .insert({
+          user_id: subscription.user_id,
+          key_hash: createHash('sha256').update(apiKey).digest('hex'),
+          key_prefix: apiKey.slice(0, 10),
+          encrypted_key: encryptMacroApiKey(apiKey),
+        })
+        .select('id')
+        .single();
+      if (keyInsertError) throw keyInsertError;
+      if (activeKey) {
+        const { error: revokeError } = await supabase.from('macro_api_keys')
+          .update({ revoked_at: now.toISOString() })
+          .eq('id', activeKey.id);
+        if (revokeError) throw revokeError;
+      }
+      if (!createdKey) throw new Error('The automatic MT5 license key was not created.');
+    }
 
     const { error: profileError } = await supabase.from('profiles').update({
       tier_status: 'vip_active',

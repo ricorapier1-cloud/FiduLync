@@ -2,33 +2,13 @@ import 'server-only';
 import type { CotPosition, EconomicCatalyst, MacroCurrency, MacroSnapshot } from '@/types/macro';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
 
-export const SEED_SNAPSHOT: MacroSnapshot = {
-  asOf: '2026-11-10T00:00:00.000Z',
-  source: 'seed',
-  cotSource: 'seed',
-  currencies: [
-    { code: 'USD', centralBank: 'Federal Reserve', policyRate: 3.75, inflation: 2.8, inflationLabel: 'Core PCE', stance: 'Restrictive' },
-    { code: 'EUR', centralBank: 'European Central Bank', policyRate: 2.15, inflation: 2.1, inflationLabel: 'HICP', stance: 'Neutral' },
-    { code: 'GBP', centralBank: 'Bank of England', policyRate: 4.0, inflation: 2.8, inflationLabel: 'CPI', stance: 'Cautious' },
-    { code: 'JPY', centralBank: 'Bank of Japan', policyRate: 0.5, inflation: 3.0, inflationLabel: 'CPI', stance: 'Normalising' },
-    { code: 'AUD', centralBank: 'Reserve Bank of Australia', policyRate: 3.6, inflation: 3.4, inflationLabel: 'CPI', stance: 'Restrictive' },
-    { code: 'CHF', centralBank: 'Swiss National Bank', policyRate: 0.0, inflation: 0.2, inflationLabel: 'CPI', stance: 'Accommodative' },
-  ],
-  cot: [
-    { market: 'EUR', netContracts: 108_400, percentile: 87, weeklyChange: 12_600 },
-    { market: 'JPY', netContracts: -76_200, percentile: 18, weeklyChange: -8_900 },
-    { market: 'GBP', netContracts: 22_100, percentile: 61, weeklyChange: 4_300 },
-    { market: 'AUD', netContracts: -41_800, percentile: 29, weeklyChange: -5_100 },
-    { market: 'CHF', netContracts: -12_700, percentile: 38, weeklyChange: 1_800 },
-    { market: 'GOLD', netContracts: 184_600, percentile: 94, weeklyChange: 17_200 },
-  ],
-  catalysts: [
-    { id: 'us-cpi-nov', region: 'US', title: 'Consumer Price Index', scheduledAt: '2026-11-12T13:30:00.000Z', impact: 'High', consensus: '2.8% y/y', actual: null },
-    { id: 'us-nfp-dec', region: 'US', title: 'Non-Farm Payrolls', scheduledAt: '2026-12-04T13:30:00.000Z', impact: 'High', consensus: '+145k', actual: null },
-    { id: 'fomc-dec', region: 'US', title: 'FOMC Rate Decision', scheduledAt: '2026-12-09T19:00:00.000Z', impact: 'High', consensus: 'Hold', actual: null },
-    { id: 'ecb-dec', region: 'EU', title: 'ECB Policy Decision', scheduledAt: '2026-12-17T13:15:00.000Z', impact: 'High', consensus: 'Hold', actual: null },
-    { id: 'uk-retail-nov', region: 'UK', title: 'Retail Sales', scheduledAt: '2026-11-20T07:00:00.000Z', impact: 'Medium', consensus: '+0.2% m/m', actual: null },
-  ],
+export const EMPTY_SNAPSHOT: MacroSnapshot = {
+  asOf: '',
+  source: 'fallback',
+  cotSource: 'unavailable',
+  currencies: [],
+  cot: [],
+  catalysts: [],
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -46,6 +26,8 @@ function isCurrency(value: unknown): value is MacroCurrency {
     && isFiniteNumber(value.policyRate)
     && isFiniteNumber(value.inflation)
     && typeof value.inflationLabel === 'string'
+    && (value.corePce === undefined || isFiniteNumber(value.corePce))
+    && (value.cpi === undefined || isFiniteNumber(value.cpi))
     && typeof value.stance === 'string';
 }
 
@@ -87,13 +69,111 @@ function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies'
 
 type Observation = { date: string; value: number };
 
+async function getFredObservations(seriesId: string, apiKey: string): Promise<Observation[]> {
+  const providerUrl = new URL('https://api.stlouisfed.org/fred/series/observations');
+  providerUrl.searchParams.set('series_id', seriesId);
+  providerUrl.searchParams.set('api_key', apiKey);
+  providerUrl.searchParams.set('file_type', 'json');
+  providerUrl.searchParams.set('sort_order', 'desc');
+  providerUrl.searchParams.set('limit', '24');
+  const response = await fetch(providerUrl, {
+    cache: 'no-store',
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!response.ok) throw new Error(`FRED returned ${response.status} for ${seriesId}.`);
+  const payload: unknown = await response.json();
+  if (!isRecord(payload) || !Array.isArray(payload.observations)) {
+    throw new Error(`FRED returned an invalid ${seriesId} observation series.`);
+  }
+  return payload.observations.flatMap((item): Observation[] => {
+    if (!isRecord(item) || typeof item.date !== 'string' || typeof item.value !== 'string') return [];
+    const value = Number(item.value);
+    return Number.isFinite(value) ? [{ date: item.date, value }] : [];
+  });
+}
+
+async function getFredUsdUpdates(apiKey: string) {
+  const [rateResult, pceResult, cpiResult] = await Promise.allSettled([
+    getFredObservations('DFF', apiKey),
+    getFredObservations('PCEPILFE', apiKey),
+    getFredObservations('CPIAUCSL', apiKey),
+  ]);
+  const latestYearOverYear = (observations: Observation[]) => {
+    const latest = observations[0];
+    if (!latest) return undefined;
+    const priorYear = observations.find((item) => item.date.slice(0, 7) === `${Number(latest.date.slice(0, 4)) - 1}${latest.date.slice(4, 7)}`);
+    return priorYear && priorYear.value !== 0 ? (latest.value / priorYear.value - 1) * 100 : undefined;
+  };
+  if (rateResult.status === 'rejected') console.warn('FRED federal funds rate is unavailable:', rateResult.reason);
+  if (pceResult.status === 'rejected') console.warn('FRED Core PCE is unavailable:', pceResult.reason);
+  if (cpiResult.status === 'rejected') console.warn('FRED CPI is unavailable:', cpiResult.reason);
+  return {
+    policyRate: rateResult.status === 'fulfilled' ? rateResult.value[0]?.value : undefined,
+    corePce: pceResult.status === 'fulfilled' ? latestYearOverYear(pceResult.value) : undefined,
+    cpi: cpiResult.status === 'fulfilled' ? latestYearOverYear(cpiResult.value) : undefined,
+  };
+}
+
+async function getFrankfurterRates(): Promise<Record<string, number>> {
+  const response = await fetch('https://api.frankfurter.app/latest?from=EUR', {
+    cache: 'no-store',
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!response.ok) throw new Error(`Frankfurter returned ${response.status}.`);
+  const payload: unknown = await response.json();
+  if (!isRecord(payload) || !isRecord(payload.rates)) throw new Error('Frankfurter returned an invalid ECB benchmark payload.');
+  const rates: Record<string, number> = {};
+  for (const [code, value] of Object.entries(payload.rates)) {
+    if (/^[A-Z]{3}$/.test(code) && typeof value === 'number' && Number.isFinite(value) && value > 0) rates[code] = value;
+  }
+  if (!Object.keys(rates).length) throw new Error('Frankfurter returned no usable ECB benchmark rates.');
+  return rates;
+}
+
+async function getFinnhubCatalysts(apiKey: string): Promise<EconomicCatalyst[]> {
+  const from = new Date().toISOString().slice(0, 10);
+  const to = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const providerUrl = new URL('https://finnhub.io/api/v1/calendar/economic');
+  providerUrl.searchParams.set('from', from);
+  providerUrl.searchParams.set('to', to);
+  providerUrl.searchParams.set('token', apiKey);
+  const response = await fetch(providerUrl, { cache: 'no-store', signal: AbortSignal.timeout(8_000) });
+  if (!response.ok) throw new Error(`Finnhub economic calendar returned ${response.status}.`);
+  const payload: unknown = await response.json();
+  if (!isRecord(payload) || !Array.isArray(payload.economicCalendar)) {
+    throw new Error('Finnhub economic calendar payload is invalid.');
+  }
+  const regions: Record<string, string> = {
+    US: 'US', EU: 'EU', GB: 'UK', JP: 'JP', AU: 'AU', CH: 'CH', CA: 'CA', NZ: 'NZ', NO: 'NO', SE: 'SE',
+  };
+  return payload.economicCalendar.flatMap((item, index): EconomicCatalyst[] => {
+    if (!isRecord(item) || typeof item.time !== 'string' || typeof item.country !== 'string'
+      || typeof item.event !== 'string') return [];
+    const impactText = typeof item.impact === 'string' ? item.impact.toLowerCase() : '';
+    const impact = impactText.includes('high') ? 'High' : impactText.includes('medium') ? 'Medium' : null;
+    const scheduledAt = new Date(item.time);
+    if (!impact || !Number.isFinite(scheduledAt.getTime()) || !regions[item.country]) return [];
+    const consensus = item.estimate === null || item.estimate === undefined ? '—' : String(item.estimate);
+    const actual = item.actual === null || item.actual === undefined ? null : String(item.actual);
+    return [{
+      id: `finnhub-${scheduledAt.toISOString()}-${index}`,
+      region: regions[item.country],
+      title: item.event,
+      scheduledAt: scheduledAt.toISOString(),
+      impact,
+      consensus,
+      actual,
+    }];
+  });
+}
+
 async function getAlphaVantageObservations(functionName: 'FEDERAL_FUNDS_RATE' | 'CPI', apiKey: string): Promise<Observation[]> {
   const providerUrl = new URL('https://www.alphavantage.co/query');
   providerUrl.searchParams.set('function', functionName);
   providerUrl.searchParams.set('apikey', apiKey);
   if (functionName === 'FEDERAL_FUNDS_RATE') providerUrl.searchParams.set('interval', 'monthly');
   const response = await fetch(providerUrl, {
-    next: { revalidate: 21_600 },
+    cache: 'no-store',
     signal: AbortSignal.timeout(8_000),
   });
   if (!response.ok) throw new Error(`Alpha Vantage returned ${response.status}.`);
@@ -132,7 +212,7 @@ async function getFmpCatalysts(apiKey: string): Promise<EconomicCatalyst[]> {
   providerUrl.searchParams.set('to', end.toISOString().slice(0, 10));
   providerUrl.searchParams.set('apikey', apiKey);
   const response = await fetch(providerUrl, {
-    next: { revalidate: 21_600 },
+    cache: 'no-store',
     signal: AbortSignal.timeout(8_000),
   });
   if (!response.ok) throw new Error(`Financial Modeling Prep returned ${response.status}.`);
@@ -168,7 +248,7 @@ async function getCotProvider(urlValue: string, token?: string): Promise<CotPosi
   const providerUrl = new URL(urlValue);
   if (providerUrl.protocol !== 'https:' && providerUrl.protocol !== 'http:') throw new Error('Unsupported COT provider protocol.');
   const response = await fetch(providerUrl, {
-    next: { revalidate: 21_600 },
+    cache: 'no-store',
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     signal: AbortSignal.timeout(8_000),
   });
@@ -205,7 +285,7 @@ async function getCftcCot(): Promise<CotPosition[]> {
   providerUrl.searchParams.set('$limit', '2000');
 
   const response = await fetch(providerUrl, {
-    next: { revalidate: 21_600 },
+    cache: 'no-store',
     signal: AbortSignal.timeout(8_000),
   });
   if (!response.ok) throw new Error(`CFTC returned ${response.status}.`);
@@ -260,52 +340,129 @@ async function getCftcCot(): Promise<CotPosition[]> {
   return positions;
 }
 
-async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
+async function getLiveProviderSnapshot(cachedCurrencies: MacroCurrency[] = []): Promise<MacroSnapshot | null> {
+  const fredApiKey = process.env.FRED_API_KEY?.trim();
+  const finnhubApiKey = process.env.FINNHUB_API_KEY?.trim();
   const alphaVantageKey = process.env.ALPHA_VANTAGE_API_KEY?.trim();
   const fmpKey = process.env.FMP_API_KEY?.trim();
   const cotProviderUrl = process.env.COT_DATA_PROVIDER_URL?.trim();
   const cotProviderToken = process.env.COT_DATA_PROVIDER_TOKEN?.trim();
 
   const snapshot: MacroSnapshot = {
-    ...SEED_SNAPSHOT,
-    currencies: SEED_SNAPSHOT.currencies.map((currency) => ({ ...currency })),
-    cot: SEED_SNAPSHOT.cot.map((position) => ({ ...position })),
-    catalysts: SEED_SNAPSHOT.catalysts.map((catalyst) => ({ ...catalyst })),
+    ...EMPTY_SNAPSHOT,
+    currencies: cachedCurrencies.map((currency) => ({ ...currency })),
+    cot: [],
+    catalysts: [],
     asOf: new Date().toISOString(),
     source: 'partial',
-    cotSource: 'seed',
+    cotSource: 'unavailable',
   };
-  const [alphaResult, fmpResult, cotResult] = await Promise.allSettled([
+  const [fredResult, finnhubResult, alphaResult, fmpResult, cotResult, frankfurterResult] = await Promise.allSettled([
+    fredApiKey ? getFredUsdUpdates(fredApiKey) : Promise.resolve(null),
+    finnhubApiKey ? getFinnhubCatalysts(finnhubApiKey) : Promise.resolve(null),
     alphaVantageKey ? getAlphaVantageUsdUpdates(alphaVantageKey) : Promise.resolve(null),
     fmpKey ? getFmpCatalysts(fmpKey) : Promise.resolve(null),
     cotProviderUrl ? getCotProvider(cotProviderUrl, cotProviderToken) : getCftcCot(),
+    getFrankfurterRates(),
   ]);
   let hasLiveData = false;
-  if (alphaVantageKey) {
+  if (fredResult.status === 'fulfilled' && isRecord(fredResult.value)) {
+    let usd = snapshot.currencies.find((currency) => currency.code === 'USD');
+    const policyRate = isFiniteNumber(fredResult.value.policyRate)
+      ? fredResult.value.policyRate
+      : usd?.policyRate;
+    const corePce = isFiniteNumber(fredResult.value.corePce) ? fredResult.value.corePce : usd?.corePce;
+    const cpi = isFiniteNumber(fredResult.value.cpi) ? fredResult.value.cpi : usd?.cpi;
+    const inflation = corePce ?? cpi ?? usd?.inflation;
+    if (policyRate !== undefined && inflation !== undefined) {
+      if (!usd) {
+        usd = {
+          code: 'USD',
+          centralBank: 'Federal Reserve',
+          policyRate,
+          inflation,
+          inflationLabel: corePce !== undefined ? 'Core PCE' : 'CPI',
+          stance: 'Live observations',
+        };
+        snapshot.currencies.push(usd);
+      }
+      if (isFiniteNumber(fredResult.value.policyRate)) {
+        usd.policyRate = fredResult.value.policyRate;
+        hasLiveData = true;
+      }
+      if (isFiniteNumber(fredResult.value.corePce)) {
+        usd.inflation = fredResult.value.corePce;
+        usd.inflationLabel = 'Core PCE';
+        usd.corePce = fredResult.value.corePce;
+        hasLiveData = true;
+      }
+      if (isFiniteNumber(fredResult.value.cpi)) {
+        usd.cpi = fredResult.value.cpi;
+        hasLiveData = true;
+      }
+      if (!isFiniteNumber(fredResult.value.corePce) && isFiniteNumber(fredResult.value.cpi)) {
+        usd.inflation = fredResult.value.cpi;
+        usd.inflationLabel = 'CPI';
+      }
+    }
+  } else if (fredResult.status === 'rejected') {
+    console.warn('FRED macro series unavailable; retaining cached USD observations:', fredResult.reason);
+  }
+  if (finnhubResult.status === 'fulfilled' && Array.isArray(finnhubResult.value)
+    && finnhubResult.value.every(isCatalyst)) {
+    snapshot.catalysts = finnhubResult.value;
+    hasLiveData = true;
+  } else if (finnhubResult.status === 'rejected') {
+    console.warn('Finnhub economic calendar unavailable; checking configured calendar adapters:', finnhubResult.reason);
+  }
+  if (frankfurterResult.status === 'fulfilled' && isRecord(frankfurterResult.value)) {
+    snapshot.ecbRates = frankfurterResult.value;
+    hasLiveData = true;
+  } else if (frankfurterResult.status === 'rejected') {
+    console.warn('ECB benchmark exchange rates are unavailable:', frankfurterResult.reason);
+  }
+  if (!fredApiKey && alphaVantageKey) {
     if (alphaResult.status === 'fulfilled' && isRecord(alphaResult.value)) {
-      const usd = snapshot.currencies.find((currency) => currency.code === 'USD');
-      if (usd) {
-        const policyRate = alphaResult.value.policyRate;
-        const inflation = alphaResult.value.inflation;
-        if (isFiniteNumber(policyRate)) {
-          usd.policyRate = policyRate;
+      let usd = snapshot.currencies.find((currency) => currency.code === 'USD');
+      const policyRate = isFiniteNumber(alphaResult.value.policyRate)
+        ? alphaResult.value.policyRate
+        : usd?.policyRate;
+      const inflation = isFiniteNumber(alphaResult.value.inflation)
+        ? alphaResult.value.inflation
+        : usd?.inflation;
+      if (policyRate !== undefined && inflation !== undefined) {
+        if (!usd) {
+          usd = {
+            code: 'USD',
+            centralBank: 'Federal Reserve',
+            policyRate,
+            inflation,
+            inflationLabel: 'CPI',
+            stance: 'Live observations',
+          };
+          snapshot.currencies.push(usd);
+        }
+        if (isFiniteNumber(alphaResult.value.policyRate)) {
+          usd.policyRate = alphaResult.value.policyRate;
           hasLiveData = true;
         }
-        if (isFiniteNumber(inflation)) {
-          usd.inflation = inflation;
+        if (isFiniteNumber(alphaResult.value.inflation)) {
+          usd.inflation = alphaResult.value.inflation;
+          usd.cpi = alphaResult.value.inflation;
+          usd.inflationLabel = 'CPI';
           hasLiveData = true;
         }
       }
     } else if (alphaResult.status === 'rejected') {
-      console.error('Alpha Vantage unavailable; retaining seeded USD macro values:', alphaResult.reason);
+      console.error('Alpha Vantage unavailable; retaining cached USD macro values:', alphaResult.reason);
     }
   }
-  if (fmpKey) {
+  if (!finnhubApiKey && fmpKey) {
     if (fmpResult.status === 'fulfilled' && Array.isArray(fmpResult.value) && fmpResult.value.every(isCatalyst)) {
       snapshot.catalysts = fmpResult.value;
       hasLiveData = true;
     } else if (fmpResult.status === 'rejected') {
-      console.error('Financial Modeling Prep unavailable; retaining seeded catalysts:', fmpResult.reason);
+      console.error('Financial Modeling Prep unavailable; retaining cached catalysts:', fmpResult.reason);
     }
   }
   if (cotResult.status === 'fulfilled' && Array.isArray(cotResult.value) && cotResult.value.every(isCotPosition)) {
@@ -313,7 +470,7 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
     snapshot.cotSource = 'provider';
     hasLiveData = true;
   } else if (cotResult.status === 'rejected') {
-    console.error('COT provider unavailable; retaining seeded positioning:', cotResult.reason);
+    console.error('COT provider unavailable; retaining cached positioning:', cotResult.reason);
   }
   return hasLiveData ? snapshot : null;
 }
@@ -330,13 +487,24 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
       return null;
     }
     if (!data || !isRecord(data.payload)) return null;
+    if (data.payload.source !== 'provider' && data.payload.source !== 'partial') return null;
     const parsed = parseProviderSnapshot(data.payload);
     if (!parsed || !Number.isFinite(Date.parse(data.refreshed_at))) return null;
+    const ecbRates = isRecord(data.payload.ecbRates)
+      ? Object.fromEntries(Object.entries(data.payload.ecbRates)
+        .filter((entry): entry is [string, number] => /^[A-Z]{3}$/.test(entry[0])
+          && isFiniteNumber(entry[1]) && entry[1] > 0))
+      : undefined;
     return {
       ...parsed,
-      source: data.payload.source === 'partial' ? 'partial' : 'provider',
-      cotSource: data.payload.cotSource === 'provider' ? 'provider' : 'seed',
+      source: data.payload.source === 'partial'
+        ? 'partial'
+        : data.payload.source === 'provider'
+          ? 'provider'
+          : 'fallback',
+      cotSource: data.payload.cotSource === 'provider' ? 'provider' : 'unavailable',
       asOf: data.refreshed_at,
+      ...(ecbRates && Object.keys(ecbRates).length > 0 ? { ecbRates } : {}),
     };
   } catch (error) {
     console.warn('Persisted macro snapshot is unavailable:', error);
@@ -344,11 +512,8 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
   }
 }
 
-export async function loadMacroSnapshot(forceRefresh = false): Promise<MacroSnapshot> {
-  if (!forceRefresh) {
-    const persisted = await getPersistedSnapshot();
-    if (persisted && Date.now() - Date.parse(persisted.asOf) <= 8 * 24 * 60 * 60 * 1000) return persisted;
-  }
+export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
+  const persisted = await getPersistedSnapshot();
   const endpoint = process.env.MACRO_DATA_PROVIDER_URL?.trim();
   if (endpoint) {
     try {
@@ -357,7 +522,7 @@ export async function loadMacroSnapshot(forceRefresh = false): Promise<MacroSnap
 
       const token = process.env.MACRO_DATA_PROVIDER_TOKEN?.trim();
       const response = await fetch(providerUrl, {
-        next: { revalidate: 1_800 },
+        cache: 'no-store',
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         signal: AbortSignal.timeout(5_000),
       });
@@ -372,10 +537,22 @@ export async function loadMacroSnapshot(forceRefresh = false): Promise<MacroSnap
   }
 
   try {
-    const liveSnapshot = await getLiveProviderSnapshot();
-    if (liveSnapshot) return liveSnapshot;
+    const liveSnapshot = await getLiveProviderSnapshot(persisted?.currencies);
+    if (liveSnapshot) {
+      if (liveSnapshot.currencies.length > 0 || !persisted) return liveSnapshot;
+      return {
+        ...persisted,
+        ...(liveSnapshot.ecbRates ? { ecbRates: liveSnapshot.ecbRates } : {}),
+        ...(liveSnapshot.cot.length > 0 ? { cot: liveSnapshot.cot, cotSource: 'provider' as const } : {}),
+        ...(liveSnapshot.catalysts.length > 0 ? { catalysts: liveSnapshot.catalysts } : {}),
+        asOf: liveSnapshot.asOf,
+        source: 'partial',
+      };
+    }
   } catch (error) {
-    console.error('Live macro APIs unavailable; using the seed snapshot:', error);
+    console.error('Live macro APIs unavailable; checking the persisted snapshot:', error);
   }
-  throw new Error('No live macro provider returned a valid snapshot.');
+  if (persisted) return persisted;
+  console.warn('No live macro source or persisted snapshot is available; serving an empty snapshot.');
+  return { ...EMPTY_SNAPSHOT, asOf: new Date().toISOString() };
 }

@@ -1,6 +1,8 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { getMacroUser } from '@/lib/macroAuth';
+import { decryptMacroApiKey, encryptMacroApiKey, generateMacroApiKey } from '@/lib/macroKeys';
+import { isMasterOwner } from '@/lib/macroAccess';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
 
 export const dynamic = 'force-dynamic';
@@ -18,19 +20,25 @@ export async function GET(request: Request) {
   try {
     const user = await getMacroUser(request);
     if (!user) return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
+    const owner = isMasterOwner(user);
     const supabase = getSupabaseAdmin();
     const [{ data: profile, error: profileError }, { data: keys, error: keysError }] = await Promise.all([
       supabase.from('profiles').select('email,tier_status,custom_fx_watchlist,macro_vip_expires_at').eq('id', user.id).maybeSingle(),
-      supabase.from('macro_api_keys').select('key_prefix,created_at').eq('user_id', user.id).is('revoked_at', null).order('created_at', { ascending: false }).limit(1),
+      supabase.from('macro_api_keys').select('key_prefix,created_at,encrypted_key').eq('user_id', user.id).is('revoked_at', null).order('created_at', { ascending: false }).limit(1),
     ]);
     if (profileError) throw profileError;
     if (keysError) throw keysError;
     return NextResponse.json({
       email: profile?.email ?? user.email ?? null,
-      tierStatus: profile?.tier_status ?? 'free',
+      tierStatus: owner ? 'vip_active' : profile?.tier_status ?? 'free',
       watchlist: profile?.custom_fx_watchlist ?? ['EURUSD'],
-      vipExpiresAt: profile?.macro_vip_expires_at ?? null,
-      apiKey: keys?.[0] ?? null,
+      vipExpiresAt: owner ? null : profile?.macro_vip_expires_at ?? null,
+      isOwner: owner,
+      apiKey: keys?.[0] ? {
+        key_prefix: keys[0].key_prefix,
+        created_at: keys[0].created_at,
+        licenseKey: keys[0].encrypted_key ? decryptMacroApiKey(keys[0].encrypted_key) : null,
+      } : null,
     }, { headers: { 'Cache-Control': 'private, no-store, max-age=0' } });
   } catch (error) {
     console.error('Macro account could not be loaded:', error);
@@ -69,11 +77,29 @@ export async function POST(request: Request) {
   try {
     const user = await getMacroUser(request);
     if (!user) return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
-    const apiKey = `ml_${randomBytes(32).toString('hex')}`;
+    const owner = isMasterOwner(user);
+    if (!owner) {
+      const { data: profile, error } = await getSupabaseAdmin().from('profiles')
+        .select('tier_status,macro_vip_expires_at')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (error) throw error;
+      if (profile?.tier_status !== 'vip_active'
+        || !profile.macro_vip_expires_at
+        || Date.parse(profile.macro_vip_expires_at) <= Date.now()) {
+        return NextResponse.json({ error: 'An active VIP Macro Pass is required to issue an MT5 license key.' }, { status: 403 });
+      }
+    }
+    const apiKey = generateMacroApiKey();
     const keyHash = createHash('sha256').update(apiKey).digest('hex');
     const supabase = getSupabaseAdmin();
     const { data: created, error: insertError } = await supabase.from('macro_api_keys')
-      .insert({ user_id: user.id, key_hash: keyHash, key_prefix: apiKey.slice(0, 10) })
+      .insert({
+        user_id: user.id,
+        key_hash: keyHash,
+        key_prefix: apiKey.slice(0, 10),
+        encrypted_key: encryptMacroApiKey(apiKey),
+      })
       .select('id,key_prefix,created_at')
       .single();
     if (insertError) throw insertError;

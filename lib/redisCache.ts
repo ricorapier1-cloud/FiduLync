@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { randomUUID } from 'node:crypto';
 import { Redis } from '@upstash/redis';
 
 type CacheEntry<T> = {
@@ -9,6 +10,7 @@ type CacheEntry<T> = {
 
 const memoryCache = new Map<string, CacheEntry<unknown>>();
 const staleMemoryCache = new Map<string, unknown>();
+const inFlight = new Map<string, Promise<unknown>>();
 const warned = new Set<string>();
 let redisClient: Redis | null | undefined;
 
@@ -38,7 +40,7 @@ function getRedisClient() {
   return redisClient;
 }
 
-export async function getCachedData<T>(
+async function loadCachedData<T>(
   key: string,
   fetchFn: () => Promise<T>,
   ttl: number,
@@ -60,6 +62,37 @@ export async function getCachedData<T>(
       }
     } catch (error) {
       warnOnce('read-failure', 'Upstash cache read failed; fetching the upstream value.', error);
+    }
+  }
+
+  let lockToken: string | null = null;
+  if (redis) {
+    try {
+      const token = randomUUID();
+      const acquired = await redis.set(`${key}:refresh-lock`, token, { nx: true, ex: 15 });
+      if (acquired === 'OK') {
+        lockToken = token;
+      } else {
+        const staleValue = await redis.get<T>(`${key}:stale`);
+        if (staleValue !== null) {
+          staleMemoryCache.set(key, staleValue);
+          memoryCache.set(key, { value: staleValue, expiresAt: now + Math.min(ttl, 5) * 1000 });
+          return staleValue;
+        }
+        for (let attempt = 0; attempt < 20; attempt += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 250));
+          const refreshedValue = await redis.get<T>(key);
+          if (refreshedValue !== null) {
+            memoryCache.set(key, { value: refreshedValue, expiresAt: Date.now() + ttl * 1000 });
+            staleMemoryCache.set(key, refreshedValue);
+            return refreshedValue;
+          }
+        }
+        throw new Error(`Concurrent refresh for ${key} did not complete in time.`);
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('Concurrent refresh for ')) throw error;
+      warnOnce('lock-failure', 'Upstash refresh lock failed; relying on in-process request coalescing.', error);
     }
   }
 
@@ -97,5 +130,33 @@ export async function getCachedData<T>(
       }
     }
     throw error;
+  } finally {
+    if (redis && lockToken) {
+      try {
+        await redis.eval(
+          'if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) else return 0 end',
+          [`${key}:refresh-lock`],
+          [lockToken],
+        );
+      } catch (error) {
+        warnOnce('lock-release-failure', 'Upstash refresh lock will expire automatically.', error);
+      }
+    }
   }
+}
+
+export function getCachedData<T>(
+  key: string,
+  fetchFn: () => Promise<T>,
+  ttl: number,
+  forceRefresh = false,
+): Promise<T> {
+  const pending = inFlight.get(key);
+  if (pending) return pending as Promise<T>;
+
+  const request = loadCachedData(key, fetchFn, ttl, forceRefresh);
+  inFlight.set(key, request);
+  return request.finally(() => {
+    if (inFlight.get(key) === request) inFlight.delete(key);
+  });
 }

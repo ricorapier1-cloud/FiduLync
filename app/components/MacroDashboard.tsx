@@ -16,7 +16,7 @@ import {
   ShieldCheck,
   TrendingUp,
 } from 'lucide-react';
-import type { MacroSnapshot } from '@/types/macro';
+import type { MacroSnapshot, MarketQuote } from '@/types/macro';
 import PaystackPop from '@paystack/inline-js';
 import { supabase } from '@/lib/supabaseClient';
 import AuthModal from '@/components/AuthModal';
@@ -24,6 +24,7 @@ import MacroAccountModal from '@/components/MacroAccountModal';
 
 type MacroDashboardProps = {
   initialSnapshot: MacroSnapshot;
+  initialQuotes: MarketQuote[];
   vipEnabled: boolean;
   vipPrice: number;
 };
@@ -92,8 +93,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export default function MacroDashboard({ initialSnapshot, vipEnabled, vipPrice }: MacroDashboardProps) {
+export default function MacroDashboard({ initialSnapshot, initialQuotes, vipEnabled, vipPrice }: MacroDashboardProps) {
   const [snapshot, setSnapshot] = useState(initialSnapshot);
+  const [quotes, setQuotes] = useState(initialQuotes);
+  const [liveFeed, setLiveFeed] = useState(false);
   const [pair, setPair] = useState<(typeof pairs)[number]['symbol']>('EURUSD');
   const [now, setNow] = useState<number | null>(null);
   const [email, setEmail] = useState('');
@@ -109,6 +112,10 @@ export default function MacroDashboard({ initialSnapshot, vipEnabled, vipPrice }
     .filter((catalyst) => now === null || Date.parse(catalyst.scheduledAt) >= now)
     .sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt));
   const currencies = snapshot.currencies;
+  const liveQuoteAvailable = liveFeed && now !== null && quotes.some((quote) => {
+    const age = now - Date.parse(quote.timestamp);
+    return quote.source === 'finnhub' && age >= 0 && age <= 120_000;
+  });
   const activePair = pairs.find((item) => item.symbol === pair) ?? pairs[0];
   const baseCurrency = currencies.find((currency) => currency.code === activePair.base);
   const quoteCurrency = currencies.find((currency) => currency.code === activePair.quote);
@@ -120,12 +127,25 @@ export default function MacroDashboard({ initialSnapshot, vipEnabled, vipPrice }
     : null;
   const policySpread = currencies.length > 1
     ? Math.max(...currencies.map((currency) => currency.policyRate)) - Math.min(...currencies.map((currency) => currency.policyRate))
-    : 0;
+    : null;
 
   useEffect(() => {
     const initialClockTimer = window.setTimeout(() => setNow(Date.now()), 0);
     const clockTimer = window.setInterval(() => setNow(Date.now()), 30_000);
     const controller = new AbortController();
+    const refreshQuotes = async () => {
+      try {
+        const response = await fetch('/api/macro/quotes', { cache: 'no-store', signal: controller.signal });
+        if (!response.ok) return;
+        const payload: unknown = await response.json();
+        if (isRecord(payload) && Array.isArray(payload.quotes)) {
+          setQuotes(payload.quotes as MarketQuote[]);
+          setLiveFeed(payload.live === true);
+        }
+      } catch {
+        // Keep the latest quote set while the upstream provider is unavailable.
+      }
+    };
     const refresh = async () => {
       setRefreshing(true);
       try {
@@ -143,10 +163,13 @@ export default function MacroDashboard({ initialSnapshot, vipEnabled, vipPrice }
       }
     };
     void refresh();
+    void refreshQuotes();
     const refreshTimer = window.setInterval(() => void refresh(), 300_000);
+    const quoteTimer = window.setInterval(() => void refreshQuotes(), 60_000);
     return () => {
       window.clearInterval(clockTimer);
       window.clearInterval(refreshTimer);
+      window.clearInterval(quoteTimer);
       window.clearTimeout(initialClockTimer);
       controller.abort();
     };
@@ -232,8 +255,12 @@ export default function MacroDashboard({ initialSnapshot, vipEnabled, vipPrice }
   return (
     <div className="macro-page">
       <div className="macro-statusline mono">
-        <span><span className="macro-pulse" /> MACRO INTELLIGENCE / GLOBAL FX</span>
-        <span className="macro-status-right"><span className="macro-feed-badge">{snapshot.source === 'provider' ? 'PROVIDER FEED' : snapshot.source === 'partial' ? 'PARTIAL FEED' : 'ILLUSTRATIVE SEED'}</span><button type="button" className="macro-refresh" aria-label="Refresh macro data" onClick={() => window.location.reload()}><RefreshCw size={13} className={refreshing ? 'macro-spin' : ''} /> REFRESH</button><button type="button" className="macro-refresh" onClick={() => accessToken ? setAccountOpen(true) : setAuthOpen(true)}>{accessToken ? 'ACCOUNT' : 'SIGN IN'}</button></span>
+        <span><span className={`macro-pulse${liveQuoteAvailable ? ' macro-pulse-live' : ''}`} /> MACRO INTELLIGENCE / GLOBAL FX</span>
+        <span className="macro-status-right"><span className={`macro-feed-badge${liveQuoteAvailable ? ' macro-feed-live' : ''}`}>{liveQuoteAvailable ? 'LIVE FEED' : snapshot.source === 'provider' ? 'PROVIDER FEED' : snapshot.source === 'partial' ? 'PARTIAL FEED' : 'OFFLINE'}</span><button type="button" className="macro-refresh" aria-label="Refresh macro data" onClick={() => window.location.reload()}><RefreshCw size={13} className={refreshing ? 'macro-spin' : ''} /> REFRESH</button><Link href="/profile" className="macro-refresh">PROFILE</Link><button type="button" className="macro-refresh" onClick={() => accessToken ? setAccountOpen(true) : setAuthOpen(true)}>{accessToken ? 'ACCOUNT' : 'SIGN IN'}</button></span>
+      </div>
+      <div className="macro-quote-strip" aria-label="Live FX quotes">
+        {quotes.map((quote) => <span key={quote.symbol} className="macro-quote mono"><strong>{quote.symbol}</strong><b>{quote.price.toFixed(quote.symbol.startsWith('XAU') ? 2 : quote.symbol.endsWith('JPY') ? 3 : 5)}</b><small className={quote.source === 'finnhub' ? 'macro-positive' : ''}>{quote.source === 'finnhub' ? 'LIVE' : 'ECB REF'}</small></span>)}
+        {Object.entries(snapshot.ecbRates ?? {}).map(([currency, value]) => <span key={`ecb-${currency}`} className="macro-quote mono"><strong>EUR/{currency}</strong><b>{value.toFixed(4)}</b><small>ECB REF</small></span>)}
       </div>
 
       <section className="macro-intro" aria-labelledby="macro-title">
@@ -244,17 +271,17 @@ export default function MacroDashboard({ initialSnapshot, vipEnabled, vipPrice }
           <a className="macro-intro-action" href="https://wa.me/2348037212445?text=Hello%2C%20I%27d%20like%20to%20automate%20a%20macro%20strategy%20with%20an%20MT5%20Expert%20Advisor." target="_blank" rel="noreferrer"><MessageCircle size={15} /> Automate this strategy <ArrowUpRight size={13} /></a>
         </div>
         <div className="macro-intro-meta mono">
-          <span>SNAPSHOT / {snapshot.source === 'provider' ? 'UPSTREAM' : snapshot.source === 'partial' ? 'MIXED INPUTS' : 'SEED BASELINE'}</span>
+          <span>SNAPSHOT / {snapshot.source === 'provider' ? 'UPSTREAM' : snapshot.source === 'partial' ? 'MIXED INPUTS' : 'OFFLINE'}</span>
           <strong>{now ? new Date(now).toISOString().replace('T', ' ').slice(0, 19) + ' UTC' : 'UTC / --:--:--'}</strong>
-          <span className="macro-provenance">{snapshot.source === 'seed' ? 'Illustrative values. Configure a provider for current observations.' : snapshot.source === 'partial' ? 'Some fields are live; remaining values use the seed baseline.' : 'Provider payload validated at the platform edge.'}</span>
+          <span className="macro-provenance">{snapshot.source === 'fallback' ? 'No fresh or cached macro observations are available.' : snapshot.source === 'partial' ? 'Only validated live or cached provider fields are displayed.' : 'Provider payload validated at the platform edge.'}</span>
         </div>
       </section>
 
       <section className="macro-kpis" aria-label="Macro overview">
-        <article className="macro-kpi"><span className="macro-kpi-label">POLICY RANGE <span>G10</span></span><strong className="mono">{formatRate(policySpread)}</strong><small>highest to lowest policy rate</small></article>
-        <article className="macro-kpi"><span className="macro-kpi-label">CENTRAL BANKS <span>TRACKED</span></span><strong className="mono">{String(currencies.length).padStart(2, '0')} <em>/ 06</em></strong><small>Fed · ECB · BoE · BoJ · RBA · SNB</small></article>
+        <article className="macro-kpi"><span className="macro-kpi-label">POLICY RANGE <span>G10</span></span><strong className="mono">{policySpread === null ? '—' : formatRate(policySpread)}</strong><small>highest to lowest available policy rate</small></article>
+        <article className="macro-kpi"><span className="macro-kpi-label">POLICY INPUTS <span>G10</span></span><strong className="mono">{String(currencies.length).padStart(2, '0')} <em>/ 10</em></strong><small>validated live country observations</small></article>
         <article className="macro-kpi"><span className="macro-kpi-label">NEXT CATALYST <span>HIGH IMPACT</span></span><strong className="mono">{sortedCatalysts[0] && now ? formatCountdown(sortedCatalysts[0].scheduledAt, now) : '—'}</strong><small>{sortedCatalysts[0]?.title ?? 'No upcoming event in feed'}</small></article>
-        <article className="macro-kpi macro-kpi-source"><span className="macro-kpi-label">DATA PROVENANCE <span>STATUS</span></span><strong className="macro-source-value"><span className={snapshot.source === 'seed' ? 'macro-source-dot' : 'macro-source-dot macro-source-live'} />{snapshot.source === 'provider' ? 'CONNECTED' : snapshot.source === 'partial' ? 'PARTIAL' : 'SEED MODE'}</strong><small>{refreshing ? 'Checking provider…' : 'External feed is optional'}</small></article>
+        <article className="macro-kpi macro-kpi-source"><span className="macro-kpi-label">DATA PROVENANCE <span>STATUS</span></span><strong className="macro-source-value"><span className={snapshot.source === 'fallback' ? 'macro-source-dot' : 'macro-source-dot macro-source-live'} />{snapshot.source === 'provider' ? 'CONNECTED' : snapshot.source === 'partial' ? 'PARTIAL' : 'OFFLINE'}</strong><small>{refreshing ? 'Checking provider…' : 'Stale cache used when available'}</small></article>
       </section>
 
       <section id="matrix" className="macro-section" aria-labelledby="matrix-title">
@@ -264,14 +291,14 @@ export default function MacroDashboard({ initialSnapshot, vipEnabled, vipPrice }
             <thead><tr><th>CCY</th><th>POLICY AUTHORITY</th><th>POLICY RATE</th><th>INFLATION</th><th>REAL RATE</th><th>POLICY STANCE</th></tr></thead>
             <tbody>{currencies.map((currency) => {
               const realRate = currency.policyRate - currency.inflation;
-              return <tr key={currency.code}><td><span className="macro-currency-code mono">{currency.code}</span></td><td>{currency.centralBank}</td><td className="mono">{formatRate(currency.policyRate)}</td><td><span className="mono">{formatRate(currency.inflation)}</span><small>{currency.inflationLabel}</small></td><td className={`mono ${realRate >= 0 ? 'macro-positive' : 'macro-negative'}`}>{realRate > 0 ? '+' : ''}{formatRate(realRate)}</td><td><span className="macro-stance">{currency.stance}</span></td></tr>;
+              return <tr key={currency.code}><td><span className="macro-currency-code mono">{currency.code}</span></td><td>{currency.centralBank}</td><td className="mono">{formatRate(currency.policyRate)}</td><td><span className="mono">{formatRate(currency.inflation)}</span><small>{currency.corePce !== undefined && currency.cpi !== undefined ? `Core PCE ${formatRate(currency.corePce)} · CPI ${formatRate(currency.cpi)}` : currency.inflationLabel}</small></td><td className={`mono ${realRate >= 0 ? 'macro-positive' : 'macro-negative'}`}>{realRate > 0 ? '+' : ''}{formatRate(realRate)}</td><td><span className="macro-stance">{currency.stance}</span></td></tr>;
             })}</tbody>
           </table>
           <div className="macro-currency-cards">{currencies.map((currency) => {
             const realRate = currency.policyRate - currency.inflation;
             return <article className="macro-currency-card" key={currency.code}><div className="macro-currency-card-head"><strong className="mono">{currency.code}</strong><span>{currency.stance}</span></div><p>{currency.centralBank}</p><div className="macro-currency-card-stats"><span>POLICY <b className="mono">{formatRate(currency.policyRate)}</b></span><span>{currency.inflationLabel.toUpperCase()} <b className="mono">{formatRate(currency.inflation)}</b></span><span>REAL <b className={`mono ${realRate >= 0 ? 'macro-positive' : 'macro-negative'}`}>{formatRate(realRate)}</b></span></div></article>;
           })}</div>
-          <div className="macro-panel-foot"><span>Real rate = policy rate − inflation proxy. Inflation measure varies by jurisdiction.</span><span className="mono">SEED VALUES ARE ILLUSTRATIVE</span></div>
+          <div className="macro-panel-foot"><span>Real rate = current policy rate − latest available inflation measure.</span><span className="mono">NO SYNTHETIC MACRO VALUES</span></div>
         </div>
       </section>
 
@@ -299,7 +326,7 @@ export default function MacroDashboard({ initialSnapshot, vipEnabled, vipPrice }
               <div className="macro-event-info"><div><span className="macro-region mono">{catalyst.region}</span><span className={`macro-impact macro-impact-${catalyst.impact.toLowerCase()}`}>{catalyst.impact}</span></div><h3>{catalyst.title}</h3><p>Consensus <b className="mono">{catalyst.consensus}</b><span>Actual <b className="mono">{catalyst.actual ?? 'Pending'}</b></span></p></div>
               <span className="macro-countdown mono">{now ? formatCountdown(catalyst.scheduledAt, now) : '--'}</span>
             </article>)}
-            <div className="macro-calendar-note"><Clock3 size={14} /><span>Seed dates are indicative. Confirm official release calendars before positioning.</span></div>
+            <div className="macro-calendar-note"><Clock3 size={14} /><span>Provider calendar consensus and actuals may be revised; confirm official release details before positioning.</span></div>
           </div>
         </section>
       </div>
@@ -312,7 +339,7 @@ export default function MacroDashboard({ initialSnapshot, vipEnabled, vipPrice }
             {snapshot.cot.map((position) => <div className="macro-cot-row" key={position.market}>
               <strong className="mono">{position.market}</strong><span className={`mono ${position.netContracts >= 0 ? 'macro-positive' : 'macro-negative'}`}>{formatContracts(position.netContracts)}</span><span className={`mono ${position.weeklyChange >= 0 ? 'macro-positive' : 'macro-negative'}`}>{position.weeklyChange > 0 ? '+' : ''}{formatContracts(position.weeklyChange)}</span><div className="macro-extreme"><div className="macro-extreme-track"><span style={{ width: `${position.percentile}%` }} /></div><span className="mono">{position.percentile}%ile</span>{(position.percentile >= 90 || position.percentile <= 10) && <span className="macro-crowded">CROWDED</span>}</div>
             </div>)}
-            <div className="macro-panel-foot"><span>{snapshot.cotSource === 'provider' ? 'COT feed validated; confirm the provider uses consistent CFTC report definitions.' : 'Illustrative net positions; configure a COT provider for current CFTC positioning.'}</span><span className="mono">POSITIONING ≠ SIGNAL</span></div>
+            <div className="macro-panel-foot"><span>{snapshot.cotSource === 'provider' ? 'CFTC report data validated; positioning is weekly and can lag market conditions.' : 'No current CFTC positioning snapshot is available.'}</span><span className="mono">POSITIONING ≠ SIGNAL</span></div>
           </div>
           <aside className="macro-cot-callout"><div className="macro-callout-icon"><TrendingUp size={18} /></div><span className="eyebrow">CROWDING WATCH</span><h3>Extremes can amplify reversals.</h3><p>High percentiles flag crowded exposure, not a timing trigger. Compare positioning with policy repricing and the catalyst calendar.</p><div className="macro-callout-stat"><span>TOP SEED EXTREME</span><strong className="mono">{snapshot.cot.reduce((highest, current) => current.percentile > highest.percentile ? current : highest, snapshot.cot[0] ?? { market: '—', percentile: 0 }).market} <em>{Math.max(0, ...snapshot.cot.map((position) => position.percentile))}%</em></strong></div></aside>
         </div>

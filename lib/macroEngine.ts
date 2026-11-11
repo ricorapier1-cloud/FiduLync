@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { SEED_SNAPSHOT, loadMacroSnapshot } from '@/lib/macroData';
+import { EMPTY_SNAPSHOT, loadMacroSnapshot } from '@/lib/macroData';
 import { getCachedData } from '@/lib/redisCache';
 import type { MacroSnapshot } from '@/types/macro';
 
@@ -13,10 +13,10 @@ export type FundamentalSignal = {
 
 export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnapshot> {
   try {
-    return await getCachedData('macro:snapshot', () => loadMacroSnapshot(forceRefresh), 3_600, forceRefresh);
+    return await getCachedData('macro:snapshot', loadMacroSnapshot, 3_600, forceRefresh);
   } catch (error) {
-    console.warn('Macro providers and cached snapshots are unavailable; serving the illustrative baseline.', error);
-    return { ...SEED_SNAPSHOT, asOf: new Date().toISOString() };
+    console.warn('Macro providers and cached snapshots are unavailable; serving an empty snapshot.', error);
+    return { ...EMPTY_SNAPSHOT, asOf: new Date().toISOString() };
   }
 }
 

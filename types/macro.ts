@@ -4,6 +4,8 @@ export type MacroCurrency = {
   policyRate: number;
   inflation: number;
   inflationLabel: string;
+  corePce?: number;
+  cpi?: number;
   stance: string;
 };
 
@@ -26,9 +28,18 @@ export type EconomicCatalyst = {
 
 export type MacroSnapshot = {
   asOf: string;
-  source: 'seed' | 'provider' | 'partial';
-  cotSource?: 'seed' | 'provider';
+  source: 'fallback' | 'provider' | 'partial';
+  cotSource?: 'unavailable' | 'provider';
+  ecbRates?: Record<string, number>;
   currencies: MacroCurrency[];
   cot: CotPosition[];
   catalysts: EconomicCatalyst[];
+};
+
+export type MarketQuote = {
+  symbol: 'EURUSD' | 'GBPUSD' | 'USDJPY' | 'XAUUSD';
+  price: number;
+  changePercent: number | null;
+  timestamp: string;
+  source: 'finnhub' | 'frankfurter';
 };
