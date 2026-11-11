@@ -1,6 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
-import { getMacroSnapshot } from '@/lib/macroData';
+import { getMacroSnapshot } from '@/lib/macroEngine';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
 
 export const dynamic = 'force-dynamic';

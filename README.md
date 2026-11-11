@@ -19,6 +19,8 @@ Set the following environment variables in the deployment environment:
 | `PAYSTACK_SECRET_KEY` | Server-side checkout, refund and transfer requests |
 | `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | Optional Paystack Inline checkout key; hosted redirect is used if omitted |
 | `PAYSTACK_VIP_PLAN_CODE` | Paystack monthly NGN plan configured for exactly ₦5,000 |
+| `UPSTASH_REDIS_REST_URL` | Optional Upstash REST endpoint for shared live/macro caching |
+| `UPSTASH_REDIS_REST_TOKEN` | Optional server-only Upstash REST token |
 | `NEXT_PUBLIC_APP_URL` | Optional canonical HTTP(S) URL for metadata and Paystack callbacks; callbacks fall back to the request origin |
 | `CRON_SECRET` | Bearer secret for scheduled settlement and macro-refresh endpoints |
 | `ALPHA_VANTAGE_API_KEY` | Optional free-tier US Federal Funds Rate and CPI observations |
@@ -27,6 +29,8 @@ Set the following environment variables in the deployment environment:
 | `MACRO_DATA_PROVIDER_TOKEN` | Optional bearer token for the complete macro snapshot provider |
 | `COT_DATA_PROVIDER_URL` | Optional HTTPS override returning a COT array or `{ "cot": [...] }`; the public CFTC legacy futures-only feed is used by default |
 | `COT_DATA_PROVIDER_TOKEN` | Optional bearer token for the COT provider override |
+| `MARKET_DATA_PROVIDER_URL` | Optional HTTPS candle endpoint; receives `pair` and `timeframe` (`H1` or `H4`) query parameters |
+| `MARKET_DATA_PROVIDER_TOKEN` | Optional bearer token for the market-data provider |
 | `MT5_CREDENTIALS_ENCRYPTION_KEY` | Base64-encoded 32-byte AES-256-GCM key for MT5 investor credentials |
 
 Generate a distinct encryption key for each environment and store it in your deployment secret manager:
@@ -52,6 +56,12 @@ Configure the private `dispute-evidence` Storage bucket and ensure the productio
 ## Payments and settlement
 
 Configure Paystack's webhook URL to `https://<your-domain>/api/paystack-webhook`. Configure the VIP plan in Paystack for exactly NGN 5,000 monthly; checkout rejects payment activation unless the signed webhook matches the authenticated account, pending reference, amount, and currency. Deal funding begins at `/api/escrow/<reference>/fund`; only a signed Paystack charge webhook with the expected currency and amount marks a deal funded. The 48-hour inspection deadline is persisted server-side, and a dispute atomically freezes a funded deal.
+
+## Live data, caching and MT5
+
+The macro adapter uses the configured macro provider for validated policy-rate, inflation/CPI, COT and catalyst observations. The optional Alpha Vantage adapter supplies US policy-rate and CPI observations; official CFTC COT data is used when no COT override is configured. Values without a live source remain explicitly identified as partial or illustrative. Configure an HTTPS `MARKET_DATA_PROVIDER_URL` that returns at least 200 chronologically ordered candles for each requested timeframe, as either `{ "candles": [{ "timestamp": "2026-11-11T12:00:00Z", "open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15 }] }` or a candle array. The technical engine requests H1 and H4 data and disables execution filters when the provider is missing, invalid or unavailable. Quotes/candles are cached for 60 seconds; macro snapshots use a 1-hour cache. Upstash is optional: when its credentials are absent or unavailable, requests continue using in-process caching and the available upstream or stale snapshot.
+
+The MT5 signal bridge is `GET /api/v1/macro-signal?pair=EURUSD&api_key=<generated-key>`. It returns fundamental/technical/confluence scores, ATR distances and fail-closed execution filters. In MetaTrader 5, open **Tools → Options → Expert Advisors**, enable **Allow WebRequest for listed URL**, and add `https://fidulync.vercel.app` (or your deployed origin). Generate the account API key in MacroLync and pass it with the requested pair. Do not embed service-role or provider credentials in an EA.
 
 `vercel.json` schedules `/api/cron/settlements` hourly and `/api/cron/sync-macro` every Friday at 23:00 UTC. Set `CRON_SECRET`; the macro job persists snapshots only when it has live CFTC/COT positioning. The COT adapter reads the official CFTC legacy futures-only report and calculates historical net-position percentiles; the normalized provider override remains available. Alpha Vantage and Financial Modeling Prep feeds are optional, with validated static seeds retained as fallback. The MT5 bridge is available at `/api/v1/macro-signal?pair=EURUSD&api_key=<key>` and validates a generated account key on each request.
 

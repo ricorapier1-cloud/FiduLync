@@ -326,7 +326,7 @@ export default function MacroDashboard({ initialSnapshot, vipEnabled, vipPrice }
           <label htmlFor="vip-email">EMAIL FOR SUBSCRIPTION</label>
           <div className="macro-vip-email"><Mail size={15} /><input id="vip-email" type="email" autoComplete="email" required readOnly={Boolean(signedInEmail)} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@company.com" /></div>
           <button type="submit" className="macro-vip-button" disabled={!vipEnabled || checkoutBusy}>{checkoutBusy ? 'Opening Paystack…' : vipEnabled ? 'Subscribe with Paystack' : 'Checkout not configured'}<ArrowRight size={15} /></button>
-          <p className="macro-vip-feedback" role="status">{checkoutMessage || (vipEnabled ? 'Secure checkout · recurring plan' : 'Configure Paystack secret and monthly plan to enable checkout.')}</p>
+          <p className={`macro-vip-feedback${vipEnabled ? '' : ' macro-subscription-badge'}`} role="status">{checkoutMessage || (vipEnabled ? 'Secure checkout · recurring plan' : 'Subscription activating soon')}</p>
         </form>
       </section>
 

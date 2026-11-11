@@ -325,7 +325,11 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
       .select('payload,refreshed_at')
       .eq('snapshot_key', 'global')
       .maybeSingle();
-    if (error || !data || !isRecord(data.payload)) return null;
+    if (error) {
+      console.warn('Persisted macro snapshot lookup failed:', error);
+      return null;
+    }
+    if (!data || !isRecord(data.payload)) return null;
     const parsed = parseProviderSnapshot(data.payload);
     if (!parsed || !Number.isFinite(Date.parse(data.refreshed_at))) return null;
     return {
@@ -334,12 +338,13 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
       cotSource: data.payload.cotSource === 'provider' ? 'provider' : 'seed',
       asOf: data.refreshed_at,
     };
-  } catch {
+  } catch (error) {
+    console.warn('Persisted macro snapshot is unavailable:', error);
     return null;
   }
 }
 
-export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnapshot> {
+export async function loadMacroSnapshot(forceRefresh = false): Promise<MacroSnapshot> {
   if (!forceRefresh) {
     const persisted = await getPersistedSnapshot();
     if (persisted && Date.now() - Date.parse(persisted.asOf) <= 8 * 24 * 60 * 60 * 1000) return persisted;
@@ -372,5 +377,5 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
   } catch (error) {
     console.error('Live macro APIs unavailable; using the seed snapshot:', error);
   }
-  return { ...SEED_SNAPSHOT, asOf: new Date().toISOString() };
+  throw new Error('No live macro provider returned a valid snapshot.');
 }

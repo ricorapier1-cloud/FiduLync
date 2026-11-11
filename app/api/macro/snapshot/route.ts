@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getMacroSnapshot } from '@/lib/macroData';
+import { getMacroSnapshot } from '@/lib/macroEngine';
 
 export const dynamic = 'force-dynamic';
 

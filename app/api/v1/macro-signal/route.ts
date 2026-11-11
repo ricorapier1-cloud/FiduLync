@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
-import { getMacroSnapshot } from '@/lib/macroData';
+import { getMacroSnapshot, getFundamentalSignal } from '@/lib/macroEngine';
+import { getTechnicalSignal } from '@/lib/technicalEngine';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
 
 export const dynamic = 'force-dynamic';
@@ -40,41 +41,49 @@ export async function GET(request: Request) {
     if (keyError) throw keyError;
     if (!keyRecord) return NextResponse.json({ error: 'A valid API key is required.' }, { status: 401 });
 
-    const snapshot = await getMacroSnapshot();
-    const quote = snapshot.currencies.find((currency) => currency.code === instrument.quote);
-    const base = instrument.base === 'XAU'
-      ? null
-      : snapshot.currencies.find((currency) => currency.code === instrument.base);
-    const cotBase = snapshot.cot.find((position) => position.market === (instrument.base === 'XAU' ? 'GOLD' : instrument.base));
-    const cotQuote = snapshot.cot.find((position) => position.market === instrument.quote);
-    if (!quote || (instrument.base !== 'XAU' && !base)) {
+    const [snapshot, technical] = await Promise.all([
+      getMacroSnapshot(),
+      getTechnicalSignal(pair),
+    ]);
+    const fundamental = getFundamentalSignal(snapshot, pair);
+    if (!fundamental) {
       return NextResponse.json({ error: 'Macro inputs are unavailable for this instrument.' }, { status: 503 });
     }
 
-    const policyDiffBps = base
-      ? Math.round((base.policyRate - quote.policyRate) * 100)
-      : Math.round(-quote.policyRate * 100);
-    const realYieldDiffBps = base
-      ? Math.round(((base.policyRate - base.inflation) - (quote.policyRate - quote.inflation)) * 100)
-      : Math.round(-(quote.policyRate - quote.inflation) * 100);
-    const rawScore = base
-      ? (base.policyRate - quote.policyRate) * 12
-        + ((base.policyRate - base.inflation) - (quote.policyRate - quote.inflation)) * 9
-        + ((cotBase?.percentile ?? 50) - (cotQuote?.percentile ?? 50)) * 0.18
-      : (quote.policyRate - quote.inflation) * -18
-        + ((cotBase?.percentile ?? 50) - 50) * 0.18;
-    const score = Math.max(-100, Math.min(100, Math.round(rawScore)));
-    const bias = score > 0 ? 'BULLISH' : score < 0 ? 'BEARISH' : 'NEUTRAL';
+    const confluenceScore = Math.max(-100, Math.min(100, Math.round(
+      fundamental.score * 0.6 + technical.score * 0.4,
+    )));
+    const bias = confluenceScore > 0 ? 'BULLISH' : confluenceScore < 0 ? 'BEARISH' : 'NEUTRAL';
+    const conviction = Math.abs(confluenceScore);
+    const grade = conviction >= 80 ? 'A' : conviction >= 60 ? 'B' : conviction >= 40 ? 'C' : conviction >= 20 ? 'D' : 'E';
+    const executionFilter = {
+      allow_buys: technical.execution_filter.allow_buys && confluenceScore > 0,
+      allow_sells: technical.execution_filter.allow_sells && confluenceScore < 0,
+      recommended_lot_multiplier: technical.execution_filter.allow_buys && confluenceScore > 0
+        || technical.execution_filter.allow_sells && confluenceScore < 0
+        ? technical.execution_filter.recommended_lot_multiplier
+        : 0,
+    };
 
     return NextResponse.json({
       status: 'success',
       pair,
+      confluence_score: confluenceScore,
+      grade,
       bias,
-      score,
-      policy_diff_bps: policyDiffBps,
-      real_yield_diff_bps: realYieldDiffBps,
-      cot_position_diff: Math.round((cotBase?.percentile ?? 50) - (cotQuote?.percentile ?? 50)),
-      execution_filter: { allow_buys: score > 0, allow_sells: score < 0 },
+      fundamental_score: fundamental.score,
+      technical_score: technical.score,
+      score: confluenceScore,
+      policy_diff_bps: fundamental.policyDiffBps,
+      real_yield_diff_bps: fundamental.realYieldDiffBps,
+      cot_position_diff: fundamental.cotPositionDiff,
+      execution_filter: executionFilter,
+      technical_available: technical.available,
+      gaussian_z_score: technical.gaussian_z_score,
+      kaufman_efficiency_ratio: technical.kaufman_efficiency_ratio,
+      market_regime: technical.regime,
+      atr_stop_pips: technical.atr_stop_pips,
+      atr_take_profit_pips: technical.atr_take_profit_pips,
       timestamp: new Date().toISOString(),
       data_as_of: snapshot.asOf,
       source: snapshot.source,

@@ -1,5 +1,5 @@
 import MacroDashboard from '@/app/components/MacroDashboard';
-import { getMacroSnapshot } from '@/lib/macroData';
+import { getMacroSnapshot } from '@/lib/macroEngine';
 
 export const dynamic = 'force-dynamic';
 

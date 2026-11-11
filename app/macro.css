@@ -133,6 +133,7 @@
 .macro-vip-button { display: inline-flex; min-height: 38px; align-items: center; justify-content: center; gap: 7px; padding: 0 10px; border: 1px solid #10b981; border-radius: 4px; background: #10b981; color: #062016; font-size: 8px; font-weight: 700; white-space: nowrap; cursor: pointer; }
 .macro-vip-button:disabled { border-color: rgba(151, 169, 178, .2); background: rgba(151, 169, 178, .11); color: #718087; cursor: not-allowed; }
 .macro-vip-feedback { min-height: 12px; grid-column: 1 / -1; margin: 0; color: #788a84; font-size: 7px; line-height: 1.5; }
+.macro-subscription-badge { width: fit-content; padding: 5px 8px; border: 1px solid rgba(16, 185, 129, .22); border-radius: 4px; background: rgba(16, 185, 129, .07); color: #9ee4c8; }
 .macro-footer { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 14px 25px; margin-top: 35px; padding: 17px 0 0; border-top: 1px solid rgba(151, 169, 178, .12); }
 .macro-footer-brand { display: inline-flex; flex-direction: column; gap: 4px; }
 .macro-footer-brand > span { color: #e2e8e9; font-size: 15px; font-weight: 650; }
@@ -160,7 +161,8 @@
   .macro-statusline > span, .macro-status-right { gap: 6px; }
   .macro-status-right { align-items: flex-end; flex-direction: column; }
   .macro-feed-badge { font-size: 7px; }
-  .macro-refresh { min-height: 24px; font-size: 7px; }
+  .macro-refresh { min-height: 44px; font-size: 8px; }
+  .macro-select-wrap select { height: 44px; }
   .macro-intro { grid-template-columns: 1fr; gap: 17px; padding: 31px 0 19px; }
   .macro-intro h1 { font-size: 34px; }
   .macro-intro > div:first-child > p { max-width: 500px; font-size: 11px; }
@@ -215,7 +217,7 @@
   .macro-vip-includes { gap: 7px 11px; }
   .macro-vip-form { grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr) auto; margin-top: 3px; }
   .macro-vip-price strong { font-size: 19px; }
-  .macro-vip-button { padding: 0 9px; font-size: 7px; }
+  .macro-vip-button { min-height: 44px; padding: 0 9px; font-size: 8px; }
   .macro-footer { grid-template-columns: 1fr; gap: 12px; margin-top: 26px; }
   .macro-footer-actions { justify-content: flex-start; }
   .macro-footer-legal { grid-column: 1; }
