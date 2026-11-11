@@ -11,6 +11,42 @@ export const EMPTY_SNAPSHOT: MacroSnapshot = {
   catalysts: [],
 };
 
+export function getFallbackSnapshot(): MacroSnapshot {
+  return {
+    asOf: new Date().toISOString(),
+    source: 'fallback',
+    cotSource: 'unavailable',
+    currencies: [
+      { code: 'USD', centralBank: 'Federal Reserve', policyRate: 3.75, inflation: 2.8, inflationLabel: 'Core PCE', stance: 'Restrictive' },
+      { code: 'EUR', centralBank: 'European Central Bank', policyRate: 2.15, inflation: 2.1, inflationLabel: 'HICP', stance: 'Neutral' },
+      { code: 'GBP', centralBank: 'Bank of England', policyRate: 4, inflation: 2.8, inflationLabel: 'CPI', stance: 'Cautious' },
+      { code: 'JPY', centralBank: 'Bank of Japan', policyRate: 0.5, inflation: 3, inflationLabel: 'CPI', stance: 'Normalising' },
+      { code: 'AUD', centralBank: 'Reserve Bank of Australia', policyRate: 3.6, inflation: 3.4, inflationLabel: 'CPI', stance: 'Restrictive' },
+      { code: 'CHF', centralBank: 'Swiss National Bank', policyRate: 0, inflation: 0.2, inflationLabel: 'CPI', stance: 'Accommodative' },
+    ],
+    cot: [],
+    catalysts: [
+      { id: 'us-cpi-nov', region: 'US', title: 'Consumer Price Index', scheduledAt: '2026-11-12T13:30:00.000Z', impact: 'High', consensus: '2.8% y/y', actual: null },
+      { id: 'us-nfp-dec', region: 'US', title: 'Non-Farm Payrolls', scheduledAt: '2026-12-04T13:30:00.000Z', impact: 'High', consensus: '+145k', actual: null },
+      { id: 'fomc-dec', region: 'US', title: 'FOMC Rate Decision', scheduledAt: '2026-12-09T19:00:00.000Z', impact: 'High', consensus: 'Hold', actual: null },
+      { id: 'ecb-dec', region: 'EU', title: 'ECB Policy Decision', scheduledAt: '2026-12-17T13:15:00.000Z', impact: 'High', consensus: 'Hold', actual: null },
+    ],
+  };
+}
+
+function mergeWithFallback(snapshot: MacroSnapshot): MacroSnapshot {
+  const fallback = getFallbackSnapshot();
+  const currencies = new Map(fallback.currencies.map((currency) => [currency.code, currency]));
+  for (const currency of snapshot.currencies) currencies.set(currency.code, currency);
+  return {
+    ...fallback,
+    ...snapshot,
+    currencies: [...currencies.values()],
+    cot: snapshot.cot,
+    catalysts: snapshot.catalysts.length > 0 ? snapshot.catalysts : fallback.catalysts,
+  };
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -153,7 +189,7 @@ async function getFinnhubCatalysts(apiKey: string): Promise<EconomicCatalyst[]> 
     const impact = impactText.includes('high') ? 'High' : impactText.includes('medium') ? 'Medium' : null;
     const scheduledAt = new Date(item.time);
     if (!impact || !Number.isFinite(scheduledAt.getTime()) || !regions[item.country]) return [];
-    const consensus = item.estimate === null || item.estimate === undefined ? '—' : String(item.estimate);
+    const consensus = item.estimate === null || item.estimate === undefined ? 'Pending' : String(item.estimate);
     const actual = item.actual === null || item.actual === undefined ? null : String(item.actual);
     return [{
       id: `finnhub-${scheduledAt.toISOString()}-${index}`,
@@ -230,7 +266,7 @@ async function getFmpCatalysts(apiKey: string): Promise<EconomicCatalyst[]> {
     const country = typeof item.country === 'string' ? item.country : '';
     const title = typeof item.event === 'string' ? item.event : '';
     if (!scheduledAt || !Number.isFinite(scheduledAt.getTime()) || !impact || !regions[country] || !title) return [];
-    const consensus = item.estimate === null || item.estimate === undefined ? '—' : String(item.estimate);
+    const consensus = item.estimate === null || item.estimate === undefined ? 'Pending' : String(item.estimate);
     const actual = item.actual === null || item.actual === undefined ? null : String(item.actual);
     return [{
       id: `fmp-${scheduledAt.toISOString()}-${index}`,
@@ -340,7 +376,7 @@ async function getCftcCot(): Promise<CotPosition[]> {
   return positions;
 }
 
-async function getLiveProviderSnapshot(cachedCurrencies: MacroCurrency[] = []): Promise<MacroSnapshot | null> {
+async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallbackSnapshot()): Promise<MacroSnapshot | null> {
   const fredApiKey = process.env.FRED_API_KEY?.trim();
   const finnhubApiKey = process.env.FINNHUB_API_KEY?.trim();
   const alphaVantageKey = process.env.ALPHA_VANTAGE_API_KEY?.trim();
@@ -349,13 +385,12 @@ async function getLiveProviderSnapshot(cachedCurrencies: MacroCurrency[] = []): 
   const cotProviderToken = process.env.COT_DATA_PROVIDER_TOKEN?.trim();
 
   const snapshot: MacroSnapshot = {
-    ...EMPTY_SNAPSHOT,
-    currencies: cachedCurrencies.map((currency) => ({ ...currency })),
-    cot: [],
-    catalysts: [],
+    ...cachedSnapshot,
+    currencies: cachedSnapshot.currencies.map((currency) => ({ ...currency })),
+    cot: cachedSnapshot.cot.map((position) => ({ ...position })),
+    catalysts: cachedSnapshot.catalysts.map((catalyst) => ({ ...catalyst })),
     asOf: new Date().toISOString(),
-    source: 'partial',
-    cotSource: 'unavailable',
+    source: cachedSnapshot.source === 'fallback' ? 'fallback' : 'partial',
   };
   const [fredResult, finnhubResult, alphaResult, fmpResult, cotResult, frankfurterResult] = await Promise.allSettled([
     fredApiKey ? getFredUsdUpdates(fredApiKey) : Promise.resolve(null),
@@ -472,6 +507,7 @@ async function getLiveProviderSnapshot(cachedCurrencies: MacroCurrency[] = []): 
   } else if (cotResult.status === 'rejected') {
     console.error('COT provider unavailable; retaining cached positioning:', cotResult.reason);
   }
+  if (hasLiveData) snapshot.source = 'partial';
   return hasLiveData ? snapshot : null;
 }
 
@@ -514,6 +550,7 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
 
 export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
   const persisted = await getPersistedSnapshot();
+  const baseline = mergeWithFallback(persisted ?? getFallbackSnapshot());
   const endpoint = process.env.MACRO_DATA_PROVIDER_URL?.trim();
   if (endpoint) {
     try {
@@ -530,29 +567,37 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
 
       const parsed = parseProviderSnapshot(await response.json() as unknown);
       if (!parsed) throw new Error('Macro provider payload failed validation.');
-      return { ...parsed, source: 'provider', cotSource: 'provider', asOf: new Date().toISOString() };
+      let ecbRates = persisted?.ecbRates;
+      try {
+        ecbRates = await getFrankfurterRates();
+      } catch (error) {
+        console.warn('ECB benchmark exchange rates are unavailable:', error);
+      }
+      return mergeWithFallback({
+        ...baseline,
+        ...parsed,
+        currencies: [...baseline.currencies, ...parsed.currencies],
+        cot: parsed.cot.length > 0 ? parsed.cot : baseline.cot,
+        catalysts: parsed.catalysts.length > 0 ? parsed.catalysts : baseline.catalysts,
+        source: 'provider',
+        cotSource: 'provider',
+        asOf: new Date().toISOString(),
+        ...(ecbRates ? { ecbRates } : {}),
+      });
     } catch (error) {
       console.error('Macro data provider unavailable; checking live API adapters:', error);
     }
   }
 
   try {
-    const liveSnapshot = await getLiveProviderSnapshot(persisted?.currencies);
+    const liveSnapshot = await getLiveProviderSnapshot(baseline);
     if (liveSnapshot) {
-      if (liveSnapshot.currencies.length > 0 || !persisted) return liveSnapshot;
-      return {
-        ...persisted,
-        ...(liveSnapshot.ecbRates ? { ecbRates: liveSnapshot.ecbRates } : {}),
-        ...(liveSnapshot.cot.length > 0 ? { cot: liveSnapshot.cot, cotSource: 'provider' as const } : {}),
-        ...(liveSnapshot.catalysts.length > 0 ? { catalysts: liveSnapshot.catalysts } : {}),
-        asOf: liveSnapshot.asOf,
-        source: 'partial',
-      };
+      return mergeWithFallback(liveSnapshot);
     }
   } catch (error) {
     console.error('Live macro APIs unavailable; checking the persisted snapshot:', error);
   }
-  if (persisted) return persisted;
-  console.warn('No live macro source or persisted snapshot is available; serving an empty snapshot.');
-  return { ...EMPTY_SNAPSHOT, asOf: new Date().toISOString() };
+  if (persisted) return mergeWithFallback(persisted);
+  console.warn('No live macro source or persisted snapshot is available; serving reference macro levels.');
+  return getFallbackSnapshot();
 }

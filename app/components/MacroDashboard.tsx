@@ -276,15 +276,15 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes, vipEnab
         </div>
         <div className="macro-intro-meta mono">
           <span>SNAPSHOT / {liveReferenceAvailable && currencies.length === 0 ? 'ECB REFERENCE' : snapshot.source === 'provider' ? 'UPSTREAM' : snapshot.source === 'partial' ? 'MIXED INPUTS' : 'OFFLINE'}</span>
-          <strong>{now ? new Date(now).toISOString().replace('T', ' ').slice(0, 19) + ' UTC' : 'UTC / --:--:--'}</strong>
-          <span className="macro-provenance">{liveReferenceAvailable && currencies.length === 0 ? 'ECB reference exchange rates are available; policy observations are not.' : snapshot.source === 'fallback' ? 'No fresh or cached macro observations are available.' : snapshot.source === 'partial' ? 'Only validated live or cached provider fields are displayed.' : 'Provider payload validated at the platform edge.'}</span>
+          <strong>{now ? new Date(now).toISOString().replace('T', ' ').slice(0, 19) + ' UTC' : 'UTC / SYNCING'}</strong>
+          <span className="macro-provenance">{liveReferenceAvailable && currencies.length === 0 ? 'ECB reference exchange rates are available; policy observations are not.' : snapshot.source === 'fallback' ? 'Reference levels are displayed while live macro providers are unavailable.' : snapshot.source === 'partial' ? 'Live and reference inputs are combined; verify timestamps before use.' : 'Provider payload validated at the platform edge.'}</span>
         </div>
       </section>
 
       <section className="macro-kpis" aria-label="Macro overview">
-        <article className="macro-kpi"><span className="macro-kpi-label">POLICY RANGE <span>G10</span></span><strong className="mono">{policySpread === null ? '—' : formatRate(policySpread)}</strong><small>highest to lowest available policy rate</small></article>
-        <article className="macro-kpi"><span className="macro-kpi-label">POLICY INPUTS <span>G10</span></span><strong className="mono">{currencies.length === 0 ? '—' : String(currencies.length).padStart(2, '0')} <em>/ 10</em></strong><small>{currencies.length === 0 ? 'No validated policy observations available' : 'validated live country observations'}</small></article>
-        <article className="macro-kpi"><span className="macro-kpi-label">NEXT CATALYST <span>HIGH IMPACT</span></span><strong className="mono">{sortedCatalysts[0] && now ? formatCountdown(sortedCatalysts[0].scheduledAt, now) : '—'}</strong><small>{sortedCatalysts[0]?.title ?? 'No upcoming event in feed'}</small></article>
+        <article className="macro-kpi"><span className="macro-kpi-label">POLICY RANGE <span>G10</span></span><strong className="mono">{policySpread === null ? 'Unavailable' : formatRate(policySpread)}</strong><small>highest to lowest available policy rate</small></article>
+        <article className="macro-kpi"><span className="macro-kpi-label">POLICY INPUTS <span>G10</span></span><strong className="mono">{String(currencies.length).padStart(2, '0')} <em>/ 10</em></strong><small>{snapshot.source === 'fallback' ? 'Reference baseline; live provider unavailable' : snapshot.source === 'partial' ? 'Live and reference inputs' : 'Validated provider observations'}</small></article>
+        <article className="macro-kpi"><span className="macro-kpi-label">NEXT CATALYST <span>HIGH IMPACT</span></span><strong className="mono">{sortedCatalysts[0] ? now ? formatCountdown(sortedCatalysts[0].scheduledAt, now) : 'Syncing' : 'No events scheduled'}</strong><small>{sortedCatalysts[0]?.title ?? 'No upcoming event in feed'}</small></article>
         <article className="macro-kpi macro-kpi-source"><span className="macro-kpi-label">DATA PROVENANCE <span>STATUS</span></span><strong className="macro-source-value"><span className={snapshot.source === 'fallback' ? 'macro-source-dot' : 'macro-source-dot macro-source-live'} />{liveReferenceAvailable && currencies.length === 0 ? 'REFERENCE' : snapshot.source === 'provider' ? 'CONNECTED' : snapshot.source === 'partial' ? 'PARTIAL' : 'OFFLINE'}</strong><small>{refreshing ? 'Checking provider…' : 'Stale cache used when available'}</small></article>
       </section>
 
@@ -302,7 +302,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes, vipEnab
             const realRate = currency.policyRate - currency.inflation;
             return <article className="macro-currency-card" key={currency.code}><div className="macro-currency-card-head"><strong className="mono">{currency.code}</strong><span>{currency.stance}</span></div><p>{currency.centralBank}</p><div className="macro-currency-card-stats"><span>POLICY <b className="mono">{formatRate(currency.policyRate)}</b></span><span>{currency.inflationLabel.toUpperCase()} <b className="mono">{formatRate(currency.inflation)}</b></span><span>REAL <b className={`mono ${realRate >= 0 ? 'macro-positive' : 'macro-negative'}`}>{formatRate(realRate)}</b></span></div></article>;
           })}</div>
-          <div className="macro-panel-foot"><span>Real rate = current policy rate − latest available inflation measure.</span><span className="mono">NO SYNTHETIC MACRO VALUES</span></div>
+          <div className="macro-panel-foot"><span>Real rate = current policy rate − latest available inflation measure.</span><span className="mono">{snapshot.source === 'fallback' ? 'REFERENCE LEVELS / VERIFY BEFORE USE' : 'LIVE INPUTS OVERRIDE REFERENCE LEVELS'}</span></div>
         </div>
       </section>
 
@@ -328,7 +328,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes, vipEnab
             {sortedCatalysts.map((catalyst) => <article className="macro-event" key={catalyst.id}>
               <div className="macro-event-time"><span className="mono">{new Date(catalyst.scheduledAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', timeZone: 'UTC' }).toUpperCase()}</span><strong className="mono">{new Date(catalyst.scheduledAt).toISOString().slice(11, 16)}Z</strong></div>
               <div className="macro-event-info"><div><span className="macro-region mono">{catalyst.region}</span><span className={`macro-impact macro-impact-${catalyst.impact.toLowerCase()}`}>{catalyst.impact}</span></div><h3>{catalyst.title}</h3><p>Consensus <b className="mono">{catalyst.consensus}</b><span>Actual <b className="mono">{catalyst.actual ?? 'Pending'}</b></span></p></div>
-              <span className="macro-countdown mono">{now ? formatCountdown(catalyst.scheduledAt, now) : '--'}</span>
+              <span className="macro-countdown mono">{now ? formatCountdown(catalyst.scheduledAt, now) : 'Syncing'}</span>
             </article>)}
             <div className="macro-calendar-note"><Clock3 size={14} /><span>Provider calendar consensus and actuals may be revised; confirm official release details before positioning.</span></div>
           </div>
@@ -340,12 +340,13 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes, vipEnab
         <div className="macro-cot-layout">
           <div className="macro-panel macro-cot-panel">
             <div className="macro-cot-head"><span>MARKET</span><span>NET NON-COMMERCIAL</span><span>W/W CHANGE</span><span>EXTREME RISK</span></div>
+            {snapshot.cot.length === 0 && <p className="macro-empty">CFTC positioning is unavailable; macro policy and calendar inputs remain active.</p>}
             {snapshot.cot.map((position) => <div className="macro-cot-row" key={position.market}>
               <strong className="mono">{position.market}</strong><span className={`mono ${position.netContracts >= 0 ? 'macro-positive' : 'macro-negative'}`}>{formatContracts(position.netContracts)}</span><span className={`mono ${position.weeklyChange >= 0 ? 'macro-positive' : 'macro-negative'}`}>{position.weeklyChange > 0 ? '+' : ''}{formatContracts(position.weeklyChange)}</span><div className="macro-extreme"><div className="macro-extreme-track"><span style={{ width: `${position.percentile}%` }} /></div><span className="mono">{position.percentile}%ile</span>{(position.percentile >= 90 || position.percentile <= 10) && <span className="macro-crowded">CROWDED</span>}</div>
             </div>)}
             <div className="macro-panel-foot"><span>{snapshot.cotSource === 'provider' ? 'CFTC report data validated; positioning is weekly and can lag market conditions.' : 'No current CFTC positioning snapshot is available.'}</span><span className="mono">POSITIONING ≠ SIGNAL</span></div>
           </div>
-          <aside className="macro-cot-callout"><div className="macro-callout-icon"><TrendingUp size={18} /></div><span className="eyebrow">CROWDING WATCH</span><h3>Extremes can amplify reversals.</h3><p>High percentiles flag crowded exposure, not a timing trigger. Compare positioning with policy repricing and the catalyst calendar.</p><div className="macro-callout-stat"><span>TOP SEED EXTREME</span><strong className="mono">{snapshot.cot.reduce((highest, current) => current.percentile > highest.percentile ? current : highest, snapshot.cot[0] ?? { market: '—', percentile: 0 }).market} <em>{Math.max(0, ...snapshot.cot.map((position) => position.percentile))}%</em></strong></div></aside>
+          <aside className="macro-cot-callout"><div className="macro-callout-icon"><TrendingUp size={18} /></div><span className="eyebrow">CROWDING WATCH</span><h3>Extremes can amplify reversals.</h3><p>High percentiles flag crowded exposure, not a timing trigger. Compare positioning with policy repricing and the catalyst calendar.</p><div className="macro-callout-stat"><span>TOP POSITIONING EXTREME</span><strong className="mono">{snapshot.cot.length > 0 ? `${snapshot.cot.reduce((highest, current) => current.percentile > highest.percentile ? current : highest, snapshot.cot[0]).market} ${Math.max(...snapshot.cot.map((position) => position.percentile))}%` : 'Unavailable'}</strong></div></aside>
         </div>
       </section>
 

@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { EMPTY_SNAPSHOT, loadMacroSnapshot } from '@/lib/macroData';
+import { getFallbackSnapshot, loadMacroSnapshot } from '@/lib/macroData';
 import { getCachedData } from '@/lib/redisCache';
 import type { MacroSnapshot } from '@/types/macro';
 
@@ -15,8 +15,8 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
   try {
     return await getCachedData('macro:snapshot', loadMacroSnapshot, 3_600, forceRefresh);
   } catch (error) {
-    console.warn('Macro providers and cached snapshots are unavailable; serving an empty snapshot.', error);
-    return { ...EMPTY_SNAPSHOT, asOf: new Date().toISOString() };
+    console.warn('Macro providers and cached snapshots are unavailable; serving reference macro levels.', error);
+    return getFallbackSnapshot();
   }
 }
 
