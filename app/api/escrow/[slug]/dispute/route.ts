@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';

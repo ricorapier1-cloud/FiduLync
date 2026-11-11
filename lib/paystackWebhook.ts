@@ -54,30 +54,40 @@ async function handleMacroSubscriptionEvent(event: PaystackEvent) {
       console.error('Paystack VIP charge did not match the stored subscription:', subscription.reference);
       return NextResponse.json({ error: 'Payment details do not match this subscription.' }, { status: 400 });
     }
-    if (subscription.last_charge_reference === reference) {
-      return NextResponse.json({ status: 'already_processed' });
-    }
-
     const now = new Date();
     const nextPayment = data.subscription?.next_payment_date;
+    const paidAt = data.paid_at && Number.isFinite(Date.parse(data.paid_at))
+      ? Date.parse(data.paid_at)
+      : now.getTime();
     const expiresAt = nextPayment && Number.isFinite(Date.parse(nextPayment))
       ? nextPayment
-      : new Date(now.getTime() + 31 * 24 * 60 * 60 * 1000).toISOString();
-    const { error: subscriptionError } = await supabase.from('macro_subscriptions').update({
-      status: 'active',
-      paystack_subscription_code: subscriptionCode ?? subscription.paystack_subscription_code,
-      paystack_customer_code: data.customer?.customer_code ?? null,
-      last_charge_reference: reference || subscription.reference,
-      activated_at: now.toISOString(),
-      updated_at: now.toISOString(),
-    }).eq('reference', subscription.reference);
-    if (subscriptionError) throw subscriptionError;
+      : new Date(paidAt + 31 * 24 * 60 * 60 * 1000).toISOString();
 
     const { error: profileError } = await supabase.from('profiles').update({
       tier_status: 'vip_active',
       macro_vip_expires_at: expiresAt,
     }).eq('id', subscription.user_id);
     if (profileError) throw profileError;
+
+    const subscriptionUpdate: {
+      status: 'active';
+      paystack_subscription_code: string | null;
+      paystack_customer_code: string | null;
+      last_charge_reference: string;
+      updated_at: string;
+      activated_at?: string;
+    } = {
+      status: 'active',
+      paystack_subscription_code: subscriptionCode ?? subscription.paystack_subscription_code,
+      paystack_customer_code: data.customer?.customer_code ?? null,
+      last_charge_reference: reference || subscription.reference,
+      updated_at: now.toISOString(),
+    };
+    if (subscription.last_charge_reference !== reference) subscriptionUpdate.activated_at = now.toISOString();
+    const { error: subscriptionError } = await supabase.from('macro_subscriptions')
+      .update(subscriptionUpdate)
+      .eq('reference', subscription.reference);
+    if (subscriptionError) throw subscriptionError;
     return NextResponse.json({ status: 'success' });
   }
 

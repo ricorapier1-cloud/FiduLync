@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { ESCROW_TERMS_VERSION } from '@/lib/escrowTerms';

@@ -24,8 +24,8 @@ export async function GET(request: Request) {
 
   try {
     const snapshot = await getMacroSnapshot(true);
-    if (snapshot.source === 'seed') {
-      return NextResponse.json({ error: 'No live macro provider returned data; stored snapshot was not changed.' }, { status: 503 });
+    if (snapshot.cotSource !== 'provider') {
+      return NextResponse.json({ error: 'No live CFTC/COT data was returned; stored snapshot was not changed.' }, { status: 503 });
     }
     const { error } = await getSupabaseAdmin().from('macro_snapshots').upsert({
       snapshot_key: 'global',

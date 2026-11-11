@@ -54,7 +54,7 @@ export default function AuthModal({ isOpen, onClose }: { isOpen: boolean, onClos
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
       <div className="bg-[#0b1016] border border-emerald-500/30 p-8 rounded-2xl w-full max-w-md shadow-2xl">
-        <h2 className="text-2xl font-bold text-white mb-6">{isLogin ? 'Login to FiduLync' : 'Create Account'}</h2>
+        <h2 className="text-2xl font-bold text-white mb-6">{isLogin ? 'Login to MacroLync' : 'Create MacroLync account'}</h2>
         <form onSubmit={handleAuth} className="space-y-4">
           <input type="email" autoComplete="email" placeholder="Email" required className="w-full bg-[#131b24] text-white p-3 rounded-lg border border-gray-700 focus:border-emerald-500 outline-none" value={email} onChange={(e) => setEmail(e.target.value)} />
           <input type="password" autoComplete={isLogin ? 'current-password' : 'new-password'} minLength={8} placeholder="Password" required className="w-full bg-[#131b24] text-white p-3 rounded-lg border border-gray-700 focus:border-emerald-500 outline-none" value={password} onChange={(e) => setPassword(e.target.value)} />

@@ -45,6 +45,8 @@ export async function GET(request: Request) {
     const base = instrument.base === 'XAU'
       ? null
       : snapshot.currencies.find((currency) => currency.code === instrument.base);
+    const cotBase = snapshot.cot.find((position) => position.market === (instrument.base === 'XAU' ? 'GOLD' : instrument.base));
+    const cotQuote = snapshot.cot.find((position) => position.market === instrument.quote);
     if (!quote || (instrument.base !== 'XAU' && !base)) {
       return NextResponse.json({ error: 'Macro inputs are unavailable for this instrument.' }, { status: 503 });
     }
@@ -58,7 +60,9 @@ export async function GET(request: Request) {
     const rawScore = base
       ? (base.policyRate - quote.policyRate) * 12
         + ((base.policyRate - base.inflation) - (quote.policyRate - quote.inflation)) * 9
-      : (quote.policyRate - quote.inflation) * -18;
+        + ((cotBase?.percentile ?? 50) - (cotQuote?.percentile ?? 50)) * 0.18
+      : (quote.policyRate - quote.inflation) * -18
+        + ((cotBase?.percentile ?? 50) - 50) * 0.18;
     const score = Math.max(-100, Math.min(100, Math.round(rawScore)));
     const bias = score > 0 ? 'BULLISH' : score < 0 ? 'BEARISH' : 'NEUTRAL';
 
@@ -69,6 +73,7 @@ export async function GET(request: Request) {
       score,
       policy_diff_bps: policyDiffBps,
       real_yield_diff_bps: realYieldDiffBps,
+      cot_position_diff: Math.round((cotBase?.percentile ?? 50) - (cotQuote?.percentile ?? 50)),
       execution_filter: { allow_buys: score > 0, allow_sells: score < 0 },
       timestamp: new Date().toISOString(),
       data_as_of: snapshot.asOf,

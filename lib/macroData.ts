@@ -179,12 +179,92 @@ async function getCotProvider(urlValue: string, token?: string): Promise<CotPosi
   return positions;
 }
 
+async function getCftcCot(): Promise<CotPosition[]> {
+  const providerUrl = new URL('https://publicreporting.cftc.gov/resource/6dca-aqww.json');
+  const cutoff = new Date(Date.now() - 3 * 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const markets = [
+    'EURO FX',
+    'JAPANESE YEN',
+    'BRITISH POUND',
+    'AUSTRALIAN DOLLAR',
+    'SWISS FRANC',
+    'CANADIAN DOLLAR',
+    'GOLD',
+  ];
+  const marketFilter = markets.map((market) => `market_and_exchange_names like '%${market}%'`).join(' OR ');
+  providerUrl.searchParams.set('$select', [
+    'report_date_as_yyyy_mm_dd',
+    'market_and_exchange_names',
+    'noncomm_positions_long_all',
+    'noncomm_positions_short_all',
+    'change_in_noncomm_long_all',
+    'change_in_noncomm_short_all',
+  ].join(','));
+  providerUrl.searchParams.set('$where', `report_date_as_yyyy_mm_dd >= '${cutoff}' AND (${marketFilter})`);
+  providerUrl.searchParams.set('$order', 'report_date_as_yyyy_mm_dd DESC');
+  providerUrl.searchParams.set('$limit', '2000');
+
+  const response = await fetch(providerUrl, {
+    next: { revalidate: 21_600 },
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!response.ok) throw new Error(`CFTC returned ${response.status}.`);
+  const payload: unknown = await response.json();
+  if (!Array.isArray(payload)) throw new Error('CFTC positioning payload is unavailable.');
+
+  const marketCodes: Array<[string, string]> = [
+    ['EURO FX - CHICAGO MERCANTILE EXCHANGE', 'EUR'],
+    ['JAPANESE YEN - CHICAGO MERCANTILE EXCHANGE', 'JPY'],
+    ['BRITISH POUND - CHICAGO MERCANTILE EXCHANGE', 'GBP'],
+    ['AUSTRALIAN DOLLAR - CHICAGO MERCANTILE EXCHANGE', 'AUD'],
+    ['SWISS FRANC - CHICAGO MERCANTILE EXCHANGE', 'CHF'],
+    ['CANADIAN DOLLAR - CHICAGO MERCANTILE EXCHANGE', 'CAD'],
+    ['GOLD - COMMODITY EXCHANGE INC.', 'GOLD'],
+  ];
+  const byMarket = new Map<string, Array<{ date: string; netContracts: number; weeklyChange: number }>>();
+  for (const row of payload) {
+    if (!isRecord(row) || typeof row.market_and_exchange_names !== 'string'
+      || typeof row.report_date_as_yyyy_mm_dd !== 'string') continue;
+    const marketName = row.market_and_exchange_names.toUpperCase();
+    const reportDate = row.report_date_as_yyyy_mm_dd;
+    if (!Number.isFinite(Date.parse(reportDate))) continue;
+    const market = marketCodes.find(([name]) => marketName === name)?.[1];
+    if (!market) continue;
+    const long = Number(row.noncomm_positions_long_all);
+    const short = Number(row.noncomm_positions_short_all);
+    if (!Number.isFinite(long) || !Number.isFinite(short)) continue;
+    const changeLong = Number(row.change_in_noncomm_long_all);
+    const changeShort = Number(row.change_in_noncomm_short_all);
+    const position = {
+      date: reportDate,
+      netContracts: long - short,
+      weeklyChange: (Number.isFinite(changeLong) ? changeLong : 0) - (Number.isFinite(changeShort) ? changeShort : 0),
+    };
+    const history = byMarket.get(market) ?? [];
+    history.push(position);
+    byMarket.set(market, history);
+  }
+
+  const positions = [...byMarket.entries()].flatMap(([market, history]): CotPosition[] => {
+    history.sort((left, right) => Date.parse(right.date) - Date.parse(left.date));
+    const latest = history[0];
+    if (!latest) return [];
+    const below = history.filter((item) => item.netContracts < latest.netContracts).length;
+    const equal = history.filter((item) => item.netContracts === latest.netContracts).length;
+    const percentile = history.length
+      ? Math.round(((below + equal / 2) / history.length) * 100)
+      : 50;
+    return [{ market, netContracts: latest.netContracts, percentile, weeklyChange: latest.weeklyChange }];
+  });
+  if (!positions.length) throw new Error('CFTC returned no supported currency or gold positions.');
+  return positions;
+}
+
 async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
   const alphaVantageKey = process.env.ALPHA_VANTAGE_API_KEY?.trim();
   const fmpKey = process.env.FMP_API_KEY?.trim();
   const cotProviderUrl = process.env.COT_DATA_PROVIDER_URL?.trim();
   const cotProviderToken = process.env.COT_DATA_PROVIDER_TOKEN?.trim();
-  if (!alphaVantageKey && !fmpKey && !cotProviderUrl) return null;
 
   const snapshot: MacroSnapshot = {
     ...SEED_SNAPSHOT,
@@ -195,20 +275,18 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
     source: 'partial',
     cotSource: 'seed',
   };
-  const providers: PromiseSettledResult<unknown>[] = await Promise.allSettled([
-    ...(alphaVantageKey ? [getAlphaVantageUsdUpdates(alphaVantageKey)] : []),
-    ...(fmpKey ? [getFmpCatalysts(fmpKey)] : []),
-    ...(cotProviderUrl ? [getCotProvider(cotProviderUrl, cotProviderToken)] : []),
+  const [alphaResult, fmpResult, cotResult] = await Promise.allSettled([
+    alphaVantageKey ? getAlphaVantageUsdUpdates(alphaVantageKey) : Promise.resolve(null),
+    fmpKey ? getFmpCatalysts(fmpKey) : Promise.resolve(null),
+    cotProviderUrl ? getCotProvider(cotProviderUrl, cotProviderToken) : getCftcCot(),
   ]);
   let hasLiveData = false;
-  let resultIndex = 0;
   if (alphaVantageKey) {
-    const result = providers[resultIndex++];
-    if (result?.status === 'fulfilled' && isRecord(result.value)) {
+    if (alphaResult.status === 'fulfilled' && isRecord(alphaResult.value)) {
       const usd = snapshot.currencies.find((currency) => currency.code === 'USD');
       if (usd) {
-        const policyRate = result.value.policyRate;
-        const inflation = result.value.inflation;
+        const policyRate = alphaResult.value.policyRate;
+        const inflation = alphaResult.value.inflation;
         if (isFiniteNumber(policyRate)) {
           usd.policyRate = policyRate;
           hasLiveData = true;
@@ -218,28 +296,24 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
           hasLiveData = true;
         }
       }
-    } else if (result?.status === 'rejected') {
-      console.error('Alpha Vantage unavailable; retaining seeded USD macro values:', result.reason);
+    } else if (alphaResult.status === 'rejected') {
+      console.error('Alpha Vantage unavailable; retaining seeded USD macro values:', alphaResult.reason);
     }
   }
   if (fmpKey) {
-    const result = providers[resultIndex];
-    if (result?.status === 'fulfilled' && Array.isArray(result.value) && result.value.every(isCatalyst)) {
-      snapshot.catalysts = result.value;
+    if (fmpResult.status === 'fulfilled' && Array.isArray(fmpResult.value) && fmpResult.value.every(isCatalyst)) {
+      snapshot.catalysts = fmpResult.value;
       hasLiveData = true;
-    } else if (result?.status === 'rejected') {
-      console.error('Financial Modeling Prep unavailable; retaining seeded catalysts:', result.reason);
+    } else if (fmpResult.status === 'rejected') {
+      console.error('Financial Modeling Prep unavailable; retaining seeded catalysts:', fmpResult.reason);
     }
   }
-  if (cotProviderUrl) {
-    const result = providers[resultIndex];
-    if (result?.status === 'fulfilled' && Array.isArray(result.value) && result.value.every(isCotPosition)) {
-      snapshot.cot = result.value;
-      snapshot.cotSource = 'provider';
-      hasLiveData = true;
-    } else if (result?.status === 'rejected') {
-      console.error('COT provider unavailable; retaining seeded positioning:', result.reason);
-    }
+  if (cotResult.status === 'fulfilled' && Array.isArray(cotResult.value) && cotResult.value.every(isCotPosition)) {
+    snapshot.cot = cotResult.value;
+    snapshot.cotSource = 'provider';
+    hasLiveData = true;
+  } else if (cotResult.status === 'rejected') {
+    console.error('COT provider unavailable; retaining seeded positioning:', cotResult.reason);
   }
   return hasLiveData ? snapshot : null;
 }

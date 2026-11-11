@@ -40,11 +40,11 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
     <>
       <header className="topbar">
         <div className="topbar-inner">
-          <Link className="brand" href="/" aria-label={isHome ? 'MacroLync home' : 'FiduLync home'}>
+          <Link className="brand" href="/" aria-label="MacroLync home">
             <span className="brand-mark"><ShieldCheck size={19} strokeWidth={2.2} /></span>
             <span className="brand-copy">
-              <span className="brand-name">{isHome ? 'Macro' : 'Fidu'}<span>Lync</span></span>
-              <span className="brand-caption">{isHome ? 'GLOBAL FX INTELLIGENCE' : 'TRUST, SETTLED.'}</span>
+              <span className="brand-name">Macro<span>Lync</span></span>
+              <span className="brand-caption">GLOBAL FX INTELLIGENCE</span>
             </span>
           </Link>
 

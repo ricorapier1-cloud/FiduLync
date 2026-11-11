@@ -62,14 +62,22 @@ function calculateBias(snapshot: MacroSnapshot, pairSymbol: (typeof pairs)[numbe
   const pair = pairs.find((item) => item.symbol === pairSymbol) ?? pairs[0];
   const usd = snapshot.currencies.find((currency) => currency.code === 'USD');
   if (!usd) return 0;
-  if (pair.base === 'XAU') return Math.max(-100, Math.min(100, Math.round((usd.policyRate - usd.inflation) * -18)));
+  if (pair.base === 'XAU') {
+    const goldPosition = snapshot.cot.find((position) => position.market === 'GOLD');
+    return Math.max(-100, Math.min(100, Math.round(
+      (usd.policyRate - usd.inflation) * -18 + ((goldPosition?.percentile ?? 50) - 50) * 0.18,
+    )));
+  }
 
   const base = snapshot.currencies.find((currency) => currency.code === pair.base);
   const quote = snapshot.currencies.find((currency) => currency.code === pair.quote);
   if (!base || !quote) return 0;
+  const basePosition = snapshot.cot.find((position) => position.market === pair.base);
+  const quotePosition = snapshot.cot.find((position) => position.market === pair.quote);
   const policyDifferential = base.policyRate - quote.policyRate;
   const realYieldDifferential = (base.policyRate - base.inflation) - (quote.policyRate - quote.inflation);
-  return Math.max(-100, Math.min(100, Math.round(policyDifferential * 12 + realYieldDifferential * 9)));
+  const cotDifferential = ((basePosition?.percentile ?? 50) - (quotePosition?.percentile ?? 50)) * 0.18;
+  return Math.max(-100, Math.min(100, Math.round(policyDifferential * 12 + realYieldDifferential * 9 + cotDifferential)));
 }
 
 function biasLabel(score: number) {

@@ -12,7 +12,7 @@
   --teal-soft: rgba(16, 185, 129, 0.12);
   --cyan: #06b6d4;
   --mono: var(--font-jetbrains-mono), 'SFMono-Regular', Consolas, monospace;
-  --sans: var(--font-sora), Inter, ui-sans-serif, system-ui, sans-serif;
+  --sans: var(--mono);
 }
 
 * { box-sizing: border-box; }

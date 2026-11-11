@@ -1,6 +1,6 @@
-# FiduLync · AlgoLync
+# MacroLync · Global FX Intelligence
 
-FiduLync provides escrow-backed deal links; AlgoLync presents MetaTrader tools with transparent, source-attributed verification states.
+MacroLync provides institutional-style FX macro research, policy divergence, catalyst risk, CFTC positioning, and a MetaTrader signal bridge.
 
 ## Local development
 
@@ -25,8 +25,8 @@ Set the following environment variables in the deployment environment:
 | `FMP_API_KEY` | Optional Financial Modeling Prep economic calendar feed |
 | `MACRO_DATA_PROVIDER_URL` | Optional HTTPS endpoint returning the complete validated macro snapshot, including COT positions |
 | `MACRO_DATA_PROVIDER_TOKEN` | Optional bearer token for the complete macro snapshot provider |
-| `COT_DATA_PROVIDER_URL` | Optional HTTPS endpoint returning a COT array or `{ "cot": [...] }` |
-| `COT_DATA_PROVIDER_TOKEN` | Optional bearer token for the COT provider |
+| `COT_DATA_PROVIDER_URL` | Optional HTTPS override returning a COT array or `{ "cot": [...] }`; the public CFTC legacy futures-only feed is used by default |
+| `COT_DATA_PROVIDER_TOKEN` | Optional bearer token for the COT provider override |
 | `MT5_CREDENTIALS_ENCRYPTION_KEY` | Base64-encoded 32-byte AES-256-GCM key for MT5 investor credentials |
 
 Generate a distinct encryption key for each environment and store it in your deployment secret manager:
@@ -53,7 +53,7 @@ Configure the private `dispute-evidence` Storage bucket and ensure the productio
 
 Configure Paystack's webhook URL to `https://<your-domain>/api/paystack-webhook`. Configure the VIP plan in Paystack for exactly NGN 5,000 monthly; checkout rejects payment activation unless the signed webhook matches the authenticated account, pending reference, amount, and currency. Deal funding begins at `/api/escrow/<reference>/fund`; only a signed Paystack charge webhook with the expected currency and amount marks a deal funded. The 48-hour inspection deadline is persisted server-side, and a dispute atomically freezes a funded deal.
 
-`vercel.json` schedules `/api/cron/settlements` hourly and `/api/cron/sync-macro` every Friday at 23:00 UTC. Set `CRON_SECRET`; the macro job persists only non-seed provider snapshots. A complete snapshot provider can supply current COT positioning; without a COT provider the interface clearly labels positioning as illustrative. The MT5 bridge is available at `/api/v1/macro-signal?pair=EURUSD&api_key=<key>` and validates a generated account key on each request. Enable Paystack transfers/refunds before using settlement automation. Automated seller bank transfers are currently limited to NGN; unsupported payout currencies remain unsettled and require an explicitly configured provider workflow. Provider transfer completion is reconciled through the Paystack webhook.
+`vercel.json` schedules `/api/cron/settlements` hourly and `/api/cron/sync-macro` every Friday at 23:00 UTC. Set `CRON_SECRET`; the macro job persists snapshots only when it has live CFTC/COT positioning. The COT adapter reads the official CFTC legacy futures-only report and calculates historical net-position percentiles; the normalized provider override remains available. Alpha Vantage and Financial Modeling Prep feeds are optional, with validated static seeds retained as fallback. The MT5 bridge is available at `/api/v1/macro-signal?pair=EURUSD&api_key=<key>` and validates a generated account key on each request.
 
 ## Verification and risk disclosures
 

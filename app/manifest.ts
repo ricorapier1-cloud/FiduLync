@@ -2,14 +2,14 @@ import { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'FiduLync',
-    short_name: 'FiduLync',
-    description: 'Safe Escrow Infrastructure for Zero Risk Social Commerce.',
+    name: 'MacroLync',
+    short_name: 'MacroLync',
+    description: 'Global foreign exchange macro intelligence and market positioning.',
     start_url: '/',
     id: '/?source=pwa',
     display: 'standalone',
     orientation: 'portrait',
-    background_color: '#0B1120',
+    background_color: '#080a0f',
     theme_color: '#10B981',
     categories: ['finance', 'business', 'shopping'],
     prefer_related_applications: false,

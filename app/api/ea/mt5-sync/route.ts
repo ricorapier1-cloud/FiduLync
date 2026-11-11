@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { createCipheriv, randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/serverAuth';
