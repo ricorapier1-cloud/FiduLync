@@ -2,12 +2,23 @@ import 'server-only';
 
 import { getFundamentalSignal, getMacroSnapshot } from '@/lib/macroEngine';
 import { getTechnicalSignal, type MarketRegime } from '@/lib/technicalEngine';
-import { getLiquiditySession } from '@/lib/currencyStrength';
+import { getCurrencyStrengthIndex, getKillzoneActive, getLiquiditySession } from '@/lib/currencyStrength';
 import { getCachedData } from '@/lib/redisCache';
 import type { MacroSnapshot } from '@/types/macro';
 
 const G10 = new Set(['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'SEK', 'NOK']);
-const TIER_ONE_EVENT = /\b(nfp|non[-\s]?farm|payrolls?|employment|unemployment|consumer price|cpi|pce|inflation|fomc|federal open market|ecb|european central bank|boe|bank of england|rate decision|interest rate|monetary policy|gdp|gross domestic product|retail sales)\b/i;
+const REGION_BY_CURRENCY: Record<string, string> = {
+  USD: 'US',
+  EUR: 'EU',
+  GBP: 'UK',
+  JPY: 'JP',
+  CHF: 'CH',
+  CAD: 'CA',
+  AUD: 'AU',
+  NZD: 'NZ',
+  SEK: 'SE',
+  NOK: 'NO',
+};
 const NEWS_BLACKOUT_MS = 30 * 60 * 1_000;
 
 export type MacroSignalPayload = {
@@ -18,6 +29,10 @@ export type MacroSignalPayload = {
   atr_sl_pips: number | null;
   atr_tp_pips: number | null;
   session: ReturnType<typeof getLiquiditySession>;
+  killzone_active: ReturnType<typeof getKillzoneActive>;
+  csi_spread: number;
+  max_risk_pct: number;
+  risk_multiplier: number;
   correlation_group: 'USD_BLOC' | 'JPY_CROSS' | 'EUR_BLOC' | 'COMMODITY_FX';
   news_lockout: boolean;
   safe_to_trade: boolean;
@@ -32,15 +47,21 @@ export function isSupportedSignalSymbol(symbol: string) {
   return base !== quote && G10.has(base) && G10.has(quote);
 }
 
-export function isNewsLockout(snapshot: MacroSnapshot, now = Date.now()) {
+function catalystMatchesPair(catalystRegion: string, symbol: string | undefined) {
+  if (!symbol) return true;
+  const currencies = [symbol.slice(0, 3), symbol.slice(3)];
+  return currencies.some((currency) => REGION_BY_CURRENCY[currency] === catalystRegion);
+}
+
+export function isNewsLockout(snapshot: MacroSnapshot, now = Date.now(), symbol?: string) {
   return snapshot.catalysts.some((catalyst) => catalyst.impact === 'High'
-    && TIER_ONE_EVENT.test(`${catalyst.title} ${catalyst.region}`)
+    && catalystMatchesPair(catalyst.region, symbol)
     && Math.abs(Date.parse(catalyst.scheduledAt) - now) <= NEWS_BLACKOUT_MS);
 }
 
-function nearNewsLockoutTransition(snapshot: MacroSnapshot, now: number) {
+function nearNewsLockoutTransition(snapshot: MacroSnapshot, now: number, symbol: string) {
   return snapshot.catalysts.some((catalyst) => catalyst.impact === 'High'
-    && TIER_ONE_EVENT.test(`${catalyst.title} ${catalyst.region}`)
+    && catalystMatchesPair(catalyst.region, symbol)
     && Math.abs(Math.abs(Date.parse(catalyst.scheduledAt) - now) - NEWS_BLACKOUT_MS) <= 15_000);
 }
 
@@ -62,8 +83,13 @@ export async function getMacroSignal(symbol: string, now = Date.now()): Promise<
     const score = fundamental
       ? Math.max(-100, Math.min(100, Math.round(fundamental.score * 0.6 + technical.score * 0.4)))
       : 0;
-    const bias = score >= 20 ? 'LONG' : score <= -20 ? 'SHORT' : 'NEUTRAL';
-    const newsLockout = isNewsLockout(snapshot, now);
+    const strengths = getCurrencyStrengthIndex(snapshot);
+    const baseStrength = strengths.find((item) => item.currency === normalizedSymbol.slice(0, 3))?.score;
+    const quoteStrength = strengths.find((item) => item.currency === normalizedSymbol.slice(3))?.score;
+    const csiSpread = baseStrength !== undefined && quoteStrength !== undefined ? baseStrength - quoteStrength : 0;
+    const newsLockout = isNewsLockout(snapshot, now, normalizedSymbol);
+    const edgeQualified = Math.abs(csiSpread) >= 60 && Math.abs(score) >= 45;
+    const bias = edgeQualified ? (score > 0 ? 'LONG' : 'SHORT') : 'NEUTRAL';
     const [base, quote] = [normalizedSymbol.slice(0, 3), normalizedSymbol.slice(3)];
     const correlationGroup = base === 'JPY' || quote === 'JPY'
       ? 'JPY_CROSS'
@@ -73,6 +99,14 @@ export async function getMacroSignal(symbol: string, now = Date.now()): Promise<
           ? 'COMMODITY_FX'
           : 'USD_BLOC';
     const session = getLiquiditySession(new Date(now));
+    const killzoneActive = getKillzoneActive(new Date(now));
+    const maxRiskPct = newsLockout || technical.regime === 'HIGH_VOL_CHOP'
+      ? 0
+      : technical.regime === 'TRENDING_EXPANSION'
+        ? 1
+        : technical.regime === 'MEAN_REVERTING'
+          ? 0.5
+          : 0;
 
     return {
       symbol: normalizedSymbol,
@@ -82,6 +116,10 @@ export async function getMacroSignal(symbol: string, now = Date.now()): Promise<
       atr_sl_pips: technical.atr_stop_pips,
       atr_tp_pips: technical.atr_take_profit_pips,
       session,
+      killzone_active: killzoneActive,
+      csi_spread: csiSpread,
+      max_risk_pct: maxRiskPct,
+      risk_multiplier: maxRiskPct,
       correlation_group: correlationGroup,
       news_lockout: newsLockout,
       safe_to_trade: Boolean(fundamental)
@@ -94,10 +132,12 @@ export async function getMacroSignal(symbol: string, now = Date.now()): Promise<
         && bias !== 'NEUTRAL'
         && technical.atr_stop_pips !== null && technical.atr_stop_pips > 0
         && technical.atr_take_profit_pips !== null && technical.atr_take_profit_pips > 0
+        && edgeQualified
+        && maxRiskPct > 0
         && (bias === 'LONG' ? technical.execution_filter.allow_buys : technical.execution_filter.allow_sells),
       timestamp_utc: new Date(now).toISOString(),
     };
   };
-  if (nearNewsLockoutTransition(snapshot, now)) return calculateSignal();
+  if (nearNewsLockoutTransition(snapshot, now, normalizedSymbol)) return calculateSignal();
   return getCachedData(`signal:${normalizedSymbol}`, calculateSignal, 15);
 }

@@ -19,6 +19,11 @@ const pairs = [
   { symbol: 'XAUUSD', base: 'XAU', quote: 'USD' },
 ] as const;
 
+const regionByCurrency: Record<string, string> = {
+  USD: 'US', EUR: 'EU', GBP: 'UK', JPY: 'JP', CHF: 'CH',
+  CAD: 'CA', AUD: 'AU', NZD: 'NZ', SEK: 'SE', NOK: 'NO',
+};
+
 function formatRate(value: number) {
   return `${value.toFixed(2)}%`;
 }
@@ -99,6 +104,13 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
     || Object.keys(snapshot.ecbRates ?? {}).length > 0
   );
   const activePair = pairs.find((item) => item.symbol === pair) ?? pairs[0];
+  const activePairRegions = new Set([activePair.base, activePair.quote]
+    .map((currency) => regionByCurrency[currency])
+    .filter((region): region is string => region !== undefined));
+  const activeNewsLockout = now !== null && snapshot.catalysts.some((catalyst) =>
+    catalyst.impact === 'High'
+    && activePairRegions.has(catalyst.region)
+    && Math.abs(Date.parse(catalyst.scheduledAt) - now) <= 30 * 60 * 1_000);
   const baseCurrency = currencies.find((currency) => currency.code === activePair.base);
   const quoteCurrency = currencies.find((currency) => currency.code === activePair.quote);
   const policyDifferentialBps = baseCurrency && quoteCurrency
@@ -266,7 +278,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
               <div className="macro-event-info"><div><span className="macro-region mono">{catalyst.region}</span><span className={`macro-impact macro-impact-${catalyst.impact.toLowerCase()}`}>{catalyst.impact}</span></div><h3>{catalyst.title}</h3><p>Consensus <b className="mono">{catalyst.consensus}</b><span>Actual <b className="mono">{catalyst.actual ?? 'Pending'}</b></span></p></div>
               <span className="macro-countdown mono">{now ? formatCountdown(catalyst.scheduledAt, now) : 'Syncing'}</span>
             </article>)}
-            <div className="macro-calendar-note"><BrandGlyph name="clock" size={14} /><span>{snapshot.calendarSource === 'provider' ? 'Provider calendar consensus and actuals may be revised; confirm official release details before positioning.' : 'Live calendar feed unavailable; displayed reference events do not enable news lockout. Verify official release details.'}</span></div>
+            <div className="macro-calendar-note"><BrandGlyph name="clock" size={14} /><span>{activeNewsLockout ? 'A high-impact event for this pair is inside the 30-minute pre/post window; the signal API enforces news lockout.' : snapshot.calendarSource === 'provider' ? 'Provider calendar consensus and actuals may be revised; confirm official release details before positioning.' : 'Curated reference schedule only. Listed high-impact events enforce a 30-minute pre/post lockout; verify release details.'}</span></div>
           </div>
         </section>
       </div>

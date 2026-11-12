@@ -190,6 +190,10 @@ function getFairEconomyCatalysts(): Promise<EconomicCatalyst[]> {
   return getCachedData('macro:fair-economy-calendar', async () => {
     const response = await fetch('https://nfs.faireconomy.media/ff_calendar_thisweek.json', {
       cache: 'no-store',
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'Mozilla/5.0 (compatible; MacroLync/1.0)',
+      },
       signal: AbortSignal.timeout(8_000),
     });
     if (!response.ok) throw new Error(`FairEconomy calendar returned ${response.status}.`);
@@ -510,11 +514,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
   } else if (fredResult.status === 'rejected') {
     console.warn('FRED macro series unavailable; retaining cached USD observations:', fredResult.reason);
   }
-  if (finnhubResult.status === 'fulfilled' && Array.isArray(finnhubResult.value)
-    && finnhubResult.value.every(isCatalyst)) {
-    snapshot.catalysts = finnhubResult.value;
-    hasLiveData = true;
-  } else if (finnhubResult.status === 'rejected') {
+  if (finnhubResult.status === 'rejected') {
     console.warn('Finnhub economic calendar unavailable; checking configured calendar adapters:', finnhubResult.reason);
   }
   if (frankfurterResult.status === 'fulfilled' && isRecord(frankfurterResult.value)) {
@@ -523,12 +523,19 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
   } else if (frankfurterResult.status === 'rejected') {
     console.warn('ECB benchmark exchange rates are unavailable:', frankfurterResult.reason);
   }
-  if (calendarResult.status === 'fulfilled' && calendarResult.value.length > 0) {
-    snapshot.catalysts = calendarResult.value;
+  const providerCalendar = calendarResult.status === 'fulfilled' && calendarResult.value.length > 0
+    ? calendarResult.value
+    : finnhubResult.status === 'fulfilled' && finnhubResult.value?.length
+      ? finnhubResult.value
+      : fmpResult.status === 'fulfilled' && fmpResult.value?.length
+        ? fmpResult.value
+        : null;
+  if (providerCalendar) {
+    snapshot.catalysts = providerCalendar;
     snapshot.calendarSource = 'provider';
     hasLiveData = true;
   } else if (calendarResult.status === 'rejected') {
-    console.warn('FairEconomy calendar is unavailable; retaining configured calendar data:', calendarResult.reason);
+    console.warn('FairEconomy calendar is unavailable; using configured provider calendars or curated reference events:', calendarResult.reason);
   }
   if (ecbResult.status === 'fulfilled') {
     const eur = snapshot.currencies.find((currency) => currency.code === 'EUR');
@@ -631,13 +638,8 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
       console.error('Alpha Vantage unavailable; retaining cached USD macro values:', alphaResult.reason);
     }
   }
-  if (!finnhubApiKey && fmpKey) {
-    if (fmpResult.status === 'fulfilled' && Array.isArray(fmpResult.value) && fmpResult.value.every(isCatalyst)) {
-      snapshot.catalysts = fmpResult.value;
-      hasLiveData = true;
-    } else if (fmpResult.status === 'rejected') {
-      console.error('Financial Modeling Prep unavailable; retaining cached catalysts:', fmpResult.reason);
-    }
+  if (fmpResult.status === 'rejected') {
+    console.error('Financial Modeling Prep unavailable; retaining available calendar events:', fmpResult.reason);
   }
   if (cotResult.status === 'fulfilled' && Array.isArray(cotResult.value) && cotResult.value.every(isCotPosition)) {
     snapshot.cot = cotResult.value;

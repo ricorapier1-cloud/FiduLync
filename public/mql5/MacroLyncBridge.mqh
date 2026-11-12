@@ -10,6 +10,9 @@ struct MacroLyncSignal
    string session;
    string correlation_group;
    int confluence_score;
+   double csi_spread;
+   string killzone_active;
+   double risk_multiplier;
    double atr_sl_pips;
    double atr_tp_pips;
    bool news_lockout;
@@ -161,8 +164,11 @@ bool MacroLyncGetSignal(
    signal.bias = "NEUTRAL";
    signal.regime = "UNAVAILABLE";
    signal.session = "OFF_HOURS";
+   signal.killzone_active = "OFF_SESSION";
    signal.correlation_group = "USD_BLOC";
    signal.confluence_score = 0;
+   signal.csi_spread = 0.0;
+   signal.risk_multiplier = 0.0;
    signal.atr_sl_pips = 0.0;
    signal.atr_tp_pips = 0.0;
    signal.news_lockout = true;
@@ -204,7 +210,10 @@ bool MacroLyncGetSignal(
    string response_regime = ML_JsonString(response, "regime");
    string response_session = ML_JsonString(response, "session");
    string response_correlation_group = ML_JsonString(response, "correlation_group");
+   string response_killzone = ML_JsonString(response, "killzone_active");
    string response_score = ML_JsonScalar(response, "confluence_score");
+   string response_csi_spread = ML_JsonScalar(response, "csi_spread");
+   string response_risk_multiplier = ML_JsonScalar(response, "risk_multiplier");
    string response_sl = ML_JsonScalar(response, "atr_sl_pips");
    string response_tp = ML_JsonScalar(response, "atr_tp_pips");
    string response_safe = ML_JsonScalar(response, "safe_to_trade");
@@ -218,7 +227,11 @@ bool MacroLyncGetSignal(
          && response_session != "NY_OVERLAP" && response_session != "OFF_HOURS")
       || (response_correlation_group != "USD_BLOC" && response_correlation_group != "JPY_CROSS"
          && response_correlation_group != "EUR_BLOC" && response_correlation_group != "COMMODITY_FX")
+      || (response_killzone != "LONDON_OPEN" && response_killzone != "NY_OVERLAP"
+         && response_killzone != "ASIAN_RANGE" && response_killzone != "OFF_SESSION")
       || !ML_IsInteger(response_score)
+      || !ML_IsNumber(response_csi_spread)
+      || !ML_IsNumber(response_risk_multiplier)
       || (response_safe != "true" && response_safe != "false")
       || (response_news != "true" && response_news != "false")
       || response_timestamp == "")
@@ -228,11 +241,20 @@ bool MacroLyncGetSignal(
       return false;
    }
    int confluence_score = (int)StringToInteger(response_score);
+   double csi_spread = StringToDouble(response_csi_spread);
+   double risk_multiplier = StringToDouble(response_risk_multiplier);
+   double expected_risk_multiplier = response_news == "true" || response_regime == "HIGH_VOL_CHOP"
+      || response_regime == "UNAVAILABLE"
+      ? 0.0
+      : response_regime == "TRENDING_EXPANSION" ? 1.0 : 0.5;
    bool atr_values_valid = (response_sl == "null" || ML_IsNumber(response_sl))
       && (response_tp == "null" || ML_IsNumber(response_tp));
-   if(confluence_score < -100 || confluence_score > 100 || !atr_values_valid
+   if(confluence_score < -100 || confluence_score > 100 || MathAbs(csi_spread) > 200.0
+      || risk_multiplier != expected_risk_multiplier
+      || !atr_values_valid
       || (response_safe == "true" && (response_sl == "null" || response_tp == "null"
          || response_news == "true" || response_bias == "NEUTRAL"
+         || risk_multiplier <= 0.0 || MathAbs(csi_spread) < 60.0 || MathAbs(confluence_score) < 45
          || StringToDouble(response_sl) <= 0.0 || StringToDouble(response_tp) <= 0.0
          || (response_regime != "TRENDING_EXPANSION" && response_regime != "MEAN_REVERTING"))))
    {
@@ -245,13 +267,71 @@ bool MacroLyncGetSignal(
    signal.bias = response_bias;
    signal.regime = response_regime;
    signal.session = response_session;
+   signal.killzone_active = response_killzone;
    signal.correlation_group = response_correlation_group;
    signal.confluence_score = confluence_score;
+   signal.csi_spread = csi_spread;
+   signal.risk_multiplier = risk_multiplier;
    signal.atr_sl_pips = response_sl == "" || response_sl == "null" ? 0.0 : StringToDouble(response_sl);
    signal.atr_tp_pips = response_tp == "" || response_tp == "null" ? 0.0 : StringToDouble(response_tp);
    signal.news_lockout = response_news == "true";
    signal.safe_to_trade = response_safe == "true" && !signal.news_lockout;
    signal.timestamp_utc = response_timestamp;
+   return true;
+}
+
+bool LogClosedTrade(
+   const string base_url,
+   const string api_key,
+   const string ticket,
+   const string symbol,
+   const string direction,
+   const double entry_price,
+   const double exit_price,
+   const double profit_usd,
+   const double r_multiple,
+   const int confluence_score,
+   const string regime,
+   const string closed_at_utc,
+   const int timeout_ms = 5000
+)
+{
+   string root = ML_BaseUrl(base_url);
+   if(root == "" || api_key == "" || ticket == "" || symbol == ""
+      || (direction != "LONG" && direction != "SHORT")
+      || !MathIsValidNumber(entry_price) || entry_price <= 0.0
+      || !MathIsValidNumber(exit_price) || exit_price <= 0.0
+      || !MathIsValidNumber(profit_usd) || !MathIsValidNumber(r_multiple)
+      || closed_at_utc == "" || StringSubstr(closed_at_utc, StringLen(closed_at_utc) - 1, 1) != "Z"
+      || confluence_score < -100 || confluence_score > 100)
+      return false;
+   string body = "{\"ticket\":\"" + ML_JsonEscape(ticket)
+      + "\",\"symbol\":\"" + ML_JsonEscape(symbol)
+      + "\",\"direction\":\"" + direction
+      + "\",\"entry_price\":" + DoubleToString(entry_price, 8)
+      + ",\"exit_price\":" + DoubleToString(exit_price, 8)
+      + ",\"profit_usd\":" + DoubleToString(profit_usd, 2)
+      + ",\"r_multiple\":" + DoubleToString(r_multiple, 4)
+      + ",\"confluence_score\":" + IntegerToString(confluence_score)
+      + ",\"regime\":\"" + ML_JsonEscape(regime)
+      + "\",\"closed_at_utc\":\"" + ML_JsonEscape(closed_at_utc) + "\"}";
+   char request_data[];
+   char response_data[];
+   string response_headers;
+   if(!ML_EncodeRequestBody(body, request_data))
+   {
+      Print("MacroLync closed-trade request body could not be encoded as UTF-8.");
+      return false;
+   }
+   string headers = "x-algo-key: " + api_key + "\r\nContent-Type: application/json\r\nAccept: application/json\r\n";
+   ResetLastError();
+   int status = WebRequest("POST", root + "/api/v1/trade-log", headers, timeout_ms, request_data, response_data, response_headers);
+   int error_code = GetLastError();
+   if(status != 202 && status != 200)
+   {
+      PrintFormat("MacroLync closed-trade request returned HTTP %d (GetLastError=%d).", status, error_code);
+      return false;
+   }
    return true;
 }
 
