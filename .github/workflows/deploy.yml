@@ -31,7 +31,8 @@ jobs:
         with:
           version: latest
 
-      - name: Deploy Edge Functions
+      - name: Deploy Supabase Edge Functions
+        if: ${{ vars.DEPLOY_SUPABASE_EDGE_FUNCTIONS == 'true' }}
         run: |
           supabase functions deploy resolve-bank-holder --no-verify-jwt
           supabase functions deploy ea-webhook-sync --no-verify-jwt
