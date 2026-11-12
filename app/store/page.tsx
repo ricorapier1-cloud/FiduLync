@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import type { Metadata } from 'next';
 import StoreTerminal from '@/app/components/StoreTerminal';
 import { getHeartbeatFleet } from '@/lib/eaHeartbeat';
+import { getLiquiditySession } from '@/lib/currencyStrength';
+import { getMacroSnapshot } from '@/lib/macroEngine';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,5 +24,12 @@ export default async function AlgoLyncStorePage() {
   }
 
   const bridgeSource = await readFile(join(process.cwd(), 'public', 'mql5', 'MacroLyncBridge.mqh'), 'utf8');
-  return <StoreTerminal initialFleet={fleet} telemetryError={telemetryError} bridgeSource={bridgeSource} />;
+  const initialSnapshot = await getMacroSnapshot();
+  return <StoreTerminal
+    initialFleet={fleet}
+    telemetryError={telemetryError}
+    bridgeSource={bridgeSource}
+    initialSnapshot={initialSnapshot}
+    session={getLiquiditySession()}
+  />;
 }

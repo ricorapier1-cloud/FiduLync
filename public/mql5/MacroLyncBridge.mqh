@@ -1,11 +1,14 @@
 #ifndef MACRO_LYNC_BRIDGE_MQH
 #define MACRO_LYNC_BRIDGE_MQH
+#property strict
 
 struct MacroLyncSignal
 {
    string symbol;
    string bias;
    string regime;
+   string session;
+   string correlation_group;
    int confluence_score;
    double atr_sl_pips;
    double atr_tp_pips;
@@ -157,6 +160,8 @@ bool MacroLyncGetSignal(
    signal.symbol = symbol;
    signal.bias = "NEUTRAL";
    signal.regime = "UNAVAILABLE";
+   signal.session = "OFF_HOURS";
+   signal.correlation_group = "USD_BLOC";
    signal.confluence_score = 0;
    signal.atr_sl_pips = 0.0;
    signal.atr_tp_pips = 0.0;
@@ -197,6 +202,8 @@ bool MacroLyncGetSignal(
    string response_symbol = ML_JsonString(response, "symbol");
    string response_bias = ML_JsonString(response, "bias");
    string response_regime = ML_JsonString(response, "regime");
+   string response_session = ML_JsonString(response, "session");
+   string response_correlation_group = ML_JsonString(response, "correlation_group");
    string response_score = ML_JsonScalar(response, "confluence_score");
    string response_sl = ML_JsonScalar(response, "atr_sl_pips");
    string response_tp = ML_JsonScalar(response, "atr_tp_pips");
@@ -207,6 +214,10 @@ bool MacroLyncGetSignal(
       || (response_bias != "LONG" && response_bias != "SHORT" && response_bias != "NEUTRAL")
       || (response_regime != "TRENDING_EXPANSION" && response_regime != "MEAN_REVERTING"
          && response_regime != "HIGH_VOL_CHOP" && response_regime != "UNAVAILABLE")
+      || (response_session != "ASIAN_RANGE" && response_session != "LONDON_KILLZONE"
+         && response_session != "NY_OVERLAP" && response_session != "OFF_HOURS")
+      || (response_correlation_group != "USD_BLOC" && response_correlation_group != "JPY_CROSS"
+         && response_correlation_group != "EUR_BLOC" && response_correlation_group != "COMMODITY_FX")
       || !ML_IsInteger(response_score)
       || (response_safe != "true" && response_safe != "false")
       || (response_news != "true" && response_news != "false")
@@ -233,6 +244,8 @@ bool MacroLyncGetSignal(
    signal.symbol = response_symbol;
    signal.bias = response_bias;
    signal.regime = response_regime;
+   signal.session = response_session;
+   signal.correlation_group = response_correlation_group;
    signal.confluence_score = confluence_score;
    signal.atr_sl_pips = response_sl == "" || response_sl == "null" ? 0.0 : StringToDouble(response_sl);
    signal.atr_tp_pips = response_tp == "" || response_tp == "null" ? 0.0 : StringToDouble(response_tp);

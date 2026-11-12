@@ -4,11 +4,15 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import BrandGlyph from '@/components/BrandGlyph';
 import type { HeartbeatRecord } from '@/lib/eaHeartbeat';
+import { getCurrencyStrengthIndex, type getLiquiditySession } from '@/lib/currencyStrength';
+import type { MacroSnapshot } from '@/types/macro';
 
 type StoreTerminalProps = {
   initialFleet: { configured: boolean; heartbeats: HeartbeatRecord[] };
   telemetryError: string;
   bridgeSource: string;
+  initialSnapshot: MacroSnapshot;
+  session: ReturnType<typeof getLiquiditySession>;
 };
 
 type SignalResult = {
@@ -18,6 +22,8 @@ type SignalResult = {
   regime: string;
   atr_sl_pips: number | null;
   atr_tp_pips: number | null;
+  session: string;
+  correlation_group: string;
   news_lockout: boolean;
   safe_to_trade: boolean;
   timestamp_utc: string;
@@ -51,12 +57,14 @@ function isSignalResult(value: unknown): value is SignalResult {
     && typeof result.regime === 'string'
     && (result.atr_sl_pips === null || typeof result.atr_sl_pips === 'number')
     && (result.atr_tp_pips === null || typeof result.atr_tp_pips === 'number')
+    && typeof result.session === 'string'
+    && typeof result.correlation_group === 'string'
     && typeof result.news_lockout === 'boolean'
     && typeof result.safe_to_trade === 'boolean'
     && typeof result.timestamp_utc === 'string';
 }
 
-export default function StoreTerminal({ initialFleet, telemetryError, bridgeSource }: StoreTerminalProps) {
+export default function StoreTerminal({ initialFleet, telemetryError, bridgeSource, initialSnapshot, session }: StoreTerminalProps) {
   const router = useRouter();
   const [symbol, setSymbol] = useState('EURUSD');
   const endpoint = useSyncExternalStore(subscribeToOrigin, getBrowserOrigin, getServerOrigin);
@@ -64,6 +72,7 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
   const [signalError, setSignalError] = useState('');
   const [testing, setTesting] = useState(false);
   const [copyState, setCopyState] = useState('');
+  const currencyStrength = getCurrencyStrengthIndex(initialSnapshot);
 
   useEffect(() => {
     const timer = window.setInterval(() => router.refresh(), 30_000);
@@ -132,6 +141,27 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
             <BrandGlyph name="arrow-down" size={15} /> Download MT5 include
           </a>
         </div>
+
+        <section className="mt-7 rounded-xl border border-white/[0.08] bg-[#0c1016] p-4 sm:p-5" aria-label="Market state">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <div className="font-mono text-[9px] tracking-[0.17em] text-slate-500">LIVE MACRO STRENGTH INDEX</div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {currencyStrength.map(({ currency, score: strength }) => (
+                  <span key={currency} className="inline-flex items-center gap-2 rounded-md border border-white/[0.08] px-2.5 py-2 font-mono text-[10px]">
+                    <strong className="text-slate-200">{currency}</strong>
+                    <span className={strength >= 0 ? 'text-emerald-300' : 'text-rose-300'}>{strength > 0 ? '+' : ''}{strength}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="min-w-36">
+              <div className="font-mono text-[9px] tracking-[0.17em] text-slate-500">LIQUIDITY SESSION</div>
+              <div className="mt-3 font-mono text-xs text-emerald-200">{session}</div>
+            </div>
+          </div>
+          <p className="mt-3 text-[9px] leading-4 text-slate-500">CSI is a relative policy/real-rate model adjusted for available COT data, not a price-return index.</p>
+        </section>
 
         <section className="mt-8" aria-labelledby="fleet-heading">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
@@ -230,6 +260,8 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
                 <div className="mt-4 grid grid-cols-2 gap-3 text-[10px]">
                   <Metric label="BIAS" value={`${signal.bias} · ${signal.confluence_score}`} />
                   <Metric label="NEWS LOCKOUT" value={signal.news_lockout ? 'ACTIVE' : 'CLEAR'} />
+                  <Metric label="SESSION" value={signal.session} />
+                  <Metric label="CORRELATION GROUP" value={signal.correlation_group} />
                   <Metric label="ATR STOP" value={signal.atr_sl_pips === null ? 'Unavailable' : `${signal.atr_sl_pips} pips`} />
                   <Metric label="ATR TARGET" value={signal.atr_tp_pips === null ? 'Unavailable' : `${signal.atr_tp_pips} pips`} />
                 </div>

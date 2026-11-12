@@ -76,7 +76,7 @@ function parseCandle(value: unknown): Candle | null {
   return candle;
 }
 
-async function fetchCandles(pair: string, timeframe: 'H1' | 'H4'): Promise<Candle[]> {
+async function fetchCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promise<Candle[]> {
   const endpoint = process.env.MARKET_DATA_PROVIDER_URL?.trim();
   if (!endpoint) return [];
 
@@ -102,7 +102,7 @@ async function fetchCandles(pair: string, timeframe: 'H1' | 'H4'): Promise<Candl
   return candles.sort((left, right) => left.timestamp - right.timestamp).slice(-MAX_CANDLES);
 }
 
-async function getCandles(pair: string, timeframe: 'H1' | 'H4') {
+async function getCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1') {
   if (!process.env.MARKET_DATA_PROVIDER_URL?.trim()) return [];
   return getCachedData(`market:candles:${pair}:${timeframe}`, () => fetchCandles(pair, timeframe), LIVE_PRICE_TTL_SECONDS);
 }
@@ -210,12 +210,14 @@ function normalizedAtrHistory(candles: Candle[], period = 14) {
   return values;
 }
 
-export function calculateTechnicalSignal(pair: string, h1: Candle[], h4: Candle[]): TechnicalSignal {
-  if (h1.length < 200 || h4.length < 200) return unavailableSignal();
+export function calculateTechnicalSignal(pair: string, h1: Candle[], h4: Candle[], d1: Candle[]): TechnicalSignal {
+  if (h1.length < 200 || h4.length < 200 || d1.length < 200) return unavailableSignal();
   const h1Values = h1.map((candle) => candle.close);
   const h4Values = h4.map((candle) => candle.close);
+  const d1Values = d1.map((candle) => candle.close);
   const h1Alignment = alignment(h1Values);
   const h4Alignment = alignment(h4Values);
+  const d1Alignment = alignment(d1Values);
   const h1ZScore = gaussianZScore(h1Values);
   const h4ZScore = gaussianZScore(h4Values);
   const ker = kaufmanEfficiencyRatio(h1Values);
@@ -234,7 +236,7 @@ export function calculateTechnicalSignal(pair: string, h1: Candle[], h4: Candle[
 
   const normalizedZ = Math.max(-3, Math.min(3, h1ZScore * 0.6 + h4ZScore * 0.4));
   const trendDirection = Math.sign(h1Values.at(-1)! - h1Values.at(-11)!);
-  const directionalScore = h1Alignment * 20 + h4Alignment * 25
+  const directionalScore = h4Alignment * 20 + d1Alignment * 25
     + trendDirection * ker * 20 + normalizedZ * 10;
   const reversionScore = -normalizedZ * 25 + (h1Alignment + h4Alignment) * 5;
   const rawScore = regime === 'TRENDING_EXPANSION'
@@ -247,10 +249,10 @@ export function calculateTechnicalSignal(pair: string, h1: Candle[], h4: Candle[
   const atrPips = atr / pipSize;
   const allowBuys = regime !== 'HIGH_VOL_CHOP'
     && score >= 35
-    && (regime === 'MEAN_REVERTING' ? h1ZScore <= -1.2 : h4Alignment > 0);
+    && (regime === 'MEAN_REVERTING' ? h1ZScore <= -1.2 : h4Alignment > 0 && d1Alignment > 0);
   const allowSells = regime !== 'HIGH_VOL_CHOP'
     && score <= -35
-    && (regime === 'MEAN_REVERTING' ? h1ZScore >= 1.2 : h4Alignment < 0);
+    && (regime === 'MEAN_REVERTING' ? h1ZScore >= 1.2 : h4Alignment < 0 && d1Alignment < 0);
   const allowsExecution = allowBuys || allowSells;
   const stopMultiplier = regime === 'TRENDING_EXPANSION' ? 1.75 : 1.5;
   const targetMultiplier = regime === 'TRENDING_EXPANSION' ? 3 : 2;
@@ -278,8 +280,12 @@ export async function getTechnicalSignal(pair: string): Promise<TechnicalSignal>
   if (!process.env.MARKET_DATA_PROVIDER_URL?.trim()) return unavailableSignal();
   try {
     return await getCachedData(`technical:signal:${pair}`, async () => {
-      const [h1, h4] = await Promise.all([getCandles(pair, 'H1'), getCandles(pair, 'H4')]);
-      return calculateTechnicalSignal(pair, h1, h4);
+      const [h1, h4, d1] = await Promise.all([
+        getCandles(pair, 'H1'),
+        getCandles(pair, 'H4'),
+        getCandles(pair, 'D1'),
+      ]);
+      return calculateTechnicalSignal(pair, h1, h4, d1);
     }, LIVE_PRICE_TTL_SECONDS);
   } catch (error) {
     console.warn(`Technical data unavailable for ${pair}; execution filters are disabled.`, error);

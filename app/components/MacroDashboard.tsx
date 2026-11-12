@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import BrandGlyph from '@/components/BrandGlyph';
+import { getCurrencyStrengthIndex } from '@/lib/currencyStrength';
 import type { MacroSnapshot, MarketQuote } from '@/types/macro';
 
 type MacroDashboardProps = {
@@ -81,17 +82,20 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
   const [pair, setPair] = useState<(typeof pairs)[number]['symbol']>('EURUSD');
   const [now, setNow] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [aiBrief, setAiBrief] = useState<{ bullets: string[]; source: 'gemini' | 'rules' } | null>(null);
+  const currencyStrength = getCurrencyStrengthIndex(snapshot);
   const score = calculateBias(snapshot, pair);
   const sortedCatalysts = [...snapshot.catalysts]
     .filter((catalyst) => now === null || Date.parse(catalyst.scheduledAt) >= now)
     .sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt));
+  const nextHighImpactCatalyst = sortedCatalysts.find((catalyst) => catalyst.impact === 'High');
   const currencies = snapshot.currencies;
   const liveQuoteAvailable = liveFeed && now !== null && quotes.some((quote) => {
     const age = now - Date.parse(quote.timestamp);
     return quote.source === 'finnhub' && age >= 0 && age <= 120_000;
   });
   const liveReferenceAvailable = now !== null && (
-    quotes.some((quote) => quote.source === 'frankfurter')
+    quotes.some((quote) => quote.source !== 'finnhub')
     || Object.keys(snapshot.ecbRates ?? {}).length > 0
   );
   const activePair = pairs.find((item) => item.symbol === pair) ?? pairs[0];
@@ -142,6 +146,21 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
     };
     void refresh();
     void refreshQuotes();
+    void fetch('/api/v1/ai-brief', { cache: 'no-store', signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) return;
+        const payload: unknown = await response.json();
+        if (isRecord(payload) && Array.isArray(payload.bullets)
+          && payload.bullets.every((bullet) => typeof bullet === 'string')
+          && (payload.source === 'gemini' || payload.source === 'rules')) {
+          setAiBrief({ bullets: payload.bullets.slice(0, 3), source: payload.source });
+        }
+      })
+      .catch((error: unknown) => {
+        if (error instanceof Error && error.name !== 'AbortError') {
+          console.warn('AI desk brief could not be loaded.', error);
+        }
+      });
     const refreshTimer = window.setInterval(() => void refresh(), 300_000);
     const quoteTimer = window.setInterval(() => void refreshQuotes(), 60_000);
     return () => {
@@ -160,7 +179,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
         <span className="macro-status-right"><span className={`macro-feed-badge${liveQuoteAvailable || liveReferenceAvailable ? ' macro-feed-live' : ''}`}>{liveQuoteAvailable ? 'LIVE FEED' : liveReferenceAvailable ? 'LIVE REFERENCE FEED' : snapshot.source === 'provider' ? 'PROVIDER FEED' : snapshot.source === 'partial' ? 'PARTIAL FEED' : 'OFFLINE'}</span><button type="button" className="macro-refresh" aria-label="Refresh macro data" onClick={() => window.location.reload()}><BrandGlyph name="refresh" size={13} className={refreshing ? 'macro-spin' : ''} /> REFRESH</button><Link href="/store" className="macro-refresh">ALGOLYNC VAULT</Link></span>
       </div>
       <div className="macro-quote-strip" aria-label="Live FX quotes">
-        {quotes.map((quote) => <span key={quote.symbol} className="macro-quote mono"><strong>{quote.symbol}</strong><b>{quote.price.toFixed(quote.symbol.startsWith('XAU') ? 2 : quote.symbol.endsWith('JPY') ? 3 : 5)}</b><small className={quote.source === 'finnhub' ? 'macro-positive' : ''}>{quote.source === 'finnhub' ? 'LIVE' : 'ECB REF'}</small></span>)}
+        {quotes.map((quote) => <span key={quote.symbol} className="macro-quote mono"><strong>{quote.symbol}</strong><b>{quote.price.toFixed(quote.symbol.startsWith('XAU') ? 2 : quote.symbol.endsWith('JPY') ? 3 : 5)}</b><small className={quote.source === 'finnhub' ? 'macro-positive' : ''}>{quote.source === 'finnhub' ? 'LIVE' : quote.source === 'frankfurter' ? 'ECB REF' : quote.source === 'gold-api' ? 'GOLD REF' : 'FX REF'}</small></span>)}
         {Object.entries(snapshot.ecbRates ?? {}).map(([currency, value]) => <span key={`ecb-${currency}`} className="macro-quote mono"><strong>EUR/{currency}</strong><b>{value.toFixed(4)}</b><small>ECB REF</small></span>)}
       </div>
 
@@ -181,23 +200,43 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
       <section className="macro-kpis" aria-label="Macro overview">
         <article className="macro-kpi"><span className="macro-kpi-label">POLICY RANGE <span>G10</span></span><strong className="mono">{policySpread === null ? 'Unavailable' : formatRate(policySpread)}</strong><small>highest to lowest available policy rate</small></article>
         <article className="macro-kpi"><span className="macro-kpi-label">POLICY INPUTS <span>G10</span></span><strong className="mono">{String(currencies.length).padStart(2, '0')} <em>/ 10</em></strong><small>{snapshot.source === 'fallback' ? 'Reference baseline; live provider unavailable' : snapshot.source === 'partial' ? 'Live and reference inputs' : 'Validated provider observations'}</small></article>
-        <article className="macro-kpi"><span className="macro-kpi-label">NEXT CATALYST <span>HIGH IMPACT</span></span><strong className="mono">{sortedCatalysts[0] ? now ? formatCountdown(sortedCatalysts[0].scheduledAt, now) : 'Syncing' : 'No events scheduled'}</strong><small>{sortedCatalysts[0]?.title ?? 'No upcoming event in feed'}</small></article>
+        <article className="macro-kpi"><span className="macro-kpi-label">NEXT CATALYST <span>HIGH IMPACT</span></span><strong className="mono">{nextHighImpactCatalyst ? now ? formatCountdown(nextHighImpactCatalyst.scheduledAt, now) : 'Syncing' : 'No events scheduled'}</strong><small>{nextHighImpactCatalyst?.title ?? 'No upcoming event in feed'}</small></article>
         <article className="macro-kpi macro-kpi-source"><span className="macro-kpi-label">DATA PROVENANCE <span>STATUS</span></span><strong className="macro-source-value"><span className={snapshot.source === 'fallback' ? 'macro-source-dot' : 'macro-source-dot macro-source-live'} />{liveReferenceAvailable && currencies.length === 0 ? 'REFERENCE' : snapshot.source === 'provider' ? 'CONNECTED' : snapshot.source === 'partial' ? 'PARTIAL' : 'OFFLINE'}</strong><small>{refreshing ? 'Checking provider…' : 'Stale cache used when available'}</small></article>
       </section>
 
+      <section className="macro-intelligence-grid" aria-label="Currency strength and AI desk brief">
+        <div className="macro-strength-panel">
+          <div className="macro-section-heading"><div><span className="eyebrow">LIVE / MACRO RELATIVE STRENGTH</span><h2>Currency strength index</h2></div><span className="macro-section-note mono">−100 / +100</span></div>
+          <div className="macro-csi-ranking">{currencyStrength.map(({ currency, score: strength }, index) => (
+            <div className="macro-csi-item" key={currency}>
+              <span className="macro-csi-rank mono">{String(index + 1).padStart(2, '0')}</span>
+              <strong className="mono">{currency}</strong>
+              <span className="macro-csi-track"><span className={strength >= 0 ? 'macro-csi-positive' : 'macro-csi-negative'} style={{ width: `${Math.abs(strength)}%` }} /></span>
+              <span className={`macro-csi-score mono ${strength >= 0 ? 'macro-positive' : 'macro-negative'}`}>{strength > 0 ? '+' : ''}{strength}</span>
+            </div>
+          ))}</div>
+          <p className="macro-csi-note">Relative policy and real-rate score, adjusted for available COT positioning; not a price-return index.</p>
+        </div>
+        <div className="macro-brief-panel">
+          <div className="macro-section-heading"><div><span className="eyebrow">QUALITATIVE / NON-EXECUTION</span><h2>AI Macro Desk Brief</h2></div><span className="macro-section-note mono">{aiBrief?.source === 'gemini' ? 'GEMINI' : aiBrief ? 'RULE-BASED' : 'LOADING'}</span></div>
+          {aiBrief ? <ul className="macro-brief-list">{aiBrief.bullets.map((bullet, index) => <li key={`${index}-${bullet}`}>{bullet}</li>)}</ul> : <p className="macro-brief-loading">Loading the independent desk brief…</p>}
+          <p className="macro-csi-note">Qualitative synthesis only. The signal API does not depend on this brief.</p>
+        </div>
+      </section>
+
       <section id="matrix" className="macro-section" aria-labelledby="matrix-title">
-        <div className="macro-section-heading"><div><span className="eyebrow">01 / MONETARY POLICY</span><h2 id="matrix-title">Global FX macro matrix</h2></div><span className="macro-section-note mono">RATE & INFLATION / % Y/Y</span></div>
+        <div className="macro-section-heading"><div><span className="eyebrow">01 / MONETARY POLICY</span><h2 id="matrix-title">Global FX macro matrix</h2></div><span className="macro-section-note mono">POLICY / INFLATION / 2Y YIELD %</span></div>
         <div className="macro-panel macro-matrix-panel">
           <table className="macro-table">
-            <thead><tr><th>CCY</th><th>POLICY AUTHORITY</th><th>POLICY RATE</th><th>INFLATION</th><th>REAL RATE</th><th>POLICY STANCE</th></tr></thead>
+            <thead><tr><th>CCY</th><th>POLICY AUTHORITY</th><th>POLICY RATE</th><th>INFLATION</th><th>2Y YIELD</th><th>REAL RATE</th><th>POLICY STANCE</th></tr></thead>
             <tbody>{currencies.map((currency) => {
               const realRate = currency.policyRate - currency.inflation;
-              return <tr key={currency.code}><td><span className="macro-currency-code mono">{currency.code}</span></td><td>{currency.centralBank}</td><td className="mono">{formatRate(currency.policyRate)}</td><td><span className="mono">{formatRate(currency.inflation)}</span><small>{currency.corePce !== undefined && currency.cpi !== undefined ? `Core PCE ${formatRate(currency.corePce)} · CPI ${formatRate(currency.cpi)}` : currency.inflationLabel}</small></td><td className={`mono ${realRate >= 0 ? 'macro-positive' : 'macro-negative'}`}>{realRate > 0 ? '+' : ''}{formatRate(realRate)}</td><td><span className="macro-stance">{currency.stance}</span></td></tr>;
+              return <tr key={currency.code}><td><span className="macro-currency-code mono">{currency.code}</span></td><td>{currency.centralBank}</td><td className="mono">{formatRate(currency.policyRate)}<small>{currency.policyRateSource === 'provider' ? 'PROVIDER' : 'REFERENCE'}</small></td><td><span className="mono">{formatRate(currency.inflation)}</span><small>{currency.corePce !== undefined && currency.cpi !== undefined ? `Core PCE ${formatRate(currency.corePce)} · CPI ${formatRate(currency.cpi)}` : currency.inflationLabel}</small></td><td className="mono">{currency.twoYearYield === undefined ? '—' : <>{formatRate(currency.twoYearYield)}<small>{currency.twoYearYieldSource === 'provider' ? 'PROVIDER' : 'REFERENCE'}</small></>}</td><td className={`mono ${realRate >= 0 ? 'macro-positive' : 'macro-negative'}`}>{realRate > 0 ? '+' : ''}{formatRate(realRate)}</td><td><span className="macro-stance">{currency.stance}</span></td></tr>;
             })}</tbody>
           </table>
           <div className="macro-currency-cards">{currencies.map((currency) => {
             const realRate = currency.policyRate - currency.inflation;
-            return <article className="macro-currency-card" key={currency.code}><div className="macro-currency-card-head"><strong className="mono">{currency.code}</strong><span>{currency.stance}</span></div><p>{currency.centralBank}</p><div className="macro-currency-card-stats"><span>POLICY <b className="mono">{formatRate(currency.policyRate)}</b></span><span>{currency.inflationLabel.toUpperCase()} <b className="mono">{formatRate(currency.inflation)}</b></span><span>REAL <b className={`mono ${realRate >= 0 ? 'macro-positive' : 'macro-negative'}`}>{formatRate(realRate)}</b></span></div></article>;
+            return <article className="macro-currency-card" key={currency.code}><div className="macro-currency-card-head"><strong className="mono">{currency.code}</strong><span>{currency.stance}</span></div><p>{currency.centralBank}</p><div className="macro-currency-card-stats"><span>POLICY <b className="mono">{formatRate(currency.policyRate)}</b></span><span>{currency.inflationLabel.toUpperCase()} <b className="mono">{formatRate(currency.inflation)}</b></span><span>2Y YIELD <b className="mono">{currency.twoYearYield === undefined ? '—' : formatRate(currency.twoYearYield)}</b></span><span>REAL <b className={`mono ${realRate >= 0 ? 'macro-positive' : 'macro-negative'}`}>{formatRate(realRate)}</b></span></div></article>;
           })}</div>
           <div className="macro-panel-foot"><span>Real rate = current policy rate − latest available inflation measure.</span><span className="mono">{snapshot.source === 'fallback' ? 'REFERENCE LEVELS / VERIFY BEFORE USE' : 'LIVE INPUTS OVERRIDE REFERENCE LEVELS'}</span></div>
         </div>
@@ -227,7 +266,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
               <div className="macro-event-info"><div><span className="macro-region mono">{catalyst.region}</span><span className={`macro-impact macro-impact-${catalyst.impact.toLowerCase()}`}>{catalyst.impact}</span></div><h3>{catalyst.title}</h3><p>Consensus <b className="mono">{catalyst.consensus}</b><span>Actual <b className="mono">{catalyst.actual ?? 'Pending'}</b></span></p></div>
               <span className="macro-countdown mono">{now ? formatCountdown(catalyst.scheduledAt, now) : 'Syncing'}</span>
             </article>)}
-            <div className="macro-calendar-note"><BrandGlyph name="clock" size={14} /><span>Provider calendar consensus and actuals may be revised; confirm official release details before positioning.</span></div>
+            <div className="macro-calendar-note"><BrandGlyph name="clock" size={14} /><span>{snapshot.calendarSource === 'provider' ? 'Provider calendar consensus and actuals may be revised; confirm official release details before positioning.' : 'Live calendar feed unavailable; displayed reference events do not enable news lockout. Verify official release details.'}</span></div>
           </div>
         </section>
       </div>

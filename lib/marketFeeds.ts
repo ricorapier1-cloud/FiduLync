@@ -66,6 +66,54 @@ async function getFrankfurterQuotes(): Promise<MarketQuote[]> {
   ];
 }
 
+async function getExchangeRateQuotes(): Promise<MarketQuote[]> {
+  const response = await fetch('https://open.er-api.com/v6/latest/USD', {
+    cache: 'no-store',
+    signal: AbortSignal.timeout(5_000),
+  });
+  if (!response.ok) throw new Error(`ExchangeRate-API returned ${response.status}.`);
+  const payload: unknown = await response.json();
+  if (!isRecord(payload) || payload.result !== 'success' || !isRecord(payload.rates)) {
+    throw new Error('ExchangeRate-API returned an invalid USD rates payload.');
+  }
+  const eur = payload.rates.EUR;
+  const gbp = payload.rates.GBP;
+  const jpy = payload.rates.JPY;
+  if (typeof eur !== 'number' || typeof gbp !== 'number' || typeof jpy !== 'number'
+    || ![eur, gbp, jpy].every((rate) => Number.isFinite(rate) && rate > 0)) {
+    throw new Error('ExchangeRate-API did not return the required currency rates.');
+  }
+  const timestamp = typeof payload.time_last_update_utc === 'string'
+    ? new Date(payload.time_last_update_utc).toISOString()
+    : new Date().toISOString();
+  return [
+    { symbol: 'EURUSD', price: 1 / eur, changePercent: null, timestamp, source: 'exchangerate-api' },
+    { symbol: 'GBPUSD', price: 1 / gbp, changePercent: null, timestamp, source: 'exchangerate-api' },
+    { symbol: 'USDJPY', price: jpy, changePercent: null, timestamp, source: 'exchangerate-api' },
+  ];
+}
+
+async function getGoldQuote(): Promise<MarketQuote> {
+  const response = await fetch('https://api.gold-api.com/price/XAU', {
+    cache: 'no-store',
+    signal: AbortSignal.timeout(5_000),
+  });
+  if (!response.ok) throw new Error(`Gold-API returned ${response.status}.`);
+  const payload: unknown = await response.json();
+  if (!isRecord(payload) || payload.currency !== 'USD' || typeof payload.price !== 'number'
+    || !Number.isFinite(payload.price) || payload.price <= 0
+    || typeof payload.updatedAt !== 'string' || !Number.isFinite(Date.parse(payload.updatedAt))) {
+    throw new Error('Gold-API returned an invalid XAU/USD quote.');
+  }
+  return {
+    symbol: 'XAUUSD',
+    price: payload.price,
+    changePercent: null,
+    timestamp: new Date(payload.updatedAt).toISOString(),
+    source: 'gold-api',
+  };
+}
+
 async function fetchMarketQuotes(): Promise<MarketQuote[]> {
   const apiKey = process.env.FINNHUB_API_KEY?.trim();
   let liveQuotes: MarketQuote[] = [];
@@ -79,15 +127,29 @@ async function fetchMarketQuotes(): Promise<MarketQuote[]> {
 
   if (liveQuotes.length === finnhubSymbols.length) return liveQuotes;
 
-  try {
-    const referenceQuotes = await getFrankfurterQuotes();
-    const bySymbol = new Map(referenceQuotes.map((quote) => [quote.symbol, quote]));
-    for (const quote of liveQuotes) bySymbol.set(quote.symbol, quote);
-    return [...bySymbol.values()];
-  } catch (error) {
-    if (liveQuotes.length) return liveQuotes;
-    throw error;
+  const bySymbol = new Map(liveQuotes.map((quote) => [quote.symbol, quote]));
+  const failures: unknown[] = [];
+  for (const provider of [getFrankfurterQuotes, getExchangeRateQuotes]) {
+    try {
+      for (const quote of await provider()) {
+        if (!bySymbol.has(quote.symbol)) bySymbol.set(quote.symbol, quote);
+      }
+    } catch (error) {
+      failures.push(error);
+      console.warn('An FX reference quote provider is unavailable:', error);
+    }
+    if (bySymbol.size >= 3 && liveQuotes.length === 0) break;
   }
+  if (!bySymbol.has('XAUUSD')) {
+    try {
+      bySymbol.set('XAUUSD', await getGoldQuote());
+    } catch (error) {
+      failures.push(error);
+      console.warn('Gold reference quote provider is unavailable:', error);
+    }
+  }
+  if (bySymbol.size) return [...bySymbol.values()];
+  throw new AggregateError(failures, 'No configured FX quote provider returned usable data.');
 }
 
 export function getMarketQuotes(): Promise<MarketQuote[]> {

@@ -37,6 +37,22 @@
 .macro-kpi > strong { color: #e2e9ea; font-size: 23px; font-weight: 500; line-height: 1.1; }
 .macro-kpi > strong em { color: #728087; font-size: 13px; font-style: normal; }
 .macro-kpi > small { overflow: hidden; color: #78868c; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.macro-intelligence-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; padding-top: 30px; }
+.macro-strength-panel, .macro-brief-panel { min-width: 0; padding: 14px; border: 1px solid rgba(151, 169, 178, .13); border-radius: 6px; background: linear-gradient(148deg, rgba(16, 23, 30, .95), rgba(11, 16, 22, .96)); }
+.macro-strength-panel .macro-section-heading, .macro-brief-panel .macro-section-heading { min-height: 40px; }
+.macro-csi-ranking { display: grid; gap: 9px; }
+.macro-csi-item { display: grid; grid-template-columns: 22px 33px minmax(30px, 1fr) 34px; align-items: center; gap: 8px; color: #aeb9bd; font-size: 9px; }
+.macro-csi-rank { color: #58676e; font-size: 7px; }
+.macro-csi-item > strong { color: #e0e8e9; font-size: 9px; font-weight: 500; }
+.macro-csi-track { display: flex; height: 5px; justify-content: center; overflow: hidden; border-radius: 3px; background: #202a30; }
+.macro-csi-track span { display: block; height: 100%; }
+.macro-csi-positive { margin-right: auto; border-radius: 0 3px 3px 0; background: #28c98c; }
+.macro-csi-negative { margin-left: auto; border-radius: 3px 0 0 3px; background: #ec7181; }
+.macro-csi-score { text-align: right; font-size: 8px; }
+.macro-csi-note { margin: 11px 0 0; color: #738087; font-size: 8px; line-height: 1.55; }
+.macro-brief-list { display: grid; gap: 10px; margin: 3px 0 0; padding-left: 16px; color: #aebabe; font-size: 9px; line-height: 1.65; }
+.macro-brief-list li::marker { color: #36d19a; }
+.macro-brief-loading { color: #829196; font-size: 9px; }
 .macro-source-value { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 13px !important; }
 .macro-source-dot { width: 7px; height: 7px; border-radius: 50%; background: #e8ae57; }
 .macro-source-live { background: #10b981; box-shadow: 0 0 9px rgba(16, 185, 129, .7); }
@@ -163,6 +179,9 @@
   .macro-kpi > strong { font-size: 20px; }
   .macro-kpi > small { font-size: 8px; }
   .macro-section { padding-top: 29px; }
+  .macro-intelligence-grid { grid-template-columns: 1fr; gap: 0; padding-top: 22px; }
+  .macro-strength-panel, .macro-brief-panel { padding: 12px; }
+  .macro-brief-panel { margin-top: 12px; }
   .macro-section-heading { align-items: flex-start; min-height: auto; margin-bottom: 11px; }
   .macro-section-heading h2 { font-size: 16px; }
   .macro-section-note { margin-top: 16px; font-size: 7px; text-align: right; }

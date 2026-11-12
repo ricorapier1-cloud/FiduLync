@@ -6,6 +6,8 @@ export type MacroCurrency = {
   inflationLabel: string;
   corePce?: number;
   cpi?: number;
+  twoYearYield?: number;
+  twoYearYieldSource?: 'provider' | 'reference';
   policyRateSource?: 'provider' | 'reference';
   inflationSource?: 'provider' | 'reference';
   stance: string;
@@ -32,6 +34,7 @@ export type MacroSnapshot = {
   asOf: string;
   source: 'fallback' | 'provider' | 'partial';
   cotSource?: 'unavailable' | 'provider';
+  calendarSource?: 'reference' | 'provider';
   ecbRates?: Record<string, number>;
   currencies: MacroCurrency[];
   cot: CotPosition[];
@@ -43,5 +46,5 @@ export type MarketQuote = {
   price: number;
   changePercent: number | null;
   timestamp: string;
-  source: 'finnhub' | 'frankfurter';
+  source: 'finnhub' | 'frankfurter' | 'exchangerate-api' | 'gold-api';
 };

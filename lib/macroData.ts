@@ -1,11 +1,19 @@
 import 'server-only';
 import type { CotPosition, EconomicCatalyst, MacroCurrency, MacroSnapshot } from '@/types/macro';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
+import {
+  getBankOfCanadaMacroInputs,
+  getBankOfEnglandPolicyRate,
+  getEcbMacroInputs,
+  getWorldBankG10Inflation,
+} from '@/lib/internationalMacro';
+import { getCachedData } from '@/lib/redisCache';
 
 export const EMPTY_SNAPSHOT: MacroSnapshot = {
   asOf: '',
   source: 'fallback',
   cotSource: 'unavailable',
+  calendarSource: 'reference',
   currencies: [],
   cot: [],
   catalysts: [],
@@ -16,13 +24,18 @@ export function getFallbackSnapshot(): MacroSnapshot {
     asOf: new Date().toISOString(),
     source: 'fallback',
     cotSource: 'unavailable',
+    calendarSource: 'reference',
     currencies: [
-      { code: 'USD', centralBank: 'Federal Reserve', policyRate: 3.75, inflation: 2.8, inflationLabel: 'Core PCE', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Restrictive' },
+      { code: 'USD', centralBank: 'Federal Reserve', policyRate: 3.75, inflation: 2.8, twoYearYield: 4, twoYearYieldSource: 'reference', inflationLabel: 'Core PCE', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Restrictive' },
       { code: 'EUR', centralBank: 'European Central Bank', policyRate: 2.15, inflation: 2.1, inflationLabel: 'HICP', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Neutral' },
       { code: 'GBP', centralBank: 'Bank of England', policyRate: 4, inflation: 2.8, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Cautious' },
       { code: 'JPY', centralBank: 'Bank of Japan', policyRate: 0.5, inflation: 3, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Normalising' },
       { code: 'AUD', centralBank: 'Reserve Bank of Australia', policyRate: 3.6, inflation: 3.4, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Restrictive' },
       { code: 'CHF', centralBank: 'Swiss National Bank', policyRate: 0, inflation: 0.2, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Accommodative' },
+      { code: 'CAD', centralBank: 'Bank of Canada', policyRate: 2.25, inflation: 2.4, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Neutral' },
+      { code: 'NZD', centralBank: 'Reserve Bank of New Zealand', policyRate: 2.5, inflation: 2.7, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Neutral' },
+      { code: 'SEK', centralBank: 'Sveriges Riksbank', policyRate: 1.75, inflation: 1.8, inflationLabel: 'CPIF', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Neutral' },
+      { code: 'NOK', centralBank: 'Norges Bank', policyRate: 4, inflation: 2.4, inflationLabel: 'CPI-ATE', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Restrictive' },
     ],
     cot: [],
     catalysts: [
@@ -64,6 +77,8 @@ function isCurrency(value: unknown): value is MacroCurrency {
     && typeof value.inflationLabel === 'string'
     && (value.corePce === undefined || isFiniteNumber(value.corePce))
     && (value.cpi === undefined || isFiniteNumber(value.cpi))
+    && (value.twoYearYield === undefined || isFiniteNumber(value.twoYearYield))
+    && (value.twoYearYieldSource === undefined || value.twoYearYieldSource === 'provider' || value.twoYearYieldSource === 'reference')
     && (value.policyRateSource === undefined || value.policyRateSource === 'provider' || value.policyRateSource === 'reference')
     && (value.inflationSource === undefined || value.inflationSource === 'provider' || value.inflationSource === 'reference')
     && typeof value.stance === 'string';
@@ -131,10 +146,11 @@ async function getFredObservations(seriesId: string, apiKey: string): Promise<Ob
 }
 
 async function getFredUsdUpdates(apiKey: string) {
-  const [rateResult, pceResult, cpiResult] = await Promise.allSettled([
+  const [rateResult, pceResult, cpiResult, twoYearResult] = await Promise.allSettled([
     getFredObservations('DFF', apiKey),
     getFredObservations('PCEPILFE', apiKey),
     getFredObservations('CPIAUCSL', apiKey),
+    getFredObservations('DGS2', apiKey),
   ]);
   const latestYearOverYear = (observations: Observation[]) => {
     const latest = observations[0];
@@ -145,10 +161,12 @@ async function getFredUsdUpdates(apiKey: string) {
   if (rateResult.status === 'rejected') console.warn('FRED federal funds rate is unavailable:', rateResult.reason);
   if (pceResult.status === 'rejected') console.warn('FRED Core PCE is unavailable:', pceResult.reason);
   if (cpiResult.status === 'rejected') console.warn('FRED CPI is unavailable:', cpiResult.reason);
+  if (twoYearResult.status === 'rejected') console.warn('FRED 2-Year Treasury yield is unavailable:', twoYearResult.reason);
   return {
     policyRate: rateResult.status === 'fulfilled' ? rateResult.value[0]?.value : undefined,
     corePce: pceResult.status === 'fulfilled' ? latestYearOverYear(pceResult.value) : undefined,
     cpi: cpiResult.status === 'fulfilled' ? latestYearOverYear(cpiResult.value) : undefined,
+    twoYearYield: twoYearResult.status === 'fulfilled' ? twoYearResult.value[0]?.value : undefined,
   };
 }
 
@@ -166,6 +184,39 @@ async function getFrankfurterRates(): Promise<Record<string, number>> {
   }
   if (!Object.keys(rates).length) throw new Error('Frankfurter returned no usable ECB benchmark rates.');
   return rates;
+}
+
+function getFairEconomyCatalysts(): Promise<EconomicCatalyst[]> {
+  return getCachedData('macro:fair-economy-calendar', async () => {
+    const response = await fetch('https://nfs.faireconomy.media/ff_calendar_thisweek.json', {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!response.ok) throw new Error(`FairEconomy calendar returned ${response.status}.`);
+    const payload: unknown = await response.json();
+    if (!Array.isArray(payload)) throw new Error('FairEconomy calendar payload is invalid.');
+    const regionMap: Record<string, string> = {
+      USD: 'US', EUR: 'EU', GBP: 'UK', JPY: 'JP', CHF: 'CH',
+      CAD: 'CA', AUD: 'AU', NZD: 'NZ', SEK: 'SE', NOK: 'NO',
+    };
+    const events = payload.flatMap((item, index): EconomicCatalyst[] => {
+      if (!isRecord(item) || typeof item.currency !== 'string'
+        || typeof item.title !== 'string' || typeof item.date !== 'string') return [];
+      const impact = item.impact === 'High' ? 'High' : item.impact === 'Medium' ? 'Medium' : null;
+      const scheduledAt = new Date(item.date);
+      if (!impact || !regionMap[item.currency] || !Number.isFinite(scheduledAt.getTime())) return [];
+      return [{
+        id: `fair-economy-${scheduledAt.toISOString()}-${index}`,
+        region: regionMap[item.currency],
+        title: item.title,
+        scheduledAt: scheduledAt.toISOString(),
+        impact,
+        consensus: typeof item.forecast === 'string' ? item.forecast : 'Pending',
+        actual: typeof item.actual === 'string' && item.actual ? item.actual : null,
+      }];
+    });
+    return events;
+  }, 900);
 }
 
 async function getFinnhubCatalysts(apiKey: string): Promise<EconomicCatalyst[]> {
@@ -394,13 +445,18 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     asOf: new Date().toISOString(),
     source: cachedSnapshot.source === 'fallback' ? 'fallback' : 'partial',
   };
-  const [fredResult, finnhubResult, alphaResult, fmpResult, cotResult, frankfurterResult] = await Promise.allSettled([
+  const [fredResult, finnhubResult, alphaResult, fmpResult, cotResult, frankfurterResult, calendarResult, ecbResult, bocResult, boeResult, worldBankResult] = await Promise.allSettled([
     fredApiKey ? getFredUsdUpdates(fredApiKey) : Promise.resolve(null),
     finnhubApiKey ? getFinnhubCatalysts(finnhubApiKey) : Promise.resolve(null),
     alphaVantageKey ? getAlphaVantageUsdUpdates(alphaVantageKey) : Promise.resolve(null),
     fmpKey ? getFmpCatalysts(fmpKey) : Promise.resolve(null),
     cotProviderUrl ? getCotProvider(cotProviderUrl, cotProviderToken) : getCftcCot(),
     getFrankfurterRates(),
+    getFairEconomyCatalysts(),
+    getEcbMacroInputs(),
+    getBankOfCanadaMacroInputs(),
+    getBankOfEnglandPolicyRate(),
+    getWorldBankG10Inflation(),
   ]);
   let hasLiveData = false;
   if (fredResult.status === 'fulfilled' && isRecord(fredResult.value)) {
@@ -440,6 +496,11 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
         usd.inflationSource = 'provider';
         hasLiveData = true;
       }
+      if (isFiniteNumber(fredResult.value.twoYearYield)) {
+        usd.twoYearYield = fredResult.value.twoYearYield;
+        usd.twoYearYieldSource = 'provider';
+        hasLiveData = true;
+      }
       if (!isFiniteNumber(fredResult.value.corePce) && isFiniteNumber(fredResult.value.cpi)) {
         usd.inflation = fredResult.value.cpi;
         usd.inflationLabel = 'CPI';
@@ -461,6 +522,76 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     hasLiveData = true;
   } else if (frankfurterResult.status === 'rejected') {
     console.warn('ECB benchmark exchange rates are unavailable:', frankfurterResult.reason);
+  }
+  if (calendarResult.status === 'fulfilled' && calendarResult.value.length > 0) {
+    snapshot.catalysts = calendarResult.value;
+    snapshot.calendarSource = 'provider';
+    hasLiveData = true;
+  } else if (calendarResult.status === 'rejected') {
+    console.warn('FairEconomy calendar is unavailable; retaining configured calendar data:', calendarResult.reason);
+  }
+  if (ecbResult.status === 'fulfilled') {
+    const eur = snapshot.currencies.find((currency) => currency.code === 'EUR');
+    if (eur) {
+      if (isFiniteNumber(ecbResult.value.policyRate)) {
+        eur.policyRate = ecbResult.value.policyRate;
+        eur.policyRateSource = 'provider';
+        hasLiveData = true;
+      }
+      if (isFiniteNumber(ecbResult.value.inflation)) {
+        eur.inflation = ecbResult.value.inflation;
+        eur.inflationLabel = 'HICP';
+        eur.inflationSource = 'provider';
+        hasLiveData = true;
+      }
+      if (isFiniteNumber(ecbResult.value.twoYearYield)) {
+        eur.twoYearYield = ecbResult.value.twoYearYield;
+        eur.twoYearYieldSource = 'provider';
+        hasLiveData = true;
+      }
+    }
+  } else {
+    console.warn('ECB policy, HICP, or yield series is unavailable:', ecbResult.reason);
+  }
+  if (bocResult.status === 'fulfilled') {
+    const cad = snapshot.currencies.find((currency) => currency.code === 'CAD');
+    if (cad) {
+      if (isFiniteNumber(bocResult.value.policyRate)) {
+        cad.policyRate = bocResult.value.policyRate;
+        cad.policyRateSource = 'provider';
+        hasLiveData = true;
+      }
+      if (isFiniteNumber(bocResult.value.inflation)) {
+        cad.inflation = bocResult.value.inflation;
+        cad.inflationLabel = 'CPI';
+        cad.inflationSource = 'provider';
+        hasLiveData = true;
+      }
+    }
+  } else {
+    console.warn('Bank of Canada Valet policy or inflation series is unavailable:', bocResult.reason);
+  }
+  if (boeResult.status === 'fulfilled') {
+    const gbp = snapshot.currencies.find((currency) => currency.code === 'GBP');
+    if (gbp) {
+      gbp.policyRate = boeResult.value;
+      gbp.policyRateSource = 'provider';
+      hasLiveData = true;
+    }
+  } else {
+    console.warn('Bank of England official Bank Rate is unavailable:', boeResult.reason);
+  }
+  if (worldBankResult.status === 'fulfilled') {
+    for (const observation of worldBankResult.value) {
+      const currency = snapshot.currencies.find((item) => item.code === observation.currency);
+      if (!currency || currency.inflationSource === 'provider') continue;
+      currency.inflation = observation.inflation;
+      currency.inflationLabel = `CPI (annual, ${observation.year})`;
+      currency.inflationSource = 'provider';
+      hasLiveData = true;
+    }
+  } else {
+    console.warn('World Bank G10 inflation data is unavailable:', worldBankResult.reason);
   }
   if (!fredApiKey && alphaVantageKey) {
     if (alphaResult.status === 'fulfilled' && isRecord(alphaResult.value)) {
@@ -547,6 +678,7 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
           ? 'provider'
           : 'fallback',
       cotSource: data.payload.cotSource === 'provider' ? 'provider' : 'unavailable',
+      calendarSource: data.payload.calendarSource === 'provider' ? 'provider' : 'reference',
       asOf: data.refreshed_at,
       ...(ecbRates && Object.keys(ecbRates).length > 0 ? { ecbRates } : {}),
     };
@@ -596,6 +728,7 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
         catalysts: parsed.catalysts.length > 0 ? parsed.catalysts : baseline.catalysts,
         source: 'provider',
         cotSource: 'provider',
+        calendarSource: parsed.catalysts.length > 0 ? 'provider' : 'reference',
         asOf: new Date().toISOString(),
         ...(ecbRates ? { ecbRates } : {}),
       });
