@@ -4,7 +4,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  ArrowLeft,
   ArrowUpRight,
   CalendarDays,
   ChartNoAxesCombined,
@@ -12,15 +11,12 @@ import {
   Menu,
   Radio,
   Shield,
-  ShieldCheck,
   X,
 } from 'lucide-react';
 
 const links = [
-  { href: '/', label: 'Overview', icon: Shield },
-  { href: '/create-link', label: 'Create escrow', icon: ShieldCheck },
-  { href: '/store', label: 'AlgoLync', icon: ChartNoAxesCombined },
-  { href: '/dashboard', label: 'Activity', icon: ArrowUpRight },
+  { href: '/', label: 'MacroLync', icon: Shield },
+  { href: '/store', label: 'AlgoLync Vault', icon: ChartNoAxesCombined },
 ];
 
 const macroLinks = [
@@ -34,27 +30,28 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const isHome = pathname === '/';
-  const isLogin = pathname === '/login';
-  const drawerLinks = isHome ? macroLinks : links;
+  const navigation = isHome
+    ? [...macroLinks, { href: '/store', label: 'AlgoLync Vault', icon: ChartNoAxesCombined }]
+    : links;
 
   return (
     <>
       <header className="topbar">
         <div className="topbar-inner">
-          <Link className="brand" href="/" aria-label="MacroLync home">
-            <span className="brand-mark"><ShieldCheck size={19} strokeWidth={2.2} /></span>
+          <Link className="brand" href="/" aria-label="MacroLync terminal">
+            <span className="brand-mark"><Shield size={19} strokeWidth={2.2} /></span>
             <span className="brand-copy">
               <span className="brand-name">Macro<span>Lync</span></span>
-              <span className="brand-caption">GLOBAL FX INTELLIGENCE</span>
+              <span className="brand-caption">INSTITUTIONAL FX TERMINAL</span>
             </span>
           </Link>
 
           <nav className="desktop-nav" aria-label="Main navigation">
-            {(isHome ? macroLinks : links).map(({ href, label }) => (
+            {navigation.map(({ href, label }) => (
               <Link
                 key={href}
                 href={href}
-                className={`nav-link ${!isHome && pathname === href ? 'nav-link-active' : ''}`}
+                className={`nav-link ${href.startsWith('#') ? '' : pathname === href ? 'nav-link-active' : ''}`}
               >
                 {label}
               </Link>
@@ -62,19 +59,9 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
           </nav>
 
           <div className="topbar-actions">
-            {!isLogin && <Link className="secure-pill sign-in-pill" href="/login">Sign in</Link>}
-            {!isHome && (
-              <Link className="back-link" href="/">
-                <ArrowLeft size={15} /> <span>Back</span>
-              </Link>
-            )}
-            {isHome ? (
-              <a className="secure-pill portfolio-nav-cta" href="#vip">VIP Macro Pass <ArrowUpRight size={14} /></a>
-            ) : (
-              <Link className="secure-pill" href="/create-link">
-                <span className="secure-dot" /> New transaction
-              </Link>
-            )}
+            <Link className="secure-pill" href={isHome ? '/store' : '/'}>
+              <span className="secure-dot" /> {isHome ? 'AlgoLync Vault' : 'Macro terminal'}
+            </Link>
             <button
               type="button"
               className="menu-toggle"
@@ -96,7 +83,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
             onClick={(event) => event.stopPropagation()}
           >
             <div className="drawer-heading">
-              <span className="eyebrow">{isHome ? 'MACROLYNC' : 'PLATFORM'}</span>
+              <span className="eyebrow">{isHome ? 'MACROLYNC' : 'ALGOLYNC VAULT'}</span>
               <button
                 type="button"
                 className="icon-button"
@@ -106,7 +93,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
                 <X size={18} />
               </button>
             </div>
-            {drawerLinks.map(({ href, label, icon: Icon }) => (
+            {navigation.map(({ href, label, icon: Icon }) => (
               <Link
                 key={href}
                 href={href}
@@ -116,16 +103,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
                 <Icon size={18} /> {label} <ArrowUpRight size={15} className="drawer-arrow" />
               </Link>
             ))}
-            {!isLogin && (
-              <Link
-                href="/login"
-                onClick={() => setDrawerOpen(false)}
-                className="drawer-link"
-              >
-                <ShieldCheck size={18} /> Sign in <ArrowUpRight size={15} className="drawer-arrow" />
-              </Link>
-            )}
-            <div className="drawer-footer">{isHome ? 'Global FX macro intelligence' : 'Institutional transaction infrastructure'}</div>
+            <div className="drawer-footer">Single-operator quantitative trading terminal</div>
           </nav>
         </div>
       )}
@@ -134,7 +112,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
 
       {!isHome && (
         <nav className="mobile-tabbar" aria-label="Bottom navigation">
-          {links.slice(0, 4).map(({ href, label, icon: Icon }) => (
+          {links.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
               href={href}
@@ -142,7 +120,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
               className={`tab-link ${pathname === href ? 'tab-link-active' : ''}`}
             >
               <Icon size={19} strokeWidth={pathname === href ? 2.2 : 1.7} />
-              <span>{label === 'Create escrow' ? 'Create' : label === 'Activity' ? 'Activity' : label}</span>
+              <span>{label}</span>
             </Link>
           ))}
         </nav>

@@ -2,16 +2,16 @@ import { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'MacroLync',
+    name: 'MacroLync Institutional Terminal',
     short_name: 'MacroLync',
-    description: 'Global foreign exchange macro intelligence and market positioning.',
+    description: 'Quantitative FX and macro intelligence with MT5 signal and telemetry integration.',
     start_url: '/',
     id: '/?source=pwa',
     display: 'standalone',
     orientation: 'portrait',
     background_color: '#080a0f',
     theme_color: '#10B981',
-    categories: ['finance', 'business', 'shopping'],
+    categories: ['finance', 'business'],
     prefer_related_applications: false,
     related_applications: [],
     icons: [
@@ -42,14 +42,12 @@ export default function manifest(): MetadataRoute.Manifest {
         form_factor: 'narrow'
       }
     ],
-    shortcuts: [
-      {
-        name: "Create Safe Link",
-        short_name: "Escrow",
-        description: "Create a new secure escrow link",
-        url: "/",
-        icons: [{ src: "/icon-192x192.png", sizes: "192x192", type: "image/png" }]
-      }
-    ]
+    shortcuts: [{
+      name: 'AlgoLync Vault',
+      short_name: 'AlgoLync',
+      description: 'Open the private algorithm vault and EA fleet monitor.',
+      url: '/store',
+      icons: [{ src: '/icon-192x192.png', sizes: '192x192', type: 'image/png' }],
+    }]
   }
 }

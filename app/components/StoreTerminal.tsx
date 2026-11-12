@@ -1,0 +1,341 @@
+'use client';
+
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  Activity,
+  ArrowDownToLine,
+  Check,
+  Copy,
+  Radio,
+  Shield,
+  ShieldAlert,
+  Signal,
+} from 'lucide-react';
+import type { HeartbeatRecord } from '@/lib/eaHeartbeat';
+
+type StoreTerminalProps = {
+  initialFleet: { configured: boolean; heartbeats: HeartbeatRecord[] };
+  telemetryError: string;
+};
+
+type SignalResult = {
+  symbol: string;
+  bias: 'LONG' | 'SHORT' | 'NEUTRAL';
+  confluence_score: number;
+  regime: string;
+  atr_sl_pips: number | null;
+  atr_tp_pips: number | null;
+  news_lockout: boolean;
+  safe_to_trade: boolean;
+  timestamp_utc: string;
+};
+
+const symbols = ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'USDCAD', 'AUDUSD', 'NZDUSD', 'EURJPY', 'XAUUSD'];
+
+function subscribeToOrigin() {
+  return () => {};
+}
+
+function getBrowserOrigin() {
+  return window.location.origin;
+}
+
+function getServerOrigin() {
+  return 'https://your-vercel-deployment.vercel.app';
+}
+
+function formatCurrency(value: number | null) {
+  return value === null ? '—' : value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function isSignalResult(value: unknown): value is SignalResult {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const result = value as Record<string, unknown>;
+  return typeof result.symbol === 'string'
+    && (result.bias === 'LONG' || result.bias === 'SHORT' || result.bias === 'NEUTRAL')
+    && typeof result.confluence_score === 'number'
+    && typeof result.regime === 'string'
+    && (result.atr_sl_pips === null || typeof result.atr_sl_pips === 'number')
+    && (result.atr_tp_pips === null || typeof result.atr_tp_pips === 'number')
+    && typeof result.news_lockout === 'boolean'
+    && typeof result.safe_to_trade === 'boolean'
+    && typeof result.timestamp_utc === 'string';
+}
+
+export default function StoreTerminal({ initialFleet, telemetryError }: StoreTerminalProps) {
+  const router = useRouter();
+  const [symbol, setSymbol] = useState('EURUSD');
+  const [apiKey, setApiKey] = useState('');
+  const endpoint = useSyncExternalStore(subscribeToOrigin, getBrowserOrigin, getServerOrigin);
+  const [signal, setSignal] = useState<SignalResult | null>(null);
+  const [signalError, setSignalError] = useState('');
+  const [testing, setTesting] = useState(false);
+  const [copyState, setCopyState] = useState('');
+
+  useEffect(() => {
+    const timer = window.setInterval(() => router.refresh(), 30_000);
+    return () => window.clearInterval(timer);
+  }, [router]);
+
+  async function testSignal() {
+    setTesting(true);
+    setSignal(null);
+    setSignalError('');
+    try {
+      const response = await fetch(`/api/v1/macro-signal?symbol=${encodeURIComponent(symbol)}`, {
+        headers: { 'x-algo-key': apiKey },
+        cache: 'no-store',
+      });
+      const payload: unknown = await response.json();
+      if (!response.ok) {
+        const message = typeof payload === 'object' && payload !== null && 'error' in payload
+          && typeof payload.error === 'string'
+          ? payload.error
+          : `Signal request failed (${response.status}).`;
+        setSignalError(message);
+        return;
+      }
+      if (!isSignalResult(payload)) {
+        setSignalError('The signal endpoint returned an invalid response.');
+        return;
+      }
+      setSignal(payload);
+    } catch (error) {
+      console.error('Live signal tester request failed:', error);
+      setSignalError('The signal endpoint could not be reached.');
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  async function copyText(label: string, value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopyState(`${label} copied`);
+    } catch (error) {
+      console.error(`Unable to copy ${label.toLowerCase()}:`, error);
+      setCopyState('Clipboard access is unavailable');
+    }
+  }
+
+  const includeSnippet = `#include <MacroLyncBridge.mqh>
+input string MacroLyncBaseUrl = "${endpoint}";
+input string MacroLyncApiKey = "YOUR_ALGO_PRIVATE_API_KEY";
+
+MacroLyncSignal macroSignal;
+if (!MacroLyncGetSignal(_Symbol, MacroLyncBaseUrl, MacroLyncApiKey, macroSignal)
+    || !macroSignal.safe_to_trade)
+{
+   return; // Fail closed: no new entries without a valid safe signal.
+}`;
+
+  return (
+    <div className="min-h-screen bg-[#080a0f] text-slate-100">
+      <main className="mx-auto w-full max-w-7xl px-5 py-9 sm:px-8 lg:py-12">
+        <div className="flex flex-wrap items-start justify-between gap-5 border-b border-white/[0.08] pb-7">
+          <div>
+            <div className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-emerald-300">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399]" />
+              ALGOLYNC / PRIVATE STRATEGY VAULT
+            </div>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Algorithm command center</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+              Proprietary strategy architecture, VPS fleet telemetry, and the MacroLync execution bridge.
+            </p>
+          </div>
+          <a
+            href="/mql5/MacroLyncBridge.mqh"
+            download
+            className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-emerald-300/25 bg-emerald-300/[0.07] px-4 text-xs font-medium text-emerald-100 transition hover:bg-emerald-300/[0.12]"
+          >
+            <ArrowDownToLine size={15} /> Download MT5 include
+          </a>
+        </div>
+
+        <section className="mt-8" aria-labelledby="fleet-heading">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <div className="font-mono text-[9px] tracking-[0.17em] text-slate-500">01 / VPS TELEMETRY</div>
+              <h2 id="fleet-heading" className="mt-1 text-lg font-semibold">Live EA fleet</h2>
+            </div>
+            <div className="flex items-center gap-2 font-mono text-[9px] text-slate-500">
+              <Radio size={13} className={initialFleet.configured ? 'text-emerald-400' : 'text-amber-400'} />
+              {telemetryError || (initialFleet.configured ? 'UPSTASH REDIS' : 'UPSTASH NOT CONFIGURED')}
+            </div>
+          </div>
+          {initialFleet.heartbeats.length === 0 ? (
+            <div className="rounded-xl border border-white/[0.08] bg-[#0c1016] px-5 py-8 text-center">
+              <Activity className="mx-auto text-slate-600" size={22} />
+              <p className="mt-3 text-sm text-slate-300">No EA heartbeats have been recorded.</p>
+              <p className="mt-1 text-xs text-slate-500">Configure Upstash and send an authenticated ping every five minutes.</p>
+            </div>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {initialFleet.heartbeats.map((ea) => (
+                <article key={`${ea.ea_name}-${ea.account_number}`} className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="truncate text-sm font-semibold text-slate-100">{ea.ea_name}</h3>
+                      <p className="mt-1 font-mono text-[10px] text-slate-500">ACCOUNT {ea.account_number}</p>
+                    </div>
+                    <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-1 font-mono text-[9px] ${ea.heartbeat_status === 'ONLINE' ? 'border-emerald-300/20 bg-emerald-300/[0.06] text-emerald-300' : 'border-rose-300/20 bg-rose-300/[0.05] text-rose-300'}`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${ea.heartbeat_status === 'ONLINE' ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                      {ea.heartbeat_status}
+                    </span>
+                  </div>
+                  <div className="mt-4 grid grid-cols-3 gap-3 border-t border-white/[0.06] pt-3">
+                    <div><div className="text-[9px] text-slate-500">EQUITY</div><div className="mt-1 font-mono text-xs">{formatCurrency(ea.equity)}</div></div>
+                    <div><div className="text-[9px] text-slate-500">FLOATING P&amp;L</div><div className={`mt-1 font-mono text-xs ${ea.floating_pnl === null ? 'text-slate-500' : ea.floating_pnl >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{formatCurrency(ea.floating_pnl)}</div></div>
+                    <div><div className="text-[9px] text-slate-500">DRAWDOWN</div><div className="mt-1 font-mono text-xs">{ea.drawdown_pct === null ? '—' : `${ea.drawdown_pct.toFixed(2)}%`}</div></div>
+                  </div>
+                  <div className="mt-3 flex justify-between text-[9px] text-slate-500">
+                    <span>BALANCE {formatCurrency(ea.balance)} · {ea.open_positions ?? '—'} OPEN</span>
+                    <span>{ea.last_seen_utc ? new Date(ea.last_seen_utc).toLocaleTimeString('en-GB', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit' }) + ' UTC' : 'STALE'}</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="mt-11" aria-labelledby="strategies-heading">
+          <div className="mb-4">
+            <div className="font-mono text-[9px] tracking-[0.17em] text-slate-500">02 / PROPRIETARY SYSTEMS</div>
+            <h2 id="strategies-heading" className="mt-1 text-lg font-semibold">Strategy architecture</h2>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <StrategyCard
+              name="ERIDAM NEXUS ADAPTIVE PRO"
+              version="NEXUS / 4.2"
+              description="Regime-adaptive execution framework with volatility-normalized risk, macro event vetoes, and portfolio-level exposure controls."
+              pairs="EURUSD · GBPUSD · USDJPY · XAUUSD"
+              timeframe="H1 signal / H4 regime"
+              shield="Equity high-water mark with daily loss circuit-breaker"
+              virtualization="Ghost orders; broker-side placement only after server validation"
+              drawdown="Hard 8% account drawdown cap"
+            />
+            <StrategyCard
+              name="VELOCITY VAULT"
+              version="VELOCITY / 2.7"
+              description="Momentum continuation system combining directional efficiency, expansion filters, and event-aware position management."
+              pairs="EURUSD · GBPUSD · AUDUSD · USDJPY"
+              timeframe="M15 execution / H1 confirmation"
+              shield="Equity floor and per-session loss lock"
+              virtualization="Virtual pending levels; cancel on volatility or news lockout"
+              drawdown="Hard 6% account drawdown cap"
+            />
+          </div>
+        </section>
+
+        <section className="mt-11 grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]" aria-label="Signal tester and MT5 connection">
+          <div className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-5 sm:p-6">
+            <div className="font-mono text-[9px] tracking-[0.17em] text-slate-500">03 / MACROLYNC API</div>
+            <h2 className="mt-1 text-lg font-semibold">Live signal tester</h2>
+            <p className="mt-1 text-xs leading-5 text-slate-400">Requests the protected signal endpoint with your private API key. The key stays in this browser session.</p>
+            <label className="mt-5 block text-[9px] tracking-wide text-slate-500" htmlFor="signal-symbol">SYMBOL</label>
+            <select id="signal-symbol" value={symbol} onChange={(event) => setSymbol(event.target.value)} className="mt-2 h-10 w-full rounded-md border border-white/[0.1] bg-[#080a0f] px-3 font-mono text-xs text-slate-200 outline-none focus:border-emerald-300/40">
+              {symbols.map((item) => <option key={item}>{item}</option>)}
+            </select>
+            <label className="mt-4 block text-[9px] tracking-wide text-slate-500" htmlFor="signal-key">ALGO_PRIVATE_API_KEY</label>
+            <input id="signal-key" type="password" autoComplete="off" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="Enter private API key" className="mt-2 h-10 w-full rounded-md border border-white/[0.1] bg-[#080a0f] px-3 font-mono text-xs text-slate-200 outline-none placeholder:text-slate-600 focus:border-emerald-300/40" />
+            <button type="button" onClick={testSignal} disabled={testing || !apiKey} className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-emerald-400 px-4 text-xs font-semibold text-[#07120d] transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40">
+              <Signal size={15} /> {testing ? 'Testing endpoint...' : 'Test live signal'}
+            </button>
+            {signalError && <p className="mt-3 text-xs text-rose-300" role="alert">{signalError}</p>}
+            {signal && (
+              <div className="mt-4 rounded-lg border border-white/[0.08] bg-black/20 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="font-mono text-xs text-slate-300">{signal.symbol} · {signal.regime}</div>
+                  <span className={`rounded border px-2 py-1 font-mono text-[9px] ${signal.safe_to_trade ? 'border-emerald-300/20 text-emerald-300' : 'border-amber-300/20 text-amber-300'}`}>{signal.safe_to_trade ? 'TRADE PERMITTED' : 'DEFENSIVE HOLD'}</span>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-3 text-[10px]">
+                  <Metric label="BIAS" value={`${signal.bias} · ${signal.confluence_score}`} />
+                  <Metric label="NEWS LOCKOUT" value={signal.news_lockout ? 'ACTIVE' : 'CLEAR'} />
+                  <Metric label="ATR STOP" value={signal.atr_sl_pips === null ? 'Unavailable' : `${signal.atr_sl_pips} pips`} />
+                  <Metric label="ATR TARGET" value={signal.atr_tp_pips === null ? 'Unavailable' : `${signal.atr_tp_pips} pips`} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-5 sm:p-6">
+            <div className="font-mono text-[9px] tracking-[0.17em] text-slate-500">04 / MT5 CONNECTION</div>
+            <h2 className="mt-1 text-lg font-semibold">Signal &amp; telemetry bridge</h2>
+            <div className="mt-5 space-y-3 rounded-lg border border-white/[0.07] bg-black/20 p-4 font-mono text-[10px]">
+              <div><span className="text-slate-500">SIGNAL</span><p className="mt-1 break-all text-emerald-200">{endpoint}/api/v1/macro-signal?symbol=EURUSD</p></div>
+              <div><span className="text-slate-500">HEARTBEAT</span><p className="mt-1 break-all text-emerald-200">{endpoint}/api/v1/ea-heartbeat</p></div>
+              <div><span className="text-slate-500">REQUIRED HEADER</span><p className="mt-1 text-slate-300">x-algo-key: &lt;ALGO_PRIVATE_API_KEY&gt;</p></div>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <a href="/mql5/MacroLyncBridge.mqh" download className="inline-flex h-9 items-center gap-2 rounded-md border border-white/[0.1] px-3 text-[10px] text-slate-300 hover:border-emerald-300/30">
+                <ArrowDownToLine size={13} /> MacroLyncBridge.mqh
+              </a>
+              <button type="button" onClick={() => void copyText('MQL5 snippet', includeSnippet)} className="inline-flex h-9 items-center gap-2 rounded-md border border-white/[0.1] px-3 text-[10px] text-slate-300 hover:border-emerald-300/30">
+                {copyState === 'MQL5 snippet copied' ? <Check size={13} /> : <Copy size={13} />} Copy fail-closed MQL5 snippet
+              </button>
+            </div>
+            {copyState && <p className="mt-2 text-[10px] text-emerald-300" role="status">{copyState}</p>}
+            <div className="mt-5 flex items-start gap-2 border-t border-white/[0.07] pt-4 text-[10px] leading-5 text-slate-500">
+              <ShieldAlert size={14} className="mt-0.5 shrink-0 text-amber-300" />
+              <p>Network, timeout, non-200, malformed JSON, or active news lockout returns defensive hold. Keep WebRequest access restricted to this Vercel origin in MT5.</p>
+            </div>
+          </div>
+        </section>
+
+        <div className="mt-8 flex items-center gap-2 border-t border-white/[0.07] pt-5 text-[10px] leading-5 text-slate-600">
+          <Shield size={13} className="shrink-0" />
+          <span>Internal research tooling. Trading is risky; every EA must retain its own account-level equity and drawdown protections.</span>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function StrategyCard({
+  name,
+  version,
+  description,
+  pairs: targetPairs,
+  timeframe,
+  shield,
+  virtualization,
+  drawdown,
+}: {
+  name: string;
+  version: string;
+  description: string;
+  pairs: string;
+  timeframe: string;
+  shield: string;
+  virtualization: string;
+  drawdown: string;
+}) {
+  return (
+    <article className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-5 sm:p-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="font-mono text-[9px] tracking-[0.14em] text-emerald-300">PROPRIETARY ALGORITHM</div>
+          <h3 className="mt-2 text-base font-semibold">{name}</h3>
+        </div>
+        <span className="rounded border border-white/[0.08] px-2 py-1 font-mono text-[9px] text-slate-500">{version}</span>
+      </div>
+      <p className="mt-3 text-xs leading-5 text-slate-400">{description}</p>
+      <dl className="mt-5 grid gap-3 border-t border-white/[0.07] pt-4 sm:grid-cols-2">
+        <Spec label="TARGET PAIRS" value={targetPairs} />
+        <Spec label="TIMEFRAME" value={timeframe} />
+        <Spec label="EQUITY SHIELD" value={shield} />
+        <Spec label="GHOST VIRTUALIZATION" value={virtualization} />
+        <Spec label="DRAWDOWN CAP" value={drawdown} />
+      </dl>
+    </article>
+  );
+}
+
+function Spec({ label, value }: { label: string; value: string }) {
+  return <div><dt className="font-mono text-[8px] tracking-wide text-slate-600">{label}</dt><dd className="mt-1 text-[10px] leading-4 text-slate-300">{value}</dd></div>;
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return <div><div className="font-mono text-[8px] text-slate-600">{label}</div><div className="mt-1 text-slate-200">{value}</div></div>;
+}

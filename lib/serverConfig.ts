@@ -24,16 +24,7 @@ export function getAppBaseUrl(fallback = DEFAULT_APP_URL): URL {
   return parseHttpUrl(fallback) ?? new URL(DEFAULT_APP_URL);
 }
 
-export function getAppOrigin(request: Request): string {
-  const requestOrigin = new URL(request.url).origin;
-  return getAppBaseUrl(requestOrigin).origin;
-}
-
 export function getSupabaseUrl(value = process.env.NEXT_PUBLIC_SUPABASE_URL): string | null {
   const url = parseHttpUrl(value);
   return url?.toString().replace(/\/$/, '') ?? null;
-}
-
-export function getPaystackSecretKey(): string | null {
-  return process.env.PAYSTACK_SECRET_KEY?.trim() || null;
 }

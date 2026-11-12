@@ -1,6 +1,6 @@
-# MacroLync · Global FX Intelligence
+# MacroLync Institutional Terminal
 
-MacroLync provides institutional-style FX macro research, policy divergence, catalyst risk, CFTC positioning, and a MetaTrader signal bridge.
+MacroLync is a single-operator quantitative FX and macro terminal. AlgoLync is its proprietary strategy vault and MT5 VPS telemetry monitor. The browser has no account or subscription flow; MT5/EA API requests use a private `x-algo-key` header.
 
 ## Local development
 
@@ -9,79 +9,71 @@ npm install
 npm run dev
 ```
 
-Set the following environment variables in the deployment environment:
+Set server-side values in `.env.local` or the deployment secret manager:
 
 | Variable | Purpose |
 | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Browser Supabase Auth client |
-| `SUPABASE_SERVICE_ROLE_KEY` | Server-only Supabase service access; never expose to the browser |
-| `PAYSTACK_SECRET_KEY` | Server-side checkout, refund and transfer requests |
-| `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | Optional Paystack Inline checkout key; hosted redirect is used if omitted |
-| `PAYSTACK_VIP_PLAN_CODE` | Paystack monthly NGN plan configured for exactly ₦5,000 |
-| `FINNHUB_API_KEY` | Optional Finnhub FX quotes and economic calendar |
-| `FRED_API_KEY` | Optional Federal Reserve policy-rate, Core PCE and CPI observations |
-| `UPSTASH_REDIS_REST_URL` | Optional Upstash REST endpoint for shared live/macro caching |
-| `UPSTASH_REDIS_REST_TOKEN` | Optional server-only Upstash REST token |
-| `NEXT_PUBLIC_APP_URL` | Optional canonical HTTP(S) URL for metadata and Paystack callbacks; callbacks fall back to the request origin |
-| `CRON_SECRET` | Bearer secret for scheduled settlement and macro-refresh endpoints |
-| `ALPHA_VANTAGE_API_KEY` | Optional free-tier US Federal Funds Rate and CPI observations |
-| `FMP_API_KEY` | Optional Financial Modeling Prep economic calendar feed |
-| `MACRO_DATA_PROVIDER_URL` | Optional HTTPS endpoint returning the complete validated macro snapshot, including COT positions |
-| `MACRO_DATA_PROVIDER_TOKEN` | Optional bearer token for the complete macro snapshot provider |
-| `COT_DATA_PROVIDER_URL` | Optional HTTPS override returning a COT array or `{ "cot": [...] }`; the public CFTC legacy futures-only feed is used by default |
-| `COT_DATA_PROVIDER_TOKEN` | Optional bearer token for the COT provider override |
-| `MARKET_DATA_PROVIDER_URL` | Optional HTTPS candle endpoint; receives `pair` and `timeframe` (`H1` or `H4`) query parameters |
-| `MARKET_DATA_PROVIDER_TOKEN` | Optional bearer token for the market-data provider |
-| `MT5_KEY_ENCRYPTION_SECRET` | Optional dedicated secret for encrypted subscriber license keys; falls back to the Supabase service-role key |
-| `MT5_CREDENTIALS_ENCRYPTION_KEY` | Base64-encoded 32-byte AES-256-GCM key for MT5 investor credentials |
+| `ALGO_PRIVATE_API_KEY` | Required static secret for the MacroLync signal and EA heartbeat APIs |
+| `UPSTASH_REDIS_REST_URL` | Upstash REST endpoint for shared caching and EA heartbeat state |
+| `UPSTASH_REDIS_REST_TOKEN` | Server-only Upstash REST token |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL for persisted macro snapshots |
+| `SUPABASE_SERVICE_ROLE_KEY` | Optional server-only Supabase persistence access; never expose to a browser |
+| `FINNHUB_API_KEY` | Optional FX quotes and economic calendar |
+| `FRED_API_KEY` | Optional Federal Reserve policy-rate and inflation observations |
+| `ALPHA_VANTAGE_API_KEY` | Optional fallback US policy-rate and CPI observations |
+| `FMP_API_KEY` | Optional economic calendar provider |
+| `MACRO_DATA_PROVIDER_URL` | Optional HTTPS endpoint returning validated currencies, COT positions, and catalysts |
+| `MACRO_DATA_PROVIDER_TOKEN` | Optional bearer token for the macro provider |
+| `COT_DATA_PROVIDER_URL` | Optional HTTPS COT override; the public CFTC futures-only feed is used by default |
+| `COT_DATA_PROVIDER_TOKEN` | Optional bearer token for the COT provider |
+| `MARKET_DATA_PROVIDER_URL` | HTTPS candle endpoint accepting `pair` and `timeframe=H1|H4` |
+| `MARKET_DATA_PROVIDER_TOKEN` | Optional bearer token for the candle provider |
+| `NEXT_PUBLIC_APP_URL` | Canonical HTTP(S) origin for metadata and signal bridge display |
+| `CRON_SECRET` | Bearer secret for the scheduled macro snapshot refresh |
 
-Generate a distinct encryption key for each environment and store it in your deployment secret manager:
+Use a long, unique random value for `ALGO_PRIVATE_API_KEY` and rotate it in the server secret manager and all EA configurations together. Never commit environment files or embed service-role/provider credentials in an EA.
 
-```bash
-openssl rand -base64 32
+## Signal engine and API
+
+`GET /api/v1/macro-signal?symbol=EURUSD` returns a flat JSON signal:
+
+```json
+{
+  "symbol": "EURUSD",
+  "bias": "NEUTRAL",
+  "confluence_score": 0,
+  "regime": "UNAVAILABLE",
+  "atr_sl_pips": null,
+  "atr_tp_pips": null,
+  "news_lockout": false,
+  "safe_to_trade": false,
+  "timestamp_utc": "2026-11-12T00:00:00.000Z"
+}
 ```
 
-Never commit environment files, secret values or investor credentials.
+Send `x-algo-key: <ALGO_PRIVATE_API_KEY>` on signal requests. The macro layer contributes 60% of the confluence score (real-yield and policy-rate differentials plus COT positioning); H1/H4 technical confluence contributes 40% using Gaussian Z-scores, KER, ADX, and ATR distances. Tier-1 high-impact NFP, CPI, FOMC, ECB, and BOE calendar events set a 30-minute pre/post news lockout. Missing or stale technical inputs, a fallback-only macro snapshot, a news lockout, or a high-volatility chop regime disables trading.
 
-## Supabase setup
+Live quotes and technical calculations use a 60-second Upstash TTL. FRED and other macro snapshot inputs use a 3,600-second TTL. The signal response itself is not cached, so a news-lockout boundary is evaluated against the current time on every request.
 
-Apply the migrations in `supabase/migrations/` to a Supabase project with Auth and Storage enabled. The institutional platform migration adds deal fee allocation, inspection deadlines, private dispute evidence, EA listings and provider-review queues, encrypted MT5 integration storage, disbursements, arbitration audit logs and restrictive RLS policies.
+## MT5 heartbeat and include
 
-Enable Email/Password and Google providers in Supabase Auth and add the deployed site URL to the Auth redirect allowlist. Apply the macro production infrastructure migration to add profile tier/watchlist state and service-role-only subscription, key-hash, and snapshot tables. Public profile state uses `profiles`, keyed to `auth.users`; generated MT5 keys are returned only once and stored as SHA-256 hashes.
+`POST /api/v1/ea-heartbeat` accepts JSON fields `ea_name`, `account_number`, `balance`, `equity`, `floating_pnl`, `drawdown_pct`, `open_positions`, and `status`, and requires the same `x-algo-key` header. Each latest state expires after 900 seconds; the AlgoLync Store labels missing/stale heartbeats `OFFLINE`.
 
-Users can sign in or create an account at `/login`. After authentication, users return to a safe same-site `next` path when provided, or to `/dashboard` by default. Google sign-in and email confirmation require the matching deployed redirect URL to be allowlisted in Supabase Auth.
+Download [`public/mql5/MacroLyncBridge.mqh`](./public/mql5/MacroLyncBridge.mqh) from `/store`. It has no DLL dependencies, calls both endpoints, and defaults signal execution to defensive hold on network errors, timeouts, non-200 responses, malformed responses, or news lockout. Configure MetaTrader 5 **Tools → Options → Expert Advisors → Allow WebRequest for listed URL** with the deployed HTTPS origin.
 
-The runtime edge-guard migration normalizes existing 1.5% fee allocations and restores missing 48-hour inspection deadlines for funded, disputed and settling deals.
+## Data providers and deployment
 
-The two allowlisted administrator email addresses must have Supabase Auth accounts. The migration assigns their profile role; administrator APIs independently verify the authenticated user, allowlisted email and database role.
+The macro adapter validates upstream policy rates, inflation, COT positioning, and catalysts; live data can be combined with a persisted Supabase snapshot. The CFTC adapter calculates non-commercial net-position percentiles. Candle provider responses must contain at least 200 chronologically valid candles per requested timeframe for EMA alignment and technical calculations.
 
-Configure the private `dispute-evidence` Storage bucket and ensure the production project has applied the RLS migration before enabling public deal creation.
+The scheduled `/api/cron/sync-macro` route uses `CRON_SECRET`. Upstash is required for shared EA heartbeat telemetry; when not configured, the dashboard clearly reports the telemetry service as unavailable and heartbeat writes return a service error.
 
-## Payments and settlement
+Historical Supabase migrations are retained for existing installations; the application no longer exposes the legacy escrow, billing, account, or user-authentication routes.
 
-Configure Paystack's webhook URL to `https://<your-domain>/api/paystack-webhook`. Configure the VIP plan in Paystack for exactly NGN 5,000 monthly; checkout rejects payment activation unless the signed webhook matches the authenticated account, pending reference, amount, and currency. Deal funding begins at `/api/escrow/<reference>/fund`; only a signed Paystack charge webhook with the expected currency and amount marks a deal funded. The 48-hour inspection deadline is persisted server-side, and a dispute atomically freezes a funded deal.
-
-## Live data, caching and MT5
-
-The macro adapter uses the configured macro provider for validated G10 policy-rate, inflation/CPI, COT and catalyst observations. Optional Finnhub supplies FX quotes and the economic calendar, FRED supplies official US policy-rate, Core PCE and CPI observations, and official CFTC COT data is used when no COT override is configured. ECB reference FX rates come from Frankfurter; they are FX valuations, not policy or inflation observations. No sample macro values are substituted for missing feeds: the complete G10 real-yield panel requires the configured macro provider to supply validated rate and inflation observations for each currency, while FRED can populate USD independently. Only validated provider snapshots are retained as stale fallbacks. Configure an HTTPS `MARKET_DATA_PROVIDER_URL` that returns at least 200 chronologically ordered candles for each requested timeframe, as either `{ "candles": [{ "timestamp": "2026-11-11T12:00:00Z", "open": 1.1, "high": 1.2, "low": 1.0, "close": 1.15 }] }` or a candle array. The technical engine requests H1 and H4 data and disables execution filters when the provider is missing, invalid or unavailable. Quotes/candles are cached for 60 seconds; macro snapshots use a 1-hour cache. Upstash is optional: when its credentials are absent or unavailable, requests continue using in-process caching and the available upstream or stale snapshot.
-
-The MT5 signal bridge is `GET /api/v1/macro-signal?pair=EURUSD&api_key=<generated-key>`. It returns fundamental/technical/confluence scores, ATR distances and fail-closed execution filters. In MetaTrader 5, open **Tools → Options → Expert Advisors**, enable **Allow WebRequest for listed URL**, and add `https://fidulync.vercel.app` (or your deployed origin). Generate the account API key in MacroLync and pass it with the requested pair. Do not embed service-role or provider credentials in an EA.
-
-`vercel.json` schedules `/api/cron/settlements` hourly and `/api/cron/sync-macro` every Friday at 23:00 UTC. Set `CRON_SECRET`; the macro job persists snapshots only when it has live CFTC/COT positioning. The COT adapter reads the official CFTC legacy futures-only report and calculates historical net-position percentiles; the normalized provider override remains available. Alpha Vantage and Financial Modeling Prep remain optional adapters. The MT5 bridge is available at `/api/v1/macro-signal?pair=EURUSD&api_key=<key>` and validates a generated account key on each request.
-
-## Verification and risk disclosures
-
-The AlgoLync marketplace displays published Supabase listings and recorded verification metrics only; no seeded sample performance, simulated quotes or demo download artifacts are served. Myfxbook and FXBlue submissions are reviewed by an administrator before a listing can be marked verified. MT5 investor credentials are accepted only by the authenticated server endpoint and encrypted with AES-256-GCM; configure the key before accepting those credentials. Automated purchase-to-license provisioning is not enabled; the legacy license-verification endpoint returns `410 Gone` rather than claiming licenses exist without a live license data source.
-
-Escrow creation associates an authenticated creator session when one is present. The customer dashboard requires Supabase Auth and reads only deals associated with that user. Apply the escrow creator migration before deploying this version.
-
-Trading and escrow services require appropriate legal, financial, identity-verification, fraud-monitoring, incident-response and provider approvals before production use. Provider settlement timing and account eligibility remain subject to Paystack and bank rules.
-
-## Validation
+## Verification
 
 ```bash
 npx tsc --noEmit
-npm run lint
 npm run build
 ```
+
+Trading involves substantial risk. Signals are research and execution inputs, not guarantees; EAs must retain independent account-level exposure, equity, and drawdown controls.

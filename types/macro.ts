@@ -6,6 +6,8 @@ export type MacroCurrency = {
   inflationLabel: string;
   corePce?: number;
   cpi?: number;
+  policyRateSource?: 'provider' | 'reference';
+  inflationSource?: 'provider' | 'reference';
   stance: string;
 };
 

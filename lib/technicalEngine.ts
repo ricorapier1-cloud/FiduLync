@@ -16,12 +16,15 @@ export type ExecutionFilter = {
   recommended_lot_multiplier: number;
 };
 
+export type MarketRegime = 'TRENDING_EXPANSION' | 'MEAN_REVERTING' | 'HIGH_VOL_CHOP' | 'UNAVAILABLE';
+
 export type TechnicalSignal = {
   available: boolean;
   score: number;
   gaussian_z_score: number | null;
   kaufman_efficiency_ratio: number | null;
-  regime: 'TRENDING' | 'RANGING' | 'UNAVAILABLE';
+  adx: number | null;
+  regime: MarketRegime;
   execution_filter: ExecutionFilter;
   atr_stop_pips: number | null;
   atr_take_profit_pips: number | null;
@@ -36,6 +39,7 @@ function unavailableSignal(): TechnicalSignal {
     score: 0,
     gaussian_z_score: null,
     kaufman_efficiency_ratio: null,
+    adx: null,
     regime: 'UNAVAILABLE',
     execution_filter: { allow_buys: false, allow_sells: false, recommended_lot_multiplier: 0 },
     atr_stop_pips: null,
@@ -136,8 +140,8 @@ function kaufmanEfficiencyRatio(values: number[], period = 10) {
   return volatility === 0 ? 0 : change / volatility;
 }
 
-function averageTrueRange(candles: Candle[], period = 14) {
-  const trueRanges = candles.slice(1).map((candle, index) => {
+function trueRanges(candles: Candle[]) {
+  return candles.slice(1).map((candle, index) => {
     const previousClose = candles[index].close;
     return Math.max(
       candle.high - candle.low,
@@ -145,8 +149,65 @@ function averageTrueRange(candles: Candle[], period = 14) {
       Math.abs(candle.low - previousClose),
     );
   });
-  const window = trueRanges.slice(-period);
+}
+
+function averageTrueRange(candles: Candle[], period = 14) {
+  const window = trueRanges(candles).slice(-period);
   return window.length < period ? null : window.reduce((sum, value) => sum + value, 0) / period;
+}
+
+function averageDirectionalIndex(candles: Candle[], period = 14) {
+  if (candles.length < period * 2 + 1) return null;
+  const ranges = trueRanges(candles);
+  let smoothedTr = ranges.slice(0, period).reduce((sum, value) => sum + value, 0);
+  let smoothedPlus = 0;
+  let smoothedMinus = 0;
+  for (let index = 1; index <= period; index += 1) {
+    const up = candles[index].high - candles[index - 1].high;
+    const down = candles[index - 1].low - candles[index].low;
+    smoothedPlus += up > down && up > 0 ? up : 0;
+    smoothedMinus += down > up && down > 0 ? down : 0;
+  }
+
+  const directionalIndexes: number[] = [];
+  for (let index = period; index < candles.length; index += 1) {
+    if (index > period) {
+      const up = candles[index].high - candles[index - 1].high;
+      const down = candles[index - 1].low - candles[index].low;
+      smoothedTr = smoothedTr - smoothedTr / period + ranges[index - 1];
+      smoothedPlus = smoothedPlus - smoothedPlus / period + (up > down && up > 0 ? up : 0);
+      smoothedMinus = smoothedMinus - smoothedMinus / period + (down > up && down > 0 ? down : 0);
+    }
+    if (smoothedTr === 0) continue;
+    const plusDi = 100 * smoothedPlus / smoothedTr;
+    const minusDi = 100 * smoothedMinus / smoothedTr;
+    const denominator = plusDi + minusDi;
+    directionalIndexes.push(denominator === 0 ? 0 : 100 * Math.abs(plusDi - minusDi) / denominator);
+  }
+
+  if (directionalIndexes.length < period) return null;
+  let adx = directionalIndexes.slice(0, period).reduce((sum, value) => sum + value, 0) / period;
+  for (const directionalIndex of directionalIndexes.slice(period)) {
+    adx = (adx * (period - 1) + directionalIndex) / period;
+  }
+  return adx;
+}
+
+function median(values: number[]) {
+  const sorted = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle];
+}
+
+function normalizedAtrHistory(candles: Candle[], period = 14) {
+  const values: number[] = [];
+  for (let end = Math.max(period + 1, candles.length - 100); end <= candles.length; end += 1) {
+    const window = candles.slice(0, end);
+    const atr = averageTrueRange(window, period);
+    const close = window.at(-1)?.close;
+    if (atr !== null && close) values.push(atr / close);
+  }
+  return values;
 }
 
 export function calculateTechnicalSignal(pair: string, h1: Candle[], h4: Candle[]): TechnicalSignal {
@@ -155,26 +216,52 @@ export function calculateTechnicalSignal(pair: string, h1: Candle[], h4: Candle[
   const h4Values = h4.map((candle) => candle.close);
   const h1Alignment = alignment(h1Values);
   const h4Alignment = alignment(h4Values);
-  const zScore = gaussianZScore(h1Values);
+  const h1ZScore = gaussianZScore(h1Values);
+  const h4ZScore = gaussianZScore(h4Values);
   const ker = kaufmanEfficiencyRatio(h1Values);
-  const h1Trend = h1Values.at(-1)! >= h1Values.at(-11)! ? 1 : -1;
-  const normalizedZ = Math.max(-3, Math.min(3, zScore));
-  const score = Math.max(-100, Math.min(100, Math.round(
-    h1Alignment * 25 + h4Alignment * 35 + normalizedZ * 5 + h1Trend * ker * 25,
-  )));
+  const adx = averageDirectionalIndex(h1);
   const atr = averageTrueRange(h1);
+  if (adx === null || atr === null) return unavailableSignal();
+
+  const currentNormalizedAtr = atr / h1Values.at(-1)!;
+  const typicalNormalizedAtr = median(normalizedAtrHistory(h1));
+  const highVolatility = typicalNormalizedAtr > 0 && currentNormalizedAtr > typicalNormalizedAtr * 1.5;
+  const regime: MarketRegime = adx < 18 && highVolatility
+    ? 'HIGH_VOL_CHOP'
+    : adx >= 22 && ker >= 0.35
+      ? 'TRENDING_EXPANSION'
+      : 'MEAN_REVERTING';
+
+  const normalizedZ = Math.max(-3, Math.min(3, h1ZScore * 0.6 + h4ZScore * 0.4));
+  const trendDirection = Math.sign(h1Values.at(-1)! - h1Values.at(-11)!);
+  const directionalScore = h1Alignment * 20 + h4Alignment * 25
+    + trendDirection * ker * 20 + normalizedZ * 10;
+  const reversionScore = -normalizedZ * 25 + (h1Alignment + h4Alignment) * 5;
+  const rawScore = regime === 'TRENDING_EXPANSION'
+    ? directionalScore
+    : regime === 'MEAN_REVERTING'
+      ? reversionScore
+      : Math.round(reversionScore * 0.25);
+  const score = Math.max(-100, Math.min(100, Math.round(rawScore)));
   const pipSize = pair.endsWith('JPY') ? 0.01 : pair.startsWith('XAU') ? 0.1 : 0.0001;
-  const atrPips = atr === null ? null : atr / pipSize;
-  const allowBuys = score >= 35 && h4Alignment > 0;
-  const allowSells = score <= -35 && h4Alignment < 0;
+  const atrPips = atr / pipSize;
+  const allowBuys = regime !== 'HIGH_VOL_CHOP'
+    && score >= 35
+    && (regime === 'MEAN_REVERTING' ? h1ZScore <= -1.2 : h4Alignment > 0);
+  const allowSells = regime !== 'HIGH_VOL_CHOP'
+    && score <= -35
+    && (regime === 'MEAN_REVERTING' ? h1ZScore >= 1.2 : h4Alignment < 0);
   const allowsExecution = allowBuys || allowSells;
+  const stopMultiplier = regime === 'TRENDING_EXPANSION' ? 1.75 : 1.5;
+  const targetMultiplier = regime === 'TRENDING_EXPANSION' ? 3 : 2;
 
   return {
     available: true,
     score,
-    gaussian_z_score: Number(zScore.toFixed(3)),
+    gaussian_z_score: Number(normalizedZ.toFixed(3)),
     kaufman_efficiency_ratio: Number(ker.toFixed(3)),
-    regime: ker >= 0.4 ? 'TRENDING' : 'RANGING',
+    adx: Number(adx.toFixed(2)),
+    regime,
     execution_filter: {
       allow_buys: allowBuys,
       allow_sells: allowSells,
@@ -182,8 +269,8 @@ export function calculateTechnicalSignal(pair: string, h1: Candle[], h4: Candle[
         ? Number(Math.min(1.2, 0.5 + Math.abs(score) / 150).toFixed(2))
         : 0,
     },
-    atr_stop_pips: atrPips === null ? null : Number((atrPips * 1.5).toFixed(1)),
-    atr_take_profit_pips: atrPips === null ? null : Number((atrPips * 2.5).toFixed(1)),
+    atr_stop_pips: Number((atrPips * stopMultiplier).toFixed(1)),
+    atr_take_profit_pips: Number((atrPips * targetMultiplier).toFixed(1)),
   };
 }
 

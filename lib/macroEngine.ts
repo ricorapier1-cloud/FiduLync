@@ -29,6 +29,8 @@ export function getFundamentalSignal(snapshot: MacroSnapshot, pair: string): Fun
   const quote = snapshot.currencies.find((currency) => currency.code === quoteCode);
   const base = baseCode === 'XAU' ? null : snapshot.currencies.find((currency) => currency.code === baseCode);
   if (!quote || (baseCode !== 'XAU' && !base)) return null;
+  if (quote.policyRateSource !== 'provider' || quote.inflationSource !== 'provider'
+    || (base && (base.policyRateSource !== 'provider' || base.inflationSource !== 'provider'))) return null;
 
   const baseCotMarket = baseCode === 'XAU' ? 'GOLD' : baseCode;
   const baseCot = snapshot.cot.find((position) => position.market === baseCotMarket);

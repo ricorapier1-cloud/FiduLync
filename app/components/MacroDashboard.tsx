@@ -1,32 +1,22 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  ArrowRight,
   ArrowUpRight,
   CalendarClock,
-  Check,
   ChevronDown,
   Clock3,
   ExternalLink,
   Mail,
-  MessageCircle,
   RefreshCw,
-  ShieldCheck,
   TrendingUp,
 } from 'lucide-react';
 import type { MacroSnapshot, MarketQuote } from '@/types/macro';
-import PaystackPop from '@paystack/inline-js';
-import { supabase } from '@/lib/supabaseClient';
-import AuthModal from '@/components/AuthModal';
-import MacroAccountModal from '@/components/MacroAccountModal';
 
 type MacroDashboardProps = {
   initialSnapshot: MacroSnapshot;
   initialQuotes: MarketQuote[];
-  vipEnabled: boolean;
-  vipPrice: number;
 };
 
 const pairs = [
@@ -93,20 +83,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export default function MacroDashboard({ initialSnapshot, initialQuotes, vipEnabled, vipPrice }: MacroDashboardProps) {
+export default function MacroDashboard({ initialSnapshot, initialQuotes }: MacroDashboardProps) {
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [quotes, setQuotes] = useState(initialQuotes);
   const [liveFeed, setLiveFeed] = useState(false);
   const [pair, setPair] = useState<(typeof pairs)[number]['symbol']>('EURUSD');
   const [now, setNow] = useState<number | null>(null);
-  const [email, setEmail] = useState('');
-  const [checkoutBusy, setCheckoutBusy] = useState(false);
-  const [checkoutMessage, setCheckoutMessage] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  const [accessToken, setAccessToken] = useState('');
-  const [signedInEmail, setSignedInEmail] = useState('');
-  const [authOpen, setAuthOpen] = useState(false);
-  const [accountOpen, setAccountOpen] = useState(false);
   const score = calculateBias(snapshot, pair);
   const sortedCatalysts = [...snapshot.catalysts]
     .filter((catalyst) => now === null || Date.parse(catalyst.scheduledAt) >= now)
@@ -179,88 +162,11 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes, vipEnab
     };
   }, []);
 
-  useEffect(() => {
-    let active = true;
-    void supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!active) return;
-      setAccessToken(session?.access_token ?? '');
-      setSignedInEmail(session?.user.email ?? '');
-      if (session?.user.email) setEmail(session.user.email);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setAccessToken(session?.access_token ?? '');
-      setSignedInEmail(session?.user.email ?? '');
-      if (session?.user.email) setEmail(session.user.email);
-    });
-    return () => {
-      active = false;
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  async function beginVipCheckout(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setCheckoutMessage('');
-    setCheckoutBusy(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token || !session.user.email) {
-        setCheckoutMessage('Sign in before subscribing to the VIP Macro Pass.');
-        setAuthOpen(true);
-        return;
-      }
-      const accountEmail = session.user.email.trim().toLowerCase();
-      setEmail(accountEmail);
-      const response = await fetch('/api/paystack-checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ email: accountEmail }),
-      });
-      const payload: unknown = await response.json();
-      if (!response.ok || !isRecord(payload)) {
-        const message = isRecord(payload) && typeof payload.error === 'string'
-          ? payload.error
-          : 'Checkout could not be started. Please try again.';
-        setCheckoutMessage(message);
-        return;
-      }
-      if (payload.mode === 'inline'
-        && typeof payload.publicKey === 'string'
-        && typeof payload.reference === 'string'
-        && typeof payload.planCode === 'string'
-        && typeof payload.amount === 'number') {
-        const paystack = new PaystackPop();
-        paystack.newTransaction({
-          key: payload.publicKey,
-          email: accountEmail,
-          amount: payload.amount,
-          currency: 'NGN',
-          planCode: payload.planCode,
-          reference: payload.reference,
-          metadata: { product: 'macro_vip_monthly' },
-          onSuccess: () => setCheckoutMessage('Payment received. Your VIP access will activate after Paystack confirms the charge.'),
-          onCancel: () => setCheckoutMessage('Checkout was cancelled.'),
-          onError: ({ message }) => setCheckoutMessage(message || 'Paystack checkout could not be opened.'),
-        });
-        return;
-      }
-      if (typeof payload.authorizationUrl !== 'string') {
-        setCheckoutMessage('Checkout could not be started. Please try again.');
-        return;
-      }
-      window.location.assign(payload.authorizationUrl);
-    } catch {
-      setCheckoutMessage('Checkout is temporarily unavailable. Please try again.');
-    } finally {
-      setCheckoutBusy(false);
-    }
-  }
-
   return (
     <div className="macro-page">
       <div className="macro-statusline mono">
         <span><span className={`macro-pulse${liveQuoteAvailable ? ' macro-pulse-live' : ''}`} /> MACRO INTELLIGENCE / GLOBAL FX</span>
-        <span className="macro-status-right"><span className={`macro-feed-badge${liveQuoteAvailable || liveReferenceAvailable ? ' macro-feed-live' : ''}`}>{liveQuoteAvailable ? 'LIVE FEED' : liveReferenceAvailable ? 'LIVE REFERENCE FEED' : snapshot.source === 'provider' ? 'PROVIDER FEED' : snapshot.source === 'partial' ? 'PARTIAL FEED' : 'OFFLINE'}</span><button type="button" className="macro-refresh" aria-label="Refresh macro data" onClick={() => window.location.reload()}><RefreshCw size={13} className={refreshing ? 'macro-spin' : ''} /> REFRESH</button><Link href="/profile" className="macro-refresh">PROFILE</Link><button type="button" className="macro-refresh" onClick={() => accessToken ? setAccountOpen(true) : setAuthOpen(true)}>{accessToken ? 'ACCOUNT' : 'SIGN IN'}</button></span>
+        <span className="macro-status-right"><span className={`macro-feed-badge${liveQuoteAvailable || liveReferenceAvailable ? ' macro-feed-live' : ''}`}>{liveQuoteAvailable ? 'LIVE FEED' : liveReferenceAvailable ? 'LIVE REFERENCE FEED' : snapshot.source === 'provider' ? 'PROVIDER FEED' : snapshot.source === 'partial' ? 'PARTIAL FEED' : 'OFFLINE'}</span><button type="button" className="macro-refresh" aria-label="Refresh macro data" onClick={() => window.location.reload()}><RefreshCw size={13} className={refreshing ? 'macro-spin' : ''} /> REFRESH</button><Link href="/store" className="macro-refresh">ALGOLYNC VAULT</Link></span>
       </div>
       <div className="macro-quote-strip" aria-label="Live FX quotes">
         {quotes.map((quote) => <span key={quote.symbol} className="macro-quote mono"><strong>{quote.symbol}</strong><b>{quote.price.toFixed(quote.symbol.startsWith('XAU') ? 2 : quote.symbol.endsWith('JPY') ? 3 : 5)}</b><small className={quote.source === 'finnhub' ? 'macro-positive' : ''}>{quote.source === 'finnhub' ? 'LIVE' : 'ECB REF'}</small></span>)}
@@ -272,7 +178,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes, vipEnab
           <span className="eyebrow">GLOBAL MACRO / DAILY BRIEF</span>
           <h1 id="macro-title">Read the regime.<br /><span>Position with context.</span></h1>
           <p>Policy divergence, real yields, and positioning pressure across the G10. Decision support, not a trade signal.</p>
-          <a className="macro-intro-action" href="https://wa.me/2348037212445?text=Hello%2C%20I%27d%20like%20to%20automate%20a%20macro%20strategy%20with%20an%20MT5%20Expert%20Advisor." target="_blank" rel="noreferrer"><MessageCircle size={15} /> Automate this strategy <ArrowUpRight size={13} /></a>
+          <Link className="macro-intro-action" href="/store"><TrendingUp size={15} /> Open the AlgoLync vault <ArrowUpRight size={13} /></Link>
         </div>
         <div className="macro-intro-meta mono">
           <span>SNAPSHOT / {liveReferenceAvailable && currencies.length === 0 ? 'ECB REFERENCE' : snapshot.source === 'provider' ? 'UPSTREAM' : snapshot.source === 'partial' ? 'MIXED INPUTS' : 'OFFLINE'}</span>
@@ -350,25 +256,11 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes, vipEnab
         </div>
       </section>
 
-      <section id="vip" className="macro-vip-section" aria-labelledby="vip-title">
-        <div className="macro-vip-mark"><ShieldCheck size={19} /></div>
-        <div className="macro-vip-copy"><span className="eyebrow">MACROLYNC / VIP</span><h2 id="vip-title">VIP Macro Pass</h2><p>Premium macro alerts and expanded COT breakdowns, billed monthly through Paystack.</p><div className="macro-vip-includes"><span><Check size={13} /> Event-driven macro alerts</span><span><Check size={13} /> Extended positioning notes</span></div></div>
-        <form className="macro-vip-form" onSubmit={beginVipCheckout}>
-          <div className="macro-vip-price"><strong className="mono">₦{new Intl.NumberFormat('en-NG').format(vipPrice)}</strong><span>/ month</span></div>
-          <label htmlFor="vip-email">EMAIL FOR SUBSCRIPTION</label>
-          <div className="macro-vip-email"><Mail size={15} /><input id="vip-email" type="email" autoComplete="email" required readOnly={Boolean(signedInEmail)} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@company.com" /></div>
-          <button type="submit" className="macro-vip-button" disabled={!vipEnabled || checkoutBusy}>{checkoutBusy ? 'Opening Paystack…' : vipEnabled ? 'Subscribe with Paystack' : 'Checkout not configured'}<ArrowRight size={15} /></button>
-          <p className={`macro-vip-feedback${vipEnabled ? '' : ' macro-subscription-badge'}`} role="status">{checkoutMessage || (vipEnabled ? 'Secure checkout · recurring plan' : 'Subscription activating soon')}</p>
-        </form>
-      </section>
-
       <footer className="macro-footer">
         <div><Link className="macro-footer-brand" href="/"><span>Macro<span>Lync</span></span><small>GLOBAL FX INTELLIGENCE</small></Link><p>Independent macro research tooling. Not investment advice.</p></div>
-        <div className="macro-footer-actions"><a href="mailto:fidulync@gmail.com"><Mail size={15} /> fidulync@gmail.com</a><a href="https://wa.me/2348037212445?text=Hello%2C%20I%27d%20like%20to%20automate%20a%20macro%20strategy%20with%20an%20MT5%20Expert%20Advisor." target="_blank" rel="noreferrer"><MessageCircle size={15} /> Automate this strategy <ArrowUpRight size={13} /></a></div>
+        <div className="macro-footer-actions"><Link href="/store"><TrendingUp size={15} /> AlgoLync Store <ArrowUpRight size={13} /></Link><a href="mailto:fidulync@gmail.com"><Mail size={15} /> fidulync@gmail.com</a></div>
         <span className="macro-footer-legal mono">RESEARCH TOOLING / NOT FINANCIAL ADVICE</span>
       </footer>
-      <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} />
-      {accessToken && <MacroAccountModal isOpen={accountOpen} accessToken={accessToken} onClose={() => setAccountOpen(false)} onSignOut={() => { setAccessToken(''); setSignedInEmail(''); }} />}
     </div>
   );
 }

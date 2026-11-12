@@ -63,15 +63,15 @@ fs.writeFileSync(path.join(publicDir, 'screenshot-mobile.png'), createPngBuffer(
 
 // Generate manifest.json
 const manifest = {
-  name: "FiduLync",
-  short_name: "FiduLync",
-  description: "P2P Escrow Protection and AlgoLync Quant Suite",
+  name: "MacroLync Institutional Terminal",
+  short_name: "MacroLync",
+  description: "Quantitative FX intelligence and proprietary algorithm vault",
   start_url: "/",
   scope: "/",
   display: "standalone",
   orientation: "any",
-  background_color: "#0f172a",
-  theme_color: "#0f172a",
+  background_color: "#080a0f",
+  theme_color: "#10b981",
   lang: "en",
   dir: "ltr",
   categories: ["finance", "utilities", "business"],
@@ -87,7 +87,7 @@ const manifest = {
     { src: "/screenshot-desktop.png", sizes: "1280x720", type: "image/png", form_factor: "wide" },
     { src: "/screenshot-mobile.png", sizes: "720x1280", type: "image/png", form_factor: "narrow" }
   ],
-  shortcuts: [{ name: "Create Escrow", short_name: "Escrow", url: "/api/escrow/create" }]
+  shortcuts: [{ name: "AlgoLync Vault", short_name: "AlgoLync", url: "/store" }]
 };
 fs.writeFileSync(path.join(publicDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
 

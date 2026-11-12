@@ -17,12 +17,12 @@ export function getFallbackSnapshot(): MacroSnapshot {
     source: 'fallback',
     cotSource: 'unavailable',
     currencies: [
-      { code: 'USD', centralBank: 'Federal Reserve', policyRate: 3.75, inflation: 2.8, inflationLabel: 'Core PCE', stance: 'Restrictive' },
-      { code: 'EUR', centralBank: 'European Central Bank', policyRate: 2.15, inflation: 2.1, inflationLabel: 'HICP', stance: 'Neutral' },
-      { code: 'GBP', centralBank: 'Bank of England', policyRate: 4, inflation: 2.8, inflationLabel: 'CPI', stance: 'Cautious' },
-      { code: 'JPY', centralBank: 'Bank of Japan', policyRate: 0.5, inflation: 3, inflationLabel: 'CPI', stance: 'Normalising' },
-      { code: 'AUD', centralBank: 'Reserve Bank of Australia', policyRate: 3.6, inflation: 3.4, inflationLabel: 'CPI', stance: 'Restrictive' },
-      { code: 'CHF', centralBank: 'Swiss National Bank', policyRate: 0, inflation: 0.2, inflationLabel: 'CPI', stance: 'Accommodative' },
+      { code: 'USD', centralBank: 'Federal Reserve', policyRate: 3.75, inflation: 2.8, inflationLabel: 'Core PCE', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Restrictive' },
+      { code: 'EUR', centralBank: 'European Central Bank', policyRate: 2.15, inflation: 2.1, inflationLabel: 'HICP', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Neutral' },
+      { code: 'GBP', centralBank: 'Bank of England', policyRate: 4, inflation: 2.8, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Cautious' },
+      { code: 'JPY', centralBank: 'Bank of Japan', policyRate: 0.5, inflation: 3, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Normalising' },
+      { code: 'AUD', centralBank: 'Reserve Bank of Australia', policyRate: 3.6, inflation: 3.4, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Restrictive' },
+      { code: 'CHF', centralBank: 'Swiss National Bank', policyRate: 0, inflation: 0.2, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Accommodative' },
     ],
     cot: [],
     catalysts: [
@@ -64,6 +64,8 @@ function isCurrency(value: unknown): value is MacroCurrency {
     && typeof value.inflationLabel === 'string'
     && (value.corePce === undefined || isFiniteNumber(value.corePce))
     && (value.cpi === undefined || isFiniteNumber(value.cpi))
+    && (value.policyRateSource === undefined || value.policyRateSource === 'provider' || value.policyRateSource === 'reference')
+    && (value.inflationSource === undefined || value.inflationSource === 'provider' || value.inflationSource === 'reference')
     && typeof value.stance === 'string';
 }
 
@@ -423,21 +425,25 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
       }
       if (isFiniteNumber(fredResult.value.policyRate)) {
         usd.policyRate = fredResult.value.policyRate;
+        usd.policyRateSource = 'provider';
         hasLiveData = true;
       }
       if (isFiniteNumber(fredResult.value.corePce)) {
         usd.inflation = fredResult.value.corePce;
         usd.inflationLabel = 'Core PCE';
         usd.corePce = fredResult.value.corePce;
+        usd.inflationSource = 'provider';
         hasLiveData = true;
       }
       if (isFiniteNumber(fredResult.value.cpi)) {
         usd.cpi = fredResult.value.cpi;
+        usd.inflationSource = 'provider';
         hasLiveData = true;
       }
       if (!isFiniteNumber(fredResult.value.corePce) && isFiniteNumber(fredResult.value.cpi)) {
         usd.inflation = fredResult.value.cpi;
         usd.inflationLabel = 'CPI';
+        usd.inflationSource = 'provider';
       }
     }
   } else if (fredResult.status === 'rejected') {
@@ -479,12 +485,14 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
         }
         if (isFiniteNumber(alphaResult.value.policyRate)) {
           usd.policyRate = alphaResult.value.policyRate;
+          usd.policyRateSource = 'provider';
           hasLiveData = true;
         }
         if (isFiniteNumber(alphaResult.value.inflation)) {
           usd.inflation = alphaResult.value.inflation;
           usd.cpi = alphaResult.value.inflation;
           usd.inflationLabel = 'CPI';
+          usd.inflationSource = 'provider';
           hasLiveData = true;
         }
       }
@@ -576,7 +584,14 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
       return mergeWithFallback({
         ...baseline,
         ...parsed,
-        currencies: [...baseline.currencies, ...parsed.currencies],
+        currencies: [
+          ...baseline.currencies,
+          ...parsed.currencies.map((currency) => ({
+            ...currency,
+            policyRateSource: 'provider' as const,
+            inflationSource: 'provider' as const,
+          })),
+        ],
         cot: parsed.cot.length > 0 ? parsed.cot : baseline.cot,
         catalysts: parsed.catalysts.length > 0 ? parsed.catalysts : baseline.catalysts,
         source: 'provider',

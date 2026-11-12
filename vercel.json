@@ -1,10 +1,6 @@
 {
   "crons": [
     {
-      "path": "/api/cron/settlements",
-      "schedule": "0 0 * * *"
-    },
-    {
       "path": "/api/cron/sync-macro",
       "schedule": "0 23 * * 5"
     }

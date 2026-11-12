@@ -1,16 +1,16 @@
 {
-  "name": "FiduLync Safe Escrow",
-  "short_name": "FiduLync",
-  "description": "Zero Risk Social Commerce and Secure Escrow Infrastructure for Africa.",
+  "name": "MacroLync Institutional Terminal",
+  "short_name": "MacroLync",
+  "description": "Quantitative FX intelligence and proprietary algorithm vault.",
   "id": "/?source=pwa",
   "start_url": "/?source=pwa",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "minimal-ui"],
-  "background_color": "#0B1120",
+  "background_color": "#080a0f",
   "theme_color": "#10B981",
   "orientation": "portrait-primary",
   "iarc_rating_id": "e84b072d-71b3-4d3e-86ae-31a8ce4e53b7",
-  "categories": ["finance", "business", "shopping"],
+  "categories": ["finance", "business"],
   "launch_handler": {
     "client_mode": ["navigate-existing", "auto"]
   },
@@ -21,10 +21,10 @@
   ],
   "shortcuts": [
     {
-      "name": "Create Safe Link",
-      "short_name": "New Link",
-      "description": "Generate a new escrow payment link",
-      "url": "/",
+      "name": "AlgoLync Vault",
+      "short_name": "AlgoLync",
+      "description": "Open the algorithm vault and EA fleet monitor.",
+      "url": "/store",
       "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
     }
   ],
