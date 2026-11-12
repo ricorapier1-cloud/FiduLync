@@ -3,35 +3,26 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  ArrowUpRight,
-  CalendarDays,
-  ChartNoAxesCombined,
-  Gauge,
-  Menu,
-  Radio,
-  Shield,
-  X,
-} from 'lucide-react';
+import BrandGlyph, { type BrandGlyphName } from '@/components/BrandGlyph';
 
 const links = [
-  { href: '/', label: 'MacroLync', icon: Shield },
-  { href: '/store', label: 'AlgoLync Vault', icon: ChartNoAxesCombined },
-];
+  { href: '/', label: 'MacroLync', icon: 'shield' },
+  { href: '/store', label: 'AlgoLync Vault', icon: 'chart' },
+] as const satisfies readonly { href: string; label: string; icon: BrandGlyphName }[];
 
 const macroLinks = [
-  { href: '#matrix', label: 'Macro matrix', icon: ChartNoAxesCombined },
-  { href: '#bias', label: 'Pair bias', icon: Gauge },
-  { href: '#catalysts', label: 'Catalysts', icon: CalendarDays },
-  { href: '#positioning', label: 'Positioning', icon: Radio },
-];
+  { href: '#matrix', label: 'Macro matrix', icon: 'chart' },
+  { href: '#bias', label: 'Pair bias', icon: 'gauge' },
+  { href: '#catalysts', label: 'Catalysts', icon: 'calendar' },
+  { href: '#positioning', label: 'Positioning', icon: 'radio' },
+] as const satisfies readonly { href: string; label: string; icon: BrandGlyphName }[];
 
 export default function PlatformShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const isHome = pathname === '/';
   const navigation = isHome
-    ? [...macroLinks, { href: '/store', label: 'AlgoLync Vault', icon: ChartNoAxesCombined }]
+    ? [...macroLinks, { href: '/store', label: 'AlgoLync Vault', icon: 'chart' as const }]
     : links;
 
   return (
@@ -39,7 +30,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
       <header className="topbar">
         <div className="topbar-inner">
           <Link className="brand" href="/" aria-label="MacroLync terminal">
-            <span className="brand-mark"><Shield size={19} strokeWidth={2.2} /></span>
+            <span className="brand-mark"><BrandGlyph name="shield" size={19} strokeWidth={2.2} /></span>
             <span className="brand-copy">
               <span className="brand-name">Macro<span>Lync</span></span>
               <span className="brand-caption">INSTITUTIONAL FX TERMINAL</span>
@@ -69,7 +60,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
               aria-expanded={drawerOpen}
               onClick={() => setDrawerOpen(!drawerOpen)}
             >
-              {drawerOpen ? <X size={21} /> : <Menu size={21} />}
+              <BrandGlyph name={drawerOpen ? 'close' : 'menu'} size={21} />
             </button>
           </div>
         </div>
@@ -90,17 +81,17 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
                 aria-label="Close navigation menu"
                 onClick={() => setDrawerOpen(false)}
               >
-                <X size={18} />
+                <BrandGlyph name="close" size={18} />
               </button>
             </div>
-            {navigation.map(({ href, label, icon: Icon }) => (
+            {navigation.map(({ href, label, icon }) => (
               <Link
                 key={href}
                 href={href}
                 onClick={() => setDrawerOpen(false)}
                 className={`drawer-link ${pathname === href ? 'drawer-link-active' : ''}`}
               >
-                <Icon size={18} /> {label} <ArrowUpRight size={15} className="drawer-arrow" />
+                <BrandGlyph name={icon} size={18} /> {label} <BrandGlyph name="arrow-up-right" size={15} className="drawer-arrow" />
               </Link>
             ))}
             <div className="drawer-footer">Single-operator quantitative trading terminal</div>
@@ -112,14 +103,14 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
 
       {!isHome && (
         <nav className="mobile-tabbar" aria-label="Bottom navigation">
-          {links.map(({ href, label, icon: Icon }) => (
+          {links.map(({ href, label, icon }) => (
             <Link
               key={href}
               href={href}
               aria-current={pathname === href ? 'page' : undefined}
               className={`tab-link ${pathname === href ? 'tab-link-active' : ''}`}
             >
-              <Icon size={19} strokeWidth={pathname === href ? 2.2 : 1.7} />
+              <BrandGlyph name={icon} size={19} strokeWidth={pathname === href ? 2.2 : 1.7} />
               <span>{label}</span>
             </Link>
           ))}

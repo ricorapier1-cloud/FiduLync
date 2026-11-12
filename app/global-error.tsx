@@ -17,7 +17,7 @@ export default function GlobalError({
     <html lang="en">
       <body style={{ margin: 0, background: '#070a0f', color: '#f8fafc', fontFamily: 'system-ui, sans-serif' }}>
         <main style={{ maxWidth: 640, margin: '12vh auto', padding: 24 }}>
-          <h1>FiduLync is temporarily unavailable</h1>
+          <h1>MacroLync is temporarily unavailable</h1>
           <p style={{ color: '#94a3b8', lineHeight: 1.6 }}>An unexpected application error occurred. Please try again. If the problem continues, contact support with the reference below.</p>
           {error.digest && <p style={{ color: '#64748b', fontFamily: 'monospace' }}>Reference: {error.digest}</p>}
           <button

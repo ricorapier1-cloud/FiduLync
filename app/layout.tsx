@@ -9,23 +9,23 @@ const jetBrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jet
 
 export const metadata: Metadata = {
   metadataBase: getAppBaseUrl(),
-  applicationName: 'MacroLync Institutional Terminal',
+  applicationName: 'MacroLync & AlgoLync Terminal',
   title: {
-    default: 'MacroLync | Institutional Trading Terminal',
-    template: '%s | MacroLync',
+    default: 'MacroLync & AlgoLync | Institutional Trading Terminal',
+    template: '%s | MacroLync & AlgoLync',
   },
-  description: 'Private quantitative FX and macro intelligence with a proprietary algorithm vault and MT5 telemetry bridge.',
+  description: 'MacroLync quantitative FX and macro research with the AlgoLync strategy vault and MT5 telemetry bridge.',
   openGraph: {
     type: 'website',
-    siteName: 'MacroLync',
-    title: 'MacroLync | Institutional Trading Terminal',
-    description: 'Private quantitative FX and macro intelligence with a proprietary algorithm vault and MT5 telemetry bridge.',
+    siteName: 'MacroLync & AlgoLync',
+    title: 'MacroLync & AlgoLync | Institutional Trading Terminal',
+    description: 'MacroLync quantitative FX and macro research with the AlgoLync strategy vault and MT5 telemetry bridge.',
     images: ['/opengraph-image.png'],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'MacroLync | Institutional Trading Terminal',
-    description: 'Institutional-style foreign exchange macro research, policy divergence, catalyst risk, and positioning context.',
+    title: 'MacroLync & AlgoLync | Institutional Trading Terminal',
+    description: 'MacroLync FX research, AlgoLync strategies, event risk, and MT5 fleet telemetry.',
     images: ['/opengraph-image.png'],
   },
 };

@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
-import { isAlgoApiConfigured, isAlgoAuthorized } from '@/lib/algoAuth';
+import { isAlgoApiConfigured, isAlgoAuthorized, isSameOriginBrowserRequest } from '@/lib/algoAuth';
 import { getMacroSignal, isSupportedSignalSymbol } from '@/lib/signalEngine';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
-  if (!isAlgoApiConfigured()) {
+  const sameOriginPreview = isSameOriginBrowserRequest(request);
+  if (!isAlgoApiConfigured() && !sameOriginPreview) {
     return NextResponse.json({ error: 'The private algorithm API is not configured.' }, { status: 503 });
   }
-  if (!isAlgoAuthorized(request)) {
+  if (!sameOriginPreview && !isAlgoAuthorized(request)) {
     return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
   }
 

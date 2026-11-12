@@ -2,21 +2,13 @@
 
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  Activity,
-  ArrowDownToLine,
-  Check,
-  Copy,
-  Radio,
-  Shield,
-  ShieldAlert,
-  Signal,
-} from 'lucide-react';
+import BrandGlyph from '@/components/BrandGlyph';
 import type { HeartbeatRecord } from '@/lib/eaHeartbeat';
 
 type StoreTerminalProps = {
   initialFleet: { configured: boolean; heartbeats: HeartbeatRecord[] };
   telemetryError: string;
+  bridgeSource: string;
 };
 
 type SignalResult = {
@@ -33,8 +25,9 @@ type SignalResult = {
 
 const symbols = ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'USDCAD', 'AUDUSD', 'NZDUSD', 'EURJPY', 'XAUUSD'];
 
-function subscribeToOrigin() {
-  return () => {};
+function subscribeToOrigin(onChange: () => void) {
+  window.addEventListener('popstate', onChange);
+  return () => window.removeEventListener('popstate', onChange);
 }
 
 function getBrowserOrigin() {
@@ -42,7 +35,7 @@ function getBrowserOrigin() {
 }
 
 function getServerOrigin() {
-  return 'https://your-vercel-deployment.vercel.app';
+  return '';
 }
 
 function formatCurrency(value: number | null) {
@@ -63,10 +56,9 @@ function isSignalResult(value: unknown): value is SignalResult {
     && typeof result.timestamp_utc === 'string';
 }
 
-export default function StoreTerminal({ initialFleet, telemetryError }: StoreTerminalProps) {
+export default function StoreTerminal({ initialFleet, telemetryError, bridgeSource }: StoreTerminalProps) {
   const router = useRouter();
   const [symbol, setSymbol] = useState('EURUSD');
-  const [apiKey, setApiKey] = useState('');
   const endpoint = useSyncExternalStore(subscribeToOrigin, getBrowserOrigin, getServerOrigin);
   const [signal, setSignal] = useState<SignalResult | null>(null);
   const [signalError, setSignalError] = useState('');
@@ -84,7 +76,6 @@ export default function StoreTerminal({ initialFleet, telemetryError }: StoreTer
     setSignalError('');
     try {
       const response = await fetch(`/api/v1/macro-signal?symbol=${encodeURIComponent(symbol)}`, {
-        headers: { 'x-algo-key': apiKey },
         cache: 'no-store',
       });
       const payload: unknown = await response.json();
@@ -119,20 +110,9 @@ export default function StoreTerminal({ initialFleet, telemetryError }: StoreTer
     }
   }
 
-  const includeSnippet = `#include <MacroLyncBridge.mqh>
-input string MacroLyncBaseUrl = "${endpoint}";
-input string MacroLyncApiKey = "YOUR_ALGO_PRIVATE_API_KEY";
-
-MacroLyncSignal macroSignal;
-if (!MacroLyncGetSignal(_Symbol, MacroLyncBaseUrl, MacroLyncApiKey, macroSignal)
-    || !macroSignal.safe_to_trade)
-{
-   return; // Fail closed: no new entries without a valid safe signal.
-}`;
-
   return (
     <div className="min-h-screen bg-[#080a0f] text-slate-100">
-      <main className="mx-auto w-full max-w-7xl px-5 py-9 sm:px-8 lg:py-12">
+      <div className="mx-auto w-full max-w-7xl px-5 py-9 sm:px-8 lg:py-12">
         <div className="flex flex-wrap items-start justify-between gap-5 border-b border-white/[0.08] pb-7">
           <div>
             <div className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-emerald-300">
@@ -149,7 +129,7 @@ if (!MacroLyncGetSignal(_Symbol, MacroLyncBaseUrl, MacroLyncApiKey, macroSignal)
             download
             className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-emerald-300/25 bg-emerald-300/[0.07] px-4 text-xs font-medium text-emerald-100 transition hover:bg-emerald-300/[0.12]"
           >
-            <ArrowDownToLine size={15} /> Download MT5 include
+            <BrandGlyph name="arrow-down" size={15} /> Download MT5 include
           </a>
         </div>
 
@@ -160,15 +140,15 @@ if (!MacroLyncGetSignal(_Symbol, MacroLyncBaseUrl, MacroLyncApiKey, macroSignal)
               <h2 id="fleet-heading" className="mt-1 text-lg font-semibold">Live EA fleet</h2>
             </div>
             <div className="flex items-center gap-2 font-mono text-[9px] text-slate-500">
-              <Radio size={13} className={initialFleet.configured ? 'text-emerald-400' : 'text-amber-400'} />
-              {telemetryError || (initialFleet.configured ? 'UPSTASH REDIS' : 'UPSTASH NOT CONFIGURED')}
+              <BrandGlyph name="radio" size={13} className={initialFleet.configured ? 'text-emerald-400' : 'text-amber-400'} />
+              {telemetryError || (initialFleet.configured ? 'UPSTASH REDIS' : 'IN-PROCESS TTL FALLBACK')}
             </div>
           </div>
           {initialFleet.heartbeats.length === 0 ? (
             <div className="rounded-xl border border-white/[0.08] bg-[#0c1016] px-5 py-8 text-center">
-              <Activity className="mx-auto text-slate-600" size={22} />
+              <BrandGlyph name="activity" className="mx-auto text-slate-600" size={22} />
               <p className="mt-3 text-sm text-slate-300">No EA heartbeats have been recorded.</p>
-              <p className="mt-1 text-xs text-slate-500">Configure Upstash and send an authenticated ping every five minutes.</p>
+              <p className="mt-1 text-xs text-slate-500">Configure Redis for cross-instance persistence; process-local TTL storage is used as a fallback.</p>
             </div>
           ) : (
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -232,15 +212,13 @@ if (!MacroLyncGetSignal(_Symbol, MacroLyncBaseUrl, MacroLyncApiKey, macroSignal)
           <div className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-5 sm:p-6">
             <div className="font-mono text-[9px] tracking-[0.17em] text-slate-500">03 / MACROLYNC API</div>
             <h2 className="mt-1 text-lg font-semibold">Live signal tester</h2>
-            <p className="mt-1 text-xs leading-5 text-slate-400">Requests the protected signal endpoint with your private API key. The key stays in this browser session.</p>
+            <p className="mt-1 text-xs leading-5 text-slate-400">Previews a same-origin live signal without placing the private EA key in the browser.</p>
             <label className="mt-5 block text-[9px] tracking-wide text-slate-500" htmlFor="signal-symbol">SYMBOL</label>
             <select id="signal-symbol" value={symbol} onChange={(event) => setSymbol(event.target.value)} className="mt-2 h-10 w-full rounded-md border border-white/[0.1] bg-[#080a0f] px-3 font-mono text-xs text-slate-200 outline-none focus:border-emerald-300/40">
               {symbols.map((item) => <option key={item}>{item}</option>)}
             </select>
-            <label className="mt-4 block text-[9px] tracking-wide text-slate-500" htmlFor="signal-key">ALGO_PRIVATE_API_KEY</label>
-            <input id="signal-key" type="password" autoComplete="off" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="Enter private API key" className="mt-2 h-10 w-full rounded-md border border-white/[0.1] bg-[#080a0f] px-3 font-mono text-xs text-slate-200 outline-none placeholder:text-slate-600 focus:border-emerald-300/40" />
-            <button type="button" onClick={testSignal} disabled={testing || !apiKey} className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-emerald-400 px-4 text-xs font-semibold text-[#07120d] transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40">
-              <Signal size={15} /> {testing ? 'Testing endpoint...' : 'Test live signal'}
+            <button type="button" onClick={testSignal} disabled={testing} className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-emerald-400 px-4 text-xs font-semibold text-[#07120d] transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40">
+              <BrandGlyph name="signal" size={15} /> {testing ? 'Testing endpoint...' : 'Test live signal'}
             </button>
             {signalError && <p className="mt-3 text-xs text-rose-300" role="alert">{signalError}</p>}
             {signal && (
@@ -269,25 +247,29 @@ if (!MacroLyncGetSignal(_Symbol, MacroLyncBaseUrl, MacroLyncApiKey, macroSignal)
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               <a href="/mql5/MacroLyncBridge.mqh" download className="inline-flex h-9 items-center gap-2 rounded-md border border-white/[0.1] px-3 text-[10px] text-slate-300 hover:border-emerald-300/30">
-                <ArrowDownToLine size={13} /> MacroLyncBridge.mqh
+                <BrandGlyph name="arrow-down" size={13} /> MacroLyncBridge.mqh
               </a>
-              <button type="button" onClick={() => void copyText('MQL5 snippet', includeSnippet)} className="inline-flex h-9 items-center gap-2 rounded-md border border-white/[0.1] px-3 text-[10px] text-slate-300 hover:border-emerald-300/30">
-                {copyState === 'MQL5 snippet copied' ? <Check size={13} /> : <Copy size={13} />} Copy fail-closed MQL5 snippet
+              <button type="button" onClick={() => void copyText('MQL5 bridge source', bridgeSource)} className="inline-flex h-9 items-center gap-2 rounded-md border border-white/[0.1] px-3 text-[10px] text-slate-300 hover:border-emerald-300/30">
+                <BrandGlyph name={copyState === 'MQL5 bridge source copied' ? 'check' : 'copy'} size={13} /> Copy bridge source
               </button>
             </div>
             {copyState && <p className="mt-2 text-[10px] text-emerald-300" role="status">{copyState}</p>}
+            <details className="mt-4 rounded-lg border border-white/[0.07] bg-black/20">
+              <summary className="cursor-pointer px-4 py-3 text-[10px] text-slate-300">View exact downloadable bridge source</summary>
+              <pre className="max-h-96 overflow-auto border-t border-white/[0.07] p-4 text-[10px] leading-5 text-slate-400"><code>{bridgeSource}</code></pre>
+            </details>
             <div className="mt-5 flex items-start gap-2 border-t border-white/[0.07] pt-4 text-[10px] leading-5 text-slate-500">
-              <ShieldAlert size={14} className="mt-0.5 shrink-0 text-amber-300" />
-              <p>Network, timeout, non-200, malformed JSON, or active news lockout returns defensive hold. Keep WebRequest access restricted to this Vercel origin in MT5.</p>
+              <BrandGlyph name="shield-alert" size={14} className="mt-0.5 shrink-0 text-amber-300" />
+              <p>Network, timeout, non-200, malformed JSON, or active news lockout returns defensive hold. Keep WebRequest access restricted to this deployed application origin in MT5.</p>
             </div>
           </div>
         </section>
 
         <div className="mt-8 flex items-center gap-2 border-t border-white/[0.07] pt-5 text-[10px] leading-5 text-slate-600">
-          <Shield size={13} className="shrink-0" />
+          <BrandGlyph name="shield" size={13} className="shrink-0" />
           <span>Internal research tooling. Trading is risky; every EA must retain its own account-level equity and drawdown protections.</span>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

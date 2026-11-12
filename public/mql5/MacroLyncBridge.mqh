@@ -26,9 +26,15 @@ string ML_JsonString(const string json, const string key)
    if(start >= StringLen(json) || StringGetCharacter(json, start) != '"') return "";
    start++;
    int end = start;
+   bool escaped = false;
    while(end < StringLen(json))
    {
-      if(StringGetCharacter(json, end) == '"' && StringGetCharacter(json, end - 1) != '\\') break;
+      ushort character = StringGetCharacter(json, end);
+      if(character == '"' && !escaped) break;
+      if(character == '\\' && !escaped)
+         escaped = true;
+      else
+         escaped = false;
       end++;
    }
    if(end >= StringLen(json)) return "";
@@ -44,6 +50,7 @@ string ML_JsonScalar(const string json, const string key)
    if(colon < 0) return "";
    int start = colon + 1;
    while(start < StringLen(json) && StringGetCharacter(json, start) <= 32) start++;
+   if(start >= StringLen(json)) return "";
    int end = start;
    while(end < StringLen(json))
    {
@@ -54,11 +61,37 @@ string ML_JsonScalar(const string json, const string key)
    return StringSubstr(json, start, end - start);
 }
 
+string ML_ResponseToString(const char &source[])
+{
+   int length = ArraySize(source);
+   if(length <= 0) return "";
+
+   uchar utf8_data[];
+   if(ArrayResize(utf8_data, length) != length) return "";
+   for(int index = 0; index < length; index++)
+      utf8_data[index] = (uchar)source[index];
+   return CharArrayToString(utf8_data, 0, length, CP_UTF8);
+}
+
+bool ML_EncodeRequestBody(const string body, char &request_data[])
+{
+   uchar utf8_data[];
+   int length = StringToCharArray(body, utf8_data, 0, WHOLE_ARRAY, CP_UTF8);
+   if(length <= 1) return false;
+
+   int payload_length = length - 1;
+   if(ArrayResize(request_data, payload_length) != payload_length) return false;
+   for(int index = 0; index < payload_length; index++)
+      request_data[index] = (char)utf8_data[index];
+   return true;
+}
+
 bool ML_IsNumber(const string value)
 {
    int length = StringLen(value);
    if(length == 0) return false;
    int start = StringGetCharacter(value, 0) == '-' ? 1 : 0;
+   if(start == length) return false;
    bool has_digit = false;
    bool has_decimal = false;
    for(int index = start; index < length; index++)
@@ -96,7 +129,10 @@ string ML_JsonEscape(string value)
 {
    StringReplace(value, "\\", "\\\\");
    StringReplace(value, "\"", "\\\"");
+   StringReplace(value, "\b", "\\b");
+   StringReplace(value, "\f", "\\f");
    StringReplace(value, "\r", "\\r");
+   StringReplace(value, "\t", "\\t");
    StringReplace(value, "\n", "\\n");
    return value;
 }
@@ -132,21 +168,32 @@ bool MacroLyncGetSignal(
    if(root == "" || api_key == "") return false;
    string url = root + "/api/v1/macro-signal?symbol=" + symbol;
    string headers = "x-algo-key: " + api_key + "\r\nAccept: application/json\r\n";
-   uchar request_data[];
-   uchar response_data[];
+   char request_data[];
+   char response_data[];
    string response_headers;
    ArrayResize(request_data, 0);
 
    ResetLastError();
    int status = WebRequest("GET", url, headers, timeout_ms, request_data, response_data, response_headers);
+   int error_code = GetLastError();
    if(status != 200)
    {
+      PrintFormat("MacroLync signal request returned HTTP %d (GetLastError=%d).", status, error_code);
       signal.news_lockout = true;
       signal.safe_to_trade = false;
       return false;
    }
 
-   string response = CharArrayToString(response_data, 0, -1, CP_UTF8);
+   string response = ML_ResponseToString(response_data);
+   StringTrimLeft(response);
+   StringTrimRight(response);
+   if(response == "")
+   {
+      PrintFormat("MacroLync signal request returned an empty payload (GetLastError=%d).", error_code);
+      signal.news_lockout = true;
+      signal.safe_to_trade = false;
+      return false;
+   }
    string response_symbol = ML_JsonString(response, "symbol");
    string response_bias = ML_JsonString(response, "bias");
    string response_regime = ML_JsonString(response, "regime");
@@ -175,6 +222,7 @@ bool MacroLyncGetSignal(
    if(confluence_score < -100 || confluence_score > 100 || !atr_values_valid
       || (response_safe == "true" && (response_sl == "null" || response_tp == "null"
          || response_news == "true" || response_bias == "NEUTRAL"
+         || StringToDouble(response_sl) <= 0.0 || StringToDouble(response_tp) <= 0.0
          || (response_regime != "TRENDING_EXPANSION" && response_regime != "MEAN_REVERTING"))))
    {
       signal.news_lockout = true;
@@ -218,14 +266,24 @@ bool MacroLyncSendHeartbeat(
       + ",\"drawdown_pct\":" + DoubleToString(drawdown_pct, 2)
       + ",\"open_positions\":" + IntegerToString(open_positions)
       + ",\"status\":\"" + ML_JsonEscape(status) + "\"}";
-   uchar request_data[];
-   uchar response_data[];
+   char request_data[];
+   char response_data[];
    string response_headers;
-   int length = StringToCharArray(body, request_data, 0, WHOLE_ARRAY, CP_UTF8);
-   if(length > 0) ArrayResize(request_data, length - 1);
+   if(!ML_EncodeRequestBody(body, request_data))
+   {
+      Print("MacroLync heartbeat request body could not be encoded as UTF-8.");
+      return false;
+   }
    string headers = "x-algo-key: " + api_key + "\r\nContent-Type: application/json\r\nAccept: application/json\r\n";
    ResetLastError();
-   return WebRequest("POST", root + "/api/v1/ea-heartbeat", headers, timeout_ms, request_data, response_data, response_headers) == 202;
+   int status = WebRequest("POST", root + "/api/v1/ea-heartbeat", headers, timeout_ms, request_data, response_data, response_headers);
+   int error_code = GetLastError();
+   if(status != 202)
+   {
+      PrintFormat("MacroLync heartbeat request returned HTTP %d (GetLastError=%d).", status, error_code);
+      return false;
+   }
+   return true;
 }
 
 void MacroLyncHeartbeatEveryFiveMinutes(

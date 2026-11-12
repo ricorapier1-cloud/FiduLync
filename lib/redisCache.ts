@@ -79,26 +79,15 @@ async function loadCachedData<T>(
           memoryCache.set(key, { value: staleValue, expiresAt: now + Math.min(ttl, 5) * 1000 });
           return staleValue;
         }
-        for (let attempt = 0; attempt < 20; attempt += 1) {
-          await new Promise((resolve) => setTimeout(resolve, 250));
-          const refreshedValue = await redis.get<T>(key);
-          if (refreshedValue !== null) {
-            memoryCache.set(key, { value: refreshedValue, expiresAt: Date.now() + ttl * 1000 });
-            staleMemoryCache.set(key, refreshedValue);
-            return refreshedValue;
-          }
-        }
-        throw new Error(`Concurrent refresh for ${key} did not complete in time.`);
       }
     } catch (error) {
-      if (error instanceof Error && error.message.startsWith('Concurrent refresh for ')) throw error;
       warnOnce('lock-failure', 'Upstash refresh lock failed; relying on in-process request coalescing.', error);
     }
   }
 
   try {
     const value = await fetchFn();
-    memoryCache.set(key, { value, expiresAt: now + ttl * 1000 });
+    memoryCache.set(key, { value, expiresAt: Date.now() + ttl * 1000 });
     staleMemoryCache.set(key, value);
 
     if (redis) {

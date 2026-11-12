@@ -2,16 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import {
-  ArrowUpRight,
-  CalendarClock,
-  ChevronDown,
-  Clock3,
-  ExternalLink,
-  Mail,
-  RefreshCw,
-  TrendingUp,
-} from 'lucide-react';
+import BrandGlyph from '@/components/BrandGlyph';
 import type { MacroSnapshot, MarketQuote } from '@/types/macro';
 
 type MacroDashboardProps = {
@@ -166,7 +157,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
     <div className="macro-page">
       <div className="macro-statusline mono">
         <span><span className={`macro-pulse${liveQuoteAvailable ? ' macro-pulse-live' : ''}`} /> MACRO INTELLIGENCE / GLOBAL FX</span>
-        <span className="macro-status-right"><span className={`macro-feed-badge${liveQuoteAvailable || liveReferenceAvailable ? ' macro-feed-live' : ''}`}>{liveQuoteAvailable ? 'LIVE FEED' : liveReferenceAvailable ? 'LIVE REFERENCE FEED' : snapshot.source === 'provider' ? 'PROVIDER FEED' : snapshot.source === 'partial' ? 'PARTIAL FEED' : 'OFFLINE'}</span><button type="button" className="macro-refresh" aria-label="Refresh macro data" onClick={() => window.location.reload()}><RefreshCw size={13} className={refreshing ? 'macro-spin' : ''} /> REFRESH</button><Link href="/store" className="macro-refresh">ALGOLYNC VAULT</Link></span>
+        <span className="macro-status-right"><span className={`macro-feed-badge${liveQuoteAvailable || liveReferenceAvailable ? ' macro-feed-live' : ''}`}>{liveQuoteAvailable ? 'LIVE FEED' : liveReferenceAvailable ? 'LIVE REFERENCE FEED' : snapshot.source === 'provider' ? 'PROVIDER FEED' : snapshot.source === 'partial' ? 'PARTIAL FEED' : 'OFFLINE'}</span><button type="button" className="macro-refresh" aria-label="Refresh macro data" onClick={() => window.location.reload()}><BrandGlyph name="refresh" size={13} className={refreshing ? 'macro-spin' : ''} /> REFRESH</button><Link href="/store" className="macro-refresh">ALGOLYNC VAULT</Link></span>
       </div>
       <div className="macro-quote-strip" aria-label="Live FX quotes">
         {quotes.map((quote) => <span key={quote.symbol} className="macro-quote mono"><strong>{quote.symbol}</strong><b>{quote.price.toFixed(quote.symbol.startsWith('XAU') ? 2 : quote.symbol.endsWith('JPY') ? 3 : 5)}</b><small className={quote.source === 'finnhub' ? 'macro-positive' : ''}>{quote.source === 'finnhub' ? 'LIVE' : 'ECB REF'}</small></span>)}
@@ -178,7 +169,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
           <span className="eyebrow">GLOBAL MACRO / DAILY BRIEF</span>
           <h1 id="macro-title">Read the regime.<br /><span>Position with context.</span></h1>
           <p>Policy divergence, real yields, and positioning pressure across the G10. Decision support, not a trade signal.</p>
-          <Link className="macro-intro-action" href="/store"><TrendingUp size={15} /> Open the AlgoLync vault <ArrowUpRight size={13} /></Link>
+          <Link className="macro-intro-action" href="/store"><BrandGlyph name="trend" size={15} /> Open the AlgoLync vault <BrandGlyph name="arrow-up-right" size={13} /></Link>
         </div>
         <div className="macro-intro-meta mono">
           <span>SNAPSHOT / {liveReferenceAvailable && currencies.length === 0 ? 'ECB REFERENCE' : snapshot.source === 'provider' ? 'UPSTREAM' : snapshot.source === 'partial' ? 'MIXED INPUTS' : 'OFFLINE'}</span>
@@ -217,7 +208,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
           <div className="macro-section-heading"><div><span className="eyebrow">02 / RELATIVE VALUE</span><h2 id="bias-title">Pair bias analyzer</h2></div><span className="macro-section-note mono">RULE-BASED MODEL</span></div>
           <div className="macro-panel macro-bias-panel">
             <label className="macro-select-label" htmlFor="macro-pair">INSTRUMENT</label>
-            <div className="macro-select-wrap"><select id="macro-pair" value={pair} onChange={(event) => setPair(event.target.value as (typeof pairs)[number]['symbol'])}>{pairs.map((item) => <option key={item.symbol} value={item.symbol}>{item.symbol}</option>)}</select><ChevronDown size={16} aria-hidden="true" /></div>
+            <div className="macro-select-wrap"><select id="macro-pair" value={pair} onChange={(event) => setPair(event.target.value as (typeof pairs)[number]['symbol'])}>{pairs.map((item) => <option key={item.symbol} value={item.symbol}>{item.symbol}</option>)}</select><BrandGlyph name="chevron-down" size={16} /></div>
             <div className={`macro-score macro-score-${score > 0 ? 'up' : score < 0 ? 'down' : 'flat'}`}><span className="mono">{score > 0 ? '+' : ''}{score}</span><span>/ 100</span></div>
             <div className="macro-score-label"><strong>{biasLabel(score)}</strong><span className="mono">FUNDAMENTAL BIAS</span></div>
             <div className="macro-bias-meter"><span className="macro-meter-mid" /><span className={`macro-meter-pointer ${score >= 0 ? 'macro-pointer-up' : 'macro-pointer-down'}`} style={{ left: `${50 + score / 2}%` }} /></div>
@@ -228,7 +219,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
         </section>
 
         <section id="catalysts" className="macro-section" aria-labelledby="catalyst-title">
-          <div className="macro-section-heading"><div><span className="eyebrow">03 / EVENT RISK</span><h2 id="catalyst-title">Economic catalysts</h2></div><span className="macro-section-note mono"><CalendarClock size={13} /> UTC</span></div>
+          <div className="macro-section-heading"><div><span className="eyebrow">03 / EVENT RISK</span><h2 id="catalyst-title">Economic catalysts</h2></div><span className="macro-section-note mono"><BrandGlyph name="calendar-clock" size={13} /> UTC</span></div>
           <div className="macro-panel macro-catalyst-panel">
             {sortedCatalysts.length === 0 && <p className="macro-empty">No upcoming events in the current snapshot.</p>}
             {sortedCatalysts.map((catalyst) => <article className="macro-event" key={catalyst.id}>
@@ -236,13 +227,13 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
               <div className="macro-event-info"><div><span className="macro-region mono">{catalyst.region}</span><span className={`macro-impact macro-impact-${catalyst.impact.toLowerCase()}`}>{catalyst.impact}</span></div><h3>{catalyst.title}</h3><p>Consensus <b className="mono">{catalyst.consensus}</b><span>Actual <b className="mono">{catalyst.actual ?? 'Pending'}</b></span></p></div>
               <span className="macro-countdown mono">{now ? formatCountdown(catalyst.scheduledAt, now) : 'Syncing'}</span>
             </article>)}
-            <div className="macro-calendar-note"><Clock3 size={14} /><span>Provider calendar consensus and actuals may be revised; confirm official release details before positioning.</span></div>
+            <div className="macro-calendar-note"><BrandGlyph name="clock" size={14} /><span>Provider calendar consensus and actuals may be revised; confirm official release details before positioning.</span></div>
           </div>
         </section>
       </div>
 
       <section id="positioning" className="macro-section" aria-labelledby="cot-title">
-        <div className="macro-section-heading"><div><span className="eyebrow">04 / POSITIONING & CROWDING</span><h2 id="cot-title">COT speculative positioning</h2></div><a className="macro-inline-link" href="https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm" target="_blank" rel="noreferrer">CFTC reports <ExternalLink size={13} /></a></div>
+        <div className="macro-section-heading"><div><span className="eyebrow">04 / POSITIONING & CROWDING</span><h2 id="cot-title">COT speculative positioning</h2></div><a className="macro-inline-link" href="https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm" target="_blank" rel="noreferrer">CFTC reports <BrandGlyph name="external-link" size={13} /></a></div>
         <div className="macro-cot-layout">
           <div className="macro-panel macro-cot-panel">
             <div className="macro-cot-head"><span>MARKET</span><span>NET NON-COMMERCIAL</span><span>W/W CHANGE</span><span>EXTREME RISK</span></div>
@@ -252,13 +243,13 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
             </div>)}
             <div className="macro-panel-foot"><span>{snapshot.cotSource === 'provider' ? 'CFTC report data validated; positioning is weekly and can lag market conditions.' : 'No current CFTC positioning snapshot is available.'}</span><span className="mono">POSITIONING ≠ SIGNAL</span></div>
           </div>
-          <aside className="macro-cot-callout"><div className="macro-callout-icon"><TrendingUp size={18} /></div><span className="eyebrow">CROWDING WATCH</span><h3>Extremes can amplify reversals.</h3><p>High percentiles flag crowded exposure, not a timing trigger. Compare positioning with policy repricing and the catalyst calendar.</p><div className="macro-callout-stat"><span>TOP POSITIONING EXTREME</span><strong className="mono">{snapshot.cot.length > 0 ? `${snapshot.cot.reduce((highest, current) => current.percentile > highest.percentile ? current : highest, snapshot.cot[0]).market} ${Math.max(...snapshot.cot.map((position) => position.percentile))}%` : 'Unavailable'}</strong></div></aside>
+          <aside className="macro-cot-callout"><div className="macro-callout-icon"><BrandGlyph name="trend" size={18} /></div><span className="eyebrow">CROWDING WATCH</span><h3>Extremes can amplify reversals.</h3><p>High percentiles flag crowded exposure, not a timing trigger. Compare positioning with policy repricing and the catalyst calendar.</p><div className="macro-callout-stat"><span>TOP POSITIONING EXTREME</span><strong className="mono">{snapshot.cot.length > 0 ? `${snapshot.cot.reduce((highest, current) => current.percentile > highest.percentile ? current : highest, snapshot.cot[0]).market} ${Math.max(...snapshot.cot.map((position) => position.percentile))}%` : 'Unavailable'}</strong></div></aside>
         </div>
       </section>
 
       <footer className="macro-footer">
         <div><Link className="macro-footer-brand" href="/"><span>Macro<span>Lync</span></span><small>GLOBAL FX INTELLIGENCE</small></Link><p>Independent macro research tooling. Not investment advice.</p></div>
-        <div className="macro-footer-actions"><Link href="/store"><TrendingUp size={15} /> AlgoLync Store <ArrowUpRight size={13} /></Link><a href="mailto:fidulync@gmail.com"><Mail size={15} /> fidulync@gmail.com</a></div>
+        <div className="macro-footer-actions"><Link href="/store"><BrandGlyph name="trend" size={15} /> AlgoLync Store <BrandGlyph name="arrow-up-right" size={13} /></Link><a href="mailto:fidulync@gmail.com"><BrandGlyph name="mail" size={15} /> fidulync@gmail.com</a></div>
         <span className="macro-footer-legal mono">RESEARCH TOOLING / NOT FINANCIAL ADVICE</span>
       </footer>
     </div>

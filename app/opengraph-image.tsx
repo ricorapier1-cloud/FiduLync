@@ -1,6 +1,6 @@
 import { ImageResponse } from 'next/og';
 
-export const alt = 'MacroLync — Global FX Intelligence';
+export const alt = 'MacroLync and AlgoLync — FX research and EA systems';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -36,7 +36,10 @@ export default function OpenGraphImage() {
               fontWeight: 700,
             }}
           >
-            M
+            <svg width="42" height="42" viewBox="0 0 32 32" fill="none">
+              <path d="M16 4.5 26 9v6.3c0 6.1-4.1 9.6-10 12.2-5.9-2.6-10-6.1-10-12.2V9l10-4.5Z" stroke="#10b981" strokeWidth="1.5" strokeLinejoin="round" />
+              <path d="M10 20v-5M15.5 20v-9M21 20v-5M9 21h13" stroke="#10b981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </div>
           <span style={{ fontSize: 38, fontWeight: 700, letterSpacing: '-2px' }}>MacroLync</span>
         </div>
@@ -53,7 +56,7 @@ export default function OpenGraphImage() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#71817f', fontSize: 14 }}>
           <span style={{ color: '#10b981' }}>●</span>
-          LIVE MACRO DATA · CFTC POSITIONING · MT5 SIGNALS
+          MACROLYNC RESEARCH · ALGOLYNC SYSTEMS · MT5 TELEMETRY
         </div>
       </div>
     ),

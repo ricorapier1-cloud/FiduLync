@@ -6,6 +6,7 @@ import { Redis } from '@upstash/redis';
 const HEARTBEAT_TTL_SECONDS = 15 * 60;
 const METADATA_TTL_SECONDS = 30 * 24 * 60 * 60;
 const HEARTBEAT_INDEX_KEY = 'ea:heartbeat:index';
+const warned = new Set<string>();
 
 export type HeartbeatInput = {
   ea_name: string;
@@ -32,18 +33,71 @@ type HeartbeatMetadata = Pick<HeartbeatInput, 'ea_name' | 'account_number'> & {
   last_seen_utc: string;
 };
 
-let redisClient: Redis | null = null;
+type MemoryHeartbeat = {
+  record: HeartbeatRecord;
+  metadata: HeartbeatMetadata;
+  expiresAt: number;
+  metadataExpiresAt: number;
+};
 
-function getRedisClient() {
+const memoryHeartbeats = new Map<string, MemoryHeartbeat>();
+let redisClient: Redis | null | undefined;
+
+function warnOnce(key: string, message: string, error?: unknown) {
+  if (warned.has(key)) return;
+  warned.add(key);
+  console.warn(message, error);
+}
+
+function getRedisClient(): Redis | null {
   if (!process.env.UPSTASH_REDIS_REST_URL?.trim() || !process.env.UPSTASH_REDIS_REST_TOKEN?.trim()) {
-    throw new Error('Upstash Redis is not configured for EA heartbeat telemetry.');
+    warnOnce('missing-credentials', 'Upstash heartbeat storage is not configured; using in-process TTL storage.');
+    redisClient = null;
+    return redisClient;
   }
-  redisClient ??= Redis.fromEnv();
+  if (redisClient !== undefined) return redisClient;
+
+  try {
+    redisClient = Redis.fromEnv();
+  } catch (error) {
+    warnOnce('client-init', 'Upstash heartbeat storage could not be initialized; using in-process TTL storage.', error);
+    redisClient = null;
+  }
   return redisClient;
 }
 
 function heartbeatId(input: Pick<HeartbeatInput, 'ea_name' | 'account_number'>) {
   return createHash('sha256').update(`${input.ea_name}\u0000${input.account_number}`).digest('hex');
+}
+
+function offlineRecord(metadata: HeartbeatMetadata): HeartbeatRecord {
+  return {
+    ...metadata,
+    balance: null,
+    equity: null,
+    floating_pnl: null,
+    drawdown_pct: null,
+    open_positions: null,
+    status: 'OFFLINE',
+    heartbeat_status: 'OFFLINE',
+  };
+}
+
+function getMemoryHeartbeats(now = Date.now()) {
+  const records: HeartbeatRecord[] = [];
+  for (const [id, entry] of memoryHeartbeats) {
+    if (entry.metadataExpiresAt <= now) {
+      memoryHeartbeats.delete(id);
+      continue;
+    }
+    records.push(entry.expiresAt > now ? entry.record : offlineRecord(entry.metadata));
+  }
+  return records;
+}
+
+function sortHeartbeats(records: HeartbeatRecord[]) {
+  return records.sort((left, right) => left.ea_name.localeCompare(right.ea_name)
+    || left.account_number.localeCompare(right.account_number));
 }
 
 export async function saveHeartbeat(input: HeartbeatInput) {
@@ -59,47 +113,57 @@ export async function saveHeartbeat(input: HeartbeatInput) {
     account_number: input.account_number,
     last_seen_utc: record.last_seen_utc,
   };
-  await Promise.all([
-    redis.set(`ea:heartbeat:state:${id}`, record, { ex: HEARTBEAT_TTL_SECONDS }),
-    redis.set(`ea:heartbeat:meta:${id}`, metadata, { ex: METADATA_TTL_SECONDS }),
-    redis.sadd(HEARTBEAT_INDEX_KEY, id),
-    redis.expire(HEARTBEAT_INDEX_KEY, METADATA_TTL_SECONDS),
-  ]);
+  memoryHeartbeats.set(id, {
+    record,
+    metadata,
+    expiresAt: Date.now() + HEARTBEAT_TTL_SECONDS * 1000,
+    metadataExpiresAt: Date.now() + METADATA_TTL_SECONDS * 1000,
+  });
+
+  if (!redis) return;
+  try {
+    await Promise.all([
+      redis.set(`ea:heartbeat:state:${id}`, record, { ex: HEARTBEAT_TTL_SECONDS }),
+      redis.set(`ea:heartbeat:meta:${id}`, metadata, { ex: METADATA_TTL_SECONDS }),
+      redis.sadd(HEARTBEAT_INDEX_KEY, id),
+      redis.expire(HEARTBEAT_INDEX_KEY, METADATA_TTL_SECONDS),
+    ]);
+  } catch (error) {
+    warnOnce('write-failure', 'Upstash heartbeat write failed; retaining the in-process snapshot.', error);
+  }
 }
 
 export async function getHeartbeatFleet(): Promise<{ configured: boolean; heartbeats: HeartbeatRecord[] }> {
-  if (!process.env.UPSTASH_REDIS_REST_URL?.trim() || !process.env.UPSTASH_REDIS_REST_TOKEN?.trim()) {
-    return { configured: false, heartbeats: [] };
-  }
   const redis = getRedisClient();
-  const ids = await redis.smembers(HEARTBEAT_INDEX_KEY);
-  const records = await Promise.all(ids.map(async (id) => {
-    const [state, metadata] = await Promise.all([
-      redis.get<HeartbeatRecord>(`ea:heartbeat:state:${id}`),
-      redis.get<HeartbeatMetadata>(`ea:heartbeat:meta:${id}`),
-    ]);
-    if (!metadata) {
-      await redis.srem(HEARTBEAT_INDEX_KEY, id);
-      return null;
+  if (!redis) return { configured: false, heartbeats: sortHeartbeats(getMemoryHeartbeats()) };
+
+  try {
+    const ids = await redis.smembers(HEARTBEAT_INDEX_KEY);
+    const records = await Promise.all(ids.map(async (id) => {
+      const [state, metadata] = await Promise.all([
+        redis.get<HeartbeatRecord>(`ea:heartbeat:state:${id}`),
+        redis.get<HeartbeatMetadata>(`ea:heartbeat:meta:${id}`),
+      ]);
+      if (!metadata) {
+        await redis.srem(HEARTBEAT_INDEX_KEY, id);
+        return null;
+      }
+      return state ?? offlineRecord(metadata);
+    }));
+
+    const merged = new Map<string, HeartbeatRecord>();
+    for (const record of [...getMemoryHeartbeats(), ...records.filter((item): item is HeartbeatRecord => item !== null)]) {
+      const id = heartbeatId(record);
+      const previous = merged.get(id);
+      if (!previous || Date.parse(record.last_seen_utc) >= Date.parse(previous.last_seen_utc)) {
+        merged.set(id, record);
+      }
     }
-    if (state) return state;
-    return {
-      ...metadata,
-      balance: null,
-      equity: null,
-      floating_pnl: null,
-      drawdown_pct: null,
-      open_positions: null,
-      status: 'OFFLINE',
-      heartbeat_status: 'OFFLINE' as const,
-    };
-  }));
-  return {
-    configured: true,
-    heartbeats: records.filter((record): record is HeartbeatRecord => record !== null)
-      .sort((left, right) => left.ea_name.localeCompare(right.ea_name)
-        || left.account_number.localeCompare(right.account_number)),
-  };
+    return { configured: true, heartbeats: sortHeartbeats([...merged.values()]) };
+  } catch (error) {
+    warnOnce('read-failure', 'Upstash heartbeat read failed; serving in-process TTL snapshots.', error);
+    return { configured: false, heartbeats: sortHeartbeats(getMemoryHeartbeats()) };
+  }
 }
 
 export function parseHeartbeatInput(value: unknown): HeartbeatInput | null {

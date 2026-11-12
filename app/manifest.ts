@@ -2,15 +2,15 @@ import { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'MacroLync Institutional Terminal',
+    name: 'MacroLync & AlgoLync Terminal',
     short_name: 'MacroLync',
-    description: 'Quantitative FX and macro intelligence with MT5 signal and telemetry integration.',
+    description: 'MacroLync FX research and AlgoLync strategy monitoring with MT5 signal and telemetry integration.',
     start_url: '/',
-    id: '/?source=pwa',
+    id: '/',
     display: 'standalone',
     orientation: 'portrait',
     background_color: '#080a0f',
-    theme_color: '#10B981',
+    theme_color: '#10b981',
     categories: ['finance', 'business'],
     prefer_related_applications: false,
     related_applications: [],
@@ -19,13 +19,19 @@ export default function manifest(): MetadataRoute.Manifest {
         src: '/icon-192x192.png',
         sizes: '192x192',
         type: 'image/png',
-        purpose: 'maskable'
+        purpose: 'any',
+      },
+      {
+        src: '/icon-192x192.png',
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'maskable',
       },
       {
         src: '/icon-512x512.png',
         sizes: '512x512',
         type: 'image/png',
-        purpose: 'any'
+        purpose: 'any',
       }
     ],
     screenshots: [
@@ -45,9 +51,9 @@ export default function manifest(): MetadataRoute.Manifest {
     shortcuts: [{
       name: 'AlgoLync Vault',
       short_name: 'AlgoLync',
-      description: 'Open the private algorithm vault and EA fleet monitor.',
+      description: 'Open the AlgoLync strategy store and live EA fleet monitor.',
       url: '/store',
       icons: [{ src: '/icon-192x192.png', sizes: '192x192', type: 'image/png' }],
-    }]
-  }
+    }],
+  };
 }

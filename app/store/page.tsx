@@ -1,7 +1,15 @@
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import type { Metadata } from 'next';
 import StoreTerminal from '@/app/components/StoreTerminal';
 import { getHeartbeatFleet } from '@/lib/eaHeartbeat';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'AlgoLync Store & Live EA Monitor',
+  description: 'AlgoLync strategy vault, live expert-advisor fleet telemetry, and the MacroLync MT5 signal bridge.',
+};
 
 export default async function AlgoLyncStorePage() {
   let fleet = { configured: false, heartbeats: [] as Awaited<ReturnType<typeof getHeartbeatFleet>>['heartbeats'] };
@@ -13,5 +21,6 @@ export default async function AlgoLyncStorePage() {
     telemetryError = 'Upstash telemetry is temporarily unavailable.';
   }
 
-  return <StoreTerminal initialFleet={fleet} telemetryError={telemetryError} />;
+  const bridgeSource = await readFile(join(process.cwd(), 'public', 'mql5', 'MacroLyncBridge.mqh'), 'utf8');
+  return <StoreTerminal initialFleet={fleet} telemetryError={telemetryError} bridgeSource={bridgeSource} />;
 }
