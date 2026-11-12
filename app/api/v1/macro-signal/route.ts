@@ -1,3 +1,4 @@
+import { getRoroSentiment } from '@/lib/roroEngine';
 import { NextResponse } from 'next/server';
 import { isAlgoApiConfigured, isAlgoAuthorized, isSameOriginBrowserRequest } from '@/lib/algoAuth';
 import { getMacroSignal, isSupportedSignalSymbol } from '@/lib/signalEngine';
@@ -7,7 +8,10 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   const sameOriginPreview = isSameOriginBrowserRequest(request);
   if (!isAlgoApiConfigured() && !sameOriginPreview) {
-    return NextResponse.json({ error: 'The private algorithm API is not configured.' }, { status: 503 });
+    const roro = await getRoroSentiment();
+  return NextResponse.json({
+    roro_regime: roro.regime,
+    roro_score: roro.score, error: 'The private algorithm API is not configured.' }, { status: 503 });
   }
   if (!sameOriginPreview && !isAlgoAuthorized(request)) {
     return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });

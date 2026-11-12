@@ -9,6 +9,7 @@ struct MacroLyncSignal
    string regime;
    string session;
    string correlation_group;
+   string roro_regime;
    int confluence_score;
    double csi_spread;
    string killzone_active;
