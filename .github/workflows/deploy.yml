@@ -27,6 +27,7 @@ jobs:
           npm run build
 
       - name: Setup Supabase CLI
+        if: ${{ vars.DEPLOY_SUPABASE_EDGE_FUNCTIONS == 'true' }}
         uses: supabase/setup-cli@v1
         with:
           version: latest
@@ -40,4 +41,13 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       - name: Deploy Production Build to Vercel
+        if: ${{ vars.DEPLOY_VERCEL == 'true' }}
         run: npx vercel --prod --token=${{ secrets.VERCEL_TOKEN }} --confirm
+
+      - name: Report skipped Supabase deployment
+        if: ${{ vars.DEPLOY_SUPABASE_EDGE_FUNCTIONS != 'true' }}
+        run: echo "::notice::Supabase Edge Function deployment skipped; set the DEPLOY_SUPABASE_EDGE_FUNCTIONS repository variable and SUPABASE_ACCESS_TOKEN secret to enable it."
+
+      - name: Report skipped Vercel deployment
+        if: ${{ vars.DEPLOY_VERCEL != 'true' }}
+        run: echo "::notice::Vercel deployment skipped; set the DEPLOY_VERCEL repository variable and VERCEL_TOKEN secret to enable it."
