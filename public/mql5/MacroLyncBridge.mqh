@@ -412,3 +412,87 @@ void MacroLyncHeartbeatEveryFiveMinutes(
 }
 
 #endif
+
+
+//+------------------------------------------------------------------+
+//| Local UTC Rollover Guard (20:45 - 22:15 UTC)                     |
+//+------------------------------------------------------------------+
+bool IsLocalRolloverWindow()
+{
+   MqlDateTime dt;
+   TimeGMT(dt);
+   int mins = dt.hour * 60 + dt.min;
+   return (mins >= 1245 && mins <= 1335);
+}
+
+//+------------------------------------------------------------------+
+//| Offline Strategy Tester Macro Regime Simulator                   |
+//| Runs automatically when MQLInfoInteger(MQL_TESTER) is true       |
+//+------------------------------------------------------------------+
+bool SimulateTesterSignal(const string symbol, MacroSignal &outSignal)
+{
+   outSignal.Reset();
+   outSignal.symbol = symbol;
+   outSignal.rollover_blackout = IsLocalRolloverWindow();
+
+   // Block illiquid Scandinavian crosses automatically
+   if(StringFind(symbol, "NOK") >= 0 || StringFind(symbol, "SEK") >= 0)
+   {
+      outSignal.safe_to_trade = false;
+      outSignal.bias = "NEUTRAL";
+      return true;
+   }
+
+   // Use D1 EMA-20 vs EMA-50 + H4 ADX + H1 ATR as deterministic offline macro proxy
+   int hFast = iMA(symbol, PERIOD_D1, 20, 0, MODE_EMA, PRICE_CLOSE);
+   int hSlow = iMA(symbol, PERIOD_D1, 50, 0, MODE_EMA, PRICE_CLOSE);
+   int hAdx  = iADX(symbol, PERIOD_H4, 14);
+   int hAtr  = iATR(symbol, PERIOD_H1, 14);
+
+   double fast[], slow[], adx[], atr[];
+   ArraySetAsSeries(fast, true);
+   ArraySetAsSeries(slow, true);
+   ArraySetAsSeries(adx, true);
+   ArraySetAsSeries(atr, true);
+
+   if(CopyBuffer(hFast, 0, 0, 2, fast) < 2 ||
+      CopyBuffer(hSlow, 0, 0, 2, slow) < 2 ||
+      CopyBuffer(hAdx,  0, 0, 2, adx)  < 2 ||
+      CopyBuffer(hAtr,  0, 0, 2, atr)  < 2)
+   {
+      IndicatorRelease(hFast); IndicatorRelease(hSlow);
+      IndicatorRelease(hAdx);  IndicatorRelease(hAtr);
+      return false;
+   }
+
+   double point  = SymbolInfoDouble(symbol, SYMBOL_POINT);
+   int    digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
+   double pipMult = (digits == 3 || digits == 5) ? 10.0 : 1.0;
+
+   double spreadPct = (slow[0] > 0.0) ? ((fast[0] - slow[0]) / slow[0]) * 100.0 : 0.0;
+   outSignal.atr_sl_pips = (point > 0.0) ? (atr[0] * 1.5) / (point * pipMult) : 25.0;
+   outSignal.news_lockout = false;
+
+   if(adx[0] >= 22.0 && MathAbs(spreadPct) >= 0.35)
+   {
+      outSignal.regime = "TRENDING_EXPANSION";
+      outSignal.bias   = (spreadPct > 0.0) ? "LONG" : "SHORT";
+      outSignal.roro_regime = (spreadPct > 0.0) ? "RISK_ON" : "RISK_OFF";
+      outSignal.confluence_score = MathMin(95.0, 65.0 + adx[0] * 0.6);
+      outSignal.risk_multiplier  = (adx[0] >= 30.0) ? 1.0 : 0.75;
+      outSignal.safe_to_trade    = !outSignal.rollover_blackout;
+   }
+   else
+   {
+      outSignal.regime = "MEAN_REVERTING";
+      outSignal.bias   = "NEUTRAL";
+      outSignal.roro_regime = "NEUTRAL";
+      outSignal.confluence_score = 40.0;
+      outSignal.risk_multiplier  = 0.0;
+      outSignal.safe_to_trade    = false;
+   }
+
+   IndicatorRelease(hFast); IndicatorRelease(hSlow);
+   IndicatorRelease(hAdx);  IndicatorRelease(hAtr);
+   return true;
+}
