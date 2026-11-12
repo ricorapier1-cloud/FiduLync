@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
-import * as sourceMod from '@/lib/currencyStrength';
+import { getCurrencyStrengthIndex } from '@/lib/currencyStrength';
 import { getTopExecutablePair, isRolloverActive } from '@/lib/institutionalGuards';
+import { getMacroSnapshot } from '@/lib/macroEngine';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const loader = (sourceMod as Record<string, unknown>)['getCurrencyStrengthIndex'];
-    const rawData = typeof loader === 'function' ? await (loader as () => Promise<unknown>)() : [];
-    const top = getTopExecutablePair(rawData);
+    const snapshot = await getMacroSnapshot();
+    const top = getTopExecutablePair(getCurrencyStrengthIndex(snapshot));
     const rollover = isRolloverActive();
 
     return NextResponse.json(
@@ -25,17 +25,11 @@ export async function GET() {
       },
       { headers: { 'Cache-Control': 's-maxage=30, stale-while-revalidate=60' } }
     );
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
+  } catch (error) {
+    console.error('Top pairs request failed:', error);
     return NextResponse.json(
-      {
-        top_executable_pair: 'USDJPY',
-        recommended_direction: 'LONG',
-        rollover_blackout: isRolloverActive(),
-        fallback: true,
-        error: message,
-      },
-      { status: 200 }
+      { error: 'Top pair data is temporarily unavailable.' },
+      { status: 503, headers: { 'Cache-Control': 'private, no-store, max-age=0' } }
     );
   }
 }

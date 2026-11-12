@@ -1,5 +1,6 @@
 'use client';
 
+import TopPairBanner from '@/components/TopPairBanner';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import BrandGlyph from '@/components/BrandGlyph';
@@ -16,6 +17,12 @@ const pairs = [
   { symbol: 'USDJPY', base: 'USD', quote: 'JPY' },
   { symbol: 'GBPUSD', base: 'GBP', quote: 'USD' },
   { symbol: 'AUDUSD', base: 'AUD', quote: 'USD' },
+  { symbol: 'NZDUSD', base: 'NZD', quote: 'USD' },
+  { symbol: 'USDCAD', base: 'USD', quote: 'CAD' },
+  { symbol: 'USDCHF', base: 'USD', quote: 'CHF' },
+  { symbol: 'EURJPY', base: 'EUR', quote: 'JPY' },
+  { symbol: 'GBPJPY', base: 'GBP', quote: 'JPY' },
+  { symbol: 'AUDJPY', base: 'AUD', quote: 'JPY' },
   { symbol: 'XAUUSD', base: 'XAU', quote: 'USD' },
 ] as const;
 
@@ -254,6 +261,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
         </div>
       </section>
 
+      <TopPairBanner />
       <div className="macro-two-column">
         <section id="bias" className="macro-section" aria-labelledby="bias-title">
           <div className="macro-section-heading"><div><span className="eyebrow">02 / RELATIVE VALUE</span><h2 id="bias-title">Pair bias analyzer</h2></div><span className="macro-section-note mono">RULE-BASED MODEL</span></div>
