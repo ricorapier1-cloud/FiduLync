@@ -16,7 +16,6 @@ export async function getRoroSentiment(): Promise<RoroSnapshot> {
   }
 
   let audjpy = 109.5;
-  let usdchf = 0.83;
 
   try {
     const res = await fetch('https://api.frankfurter.app/latest?from=AUD&to=JPY,USD,CHF', {
@@ -25,9 +24,6 @@ export async function getRoroSentiment(): Promise<RoroSnapshot> {
     if (res.ok) {
       const json = await res.json();
       if (json?.rates?.JPY) audjpy = Number(json.rates.JPY);
-      if (json?.rates?.CHF && json?.rates?.USD) {
-        usdchf = Number(json.rates.CHF) / Number(json.rates.USD);
-      }
     }
   } catch {
     // Fallback to baseline institutional reference levels

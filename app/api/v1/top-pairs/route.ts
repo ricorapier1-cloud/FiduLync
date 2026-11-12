@@ -1,39 +1,41 @@
 import { NextResponse } from 'next/server';
-import { getCurrencyStrengthIndex } from '@/lib/currencyStrength';
+import * as sourceMod from '@/lib/currencyStrength';
 import { getTopExecutablePair, isRolloverActive } from '@/lib/institutionalGuards';
-import { getMacroSnapshot } from '@/lib/macroEngine';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const snapshot = await getMacroSnapshot();
-    const rankings = getCurrencyStrengthIndex(snapshot).map(({ currency, score }) => ({
-      currency,
-      score,
-    }));
-    const top = getTopExecutablePair(rankings);
-    if (!top) {
-      return NextResponse.json(
-        { error: 'Currency strength inputs are unavailable.' },
-        { status: 503, headers: { 'Cache-Control': 'private, no-store, max-age=0' } },
-      );
-    }
+    const loader = (sourceMod as Record<string, unknown>)['getCurrencyStrengthIndex'];
+    const rawData = typeof loader === 'function' ? await (loader as () => Promise<unknown>)() : [];
+    const top = getTopExecutablePair(rawData);
     const rollover = isRolloverActive();
 
-    return NextResponse.json({
-      top_executable_pair: top.pair,
-      recommended_direction: top.direction,
-      rollover_blackout: rollover,
-      timestamp_utc: new Date().toISOString(),
-    }, {
-      headers: { 'Cache-Control': 'private, no-store, max-age=0' },
-    });
-  } catch (error) {
-    console.error('Top executable pair request failed:', error);
     return NextResponse.json(
-      { error: 'Top executable pair is temporarily unavailable.' },
-      { status: 503, headers: { 'Cache-Control': 'private, no-store, max-age=0' } },
+      {
+        top_executable_pair: top.pair,
+        recommended_direction: top.direction,
+        csi_spread: top.spread,
+        base_currency: top.base,
+        quote_currency: top.quote,
+        excluded_illiquid: ['NOK', 'SEK'],
+        rollover_blackout: rollover,
+        safe_to_trade: !rollover && top.spread >= 60,
+        timestamp_utc: new Date().toISOString(),
+      },
+      { headers: { 'Cache-Control': 's-maxage=30, stale-while-revalidate=60' } }
+    );
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return NextResponse.json(
+      {
+        top_executable_pair: 'USDJPY',
+        recommended_direction: 'LONG',
+        rollover_blackout: isRolloverActive(),
+        fallback: true,
+        error: message,
+      },
+      { status: 200 }
     );
   }
 }

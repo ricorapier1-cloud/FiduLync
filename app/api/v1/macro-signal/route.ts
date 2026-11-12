@@ -1,3 +1,4 @@
+import { isRolloverActive } from '@/lib/institutionalGuards';
 import { getRoroSentiment } from '@/lib/roroEngine';
 import { NextResponse } from 'next/server';
 import { isAlgoApiConfigured, isAlgoAuthorized, isSameOriginBrowserRequest } from '@/lib/algoAuth';
@@ -10,6 +11,7 @@ export async function GET(request: Request) {
   if (!isAlgoApiConfigured() && !sameOriginPreview) {
     const roro = await getRoroSentiment();
   return NextResponse.json({
+    rollover_blackout: isRolloverActive(),
     roro_regime: roro.regime,
     roro_score: roro.score, error: 'The private algorithm API is not configured.' }, { status: 503 });
   }
