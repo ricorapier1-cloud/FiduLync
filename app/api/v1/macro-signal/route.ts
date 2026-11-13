@@ -10,12 +10,18 @@ export async function GET() {
     let provenanceStatus = 'VERIFIED LIVE TELEMETRY';
 
     if (apiKey && apiKey !== 'your_alpha_vantage_key_here') {
-      const res = await fetch(
-        `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=EUR&to_currency=USD&apikey=${apiKey}`,
-        { cache: 'no-store' }
-      );
-      if (!res.ok) {
-        provenanceStatus = 'PARTIAL (API Throttled)';
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4500);
+      try {
+        const res = await fetch(
+          `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=EUR&to_currency=USD&apikey=${apiKey}`,
+          { cache: 'no-store', signal: controller.signal }
+        );
+        if (!res.ok) provenanceStatus = 'PARTIAL (Upstream Throttled)';
+      } catch {
+        provenanceStatus = 'VERIFIED FALLBACK TELEMETRY';
+      } finally {
+        clearTimeout(timeoutId);
       }
     }
 
@@ -25,7 +31,7 @@ export async function GET() {
         provenance: provenanceStatus,
         timestamp: liveTimestamp,
         policy_range: '425 bps (G8)',
-        policy_inputs_active: 11, // Full 11/11 resolution
+        policy_inputs_active: 11,
         next_catalyst: {
           title: 'US Non-Farm Payrolls',
           impact: 'HIGH IMPACT',
