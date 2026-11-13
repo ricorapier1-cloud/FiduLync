@@ -11,14 +11,12 @@ export default function StorePage() {
           </Link>
           <span className="text-xs font-mono text-emerald-400/70">INSTITUTIONAL LICENSING</span>
         </div>
-
         <div className="text-center mb-10">
           <h1 className="text-3xl font-bold tracking-tight mb-3">AlgoLync Vault</h1>
           <p className="text-sm text-emerald-200/70 max-w-xl mx-auto">
             Automated account-bound licensing with live MacroLync rollover protection and cloud heartbeat telemetry.
           </p>
         </div>
-
         <PaystackCheckout />
       </div>
     </main>

@@ -32,9 +32,7 @@ export function PaystackCheckout() {
         return;
       }
 
-      if (data.license_key) {
-        setLicenseKey(data.license_key);
-      }
+      if (data.license_key) setLicenseKey(data.license_key);
     } catch {
       setErrorMsg('Network error during checkout initialization');
     } finally {

@@ -1,5 +1,3 @@
--- MacroLync & AlgoLync Production Schema (Run in Supabase SQL Editor)
-
 CREATE TABLE IF NOT EXISTS public.licenses (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     license_key TEXT UNIQUE NOT NULL,

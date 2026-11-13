@@ -22,7 +22,6 @@ export async function POST(req: Request) {
     const paystackSecret = process.env.PAYSTACK_SECRET_KEY || '';
     const reference = `ALGO_${mt5Account}_${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 
-    // If Paystack live/test secret is configured, initialize real Paystack checkout
     if (paystackSecret.startsWith('sk_')) {
       const origin = req.headers.get('origin') || 'https://fidulync.vercel.app';
       const psRes = await fetch('https://api.paystack.co/transaction/initialize', {
@@ -33,13 +32,10 @@ export async function POST(req: Request) {
         },
         body: JSON.stringify({
           email,
-          amount: 15000000, // NGN 150,000 in kobo (adjust currency/amount in Paystack dashboard)
+          amount: 15000000,
           reference,
           callback_url: `${origin}/store?ref=${reference}`,
-          metadata: {
-            mt5_account: mt5Account,
-            tier: 'INSTITUTIONAL_PRO',
-          },
+          metadata: { mt5_account: mt5Account, tier: 'INSTITUTIONAL_PRO' },
         }),
       });
 
@@ -54,7 +50,6 @@ export async function POST(req: Request) {
       }
     }
 
-    // Fallback instant provisioning when running in sandbox/unconfigured mode
     const licenseKey = `ALGOLYNX-${mt5Account}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
     return NextResponse.json({
       success: true,
