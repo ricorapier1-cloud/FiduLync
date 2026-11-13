@@ -4,6 +4,7 @@
 //+------------------------------------------------------------------+
 #property copyright "MacroLync & Algolync Store"
 #property link      "https://fidulync.vercel.app"
+#property version   "1.02"
 
 bool VerifyAlgolyncLicense(string licenseKey, long mt5Account)
 {
