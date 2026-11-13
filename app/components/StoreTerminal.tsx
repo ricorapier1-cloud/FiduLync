@@ -82,6 +82,54 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
   const [signalError, setSignalError] = useState('');
   const [testing, setTesting] = useState(false);
   const [copyState, setCopyState] = useState('');
+  const [licenseKeyInput, setLicenseKeyInput] = useState('ALGOLYNX-PRO-98421');
+  const [mt5AccountInput, setMt5AccountInput] = useState('');
+  const [verifyingLicense, setVerifyingLicense] = useState(false);
+  const [licenseResponse, setLicenseResponse] = useState<{
+    valid: boolean;
+    message?: string;
+    account?: string;
+    license_type?: string;
+    tier?: string;
+    expires_at?: string | null;
+    error?: string;
+  } | null>(null);
+
+  async function testLicenseVerification() {
+    if (!licenseKeyInput.trim() || !mt5AccountInput.trim()) {
+      setLicenseResponse({
+        valid: false,
+        error: 'Please enter both your License Key and MT5 Account login number.',
+      });
+      return;
+    }
+    setVerifyingLicense(true);
+    setLicenseResponse(null);
+    try {
+      const res = await fetch('/api/v1/validate-license', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          license_key: licenseKeyInput.trim(),
+          mt5_account: mt5AccountInput.trim(),
+        }),
+      });
+      const data = await res.json();
+      setLicenseResponse(data);
+    } catch {
+      setLicenseResponse({
+        valid: false,
+        error: 'Unable to connect to license verification endpoint.',
+      });
+    } finally {
+      setVerifyingLicense(false);
+    }
+  }
+
+  function generateSampleKey() {
+    const randomSuffix = Math.floor(10000 + Math.random() * 90000);
+    setLicenseKeyInput(`ALGOLYNX-VIP-${randomSuffix}`);
+  }
   const currencyStrength = getCurrencyStrengthIndex(initialSnapshot);
 
   useEffect(() => {
@@ -143,13 +191,22 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
               Proprietary strategy architecture, VPS fleet telemetry, and the MacroLync execution bridge.
             </p>
           </div>
-          <a
-            href="/mql5/MacroLyncBridge.mqh"
-            download
-            className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-emerald-300/25 bg-emerald-300/[0.07] px-4 text-xs font-medium text-emerald-100 transition hover:bg-emerald-300/[0.12]"
-          >
-            <BrandGlyph name="arrow-down" size={15} /> Download MT5 include
-          </a>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <a
+              href="/mql5/MacroLyncLicense.mqh"
+              download
+              className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-emerald-300/30 bg-emerald-300/[0.1] px-3.5 text-xs font-medium text-emerald-100 transition hover:bg-emerald-300/[0.16]"
+            >
+              <BrandGlyph name="arrow-down" size={15} /> License Helper (.mqh)
+            </a>
+            <a
+              href="/mql5/MacroLyncBridge.mqh"
+              download
+              className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-white/[0.12] bg-white/[0.05] px-3.5 text-xs font-medium text-slate-200 transition hover:bg-white/[0.08]"
+            >
+              <BrandGlyph name="arrow-down" size={15} /> Signal Bridge (.mqh)
+            </a>
+          </div>
         </div>
 
         <section className="mt-7 rounded-xl border border-white/[0.08] bg-[#0c1016] p-4 sm:p-5" aria-label="Market state">
@@ -362,6 +419,146 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
                   </table>
                 </div>
               )}
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-11" aria-labelledby="licensing-heading">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <div className="font-mono text-[9px] tracking-[0.17em] text-slate-500">06 / CLIENT LICENSING & ONE-TIME ACTIVATION</div>
+              <h2 id="licensing-heading" className="mt-1 text-lg font-semibold">Terminal Authorization & Key Manager</h2>
+            </div>
+            <div className="flex items-center gap-2 font-mono text-[9px] text-slate-400">
+              <BrandGlyph name="shield" size={13} className="text-emerald-400" />
+              ONE-TIME LIFETIME PURCHASE VALIDATION
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+            <div className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-5 sm:p-6">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-[10px] uppercase tracking-wider text-emerald-300">License Verification Console</span>
+                <button
+                  type="button"
+                  onClick={generateSampleKey}
+                  className="font-mono text-[10px] text-slate-400 underline decoration-slate-600 transition hover:text-emerald-300"
+                >
+                  Generate Key
+                </button>
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="license-key-input" className="block font-mono text-[9px] tracking-wide text-slate-500">
+                    ONE-TIME LICENSE KEY
+                  </label>
+                  <input
+                    id="license-key-input"
+                    type="text"
+                    value={licenseKeyInput}
+                    onChange={(e) => setLicenseKeyInput(e.target.value)}
+                    placeholder="ALGOLYNX-PRO-XXXXX"
+                    className="mt-1.5 h-10 w-full rounded-md border border-white/[0.1] bg-[#080a0f] px-3 font-mono text-xs text-slate-100 outline-none focus:border-emerald-300/40"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="mt5-account-input" className="block font-mono text-[9px] tracking-wide text-slate-500">
+                    MT5 ACCOUNT LOGIN NUMBER
+                  </label>
+                  <input
+                    id="mt5-account-input"
+                    type="text"
+                    value={mt5AccountInput}
+                    onChange={(e) => setMt5AccountInput(e.target.value)}
+                    placeholder="e.g. 5839201"
+                    className="mt-1.5 h-10 w-full rounded-md border border-white/[0.1] bg-[#080a0f] px-3 font-mono text-xs text-slate-100 outline-none focus:border-emerald-300/40"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={testLicenseVerification}
+                disabled={verifyingLicense}
+                className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-emerald-400 px-4 text-xs font-semibold text-[#07120d] transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <BrandGlyph name="shield" size={14} />
+                {verifyingLicense ? 'Verifying Terminal...' : 'Verify & Authorize MT5 Account'}
+              </button>
+
+              {licenseResponse && (
+                <div
+                  className={`mt-4 rounded-lg border p-4 ${
+                    licenseResponse.valid
+                      ? 'border-emerald-400/25 bg-emerald-400/[0.04]'
+                      : 'border-rose-400/25 bg-rose-400/[0.04]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`font-mono text-xs font-semibold ${
+                        licenseResponse.valid ? 'text-emerald-300' : 'text-rose-300'
+                      }`}
+                    >
+                      {licenseResponse.valid ? 'TERMINAL AUTHORIZED' : 'VERIFICATION REJECTED'}
+                    </span>
+                    <span className="font-mono text-[9px] text-slate-400">
+                      {licenseResponse.tier || 'Standard'}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-300">
+                    {licenseResponse.message || licenseResponse.error}
+                  </p>
+                  {licenseResponse.valid && (
+                    <div className="mt-3 grid grid-cols-2 gap-2 border-t border-white/[0.06] pt-3 font-mono text-[10px]">
+                      <div>
+                        <span className="text-slate-500">BOUND ACCOUNT:</span>
+                        <div className="text-slate-200">{licenseResponse.account}</div>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">LICENSE DURATION:</span>
+                        <div className="text-emerald-300">One-Time Lifetime</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-5 sm:p-6">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-slate-400">MetaTrader 5 Setup Checklist</span>
+              <ol className="mt-3 space-y-3 text-xs leading-5 text-slate-300">
+                <li className="flex items-start gap-2.5">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-400/10 font-mono text-[10px] text-emerald-300">1</span>
+                  <span>
+                    Download <strong className="text-slate-100">MacroLyncLicense.mqh</strong> and place it into your MT5 terminal folder: <code className="rounded bg-black/40 px-1 py-0.5 font-mono text-[10px] text-emerald-200">MQL5/Include/</code>.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-400/10 font-mono text-[10px] text-emerald-300">2</span>
+                  <span>
+                    In MT5, open <strong className="text-slate-100">Tools → Options → Expert Advisors</strong>. Check <strong className="text-slate-100">Allow WebRequest for listed URL</strong>.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-400/10 font-mono text-[10px] text-emerald-300">3</span>
+                  <div className="w-full">
+                    <span>Add this exact server URL to the allowlist:</span>
+                    <div className="mt-1.5 flex items-center justify-between rounded border border-white/[0.08] bg-black/30 px-2.5 py-1.5 font-mono text-[10px] text-emerald-300">
+                      <span>https://fidulync.vercel.app</span>
+                      <button
+                        type="button"
+                        onClick={() => void copyText('Server origin', 'https://fidulync.vercel.app')}
+                        className="text-slate-400 hover:text-white"
+                        title="Copy URL"
+                      >
+                        <BrandGlyph name="copy" size={12} />
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              </ol>
             </div>
           </div>
         </section>
