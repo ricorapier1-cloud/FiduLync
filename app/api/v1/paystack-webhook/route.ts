@@ -42,8 +42,11 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ status: 'ignored_event' }, { status: 200 });
-  } catch (err: any) {
-    console.error('[Paystack Webhook Error]', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (error) {
+    console.error('[Paystack Webhook Error]', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

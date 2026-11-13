@@ -24,7 +24,10 @@ export async function POST(req: Request) {
     } else {
       return NextResponse.json({ valid: false, error: 'Invalid or expired Algolync license key.' }, { status: 403 });
     }
-  } catch (err: any) {
-    return NextResponse.json({ valid: false, error: err.message || 'Internal server error' }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json(
+      { valid: false, error: error instanceof Error ? error.message : 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
