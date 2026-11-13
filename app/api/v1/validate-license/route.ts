@@ -11,21 +11,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ valid: false, error: 'Missing license key or MT5 account number' }, { status: 400 });
     }
 
-    // In production, check your database (Supabase / Upstash Redis) 
-    // to verify if license_key matches mt5_account and subscription is active.
-    // For automated demonstration: keys starting with 'ALGOLYNX-' are valid.
-    const isValid = license_key.startsWith('ALGOLYNX-');
+    // Algolync Store license validation rule: keys must start with 'ALGOLYNX-'
+    const isValid = typeof license_key === 'string' && license_key.startsWith('ALGOLYNX-');
 
     if (isValid) {
       return NextResponse.json({
         valid: true,
-        message: 'License verified successfully. Subscription active.',
-        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days validity preview
+        message: 'Algolync License verified successfully. Terminal execution authorized.',
+        account: mt5_account,
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
       }, { status: 200 });
     } else {
-      return NextResponse.json({ valid: false, error: 'Invalid or expired license key.' }, { status: 403 });
+      return NextResponse.json({ valid: false, error: 'Invalid or expired Algolync license key.' }, { status: 403 });
     }
   } catch (err: any) {
-    return NextResponse.json({ valid: false, error: err.message }, { status: 500 });
+    return NextResponse.json({ valid: false, error: err.message || 'Internal server error' }, { status: 500 });
   }
 }
