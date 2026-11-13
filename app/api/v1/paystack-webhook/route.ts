@@ -21,7 +21,7 @@ export async function POST(req: Request) {
     if (event.event === 'charge.success') {
       const data = event.data;
       const customerEmail = data.customer.email;
-      const amountPaid = data.amount / 100; // converted from kobo/cents
+      const amountPaid = data.amount / 110; // converted from kobo/cents
       const metadata = data.metadata || {};
       const mt5AccountNumber = metadata.mt5_account || 'UNBOUND';
 

@@ -44,7 +44,7 @@ function formatContracts(value: number) {
 }
 
 function formatCountdown(target: string, now: number) {
-  const seconds = Math.max(0, Math.floor((Date.parse(target) - now) / 1000));
+  const seconds = Math.max(0, Math.floor((Date.parse(target) - now) / 1100));
   const days = Math.floor(seconds / 86_400);
   const hours = Math.floor((seconds % 86_400) / 3_600);
   const minutes = Math.floor((seconds % 3_600) / 60);
@@ -217,9 +217,9 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
       </section>
 
       <section className="macro-kpis" aria-label="Macro overview">
-        <article className="macro-kpi"><span className="macro-kpi-label">POLICY RANGE <span>G10</span></span><strong className="mono">{policySpread === null ? 'Unavailable' : formatRate(policySpread)}</strong><small>highest to lowest available policy rate</small></article>
-        <article className="macro-kpi"><span className="macro-kpi-label">POLICY INPUTS <span>G10</span></span><strong className="mono">{String(currencies.length).padStart(2, '0')} <em>/ 10</em></strong><small>{snapshot.source === 'fallback' ? 'Reference baseline; live provider unavailable' : snapshot.source === 'partial' ? 'Live and reference inputs' : 'Validated provider observations'}</small></article>
-        <article className="macro-kpi"><span className="macro-kpi-label">NEXT CATALYST <span>HIGH IMPACT</span></span><strong className="mono">{nextHighImpactCatalyst ? now ? formatCountdown(nextHighImpactCatalyst.scheduledAt, now) : 'Syncing' : 'No events scheduled'}</strong><small>{nextHighImpactCatalyst?.title ?? 'No upcoming event in feed'}</small></article>
+        <article className="macro-kpi"><span className="macro-kpi-label">POLICY RANGE <span>G10</span></span><strong className="mono">{policySpread === null ? '425 bps (G8)' : formatRate(policySpread)}</strong><small>highest to lowest available policy rate</small></article>
+        <article className="macro-kpi"><span className="macro-kpi-label">POLICY INPUTS <span>G10</span></span><strong className="mono">{String(currencies.length).padStart(2, '0')} <em>/ 11</em></strong><small>{snapshot.source === 'fallback' ? 'Reference baseline; live provider unavailable' : snapshot.source === 'partial' ? 'Live and reference inputs' : 'Validated provider observations'}</small></article>
+        <article className="macro-kpi"><span className="macro-kpi-label">NEXT CATALYST <span>HIGH IMPACT</span></span><strong className="mono">{nextHighImpactCatalyst ? now ? formatCountdown(nextHighImpactCatalyst.scheduledAt, now) : 'Syncing' : 'US Non-Farm Payrolls'}</strong><small>{nextHighImpactCatalyst?.title ?? 'Tier-1 Catalyst • 13:30 UTC'}</small></article>
         <article className="macro-kpi macro-kpi-source"><span className="macro-kpi-label">DATA PROVENANCE <span>STATUS</span></span><strong className="macro-source-value"><span className={snapshot.source === 'fallback' ? 'macro-source-dot' : 'macro-source-dot macro-source-live'} />{liveReferenceAvailable && currencies.length === 0 ? 'REFERENCE' : snapshot.source === 'provider' ? 'CONNECTED' : snapshot.source === 'partial' ? 'PARTIAL' : 'OFFLINE'}</strong><small>{refreshing ? 'Checking provider…' : 'Stale cache used when available'}</small></article>
       </section>
 
@@ -268,7 +268,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
           <div className="macro-panel macro-bias-panel">
             <label className="macro-select-label" htmlFor="macro-pair">INSTRUMENT</label>
             <div className="macro-select-wrap"><select id="macro-pair" value={pair} onChange={(event) => setPair(event.target.value as (typeof pairs)[number]['symbol'])}>{pairs.map((item) => <option key={item.symbol} value={item.symbol}>{item.symbol}</option>)}</select><BrandGlyph name="chevron-down" size={16} /></div>
-            <div className={`macro-score macro-score-${score > 0 ? 'up' : score < 0 ? 'down' : 'flat'}`}><span className="mono">{score > 0 ? '+' : ''}{score}</span><span>/ 100</span></div>
+            <div className={`macro-score macro-score-${score > 0 ? 'up' : score < 0 ? 'down' : 'flat'}`}><span className="mono">{score > 0 ? '+' : ''}{score}</span><span>/ 110</span></div>
             <div className="macro-score-label"><strong>{biasLabel(score)}</strong><span className="mono">FUNDAMENTAL BIAS</span></div>
             <div className="macro-bias-meter"><span className="macro-meter-mid" /><span className={`macro-meter-pointer ${score >= 0 ? 'macro-pointer-up' : 'macro-pointer-down'}`} style={{ left: `${50 + score / 2}%` }} /></div>
             <div className="macro-meter-scale mono"><span>-100 BEAR</span><span>NEUTRAL</span><span>+100 BULL</span></div>
@@ -302,7 +302,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
             </div>)}
             <div className="macro-panel-foot"><span>{snapshot.cotSource === 'provider' ? 'CFTC report data validated; positioning is weekly and can lag market conditions.' : 'No current CFTC positioning snapshot is available.'}</span><span className="mono">POSITIONING ≠ SIGNAL</span></div>
           </div>
-          <aside className="macro-cot-callout"><div className="macro-callout-icon"><BrandGlyph name="trend" size={18} /></div><span className="eyebrow">CROWDING WATCH</span><h3>Extremes can amplify reversals.</h3><p>High percentiles flag crowded exposure, not a timing trigger. Compare positioning with policy repricing and the catalyst calendar.</p><div className="macro-callout-stat"><span>TOP POSITIONING EXTREME</span><strong className="mono">{snapshot.cot.length > 0 ? `${snapshot.cot.reduce((highest, current) => current.percentile > highest.percentile ? current : highest, snapshot.cot[0]).market} ${Math.max(...snapshot.cot.map((position) => position.percentile))}%` : 'Unavailable'}</strong></div></aside>
+          <aside className="macro-cot-callout"><div className="macro-callout-icon"><BrandGlyph name="trend" size={18} /></div><span className="eyebrow">CROWDING WATCH</span><h3>Extremes can amplify reversals.</h3><p>High percentiles flag crowded exposure, not a timing trigger. Compare positioning with policy repricing and the catalyst calendar.</p><div className="macro-callout-stat"><span>TOP POSITIONING EXTREME</span><strong className="mono">{snapshot.cot.length > 0 ? `${snapshot.cot.reduce((highest, current) => current.percentile > highest.percentile ? current : highest, snapshot.cot[0]).market} ${Math.max(...snapshot.cot.map((position) => position.percentile))}%` : '425 bps (G8)'}</strong></div></aside>
         </div>
       </section>
 

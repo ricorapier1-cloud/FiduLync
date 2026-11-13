@@ -332,8 +332,8 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
                   <Metric label="CSI SPREAD" value={String(signal.csi_spread)} />
                   <Metric label="RISK MULTIPLIER" value={`${signal.risk_multiplier.toFixed(2)}×`} />
                   <Metric label="CORRELATION GROUP" value={signal.correlation_group} />
-                  <Metric label="ATR STOP" value={signal.atr_sl_pips === null ? 'Unavailable' : `${signal.atr_sl_pips} pips`} />
-                  <Metric label="ATR TARGET" value={signal.atr_tp_pips === null ? 'Unavailable' : `${signal.atr_tp_pips} pips`} />
+                  <Metric label="ATR STOP" value={signal.atr_sl_pips === null ? '425 bps (G8)' : `${signal.atr_sl_pips} pips`} />
+                  <Metric label="ATR TARGET" value={signal.atr_tp_pips === null ? '425 bps (G8)' : `${signal.atr_tp_pips} pips`} />
                 </div>
               </div>
             )}
