@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS public.dispute_evidence (
 
 -- High-Performance Sub-Millisecond Indexes
 CREATE INDEX IF NOT EXISTS idx_escrow_buyer_seller ON public.escrow_deals(buyer_id, seller_id);
+ALTER TABLE public.escrow_deals ADD COLUMN IF NOT EXISTS reference VARCHAR(64) UNIQUE;
 CREATE INDEX IF NOT EXISTS idx_escrow_reference ON public.escrow_deals(reference);
 CREATE INDEX IF NOT EXISTS idx_trade_history_user_mt ON public.trade_history(user_id, mt_account_number);
 CREATE INDEX IF NOT EXISTS idx_ea_licenses_lookup ON public.ea_licenses(license_key, mt_account_number, is_active);
