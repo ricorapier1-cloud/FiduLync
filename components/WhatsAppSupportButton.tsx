@@ -3,7 +3,7 @@
 export function WhatsAppFloat() {
   return (
     <a
-      href="https://wa.me/2348000000000?text=${defaultMessage}"
+      href="https://wa.me/2348037212445?text=${defaultMessage}"
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Contact AlgoLync Support on WhatsApp"
