@@ -1,47 +1,36 @@
-import crypto from 'crypto';
 import { NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { checkRateLimit } from '@/lib/rateLimit';
-import { isSupabaseConfigured, supabaseQuery } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
-function buildSandboxLicenseKey(mt5Account: number): string {
-  return `ALGOLYNX-${mt5Account}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
-}
-
-export async function GET() {
-  return NextResponse.json({
-    status: 'active',
-    endpoint: '/api/v1/create-checkout',
-    description: 'AlgoLync MT5 Cloud Gate checkout and license initialization gateway.',
-    methods: ['GET', 'POST'],
-  });
-}
+const PRICING: Record<'NGN' | 'USD', { minorUnits: number; label: string }> = {
+  NGN: { minorUnits: 15000000, label: '₦150,000 / mo' },
+  USD: { minorUnits: 10000, label: '$100 / mo' },
+};
 
 export async function POST(req: Request) {
   const ip = req.headers.get('x-forwarded-for') || '127.0.0.1';
-  if (!checkRateLimit(ip, 25, 60_000)) {
-    return NextResponse.json({ success: false, error: 'Too many checkout requests. Please wait.' }, { status: 429 });
+  if (!checkRateLimit(ip, 15, 60000)) {
+    return NextResponse.json({ success: false, error: 'Too many checkout requests.' }, { status: 429 });
   }
 
   try {
     const body = await req.json();
-    const email = String(body?.email ?? '').trim().toLowerCase();
-    const mt5Account = Number(body?.mt5_account ?? 0);
+    const email = String(body?.email || '').trim().toLowerCase();
+    const mt5Account = Number(body?.mt5_account || 0);
+    const currency = body?.currency === 'USD' ? 'USD' : 'NGN';
 
     if (!email.includes('@') || !Number.isFinite(mt5Account) || mt5Account <= 0) {
-      return NextResponse.json(
-        { success: false, error: 'Enter a valid email and MT5 account login number.' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: 'Enter a valid email and MT5 account number.' }, { status: 400 });
     }
 
-    const paystackSecret = process.env.PAYSTACK_SECRET_KEY?.trim() ?? '';
-    const reference = `ALGO_${mt5Account}_${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+    const paystackSecret = (process.env.PAYSTACK_SECRET_KEY || '').trim();
+    const reference = `ALGO_${currency}_${mt5Account}_${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 
     if (paystackSecret.startsWith('sk_')) {
-      const origin = req.headers.get('origin') ?? 'https://fidulync.vercel.app';
-      const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+      const origin = req.headers.get('origin') || 'https://fidulync.vercel.app';
+      const psRes = await fetch('https://api.paystack.co/transaction/initialize', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${paystackSecret}`,
@@ -49,56 +38,40 @@ export async function POST(req: Request) {
         },
         body: JSON.stringify({
           email,
-          amount: 15000000,
+          amount: PRICING[currency].minorUnits,
+          currency,
           reference,
           callback_url: `${origin}/store?ref=${reference}`,
-          metadata: {
-            mt5_account: mt5Account,
-            tier: 'INSTITUTIONAL_PRO',
-          },
+          metadata: { mt5_account: mt5Account, currency, tier: 'INSTITUTIONAL_PRO' },
         }),
       });
 
-      const paystackData = await paystackResponse.json();
-      if (paystackResponse.ok && paystackData?.status && paystackData?.data?.authorization_url) {
+      const psData = await psRes.json();
+      if (psData?.status && psData?.data?.authorization_url) {
         return NextResponse.json({
           success: true,
           mode: 'paystack_redirect',
-          authorization_url: paystackData.data.authorization_url,
+          authorization_url: psData.data.authorization_url,
           reference,
         });
       }
+      return NextResponse.json({
+        success: false,
+        error: psData?.message || `Paystack ${currency} initialization rejected. Ensure ${currency} is enabled in Paystack settings.`,
+      }, { status: 400 });
     }
 
-    const licenseKey = buildSandboxLicenseKey(mt5Account);
-
-    if (isSupabaseConfigured()) {
-      await supabaseQuery('licenses', {
-        method: 'POST',
-        prefer: 'resolution=merge-duplicates',
-        body: {
-          license_key: licenseKey,
-          mt5_account: mt5Account,
-          email,
-          tier: 'INSTITUTIONAL_PRO',
-          status: 'active',
-          created_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-      }).catch((error) => {
-        console.warn('Instant license provision warning:', error);
-      });
-    }
-
+    const licenseKey = `ALGOLYNX-${mt5Account}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
     return NextResponse.json({
       success: true,
       mode: 'sandbox_instant',
       license_key: licenseKey,
+      currency,
       email,
       mt5_account: mt5Account,
     });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Checkout initialization failed';
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Checkout initialization failed';
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

@@ -4,6 +4,7 @@ import { useState } from 'react';
 export function PaystackCheckout() {
   const [email, setEmail] = useState('');
   const [mt5Account, setMt5Account] = useState('');
+  const [currency, setCurrency] = useState<'NGN' | 'USD'>('NGN');
   const [loading, setLoading] = useState(false);
   const [licenseKey, setLicenseKey] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -18,7 +19,7 @@ export function PaystackCheckout() {
       const res = await fetch('/api/v1/create-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, mt5_account: Number(mt5Account) }),
+        body: JSON.stringify({ email, mt5_account: Number(mt5Account), currency }),
       });
       const data = await res.json();
 
@@ -26,12 +27,10 @@ export function PaystackCheckout() {
         setErrorMsg(data.error || 'Checkout initialization failed');
         return;
       }
-
       if (data.mode === 'paystack_redirect' && data.authorization_url) {
         window.location.href = data.authorization_url;
         return;
       }
-
       if (data.license_key) setLicenseKey(data.license_key);
     } catch {
       setErrorMsg('Network error during checkout initialization');
@@ -48,9 +47,26 @@ export function PaystackCheckout() {
           MT5 CLOUD GATE
         </span>
       </div>
-      <p className="text-xs text-emerald-300/70 mb-5">
+      <p className="text-xs text-emerald-300/70 mb-4">
         Bind an institutional license directly to your MetaTrader 5 account number.
       </p>
+
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        {(['NGN', 'USD'] as const).map((curr) => (
+          <button
+            key={curr}
+            type="button"
+            onClick={() => setCurrency(curr)}
+            className={`py-2 px-3 rounded font-mono text-xs border transition-colors ${
+              currency === curr
+                ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 font-bold'
+                : 'bg-black/40 border-emerald-500/20 text-emerald-400/60 hover:border-emerald-500/40'
+            }`}
+          >
+            {curr === 'NGN' ? 'NGN (₦150,000)' : 'USD ($100)'}
+          </button>
+        ))}
+      </div>
 
       {errorMsg && (
         <div className="mb-4 p-3 rounded bg-red-950/60 border border-red-500/40 text-xs font-mono text-red-300">
@@ -97,7 +113,7 @@ export function PaystackCheckout() {
             disabled={loading}
             className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black font-mono font-bold py-2.5 rounded transition-colors text-sm tracking-wider"
           >
-            {loading ? 'INITIALIZING SECURE GATE...' : 'PROVISION MT5 LICENSE'}
+            {loading ? 'INITIALIZING SECURE GATE...' : `PROVISION LICENSE (${currency})`}
           </button>
         </form>
       )}

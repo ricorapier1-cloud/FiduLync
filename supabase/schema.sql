@@ -33,3 +33,18 @@ CREATE TABLE IF NOT EXISTS public.ea_heartbeats (
 ALTER TABLE public.licenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ea_heartbeats ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'NGN';
+
+CREATE TABLE IF NOT EXISTS public.macro_snapshots (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    regime_label TEXT NOT NULL,
+    top_long TEXT NOT NULL,
+    top_short TEXT NOT NULL,
+    policy_spread NUMERIC NOT NULL,
+    provenance TEXT DEFAULT 'LIVE',
+    csi_scores JSONB NOT NULL,
+    recorded_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.macro_snapshots ENABLE ROW LEVEL SECURITY;
