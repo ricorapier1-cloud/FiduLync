@@ -59,9 +59,9 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
               href="https://wa.me/2348037212445?text=Hello%20Desk%2C%20I%20have%20an%20enquiry%20regarding%20AlgoLync%20EAs"
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-3 py-1 font-mono text-[10px] text-emerald-300 transition hover:bg-emerald-400/20"
+              className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-400/10 h-11 w-11 justify-center p-0 font-mono text-[10px] text-emerald-300 transition hover:bg-emerald-400/20"
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> WhatsApp Desk
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> 
             </a>
             <Link className="secure-pill" href={isHome ? '/store' : '/'}>
               <span className="secure-dot" /> {isHome ? 'AlgoLync Vault' : 'Macro terminal'}
@@ -115,7 +115,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
                 onClick={() => setDrawerOpen(false)}
                 className="flex items-center justify-center gap-2 rounded-lg bg-emerald-400 py-2.5 font-mono text-xs font-semibold text-[#07120d]"
               >
-                WhatsApp Desk: +234 803 721 2445
+                : +234 803 721 2445
               </a>
             </div>
             <div className="drawer-footer">Single-operator quantitative trading terminal</div>
