@@ -1,13 +1,23 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { isSupabaseConfigured, supabaseQuery } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
+export async function GET() {
+  return NextResponse.json({
+    status: 'active',
+    endpoint: '/api/v1/create-checkout',
+    description: 'AlgoLync MT5 Cloud Gate checkout and license initialization gateway.',
+    methods: ['GET', 'POST'],
+  });
+}
+
 export async function POST(req: Request) {
   const ip = req.headers.get('x-forwarded-for') || '127.0.0.1';
-  if (!checkRateLimit(ip, 15, 60000)) {
-    return NextResponse.json({ success: false, error: 'Too many checkout requests.' }, { status: 429 });
+  if (!checkRateLimit(ip, 20, 60000)) {
+    return NextResponse.json({ success: false, error: 'Too many checkout requests. Please wait.' }, { status: 429 });
   }
 
   try {
@@ -16,7 +26,7 @@ export async function POST(req: Request) {
     const mt5Account = Number(body?.mt5_account || 0);
 
     if (!email.includes('@') || mt5Account <= 0) {
-      return NextResponse.json({ success: false, error: 'Enter a valid email and MT5 account number.' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Enter a valid email and MT5 account login number.' }, { status: 400 });
     }
 
     const paystackSecret = process.env.PAYSTACK_SECRET_KEY || '';
@@ -51,6 +61,23 @@ export async function POST(req: Request) {
     }
 
     const licenseKey = `ALGOLYNX-${mt5Account}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+
+    if (isSupabaseConfigured()) {
+      await supabaseQuery('licenses', {
+        method: 'POST',
+        prefer: 'resolution=merge-duplicates',
+        body: {
+          license_key: licenseKey,
+          mt5_account: mt5Account,
+          email,
+          tier: 'INSTITUTIONAL_PRO',
+          status: 'active',
+          created_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      }).catch((e) => console.warn('Instant license provision record warning:', e));
+    }
+
     return NextResponse.json({
       success: true,
       mode: 'sandbox_instant',

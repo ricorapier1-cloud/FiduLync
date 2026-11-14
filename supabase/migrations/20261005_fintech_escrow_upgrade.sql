@@ -18,6 +18,17 @@ CREATE POLICY "Authenticated users can read dispute evidence"
   USING (bucket_id = 'dispute-evidence');
 
 -- D. Vault-Isolated Row-Level Security (RLS) for Trade Logs
+CREATE TABLE IF NOT EXISTS public.trade_history (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  license_key TEXT,
+  mt_account_number TEXT,
+  pair VARCHAR(20),
+  seller_account TEXT,
+  buyer_phone TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
 ALTER TABLE public.trade_history ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can read own trade history" ON public.trade_history;
 

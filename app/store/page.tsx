@@ -1,24 +1,41 @@
-import Link from 'next/link';
-import { PaystackCheckout } from '@/components/PaystackCheckout';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import type { Metadata } from 'next';
+import StoreTerminal from '@/app/components/StoreTerminal';
+import { getHeartbeatFleet } from '@/lib/eaHeartbeat';
+import { getLiquiditySession } from '@/lib/currencyStrength';
+import { getMacroSnapshot } from '@/lib/macroEngine';
+import { getTradeExpectancy } from '@/lib/tradeLedger';
 
-export default function StorePage() {
+export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'AlgoLync Store & Live EA Monitor',
+  description: 'AlgoLync strategy vault, live expert-advisor fleet telemetry, instant Paystack license provisioning, and the MacroLync MT5 signal bridge.',
+};
+
+export default async function AlgoLyncStorePage() {
+  let fleet = { configured: false, heartbeats: [] as Awaited<ReturnType<typeof getHeartbeatFleet>>['heartbeats'] };
+  let telemetryError = '';
+  try {
+    fleet = await getHeartbeatFleet();
+  } catch (error) {
+    console.error('Unable to load EA fleet telemetry for the AlgoLync vault:', error);
+    telemetryError = 'Upstash telemetry is temporarily unavailable.';
+  }
+
+  const bridgeSource = await readFile(join(process.cwd(), 'public', 'mql5', 'MacroLyncBridge.mqh'), 'utf8');
+  const initialSnapshot = await getMacroSnapshot();
+  const initialTradeExpectancy = await getTradeExpectancy();
+
   return (
-    <main className="min-h-screen bg-[#030A08] text-emerald-50 px-4 py-12 pb-32">
-      <div className="max-w-3xl mx-auto">
-        <div className="mb-8 flex items-center justify-between">
-          <Link href="/" className="text-xs font-mono text-emerald-400 hover:underline">
-            ← BACK TO MACRO TERMINAL
-          </Link>
-          <span className="text-xs font-mono text-emerald-400/70">INSTITUTIONAL LICENSING</span>
-        </div>
-        <div className="text-center mb-10">
-          <h1 className="text-3xl font-bold tracking-tight mb-3">AlgoLync Vault</h1>
-          <p className="text-sm text-emerald-200/70 max-w-xl mx-auto">
-            Automated account-bound licensing with live MacroLync rollover protection and cloud heartbeat telemetry.
-          </p>
-        </div>
-        <PaystackCheckout />
-      </div>
-    </main>
+    <StoreTerminal
+      initialFleet={fleet}
+      telemetryError={telemetryError}
+      bridgeSource={bridgeSource}
+      initialSnapshot={initialSnapshot}
+      initialTradeExpectancy={initialTradeExpectancy}
+      session={getLiquiditySession()}
+    />
   );
 }

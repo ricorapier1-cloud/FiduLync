@@ -3,6 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import BrandGlyph from '@/components/BrandGlyph';
+import { PaystackCheckout } from '@/components/PaystackCheckout';
 import type { HeartbeatRecord } from '@/lib/eaHeartbeat';
 import { getCurrencyStrengthIndex, type getLiquiditySession } from '@/lib/currencyStrength';
 import type { TradeExpectancy } from '@/lib/tradeLedger';
@@ -420,6 +421,22 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
                 </div>
               )}
             </div>
+          </div>
+        </section>
+
+                <section className="mt-11" aria-labelledby="provisioning-heading">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <div className="font-mono text-[9px] tracking-[0.17em] text-emerald-400">05 / INSTANT VAULT ACCESS & LICENSE PROVISIONING</div>
+              <h2 id="provisioning-heading" className="mt-1 text-lg font-semibold">Acquire Institutional EA License</h2>
+            </div>
+            <div className="flex items-center gap-2 font-mono text-[9px] text-emerald-300">
+              <BrandGlyph name="shield" size={13} className="text-emerald-400" />
+              LIFETIME MT5 ACCOUNT BINDING
+            </div>
+          </div>
+          <div className="rounded-xl border border-emerald-500/20 bg-[#06120E]/80 p-5 sm:p-6 shadow-2xl backdrop-blur-sm">
+            <PaystackCheckout />
           </div>
         </section>
 
