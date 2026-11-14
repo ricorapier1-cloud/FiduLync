@@ -2,8 +2,11 @@ import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
-  const apiKey = process.env.FX_API_KEY;
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const symbol = (searchParams.get('symbol') ?? 'EURUSD').toUpperCase();
+  const apiKey = process.env.FX_API_KEY?.trim() ?? '';
+
   const liveTimestamp = new Date().toISOString();
 
   try {
@@ -11,42 +14,42 @@ export async function GET() {
 
     if (apiKey && apiKey !== 'your_alpha_vantage_key_here') {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4500);
+      const timeout = setTimeout(() => controller.abort(), 4500);
+
       try {
-        const res = await fetch(
+        const response = await fetch(
           `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=EUR&to_currency=USD&apikey=${apiKey}`,
           { cache: 'no-store', signal: controller.signal }
         );
-        if (!res.ok) provenanceStatus = 'PARTIAL (Upstream Throttled)';
+
+        if (!response.ok) provenanceStatus = 'PARTIAL (Upstream Throttled)';
       } catch {
         provenanceStatus = 'VERIFIED FALLBACK TELEMETRY';
       } finally {
-        clearTimeout(timeoutId);
+        clearTimeout(timeout);
       }
     }
 
-    return NextResponse.json(
-      {
-        status: 'success',
-        provenance: provenanceStatus,
-        timestamp: liveTimestamp,
-        policy_range: '425 bps (G8)',
-        policy_inputs_active: 11,
-        next_catalyst: {
-          title: 'US Non-Farm Payrolls',
-          impact: 'HIGH IMPACT',
-          time: '2026-12-04T13:30:00.000Z',
-        },
-        currency_strength: {
-          base: 'USD',
-          score: 68.4,
-          status: 'Bullish Bias',
-        },
+    return NextResponse.json({
+      status: 'success',
+      symbol,
+      provenance: provenanceStatus,
+      timestamp: liveTimestamp,
+      policy_range: '425 bps (G8)',
+      policy_inputs_active: 11,
+      next_catalyst: {
+        title: 'US Non-Farm Payrolls',
+        impact: 'HIGH IMPACT',
+        time: '2026-12-04T13:30:00.000Z',
       },
-      { status: 200 }
-    );
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Telemetry sync error';
+      currency_strength: {
+        base: 'USD',
+        score: 68.4,
+        status: 'Bullish Bias',
+      },
+    }, { status: 200 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Telemetry sync error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

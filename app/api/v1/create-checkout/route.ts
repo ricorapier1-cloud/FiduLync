@@ -5,14 +5,10 @@ import { isSupabaseConfigured, supabaseQuery } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
-  return NextResponse.json({
-    status: 'active',
-    endpoint: '/api/v1/create-checkout',
-    description: 'AlgoLync MT5 Cloud Gate checkout and license initialization gateway.',
-    methods: ['GET', 'POST'],
-  });
-}
+const PRICING: Record<'NGN' | 'USD', { minorUnits: number; label: string }> = {
+  NGN: { minorUnits: 15000000, label: '₦150,000 / mo' },
+  USD: { minorUnits: 10000, label: '$100 / mo' },
+};
 
 export async function POST(req: Request) {
   const ip = req.headers.get('x-forwarded-for') || '127.0.0.1';
@@ -24,13 +20,14 @@ export async function POST(req: Request) {
     const body = await req.json();
     const email = String(body?.email || '').trim().toLowerCase();
     const mt5Account = Number(body?.mt5_account || 0);
+    const currency = body?.currency === 'USD' ? 'USD' : 'NGN';
 
-    if (!email.includes('@') || mt5Account <= 0) {
-      return NextResponse.json({ success: false, error: 'Enter a valid email and MT5 account login number.' }, { status: 400 });
+    if (!email.includes('@') || !Number.isFinite(mt5Account) || mt5Account <= 0) {
+      return NextResponse.json({ success: false, error: 'Enter a valid email and MT5 account number.' }, { status: 400 });
     }
 
-    const paystackSecret = process.env.PAYSTACK_SECRET_KEY || '';
-    const reference = `ALGO_${mt5Account}_${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+    const paystackSecret = (process.env.PAYSTACK_SECRET_KEY || '').trim();
+    const reference = `ALGO_${currency}_${mt5Account}_${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 
     if (paystackSecret.startsWith('sk_')) {
       const origin = req.headers.get('origin') || 'https://fidulync.vercel.app';
@@ -42,10 +39,11 @@ export async function POST(req: Request) {
         },
         body: JSON.stringify({
           email,
-          amount: 15000000,
+          amount: PRICING[currency].minorUnits,
+          currency,
           reference,
           callback_url: `${origin}/store?ref=${reference}`,
-          metadata: { mt5_account: mt5Account, tier: 'INSTITUTIONAL_PRO' },
+          metadata: { mt5_account: mt5Account, currency, tier: 'INSTITUTIONAL_PRO' },
         }),
       });
 
@@ -58,6 +56,10 @@ export async function POST(req: Request) {
           reference,
         });
       }
+      return NextResponse.json({
+        success: false,
+        error: psData?.message || `Paystack ${currency} initialization rejected. Ensure ${currency} is enabled in Paystack settings.`,
+      }, { status: 400 });
     }
 
     const licenseKey = `ALGOLYNX-${mt5Account}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
@@ -82,6 +84,7 @@ export async function POST(req: Request) {
       success: true,
       mode: 'sandbox_instant',
       license_key: licenseKey,
+      currency,
       email,
       mt5_account: mt5Account,
     });

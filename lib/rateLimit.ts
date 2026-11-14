@@ -1,18 +1,33 @@
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+type RateBucket = {
+  timestamps: number[];
+};
 
-export function checkRateLimit(ip: string, limit = 30, windowMs = 60000): boolean {
+const rateLimitMap = new Map<string, RateBucket>();
+
+export function checkRateLimit(ip: string, limit = 25, windowMs = 60_000): boolean {
   const now = Date.now();
   const current = rateLimitMap.get(ip);
 
-  if (!current || now > current.resetTime) {
-    rateLimitMap.set(ip, { count: 1, resetTime: now + windowMs });
-    return true;
+  const timestamps = current?.timestamps.filter((ts) => now - ts < windowMs) ?? [];
+  if (current && timestamps.length === 0) {
+    rateLimitMap.delete(ip);
   }
 
-  if (current.count >= limit) {
+  const active = timestamps.length > 0 ? timestamps : [];
+  const next = [...active, now];
+
+  if (next.length > limit) {
     return false;
   }
 
-  current.count++;
+  rateLimitMap.set(ip, { timestamps: next });
   return true;
+}
+
+export function clearRateLimit(ip?: string): void {
+  if (ip) {
+    rateLimitMap.delete(ip);
+    return;
+  }
+  rateLimitMap.clear();
 }
