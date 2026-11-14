@@ -8,7 +8,7 @@ export default function WhatsAppSupportButton() {
   const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${defaultMessage}`;
 
   return (
-    <aside aria-label="Support desk" className="fixed bottom-20 right-4 z-50 sm:bottom-6 sm:right-6">
+    <aside aria-label="Support desk" className="fixed bottom-20 right-4 z-50 sm:bottom-24 sm:right-6">
       <a
         href={whatsappUrl}
         target="_blank"

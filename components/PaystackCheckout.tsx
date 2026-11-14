@@ -2,12 +2,20 @@
 import { useState } from 'react';
 
 export function PaystackCheckout() {
+  const [tab, setTab] = useState<'BUY' | 'RECOVER'>('BUY');
+  const [plan, setPlan] = useState<'MONTHLY' | 'LIFETIME'>('MONTHLY');
+  const [currency, setCurrency] = useState<'NGN' | 'USD'>('NGN');
   const [email, setEmail] = useState('');
   const [mt5Account, setMt5Account] = useState('');
-  const [currency, setCurrency] = useState<'NGN' | 'USD'>('NGN');
   const [loading, setLoading] = useState(false);
   const [licenseKey, setLicenseKey] = useState<string | null>(null);
+  const [downloadUrl, setDownloadUrl] = useState<string>('/downloads/AlgoLync_EA_README.txt');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const priceDisplay =
+    plan === 'MONTHLY'
+      ? currency === 'NGN' ? '₦65,000 / mo' : '$49 / mo'
+      : currency === 'NGN' ? '₦250,000 One-Time' : '$199 One-Time';
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,7 +27,7 @@ export function PaystackCheckout() {
       const res = await fetch('/api/v1/create-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, mt5_account: Number(mt5Account), currency }),
+        body: JSON.stringify({ email, mt5_account: Number(mt5Account), currency, plan }),
       });
       const data = await res.json();
 
@@ -31,7 +39,10 @@ export function PaystackCheckout() {
         window.location.href = data.authorization_url;
         return;
       }
-      if (data.license_key) setLicenseKey(data.license_key);
+      if (data.license_key) {
+        setLicenseKey(data.license_key);
+        if (data.download_url) setDownloadUrl(data.download_url);
+      }
     } catch {
       setErrorMsg('Network error during checkout initialization');
     } finally {
@@ -39,34 +50,102 @@ export function PaystackCheckout() {
     }
   };
 
+  const handleRecover = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !mt5Account) return;
+    setLoading(true);
+    setErrorMsg(null);
+
+    try {
+      const res = await fetch('/api/v1/lookup-license', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, mt5_account: Number(mt5Account) }),
+      });
+      const data = await res.json();
+      if (!data.found) {
+        setErrorMsg(data.error || 'License not found.');
+        return;
+      }
+      setLicenseKey(data.license_key);
+      if (data.download_url) setDownloadUrl(data.download_url);
+    } catch {
+      setErrorMsg('Network error while looking up license.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="bg-[#06120E] border border-emerald-500/30 rounded-xl p-6 max-w-md mx-auto text-emerald-100 shadow-2xl">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-lg font-mono font-bold tracking-wide text-emerald-400">ALGOLYNX VAULT ACCESS</h3>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-lg font-mono font-bold tracking-wide text-emerald-400">ALGOLYNX VAULT</h3>
         <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
           MT5 CLOUD GATE
         </span>
       </div>
-      <p className="text-xs text-emerald-300/70 mb-4">
-        Bind an institutional license directly to your MetaTrader 5 account number.
-      </p>
 
-      <div className="grid grid-cols-2 gap-2 mb-4">
-        {(['NGN', 'USD'] as const).map((curr) => (
-          <button
-            key={curr}
-            type="button"
-            onClick={() => setCurrency(curr)}
-            className={`py-2 px-3 rounded font-mono text-xs border transition-colors ${
-              currency === curr
-                ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 font-bold'
-                : 'bg-black/40 border-emerald-500/20 text-emerald-400/60 hover:border-emerald-500/40'
-            }`}
-          >
-            {curr === 'NGN' ? 'NGN (₦150,000)' : 'USD ($100)'}
-          </button>
-        ))}
+      {/* Mode Switcher: New License vs Download / Recover */}
+      <div className="grid grid-cols-2 gap-1.5 p-1 rounded-lg bg-black/50 border border-emerald-500/20 mb-4">
+        <button
+          type="button"
+          onClick={() => { setTab('BUY'); setLicenseKey(null); setErrorMsg(null); }}
+          className={`py-1.5 rounded font-mono text-xs transition-colors ${
+            tab === 'BUY' ? 'bg-emerald-500 text-black font-bold' : 'text-emerald-300/70 hover:text-white'
+          }`}
+        >
+          NEW LICENSE
+        </button>
+        <button
+          type="button"
+          onClick={() => { setTab('RECOVER'); setLicenseKey(null); setErrorMsg(null); }}
+          className={`py-1.5 rounded font-mono text-xs transition-colors ${
+            tab === 'RECOVER' ? 'bg-emerald-500 text-black font-bold' : 'text-emerald-300/70 hover:text-white'
+          }`}
+        >
+          DOWNLOAD EA / KEY
+        </button>
       </div>
+
+      {tab === 'BUY' && !licenseKey && (
+        <>
+          <div className="grid grid-cols-2 gap-2 mb-2.5">
+            {(['MONTHLY', 'LIFETIME'] as const).map((tier) => (
+              <button
+                key={tier}
+                type="button"
+                onClick={() => setPlan(tier)}
+                className={`py-2 px-2 rounded font-mono text-xs border transition-colors ${
+                  plan === tier
+                    ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 font-bold'
+                    : 'bg-black/40 border-emerald-500/20 text-emerald-400/60'
+                }`}
+              >
+                {tier === 'MONTHLY' ? 'MONTHLY ACCESS' : 'LIFETIME BIND'}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            {(['NGN', 'USD'] as const).map((curr) => (
+              <button
+                key={curr}
+                type="button"
+                onClick={() => setCurrency(curr)}
+                className={`py-2 px-2 rounded font-mono text-xs border transition-colors ${
+                  currency === curr
+                    ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 font-bold'
+                    : 'bg-black/40 border-emerald-500/20 text-emerald-400/60'
+                }`}
+              >
+                {curr === 'NGN'
+                  ? plan === 'MONTHLY' ? 'NGN (₦65,000)' : 'NGN (₦250,000)'
+                  : plan === 'MONTHLY' ? 'USD ($49)' : 'USD ($199)'}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       {errorMsg && (
         <div className="mb-4 p-3 rounded bg-red-950/60 border border-red-500/40 text-xs font-mono text-red-300">
@@ -75,17 +154,26 @@ export function PaystackCheckout() {
       )}
 
       {licenseKey ? (
-        <div className="bg-emerald-950/60 border border-emerald-500/50 p-4 rounded-lg text-center">
-          <p className="text-xs text-emerald-300 mb-1">LICENSE PROVISIONED:</p>
-          <code className="text-sm font-mono font-bold text-emerald-400 block select-all bg-black/50 p-2.5 rounded">
-            {licenseKey}
-          </code>
-          <p className="text-[11px] text-emerald-400/70 mt-2">
-            Paste this key into your MT5 EA <span className="font-mono">InpLicenseKey</span> parameter.
+        <div className="bg-emerald-950/60 border border-emerald-500/50 p-4 rounded-lg text-center space-y-3">
+          <div>
+            <p className="text-[11px] font-mono text-emerald-300 mb-1">ACTIVE MT5 LICENSE KEY:</p>
+            <code className="text-sm font-mono font-bold text-emerald-400 block select-all bg-black/60 p-2.5 rounded">
+              {licenseKey}
+            </code>
+          </div>
+          <a
+            href={downloadUrl}
+            download
+            className="block w-full bg-emerald-500 hover:bg-emerald-400 text-black font-mono font-bold py-2.5 rounded text-xs tracking-wider transition-colors"
+          >
+            DOWNLOAD ALGOLYNX EA PACKAGE (.EX5)
+          </a>
+          <p className="text-[11px] text-emerald-400/70">
+            Whitelist <span className="font-mono text-emerald-300">https://fidulync.vercel.app</span> in MT5 Tools → Options → Expert Advisors.
           </p>
         </div>
       ) : (
-        <form onSubmit={handleCheckout} className="space-y-4">
+        <form onSubmit={tab === 'BUY' ? handleCheckout : handleRecover} className="space-y-4">
           <div>
             <label className="block text-xs font-mono mb-1 text-emerald-300">Subscriber Email</label>
             <input
@@ -111,9 +199,13 @@ export function PaystackCheckout() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black font-mono font-bold py-2.5 rounded transition-colors text-sm tracking-wider"
+            className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black font-mono font-bold py-2.5 rounded transition-colors text-xs sm:text-sm tracking-wider"
           >
-            {loading ? 'INITIALIZING SECURE GATE...' : `PROVISION LICENSE (${currency})`}
+            {loading
+              ? 'PROCESSING...'
+              : tab === 'BUY'
+              ? `PROVISION LICENSE • ${priceDisplay}`
+              : 'RETRIEVE KEY & DOWNLOAD EA'}
           </button>
         </form>
       )}

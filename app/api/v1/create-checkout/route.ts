@@ -4,9 +4,18 @@ import { checkRateLimit } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
-const PRICING: Record<'NGN' | 'USD', { minorUnits: number; label: string }> = {
-  NGN: { minorUnits: 15000000, label: '₦150,000 / mo' },
-  USD: { minorUnits: 10000, label: '$100 / mo' },
+type PlanTier = 'MONTHLY' | 'LIFETIME';
+type CurrencyCode = 'NGN' | 'USD';
+
+const PRICING: Record<PlanTier, Record<CurrencyCode, { minorUnits: number; label: string }>> = {
+  MONTHLY: {
+    NGN: { minorUnits: 6500000, label: '₦65,000 / mo' },
+    USD: { minorUnits: 4900, label: '$49 / mo' },
+  },
+  LIFETIME: {
+    NGN: { minorUnits: 25000000, label: '₦250,000 Lifetime' },
+    USD: { minorUnits: 19900, label: '$199 Lifetime' },
+  },
 };
 
 export async function POST(req: Request) {
@@ -19,14 +28,15 @@ export async function POST(req: Request) {
     const body = await req.json();
     const email = String(body?.email || '').trim().toLowerCase();
     const mt5Account = Number(body?.mt5_account || 0);
-    const currency = body?.currency === 'USD' ? 'USD' : 'NGN';
+    const currency: CurrencyCode = body?.currency === 'USD' ? 'USD' : 'NGN';
+    const plan: PlanTier = body?.plan === 'LIFETIME' ? 'LIFETIME' : 'MONTHLY';
 
     if (!email.includes('@') || !Number.isFinite(mt5Account) || mt5Account <= 0) {
       return NextResponse.json({ success: false, error: 'Enter a valid email and MT5 account number.' }, { status: 400 });
     }
 
     const paystackSecret = (process.env.PAYSTACK_SECRET_KEY || '').trim();
-    const reference = `ALGO_${currency}_${mt5Account}_${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+    const reference = `ALGO_${plan}_${currency}_${mt5Account}_${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
 
     if (paystackSecret.startsWith('sk_')) {
       const origin = req.headers.get('origin') || 'https://fidulync.vercel.app';
@@ -38,11 +48,11 @@ export async function POST(req: Request) {
         },
         body: JSON.stringify({
           email,
-          amount: PRICING[currency].minorUnits,
+          amount: PRICING[plan][currency].minorUnits,
           currency,
           reference,
           callback_url: `${origin}/store?ref=${reference}`,
-          metadata: { mt5_account: mt5Account, currency, tier: 'INSTITUTIONAL_PRO' },
+          metadata: { mt5_account: mt5Account, currency, tier: plan },
         }),
       });
 
@@ -61,11 +71,13 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    const licenseKey = `ALGOLYNX-${mt5Account}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+    const licenseKey = `ALGOLYNX-${plan === 'LIFETIME' ? 'LT' : 'MO'}-${mt5Account}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
     return NextResponse.json({
       success: true,
       mode: 'sandbox_instant',
       license_key: licenseKey,
+      download_url: '/downloads/AlgoLync_EA_README.txt',
+      plan,
       currency,
       email,
       mt5_account: mt5Account,
