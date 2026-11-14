@@ -132,7 +132,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
 
   useEffect(() => {
     const initialClockTimer = window.setTimeout(() => setNow(Date.now()), 0);
-    const clockTimer = window.setInterval(() => setNow(Date.now()), 30_000);
+    const clockTimer = window.setInterval(() => setNow(Date.now()), 1_000);
     const controller = new AbortController();
     const refreshQuotes = async () => {
       try {
@@ -192,7 +192,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
   }, []);
 
   return (
-    <div className="macro-page">
+    <div className="macro-page pb-32 sm:pb-0">
       <div className="macro-statusline mono">
         <span><span className={`macro-pulse${liveQuoteAvailable ? ' macro-pulse-live' : ''}`} /> MACRO INTELLIGENCE / GLOBAL FX</span>
         <span className="macro-status-right"><span className={`macro-feed-badge${liveQuoteAvailable || liveReferenceAvailable ? ' macro-feed-live' : ''}`}>{liveQuoteAvailable ? 'LIVE FEED' : liveReferenceAvailable ? 'LIVE REFERENCE FEED' : snapshot.source === 'provider' ? 'PROVIDER FEED' : snapshot.source === 'partial' ? 'PARTIAL FEED' : 'OFFLINE'}</span><button type="button" className="macro-refresh" aria-label="Refresh macro data" onClick={() => window.location.reload()}><BrandGlyph name="refresh" size={13} className={refreshing ? 'macro-spin' : ''} /> REFRESH</button><Link href="/store" className="macro-refresh">ALGOLYNC VAULT</Link></span>
