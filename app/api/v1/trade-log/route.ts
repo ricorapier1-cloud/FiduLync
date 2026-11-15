@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 function readCredentials(request: Request) {
   const params = new URL(request.url).searchParams;
-  return { mt5Account: Number(params.get('mt5_account')), licenseKey: (params.get('license_key') || '').trim() };
+  return { mt5Account: Number(params.get('mt5_account')), licenseKey: (request.headers.get('x-license-key') || '').trim() };
 }
 
 export async function GET(request: Request) {
