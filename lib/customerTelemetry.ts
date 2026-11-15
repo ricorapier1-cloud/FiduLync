@@ -45,10 +45,10 @@ export async function validateCustomerLicense(mt5Account: number, licenseKey: st
     status: 'eq.active',
     limit: '1',
   });
-  const rows = await supabaseRows<{ license_key: string; mt5_account: number; status: string; expires_at: string | null }>('licenses', query.toString());
+  const rows = await supabaseRows<{ license_key: string; mt5_account: number | string; status: string; expires_at: string | null }>('licenses', query.toString());
   if (rows.length !== 1) return false;
   const row = rows[0];
-  return row.mt5_account === mt5Account && row.license_key === licenseKey.trim()
+  return Number(row.mt5_account) === mt5Account && row.license_key === licenseKey.trim()
     && row.status === 'active'
     && (!row.expires_at || Date.parse(row.expires_at) > Date.now());
 }
