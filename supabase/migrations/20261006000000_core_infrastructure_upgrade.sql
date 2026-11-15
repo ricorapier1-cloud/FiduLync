@@ -9,6 +9,7 @@ VALUES ('dispute-evidence', 'dispute-evidence', false, false)
 ON CONFLICT (id) DO NOTHING;
 
 -- Storage Bucket RLS (Authenticated access only)
+DROP POLICY IF EXISTS "Upload Dispute Evidence" ON storage.objects;
 CREATE POLICY "Upload Dispute Evidence" 
 ON storage.objects FOR INSERT 
 WITH CHECK (
