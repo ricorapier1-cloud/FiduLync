@@ -4,6 +4,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import BrandGlyph from '@/components/BrandGlyph';
 import { PaystackCheckout } from '@/components/PaystackCheckout';
+import { QuantStrategyCatalog } from '@/components/QuantStrategyCatalog';
 import type { HeartbeatRecord } from '@/lib/eaHeartbeat';
 import { getCurrencyStrengthIndex, type getLiquiditySession } from '@/lib/currencyStrength';
 import type { TradeExpectancy } from '@/lib/tradeLedger';
@@ -180,7 +181,7 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
 
   return (
     <div className="min-h-screen bg-[#080a0f] text-slate-100">
-      <div className="mx-auto w-full max-w-7xl px-5 py-9 sm:px-8 lg:py-12">
+      <div className="mx-auto w-full max-w-7xl px-5 py-9 sm:px-8 lg:py-12 pb-36 sm:pb-16">
         <div className="flex flex-wrap items-start justify-between gap-5 border-b border-white/[0.08] pb-7">
           <div>
             <div className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-emerald-300">
@@ -278,32 +279,7 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
         </section>
 
         <section className="mt-11" aria-labelledby="strategies-heading">
-          <div className="mb-4">
-            <div className="font-mono text-[9px] tracking-[0.17em] text-slate-500">02 / PROPRIETARY SYSTEMS</div>
-            <h2 id="strategies-heading" className="mt-1 text-lg font-semibold">Strategy architecture</h2>
-          </div>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <StrategyCard
-              name="ERIDAM NEXUS ADAPTIVE PRO"
-              version="NEXUS / 4.2"
-              description="Regime-adaptive execution framework with volatility-normalized risk, macro event vetoes, and portfolio-level exposure controls."
-              pairs="EURUSD · GBPUSD · USDJPY · XAUUSD"
-              timeframe="H1 signal / H4 regime"
-              shield="Equity high-water mark with daily loss circuit-breaker"
-              virtualization="Ghost orders; broker-side placement only after server validation"
-              drawdown="Hard 8% account drawdown cap"
-            />
-            <StrategyCard
-              name="VELOCITY VAULT"
-              version="VELOCITY / 2.7"
-              description="Momentum continuation system combining directional efficiency, expansion filters, and event-aware position management."
-              pairs="EURUSD · GBPUSD · AUDUSD · USDJPY"
-              timeframe="M15 execution / H1 confirmation"
-              shield="Equity floor and per-session loss lock"
-              virtualization="Virtual pending levels; cancel on volatility or news lockout"
-              drawdown="Hard 6% account drawdown cap"
-            />
-          </div>
+          <QuantStrategyCatalog />
         </section>
 
         <section className="mt-11 grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]" aria-label="Signal tester and MT5 connection">
@@ -424,7 +400,7 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
           </div>
         </section>
 
-                <section className="mt-11" aria-labelledby="provisioning-heading">
+                <section id="vault-checkout" className="mt-11 scroll-mt-24" aria-labelledby="provisioning-heading">
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
               <div className="font-mono text-[9px] tracking-[0.17em] text-emerald-400">05 / INSTANT VAULT ACCESS & LICENSE PROVISIONING</div>

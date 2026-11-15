@@ -60,3 +60,82 @@ export async function supabaseRead<T = unknown>(
     query,
   });
 }
+
+// Typed helper functions for the 3 core tables:
+
+export type LicenseRecord = {
+  license_key: string;
+  mt5_account: number;
+  email: string;
+  tier?: string;
+  status?: string;
+  expires_at?: string | null;
+};
+
+export async function persistLicense(license: LicenseRecord) {
+  return supabaseQuery('licenses', {
+    method: 'POST',
+    prefer: 'resolution=merge-duplicates',
+    body: {
+      license_key: license.license_key,
+      mt5_account: license.mt5_account,
+      email: license.email.toLowerCase(),
+      tier: license.tier || 'INSTITUTIONAL_PRO',
+      status: license.status || 'active',
+      expires_at: license.expires_at ?? null,
+      created_at: new Date().toISOString(),
+    },
+  });
+}
+
+export type TransactionRecord = {
+  reference: string;
+  email: string;
+  amount: number;
+  status: string;
+  mt5_account?: number | null;
+  currency?: string;
+};
+
+export async function recordTransaction(tx: TransactionRecord) {
+  return supabaseQuery('transactions', {
+    method: 'POST',
+    prefer: 'resolution=merge-duplicates',
+    body: {
+      reference: tx.reference,
+      email: tx.email.toLowerCase(),
+      amount: tx.amount,
+      status: tx.status,
+      mt5_account: tx.mt5_account || null,
+      currency: tx.currency || 'NGN',
+      created_at: new Date().toISOString(),
+    },
+  });
+}
+
+export type HeartbeatRecord = {
+  mt5_account: number;
+  license_key: string;
+  balance: number;
+  equity: number;
+  drawdown_pct?: number;
+  open_positions?: number;
+  vps_ping_ms?: number;
+};
+
+export async function upsertHeartbeat(hb: HeartbeatRecord) {
+  return supabaseQuery('ea_heartbeats', {
+    method: 'POST',
+    prefer: 'resolution=merge-duplicates',
+    body: {
+      mt5_account: hb.mt5_account,
+      license_key: hb.license_key,
+      balance: hb.balance,
+      equity: hb.equity,
+      drawdown_pct: hb.drawdown_pct ?? 0,
+      open_positions: hb.open_positions ?? 0,
+      vps_ping_ms: hb.vps_ping_ms ?? 0,
+      updated_at: new Date().toISOString(),
+    },
+  });
+}

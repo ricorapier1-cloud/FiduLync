@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { checkRateLimit } from '@/lib/rateLimit';
-import { isSupabaseConfigured, supabaseQuery } from '@/lib/supabaseAdmin';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { isSupabaseConfigured, persistLicense } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +20,7 @@ const PRICING: Record<PlanTier, Record<CurrencyCode, { minorUnits: number; label
 };
 
 export async function POST(req: Request) {
-  const ip = req.headers.get('x-forwarded-for') || '127.0.0.1';
+  const ip = getClientIp(req);
   if (!checkRateLimit(ip, 20, 60000)) {
     return NextResponse.json({ success: false, error: 'Too many checkout requests. Please wait.' }, { status: 429 });
   }
@@ -73,6 +73,22 @@ export async function POST(req: Request) {
     }
 
     const licenseKey = `ALGOLYNX-${plan === 'LIFETIME' ? 'LT' : 'MO'}-${mt5Account}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+
+    if (isSupabaseConfigured()) {
+      try {
+        await persistLicense({
+          license_key: licenseKey,
+          mt5_account: mt5Account,
+          email,
+          tier: plan === 'LIFETIME' ? 'INSTITUTIONAL_LIFETIME' : 'INSTITUTIONAL_MONTHLY',
+          status: 'active',
+          expires_at: plan === 'LIFETIME' ? null : new Date(Date.now() + 30 * 86400000).toISOString(),
+        });
+      } catch (dbErr) {
+        console.warn('Sandbox license DB insert non-critical warning:', dbErr);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       mode: 'sandbox_instant',
@@ -84,7 +100,12 @@ export async function POST(req: Request) {
       mt5_account: mt5Account,
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Checkout initialization failed';
+    const message = err instanceof Error ? errorToString(err) : 'Checkout initialization failed';
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
+}
+
+function errorToString(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
 }

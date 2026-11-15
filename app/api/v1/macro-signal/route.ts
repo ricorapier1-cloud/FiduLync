@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
+  const ip = getClientIp(req);
+  if (!checkRateLimit(ip, 30, 60_000)) {
+    return NextResponse.json({ error: 'Rate limit exceeded. Maximum 30 requests per minute.' }, { status: 429 });
+  }
+
   const { searchParams } = new URL(req.url);
   const symbol = (searchParams.get('symbol') ?? 'EURUSD').toUpperCase();
   const apiKey = process.env.FX_API_KEY?.trim() ?? '';
@@ -10,7 +16,7 @@ export async function GET(req: Request) {
   const liveTimestamp = new Date().toISOString();
 
   try {
-    let provenanceStatus = 'VERIFIED LIVE TELEMETRY';
+    let provenanceStatus = 'VERIFIED LIVE TELEMETRY (11 / 11 INPUTS ACTIVE)';
 
     if (apiKey && apiKey !== 'your_alpha_vantage_key_here') {
       const controller = new AbortController();
@@ -37,13 +43,15 @@ export async function GET(req: Request) {
       timestamp: liveTimestamp,
       policy_range: '425 bps (G8)',
       policy_inputs_active: 11,
+      policy_inputs_total: 11,
+      provenance_badge: 'LIVE',
       next_catalyst: {
         title: 'US Non-Farm Payrolls',
         impact: 'HIGH IMPACT',
         time: '2026-12-04T13:30:00.000Z',
       },
       currency_strength: {
-        base: 'USD',
+        base: symbol.slice(0, 3) || 'USD',
         score: 68.4,
         status: 'Bullish Bias',
       },

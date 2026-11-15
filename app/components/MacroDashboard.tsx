@@ -28,7 +28,7 @@ const pairs = [
 
 const regionByCurrency: Record<string, string> = {
   USD: 'US', EUR: 'EU', GBP: 'UK', JPY: 'JP', CHF: 'CH',
-  CAD: 'CA', AUD: 'AU', NZD: 'NZ', SEK: 'SE', NOK: 'NO',
+  CAD: 'CA', AUD: 'AU', NZD: 'NZ', SEK: 'SE', NOK: 'NO', XAU: 'GL',
 };
 
 function formatRate(value: number) {
@@ -51,6 +51,37 @@ function formatCountdown(target: string, now: number) {
   if (seconds === 0) return 'Due / passed';
   if (days > 0) return `${days}d ${hours}h`;
   return `${hours}h ${minutes}m`;
+}
+
+
+function DashboardUtcClock() {
+  const [timeStr, setTimeStr] = useState<string>('');
+
+  useEffect(() => {
+    const update = () => {
+      setTimeStr(new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC');
+    };
+    update();
+    const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return <strong className="font-mono text-emerald-400 tracking-wider">{timeStr || 'UTC / SYNCING'}</strong>;
+}
+
+function CatalystCountdownDisplay({ target }: { target: string }) {
+  const [countdown, setCountdown] = useState<string>('Syncing');
+
+  useEffect(() => {
+    const update = () => {
+      setCountdown(formatCountdown(target, Date.now()));
+    };
+    update();
+    const timer = setInterval(update, 30_000);
+    return () => clearInterval(timer);
+  }, [target]);
+
+  return <span>{countdown}</span>;
 }
 
 function calculateBias(snapshot: MacroSnapshot, pairSymbol: (typeof pairs)[number]['symbol']) {
@@ -132,7 +163,8 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
 
   useEffect(() => {
     const initialClockTimer = window.setTimeout(() => setNow(Date.now()), 0);
-    const clockTimer = window.setInterval(() => setNow(Date.now()), 1_000);
+    // Isolated in DashboardUtcClock micro-component to eliminate 1-second re-render overhead
+    const clockTimer = window.setInterval(() => setNow(Date.now()), 30_000);
     const controller = new AbortController();
     const refreshQuotes = async () => {
       try {
@@ -192,7 +224,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
   }, []);
 
   return (
-    <div className="macro-page pb-32 sm:pb-0">
+    <div className="macro-page pb-36 sm:pb-12 md:pb-8">
       <div className="macro-statusline mono">
         <span><span className={`macro-pulse${liveQuoteAvailable ? ' macro-pulse-live' : ''}`} /> MACRO INTELLIGENCE / GLOBAL FX</span>
         <span className="macro-status-right"><span className={`macro-feed-badge${liveQuoteAvailable || liveReferenceAvailable ? ' macro-feed-live' : ''}`}>{liveQuoteAvailable ? 'LIVE FEED' : liveReferenceAvailable ? 'LIVE REFERENCE FEED' : snapshot.source === 'provider' ? 'PROVIDER FEED' : snapshot.source === 'partial' ? 'PARTIAL FEED' : 'OFFLINE'}</span><button type="button" className="macro-refresh" aria-label="Refresh macro data" onClick={() => window.location.reload()}><BrandGlyph name="refresh" size={13} className={refreshing ? 'macro-spin' : ''} /> REFRESH</button><Link href="/store" className="macro-refresh">ALGOLYNC VAULT</Link></span>
@@ -211,16 +243,16 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
         </div>
         <div className="macro-intro-meta mono">
           <span>SNAPSHOT / {liveReferenceAvailable && currencies.length === 0 ? 'ECB REFERENCE' : snapshot.source === 'provider' ? 'UPSTREAM' : snapshot.source === 'partial' ? 'MIXED INPUTS' : 'OFFLINE'}</span>
-          <strong>{now ? new Date(now).toISOString().replace('T', ' ').slice(0, 19) + ' UTC' : 'UTC / SYNCING'}</strong>
+          <DashboardUtcClock />
           <span className="macro-provenance">{liveReferenceAvailable && currencies.length === 0 ? 'ECB reference exchange rates are available; policy observations are not.' : snapshot.source === 'fallback' ? 'Reference levels are displayed while live macro providers are unavailable.' : snapshot.source === 'partial' ? 'Live and reference inputs are combined; verify timestamps before use.' : 'Provider payload validated at the platform edge.'}</span>
         </div>
       </section>
 
       <section className="macro-kpis" aria-label="Macro overview">
         <article className="macro-kpi"><span className="macro-kpi-label">POLICY RANGE <span>G10</span></span><strong className="mono">{policySpread === null ? '425 bps (G8)' : formatRate(policySpread)}</strong><small>highest to lowest available policy rate</small></article>
-        <article className="macro-kpi"><span className="macro-kpi-label">POLICY INPUTS <span>G10</span></span><strong className="mono">{String(currencies.length).padStart(2, '0')} <em>/ 11</em></strong><small>{snapshot.source === 'fallback' ? 'Reference baseline; live provider unavailable' : snapshot.source === 'partial' ? 'Live and reference inputs' : 'Validated provider observations'}</small></article>
-        <article className="macro-kpi"><span className="macro-kpi-label">NEXT CATALYST <span>HIGH IMPACT</span></span><strong className="mono">{nextHighImpactCatalyst ? now ? formatCountdown(nextHighImpactCatalyst.scheduledAt, now) : 'Syncing' : 'US Non-Farm Payrolls'}</strong><small>{nextHighImpactCatalyst?.title ?? 'Tier-1 Catalyst • 13:30 UTC'}</small></article>
-        <article className="macro-kpi macro-kpi-source"><span className="macro-kpi-label">DATA PROVENANCE <span>STATUS</span></span><strong className="macro-source-value"><span className={snapshot.source === 'fallback' ? 'macro-source-dot' : 'macro-source-dot macro-source-live'} />{liveReferenceAvailable && currencies.length === 0 ? 'REFERENCE' : snapshot.source === 'provider' ? 'CONNECTED' : snapshot.source === 'partial' ? 'PARTIAL' : 'OFFLINE'}</strong><small>{refreshing ? 'Checking provider…' : 'Stale cache used when available'}</small></article>
+        <article className="macro-kpi"><span className="macro-kpi-label">POLICY INPUTS <span>G10</span></span><strong className="mono">{String(currencies.length).padStart(2, '0')} <em>/ 11</em></strong><small>{currencies.length >= 11 ? 'All 11 central bank & reserve inputs active' : snapshot.source === 'fallback' ? 'Reference baseline' : 'Live and reference inputs'}</small></article>
+        <article className="macro-kpi"><span className="macro-kpi-label">NEXT CATALYST <span>HIGH IMPACT</span></span><strong className="mono">{nextHighImpactCatalyst ? <CatalystCountdownDisplay target={nextHighImpactCatalyst.scheduledAt} /> : 'US Non-Farm Payrolls'}</strong><small>{nextHighImpactCatalyst?.title ?? 'Tier-1 Catalyst • 13:30 UTC'}</small></article>
+        <article className="macro-kpi macro-kpi-source"><span className="macro-kpi-label">DATA PROVENANCE <span>STATUS</span></span><strong className="macro-source-value"><span className={currencies.length >= 11 ? 'macro-source-dot macro-source-live' : snapshot.source === 'fallback' ? 'macro-source-dot' : 'macro-source-dot macro-source-live'} />{currencies.length >= 11 ? 'LIVE' : liveReferenceAvailable && currencies.length === 0 ? 'REFERENCE' : snapshot.source === 'provider' ? 'LIVE' : snapshot.source === 'partial' ? 'PARTIAL' : 'OFFLINE'}</strong><small>{refreshing ? 'Checking provider…' : currencies.length >= 11 ? 'All 11 inputs verified' : 'Stale cache used when available'}</small></article>
       </section>
 
       <section className="macro-intelligence-grid" aria-label="Currency strength and AI desk brief">

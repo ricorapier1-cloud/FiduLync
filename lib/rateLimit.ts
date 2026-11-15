@@ -4,7 +4,16 @@ type RateBucket = {
 
 const rateLimitMap = new Map<string, RateBucket>();
 
-export function checkRateLimit(ip: string, limit = 25, windowMs = 60_000): boolean {
+export function getClientIp(req: Request): string {
+  const forwarded = req.headers.get('x-forwarded-for');
+  if (forwarded) {
+    const first = forwarded.split(',')[0]?.trim();
+    if (first) return first;
+  }
+  return req.headers.get('x-real-ip')?.trim() || '127.0.0.1';
+}
+
+export function checkRateLimit(ip: string, limit = 30, windowMs = 60_000): boolean {
   const now = Date.now();
   const current = rateLimitMap.get(ip);
 

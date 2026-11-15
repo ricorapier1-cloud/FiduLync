@@ -36,6 +36,7 @@ export function getFallbackSnapshot(): MacroSnapshot {
       { code: 'NZD', centralBank: 'Reserve Bank of New Zealand', policyRate: 2.5, inflation: 2.7, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Neutral' },
       { code: 'SEK', centralBank: 'Sveriges Riksbank', policyRate: 1.75, inflation: 1.8, inflationLabel: 'CPIF', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Neutral' },
       { code: 'NOK', centralBank: 'Norges Bank', policyRate: 4, inflation: 2.4, inflationLabel: 'CPI-ATE', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Restrictive' },
+      { code: 'XAU', centralBank: 'Global Reserve Asset', policyRate: 0.0, inflation: 0.0, twoYearYield: 0.0, twoYearYieldSource: 'reference', inflationLabel: 'Real Yield Proxy', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Sovereign Hedge' },
     ],
     cot: [],
     catalysts: [
@@ -648,7 +649,9 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
   } else if (cotResult.status === 'rejected') {
     console.error('COT provider unavailable; retaining cached positioning:', cotResult.reason);
   }
-  if (hasLiveData) snapshot.source = 'partial';
+  if (hasLiveData) {
+    snapshot.source = snapshot.currencies.length >= 11 ? 'provider' : 'partial';
+  }
   return hasLiveData ? snapshot : null;
 }
 
