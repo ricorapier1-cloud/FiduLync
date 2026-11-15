@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 function credentials(request: Request) {
   const url = new URL(request.url);
   const mt5Account = Number(url.searchParams.get('mt5_account'));
-  const licenseKey = (url.searchParams.get('license_key') || '').trim();
+  const licenseKey = (request.headers.get('x-license-key') || '').trim();
   return { mt5Account, licenseKey };
 }
 
