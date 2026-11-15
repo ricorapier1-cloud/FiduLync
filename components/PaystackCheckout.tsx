@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export function PaystackCheckout() {
   const [tab, setTab] = useState<'BUY' | 'RECOVER'>('BUY');
@@ -12,6 +12,34 @@ export function PaystackCheckout() {
   const [licenseKey, setLicenseKey] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string>('/downloads/AlgoLync_EA_README.txt');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    const reference = new URLSearchParams(window.location.search).get('ref');
+    if (!reference) return;
+
+    let active = true;
+    setLoading(true);
+    fetch(`/api/v1/verify-payment?reference=${encodeURIComponent(reference)}`, { cache: 'no-store' })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok || !data.success || typeof data.license_key !== 'string') {
+          throw new Error(data.error || 'Payment verification is still pending. Please contact support with your payment reference.');
+        }
+        if (active) {
+          setLicenseKey(data.license_key);
+          if (typeof data.download_url === 'string') setDownloadUrl(data.download_url);
+          window.history.replaceState({}, '', '/store');
+        }
+      })
+      .catch((error: unknown) => {
+        if (active) setErrorMsg(error instanceof Error ? error.message : 'Unable to verify payment.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => { active = false; };
+  }, []);
 
   const priceDisplay =
     plan === 'MONTHLY'
