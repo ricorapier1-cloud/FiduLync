@@ -235,50 +235,18 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
           <p className="mt-3 text-[9px] leading-4 text-slate-500">CSI is a relative policy/real-rate model adjusted for available COT data, not a price-return index.</p>
         </section>
 
-        <section className="mt-8" aria-labelledby="fleet-heading">
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <section className="mt-8 rounded-xl border border-white/[0.08] bg-[#0c1016] p-4 sm:p-5" aria-label="Fleet telemetry privacy">
+          <div className="flex items-center justify-between gap-3">
             <div>
               <div className="font-mono text-[9px] tracking-[0.17em] text-slate-500">01 / VPS TELEMETRY</div>
-              <h2 id="fleet-heading" className="mt-1 text-lg font-semibold">Live EA fleet</h2>
+              <h2 className="mt-1 text-lg font-semibold">Customer account privacy</h2>
+              <p className="mt-1 text-xs text-slate-400">Fleet-wide account balances and trade details are not displayed in the public Store. Bind your own licensed MT5 account below to view its private telemetry.</p>
             </div>
-            <div className="flex items-center gap-2 font-mono text-[9px] text-slate-500">
-              <BrandGlyph name="radio" size={13} className={initialFleet.configured ? 'text-emerald-400' : 'text-amber-400'} />
-              {telemetryError || (initialFleet.configured ? 'UPSTASH REDIS' : 'IN-PROCESS TTL FALLBACK')}
+            <div className="shrink-0 text-right font-mono text-[9px] text-slate-500">
+              <div>{initialFleet.heartbeats.length} RECENT NODES</div>
+              <div>{telemetryError || (initialFleet.configured ? 'SHARED STORE' : 'LOCAL FALLBACK')}</div>
             </div>
           </div>
-          {initialFleet.heartbeats.length === 0 ? (
-            <div className="rounded-xl border border-white/[0.08] bg-[#0c1016] px-5 py-8 text-center">
-              <BrandGlyph name="activity" className="mx-auto text-slate-600" size={22} />
-              <p className="mt-3 text-sm text-slate-300">No EA heartbeats have been recorded.</p>
-              <p className="mt-1 text-xs text-slate-500">Configure Redis for cross-instance persistence; process-local TTL storage is used as a fallback.</p>
-            </div>
-          ) : (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {initialFleet.heartbeats.map((ea) => (
-                <article key={`${ea.ea_name}-${ea.account_number}`} className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3 className="truncate text-sm font-semibold text-slate-100">{ea.ea_name}</h3>
-                      <p className="mt-1 font-mono text-[10px] text-slate-500">ACCOUNT {ea.account_number}</p>
-                    </div>
-                    <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-1 font-mono text-[9px] ${ea.heartbeat_status === 'ONLINE' ? 'border-emerald-300/20 bg-emerald-300/[0.06] text-emerald-300' : 'border-rose-300/20 bg-rose-300/[0.05] text-rose-300'}`}>
-                      <span className={`h-1.5 w-1.5 rounded-full ${ea.heartbeat_status === 'ONLINE' ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-                      {ea.heartbeat_status}
-                    </span>
-                  </div>
-                  <div className="mt-4 grid grid-cols-3 gap-3 border-t border-white/[0.06] pt-3">
-                    <div><div className="text-[9px] text-slate-500">EQUITY</div><div className="mt-1 font-mono text-xs">{formatCurrency(ea.equity)}</div></div>
-                    <div><div className="text-[9px] text-slate-500">FLOATING P&amp;L</div><div className={`mt-1 font-mono text-xs ${ea.floating_pnl === null ? 'text-slate-500' : ea.floating_pnl >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{formatCurrency(ea.floating_pnl)}</div></div>
-                    <div><div className="text-[9px] text-slate-500">DRAWDOWN</div><div className="mt-1 font-mono text-xs">{ea.drawdown_pct === null ? '—' : `${ea.drawdown_pct.toFixed(2)}%`}</div></div>
-                  </div>
-                  <div className="mt-3 flex justify-between text-[9px] text-slate-500">
-                    <span>BALANCE {formatCurrency(ea.balance)} · {ea.open_positions ?? '—'} OPEN</span>
-                    <span>{ea.last_seen_utc ? new Date(ea.last_seen_utc).toLocaleTimeString('en-GB', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit' }) + ' UTC' : 'STALE'}</span>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
         </section>
 
         <LiveAccountMonitor />
