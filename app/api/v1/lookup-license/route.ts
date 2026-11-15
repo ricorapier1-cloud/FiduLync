@@ -47,8 +47,8 @@ export async function POST(request: Request) {
     const valid = await validateCustomerLicense(mt5Account, licenseKey);
     return NextResponse.json(
       valid
-        ? { valid: true, mt5_account: mt5Account, message: 'Account license verified.' }
-        : { valid: false, error: 'License does not authorize this MT5 account.' },
+        ? { found: true, valid: true, mt5_account: mt5Account, license_key: licenseKey, download_url: '/downloads/AlgoLync_EA_README.txt', message: 'License verified. The installation guide is ready.' }
+        : { found: false, valid: false, error: 'License does not authorize this MT5 account.' },
       {
         status: valid ? 200 : 401,
         headers: { 'Cache-Control': 'no-store, max-age=0' },
