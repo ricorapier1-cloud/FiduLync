@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   }
 
   const reference = new URL(request.url).searchParams.get('reference')?.trim() ?? '';
-  const match = /^ALGO_(MONTHLY|LIFETIME)_(NGN|USD)_([0-9]{1,20})_([A-F0-9]{6})$/.exec(reference);
+  const match = /^ALGO_(MONTHLY|LIFETIME)_(NGN|USD)_([0-9]{1,20})_([A-F0-9]{32})$/.exec(reference);
   if (!match) return NextResponse.json({ success: false, error: 'Invalid payment reference.' }, { status: 400, headers });
 
   const [, plan, currency, accountText] = match;
