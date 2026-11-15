@@ -19,8 +19,11 @@ export async function POST(request: Request) {
   const email = typeof input.email === 'string' ? input.email.trim().toLowerCase() : '';
   const mt5Account = Number(input.mt5_account);
   const licenseKey = typeof input.license_key === 'string' ? input.license_key.trim() : '';
-  if (!email.includes('@') || !Number.isSafeInteger(mt5Account) || mt5Account <= 0) {
-    return NextResponse.json({ found: false, error: 'Provide a valid subscriber email and MT5 account number.' }, { status: 400 });
+  if (!Number.isSafeInteger(mt5Account) || mt5Account <= 0) {
+    return NextResponse.json({ found: false, error: 'Provide a valid MT5 account number.' }, { status: 400 });
+  }
+  if (!licenseKey && !email.includes('@')) {
+    return NextResponse.json({ found: false, error: 'Provide a subscriber email or the account-bound license key.' }, { status: 400 });
   }
   try {
     if (licenseKey) {
