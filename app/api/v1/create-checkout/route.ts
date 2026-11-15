@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     const reference = `ALGO_${plan}_${currency}_${mt5Account}_${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
 
     if (paystackSecret.startsWith('sk_')) {
-      const origin = (process.env.NEXT_PUBLIC_APP_URL || 'https://fidulync.vercel.app').trim().replace(/\\/+$/, '');
+      const origin = (process.env.NEXT_PUBLIC_APP_URL || 'https://fidulync.vercel.app').trim().replace(/\/+$/, '');
       const psRes = await fetch('https://api.paystack.co/transaction/initialize', {
         method: 'POST',
         headers: {
