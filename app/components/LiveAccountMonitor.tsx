@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 type Heartbeat = {
   mt5_account: number; ea_name: string; balance: number; equity: number;
   floating_pnl: number; drawdown_pct: number; open_positions: number;
-  status: string; updated_at: string; connection_status: 'ONLINE' | 'STANDBY';
+  status: string; updated_at: string; connection_status: 'ONLINE' | 'OFFLINE';
 };
 type Trade = {
   ticket: string; symbol: string; direction: 'LONG' | 'SHORT';
@@ -88,20 +88,22 @@ export default function LiveAccountMonitor() {
           <h2 id="live-account-heading" className="mt-1 text-lg font-semibold text-slate-100">Live Account Monitor</h2>
           <p className="mt-1 text-xs text-slate-500">Read-only MT5 telemetry. Never enter broker passwords.</p>
         </div>
-        <span className={'rounded border px-2.5 py-1 font-mono text-[9px] ' + (heartbeat?.connection_status === 'ONLINE' ? 'border-emerald-400/30 text-emerald-300' : 'border-amber-400/30 text-amber-300')}>
-          {heartbeat?.connection_status ?? (bound ? 'STANDBY' : 'NOT BOUND')}
+        <span className={'rounded border px-2.5 py-1 font-mono text-[9px] ' + (heartbeat?.connection_status === 'ONLINE' ? 'border-emerald-400/30 text-emerald-300' : heartbeat?.connection_status === 'OFFLINE' ? 'border-rose-400/30 text-rose-300' : 'border-amber-400/30 text-amber-300')}>
+          {heartbeat?.connection_status ?? (bound ? 'STANDBY — AWAITING FIRST HEARTBEAT' : 'NOT BOUND')}
         </span>
       </div>
       <form onSubmit={bindAccount} className="mt-5 grid gap-3 sm:grid-cols-[1fr_1.3fr_auto]">
         <label className="text-[9px] font-mono tracking-wide text-slate-500">MT5 ACCOUNT NUMBER
-          <input value={account} onChange={e => setAccount(e.target.value)} inputMode="numeric" autoComplete="off" className="mt-1.5 h-10 w-full rounded-md border border-white/10 bg-black/30 px-3 font-mono text-xs text-slate-100 outline-none focus:border-cyan-300/40" placeholder="MT5 login" />
+          <input value={account} onChange={e => { setAccount(e.target.value); setBound(false); setHeartbeat(null); setTrades([]); }} inputMode="numeric" autoComplete="off" className="mt-1.5 h-10 w-full rounded-md border border-white/10 bg-black/30 px-3 font-mono text-xs text-slate-100 outline-none focus:border-cyan-300/40" placeholder="MT5 login" />
         </label>
         <label className="text-[9px] font-mono tracking-wide text-slate-500">LICENSE KEY
-          <input value={license} onChange={e => setLicense(e.target.value)} type="password" autoComplete="off" className="mt-1.5 h-10 w-full rounded-md border border-white/10 bg-black/30 px-3 font-mono text-xs text-slate-100 outline-none focus:border-cyan-300/40" placeholder="Your customer license key" />
+          <input value={license} onChange={e => { setLicense(e.target.value); setBound(false); setHeartbeat(null); setTrades([]); }} type="password" autoComplete="off" className="mt-1.5 h-10 w-full rounded-md border border-white/10 bg-black/30 px-3 font-mono text-xs text-slate-100 outline-none focus:border-cyan-300/40" placeholder="Your customer license key" />
         </label>
         <button disabled={loading} className="mt-4 h-10 self-end rounded-md border border-cyan-300/30 bg-cyan-300/10 px-4 text-xs font-semibold text-cyan-100 hover:bg-cyan-300/15 disabled:opacity-50">{loading ? 'VERIFYING…' : 'BIND ACCOUNT'}</button>
       </form>
       {error && <p role="alert" className="mt-3 text-xs text-rose-300">{error}</p>}
+      {bound && !heartbeat && !error && <p className="mt-4 rounded-md border border-amber-300/20 bg-amber-300/[0.05] p-3 text-xs leading-5 text-amber-100/80">Account verified. Waiting for the first authenticated MT5 EA heartbeat. Attach the licensed EA to a chart, enable WebRequest for this website in MT5, and confirm the EA is configured with the account license. No broker password is required.</p>}
+      {heartbeat && <p className="mt-3 text-[10px] text-slate-500">Last heartbeat: {new Date(heartbeat.updated_at).toLocaleString()} · EA: {heartbeat.ea_name}</p>}
       {bound && <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         {[
           ['BALANCE', money(heartbeat?.balance)], ['EQUITY', money(heartbeat?.equity)],
