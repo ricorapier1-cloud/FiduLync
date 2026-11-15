@@ -1,43 +1,56 @@
 import { NextResponse } from 'next/server';
-import { checkRateLimit } from '@/lib/rateLimit';
-import { isSupabaseConfigured, supabaseQuery } from '@/lib/supabaseAdmin';
+import { isAlgoApiConfigured, isAlgoAuthorized } from '@/lib/algoAuth';
+import { parseHeartbeatInput, saveHeartbeat } from '@/lib/eaHeartbeat';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(req: Request) {
-  const ip = req.headers.get('x-forwarded-for') || '127.0.0.1';
-  if (!checkRateLimit(ip, 60, 60000)) {
-    return NextResponse.json({ ok: false, error: 'Rate limit exceeded' }, { status: 429 });
+export async function POST(request: Request) {
+  const ip = getClientIp(request);
+  if (!checkRateLimit(ip, 60, 60_000)) {
+    return NextResponse.json({ ok: false, error: 'Rate limit exceeded.' }, { status: 429 });
+  }
+
+  if (!isAlgoApiConfigured()) {
+    return NextResponse.json(
+      { ok: false, error: 'EA telemetry authentication is not configured.' },
+      { status: 503 }
+    );
+  }
+
+  if (!isAlgoAuthorized(request)) {
+    return NextResponse.json({ ok: false, error: 'Unauthorized EA telemetry.' }, { status: 401 });
+  }
+
+  const contentLength = Number(request.headers.get('content-length') ?? 0);
+  if (contentLength > 16_384) {
+    return NextResponse.json({ ok: false, error: 'Telemetry payload is too large.' }, { status: 413 });
+  }
+
+  let payload: unknown;
+  try {
+    payload = await request.json();
+  } catch {
+    return NextResponse.json({ ok: false, error: 'A valid JSON heartbeat is required.' }, { status: 400 });
+  }
+
+  const heartbeat = parseHeartbeatInput(payload);
+  if (!heartbeat) {
+    return NextResponse.json({ ok: false, error: 'Heartbeat payload fields are invalid.' }, { status: 400 });
   }
 
   try {
-    const body = await req.json();
-    const mt5Account = Number(body?.mt5_account || 0);
-    const licenseKey = String(body?.license_key || '').trim();
-
-    if (mt5Account <= 0 || !licenseKey.startsWith('ALGOLYNX-')) {
-      return NextResponse.json({ ok: false, error: 'Unauthorized EA telemetry' }, { status: 401 });
-    }
-
-    if (isSupabaseConfigured()) {
-      await supabaseQuery('ea_heartbeats', {
-        method: 'POST',
-        prefer: 'resolution=merge-duplicates',
-        body: {
-          mt5_account: mt5Account,
-          license_key: licenseKey,
-          balance: Number(body?.balance || 0),
-          equity: Number(body?.equity || 0),
-          drawdown_pct: Number(body?.drawdown_pct || 0),
-          open_positions: Number(body?.open_positions || 0),
-          vps_ping_ms: Number(body?.vps_ping_ms || 0),
-          updated_at: new Date().toISOString(),
-        },
-      });
-    }
-
-    return NextResponse.json({ ok: true, server_utc: new Date().toISOString() });
-  } catch {
-    return NextResponse.json({ ok: false, error: 'Invalid telemetry payload' }, { status: 400 });
+    await saveHeartbeat(heartbeat);
+    // The shipped MQL5 bridge treats HTTP 202 as an accepted heartbeat.
+    return NextResponse.json(
+      { ok: true, server_utc: new Date().toISOString(), ttl_seconds: 900 },
+      { status: 202, headers: { 'Cache-Control': 'no-store' } }
+    );
+  } catch (error) {
+    console.error('EA heartbeat could not be stored:', error);
+    return NextResponse.json(
+      { ok: false, error: 'Heartbeat storage is temporarily unavailable.' },
+      { status: 503 }
+    );
   }
 }
