@@ -1,8 +1,17 @@
 -- Customer-scoped MT5 telemetry. No broker credentials are collected or stored.
+-- Keep heartbeat rows isolated by the verified customer license.
 ALTER TABLE public.ea_heartbeats
+  ADD COLUMN IF NOT EXISTS license_key TEXT REFERENCES public.licenses(license_key) ON DELETE CASCADE,
   ADD COLUMN IF NOT EXISTS ea_name TEXT NOT NULL DEFAULT 'MT5 Expert Advisor',
   ADD COLUMN IF NOT EXISTS floating_pnl NUMERIC NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'RUNNING';
+
+-- The API upserts one heartbeat per MT5 account using on_conflict=mt5_account.
+CREATE UNIQUE INDEX IF NOT EXISTS ea_heartbeats_mt5_account_unique
+  ON public.ea_heartbeats (mt5_account);
+
+CREATE INDEX IF NOT EXISTS ea_heartbeats_license_account_idx
+  ON public.ea_heartbeats (license_key, mt5_account);
 
 CREATE TABLE IF NOT EXISTS public.trade_ledger (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -24,6 +33,5 @@ CREATE TABLE IF NOT EXISTS public.trade_ledger (
 
 CREATE INDEX IF NOT EXISTS trade_ledger_account_closed_idx
   ON public.trade_ledger (mt5_account, closed_at_utc DESC);
-CREATE INDEX IF NOT EXISTS ea_heartbeats_license_account_idx
-  ON public.ea_heartbeats (license_key, mt5_account);
+
 ALTER TABLE public.trade_ledger ENABLE ROW LEVEL SECURITY;
