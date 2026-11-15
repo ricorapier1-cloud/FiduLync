@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
-import { isSupabaseConfigured, persistLicense } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,7 +39,7 @@ export async function POST(req: Request) {
     const reference = `ALGO_${plan}_${currency}_${mt5Account}_${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
 
     if (paystackSecret.startsWith('sk_')) {
-      const origin = req.headers.get('origin') || 'https://fidulync.vercel.app';
+      const origin = (process.env.NEXT_PUBLIC_APP_URL || 'https://fidulync.vercel.app').trim().replace(/\\/+$/, '');
       const psRes = await fetch('https://api.paystack.co/transaction/initialize', {
         method: 'POST',
         headers: {
