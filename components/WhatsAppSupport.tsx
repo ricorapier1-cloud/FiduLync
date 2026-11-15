@@ -6,7 +6,7 @@ export default function WhatsAppSupport() {
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Contact AlgoLync Desk on WhatsApp"
-      className="fixed bottom-20 sm:bottom-6 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full border border-emerald-400/50 bg-[#030A08]/95 text-emerald-400 shadow-2xl shadow-black backdrop-blur-md transition-all hover:scale-110 hover:border-emerald-300 hover:bg-emerald-500 hover:text-black"
+      className="fixed bottom-24 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full border border-emerald-400/50 bg-[#030A08]/95 text-emerald-400 shadow-2xl shadow-black backdrop-blur-md transition-all hover:scale-110 hover:border-emerald-300 hover:bg-emerald-500 hover:text-black"
     >
       <span className="absolute -top-1 -right-1 flex h-3 w-3">
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
