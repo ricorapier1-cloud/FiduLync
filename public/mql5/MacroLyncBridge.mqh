@@ -309,7 +309,9 @@ bool LogClosedTrade(
       || closed_at_utc == "" || StringSubstr(closed_at_utc, StringLen(closed_at_utc) - 1, 1) != "Z"
       || confluence_score < -100 || confluence_score > 100)
       return false;
-   string body = "{\"ticket\":\"" + ML_JsonEscape(ticket)
+   string body = "{\"mt5_account\":" + IntegerToString(mt5_account)
+      + ",\"license_key\":\"" + ML_JsonEscape(license_key)
+      + "\",\"ticket\":\"" + ML_JsonEscape(ticket)
       + "\",\"symbol\":\"" + ML_JsonEscape(symbol)
       + "\",\"direction\":\"" + direction
       + "\",\"entry_price\":" + DoubleToString(entry_price, 8)
@@ -355,8 +357,11 @@ bool MacroLyncSendHeartbeat(
 )
 {
    string root = ML_BaseUrl(base_url);
-   if(root == "" || api_key == "") return false;
-   string body = "{\"ea_name\":\"" + ML_JsonEscape(ea_name)
+   long accountLogin = AccountInfoInteger(ACCOUNT_LOGIN);
+   if(root == "" || api_key == "" || license_key == "" || accountLogin <= 0) return false;
+   string body = "{\"mt5_account\":" + IntegerToString(accountLogin)
+      + ",\"license_key\":\"" + ML_JsonEscape(license_key)
+      + "\",\"ea_name\":\"" + ML_JsonEscape(ea_name)
       + "\",\"account_number\":\"" + ML_JsonEscape(account_number)
       + "\",\"balance\":" + DoubleToString(balance, 2)
       + ",\"equity\":" + DoubleToString(equity, 2)
