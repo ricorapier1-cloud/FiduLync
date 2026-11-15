@@ -31,12 +31,12 @@ export async function POST(req: Request) {
     const currency: CurrencyCode = body?.currency === 'USD' ? 'USD' : 'NGN';
     const plan: PlanTier = body?.plan === 'LIFETIME' ? 'LIFETIME' : 'MONTHLY';
 
-    if (!email.includes('@') || !Number.isFinite(mt5Account) || mt5Account <= 0) {
+    if (!email.includes('@') || !Number.isSafeInteger(mt5Account) || mt5Account <= 0) {
       return NextResponse.json({ success: false, error: 'Enter a valid email and MT5 account number.' }, { status: 400 });
     }
 
     const paystackSecret = (process.env.PAYSTACK_SECRET_KEY || '').trim();
-    const reference = `ALGO_${plan}_${currency}_${mt5Account}_${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+    const reference = `ALGO_${plan}_${currency}_${mt5Account}_${crypto.randomBytes(16).toString('hex').toUpperCase()}`;
 
     if (paystackSecret.startsWith('sk_')) {
       const origin = (process.env.NEXT_PUBLIC_APP_URL || 'https://fidulync.vercel.app').trim().replace(/\/+$/, '');
