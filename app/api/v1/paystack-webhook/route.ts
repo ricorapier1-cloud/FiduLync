@@ -44,7 +44,7 @@ export async function POST(request: Request) {
   }
   const payment = data as Record<string, unknown>;
   const reference = typeof payment.reference === 'string' ? payment.reference : '';
-  const match = /^ALGO_(MONTHLY|LIFETIME)_(NGN|USD)_([0-9]{1,20})_([A-F0-9]{6})$/.exec(reference);
+  const match = /^ALGO_(MONTHLY|LIFETIME)_(NGN|USD)_([0-9]{1,20})_([A-F0-9]{32})$/.exec(reference);
   if (!match || payment.status !== 'success') {
     return NextResponse.json({ error: 'Unrecognized or unsuccessful payment.' }, { status: 400 });
   }
