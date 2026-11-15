@@ -7,6 +7,7 @@ export function PaystackCheckout() {
   const [currency, setCurrency] = useState<'NGN' | 'USD'>('NGN');
   const [email, setEmail] = useState('');
   const [mt5Account, setMt5Account] = useState('');
+  const [recoveryLicenseKey, setRecoveryLicenseKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [licenseKey, setLicenseKey] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string>('/downloads/AlgoLync_EA_README.txt');
@@ -52,7 +53,7 @@ export function PaystackCheckout() {
 
   const handleRecover = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !mt5Account) return;
+    if (!mt5Account || !recoveryLicenseKey.trim()) return;
     setLoading(true);
     setErrorMsg(null);
 
@@ -60,7 +61,7 @@ export function PaystackCheckout() {
       const res = await fetch('/api/v1/lookup-license', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, mt5_account: Number(mt5Account) }),
+        body: JSON.stringify({ license_key: recoveryLicenseKey.trim(), mt5_account: mt5Account }),
       });
       const data = await res.json();
       if (!data.found) {
@@ -166,15 +167,16 @@ export function PaystackCheckout() {
             download
             className="block w-full bg-emerald-500 hover:bg-emerald-400 text-black font-mono font-bold py-2.5 rounded text-xs tracking-wider transition-colors"
           >
-            DOWNLOAD ALGOLYNX EA PACKAGE (.EX5)
+            DOWNLOAD MT5 INSTALLATION GUIDE
           </a>
+          <p className="text-[11px] text-emerald-400/70">This is the installation guide, not a compiled .EX5 robot. Compiled EA packages will be published after MetaEditor compilation and testing.</p>
           <p className="text-[11px] text-emerald-400/70">
             Whitelist <span className="font-mono text-emerald-300">https://fidulync.vercel.app</span> in MT5 Tools → Options → Expert Advisors.
           </p>
         </div>
       ) : (
         <form onSubmit={tab === 'BUY' ? handleCheckout : handleRecover} className="space-y-4">
-          <div>
+          {tab === 'BUY' && <div>
             <label className="block text-xs font-mono mb-1 text-emerald-300">Subscriber Email</label>
             <input
               type="email"
@@ -184,7 +186,11 @@ export function PaystackCheckout() {
               placeholder="trader@institution.com"
               className="w-full bg-black/60 border border-emerald-500/30 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-400 font-mono"
             />
-          </div>
+          </div>}
+          {tab === 'RECOVER' && <div>
+            <label className="block text-xs font-mono mb-1 text-emerald-300">Existing License Key</label>
+            <input type="text" required value={recoveryLicenseKey} onChange={(e) => setRecoveryLicenseKey(e.target.value.toUpperCase())} placeholder="ALGOLYNX-..." className="w-full bg-black/60 border border-emerald-500/30 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-400 font-mono" />
+          </div>}
           <div>
             <label className="block text-xs font-mono mb-1 text-emerald-300">MT5 Account Number</label>
             <input
@@ -205,7 +211,7 @@ export function PaystackCheckout() {
               ? 'PROCESSING...'
               : tab === 'BUY'
               ? `PROVISION LICENSE • ${priceDisplay}`
-              : 'RETRIEVE KEY & DOWNLOAD EA'}
+              : 'VERIFY LICENSE & GET INSTALL GUIDE'}
           </button>
         </form>
       )}
