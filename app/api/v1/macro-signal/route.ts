@@ -1,63 +1,56 @@
 import { NextResponse } from 'next/server';
+import { getMacroSignal, isSupportedSignalSymbol } from '@/lib/signalEngine';
+import { isAlgoAuthorized, isSameOriginBrowserRequest } from '@/lib/algoAuth';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: Request) {
-  const ip = getClientIp(req);
+export async function GET(request: Request) {
+  const ip = getClientIp(request);
   if (!checkRateLimit(ip, 30, 60_000)) {
-    return NextResponse.json({ error: 'Rate limit exceeded. Maximum 30 requests per minute.' }, { status: 429 });
+    return NextResponse.json(
+      { error: 'Rate limit exceeded. Maximum 30 requests per minute.' },
+      { status: 429, headers: { 'Cache-Control': 'no-store' } }
+    );
   }
 
-  const { searchParams } = new URL(req.url);
-  const symbol = (searchParams.get('symbol') ?? 'EURUSD').toUpperCase();
-  const apiKey = process.env.FX_API_KEY?.trim() ?? '';
+  // The Store's same-origin preview is allowed without exposing the EA secret.
+  // MT5 clients must authenticate with the server-side x-algo-key.
+  if (!isSameOriginBrowserRequest(request) && !isAlgoAuthorized(request)) {
+    return NextResponse.json(
+      { error: 'Unauthorized signal request.' },
+      { status: 401, headers: { 'Cache-Control': 'no-store' } }
+    );
+  }
 
-  const liveTimestamp = new Date().toISOString();
+  const { searchParams } = new URL(request.url);
+  const symbol = (searchParams.get('symbol') ?? 'EURUSD').trim().toUpperCase();
+
+  if (!isSupportedSignalSymbol(symbol)) {
+    return NextResponse.json(
+      { error: 'Unsupported trading symbol.' },
+      { status: 400, headers: { 'Cache-Control': 'no-store' } }
+    );
+  }
 
   try {
-    let provenanceStatus = 'VERIFIED LIVE TELEMETRY (11 / 11 INPUTS ACTIVE)';
-
-    if (apiKey && apiKey !== 'your_alpha_vantage_key_here') {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 4500);
-
-      try {
-        const response = await fetch(
-          `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=EUR&to_currency=USD&apikey=${apiKey}`,
-          { cache: 'no-store', signal: controller.signal }
-        );
-
-        if (!response.ok) provenanceStatus = 'PARTIAL (Upstream Throttled)';
-      } catch {
-        provenanceStatus = 'VERIFIED FALLBACK TELEMETRY';
-      } finally {
-        clearTimeout(timeout);
-      }
+    const signal = await getMacroSignal(symbol);
+    if (!signal) {
+      return NextResponse.json(
+        { error: 'A signal could not be generated for this symbol.' },
+        { status: 422, headers: { 'Cache-Control': 'no-store' } }
+      );
     }
 
-    return NextResponse.json({
-      status: 'success',
-      symbol,
-      provenance: provenanceStatus,
-      timestamp: liveTimestamp,
-      policy_range: '425 bps (G8)',
-      policy_inputs_active: 11,
-      policy_inputs_total: 11,
-      provenance_badge: 'LIVE',
-      next_catalyst: {
-        title: 'US Non-Farm Payrolls',
-        impact: 'HIGH IMPACT',
-        time: '2026-12-04T13:30:00.000Z',
-      },
-      currency_strength: {
-        base: symbol.slice(0, 3) || 'USD',
-        score: 68.4,
-        status: 'Bullish Bias',
-      },
-    }, { status: 200 });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Telemetry sync error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(signal, {
+      status: 200,
+      headers: { 'Cache-Control': 'no-store' },
+    });
+  } catch (error) {
+    console.error('Macro signal generation failed:', error);
+    return NextResponse.json(
+      { error: 'Macro signal service is temporarily unavailable.' },
+      { status: 503, headers: { 'Cache-Control': 'no-store' } }
+    );
   }
 }
