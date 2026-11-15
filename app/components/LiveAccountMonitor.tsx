@@ -59,10 +59,12 @@ export default function LiveAccountMonitor() {
     setError('');
     setBound(true);
     try {
-      const params = new URLSearchParams({ mt5_account: account.trim() });
-      const response = await fetch('/api/v1/ea-heartbeat?' + params.toString(), { cache: 'no-store', headers: { 'x-license-key': license.trim() } });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Account verification failed.');
+      const verification = await fetch('/api/v1/lookup-license', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mt5_account: Number(account.trim()), license_key: license.trim() }),
+      });
+      const verificationData = await verification.json();
+      if (!verification.ok || verificationData.valid !== true) throw new Error(verificationData.error || 'License does not authorize this MT5 account.');
       await refresh();
     } catch (e) {
       setBound(false);
