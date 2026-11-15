@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import BrandGlyph from '@/components/BrandGlyph';
 import { PaystackCheckout } from '@/components/PaystackCheckout';
 import { QuantStrategyCatalog } from '@/components/QuantStrategyCatalog';
+import LiveAccountMonitor from '@/components/LiveAccountMonitor';
 import type { HeartbeatRecord } from '@/lib/eaHeartbeat';
 import { getCurrencyStrengthIndex, type getLiquiditySession } from '@/lib/currencyStrength';
 import type { TradeExpectancy } from '@/lib/tradeLedger';
@@ -279,6 +280,8 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
             </div>
           )}
         </section>
+
+        <LiveAccountMonitor />
 
         <section className="mt-11" aria-labelledby="strategies-heading">
           <QuantStrategyCatalog />
