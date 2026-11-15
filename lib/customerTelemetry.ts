@@ -84,7 +84,8 @@ export async function getCustomerHeartbeat(mt5Account: number, licenseKey: strin
   const rows = await supabaseRows<Omit<CustomerHeartbeat, 'license_key'> & { updated_at: string }>('ea_heartbeats', query.toString());
   if (!rows.length) return null;
   const row = rows[0];
-  const online = Number.isFinite(Date.parse(row.updated_at)) && Date.now() - Date.parse(row.updated_at) <= 15 * 60_000;
+  const online = (row.status === 'RUNNING' || row.status === 'ONLINE')
+    && Number.isFinite(Date.parse(row.updated_at)) && Date.now() - Date.parse(row.updated_at) <= 15 * 60_000;
   return { ...row, connection_status: online ? 'ONLINE' as const : 'STANDBY' as const };
 }
 
