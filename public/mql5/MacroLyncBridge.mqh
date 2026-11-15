@@ -294,11 +294,14 @@ bool LogClosedTrade(
    const int confluence_score,
    const string regime,
    const string closed_at_utc,
-   const int timeout_ms = 5000
+   const int timeout_ms = 5000,
+   const long mt5_account = 0,
+   const string license_key = ""
 )
 {
    string root = ML_BaseUrl(base_url);
    if(root == "" || api_key == "" || ticket == "" || symbol == ""
+      || mt5_account <= 0 || license_key == ""
       || (direction != "LONG" && direction != "SHORT")
       || !MathIsValidNumber(entry_price) || entry_price <= 0.0
       || !MathIsValidNumber(exit_price) || exit_price <= 0.0
@@ -347,7 +350,8 @@ bool MacroLyncSendHeartbeat(
    const double drawdown_pct,
    const int open_positions,
    const string status = "RUNNING",
-   const int timeout_ms = 5000
+   const int timeout_ms = 5000,
+   const string license_key = ""
 )
 {
    string root = ML_BaseUrl(base_url);
@@ -390,7 +394,8 @@ void MacroLyncHeartbeatEveryFiveMinutes(
    const double floating_pnl,
    const double drawdown_pct,
    const int open_positions,
-   const string status = "RUNNING"
+   const string status = "RUNNING",
+   const string license_key = ""
 )
 {
    static datetime last_attempt = 0;
@@ -407,7 +412,9 @@ void MacroLyncHeartbeatEveryFiveMinutes(
       floating_pnl,
       drawdown_pct,
       open_positions,
-      status
+      status,
+      5000,
+      license_key
    );
 }
 
