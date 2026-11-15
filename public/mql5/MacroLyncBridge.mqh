@@ -423,8 +423,10 @@ void MacroLyncHeartbeatEveryFiveMinutes(
    );
 }
 
-#endif
 
+// Optional legacy tester helpers depend on the host EA's MacroSignal type.
+// Define MACRO_LYNC_ENABLE_LEGACY_TESTER_SIMULATOR only when that type is available.
+#ifdef MACRO_LYNC_ENABLE_LEGACY_TESTER_SIMULATOR
 
 //+------------------------------------------------------------------+
 //| Local UTC Rollover Guard (20:45 - 22:15 UTC)                     |
@@ -508,3 +510,6 @@ bool SimulateTesterSignal(const string symbol, MacroSignal &outSignal)
    IndicatorRelease(hAdx);  IndicatorRelease(hAtr);
    return true;
 }
+
+#endif // MACRO_LYNC_ENABLE_LEGACY_TESTER_SIMULATOR
+#endif // MACRO_LYNC_BRIDGE_MQH
