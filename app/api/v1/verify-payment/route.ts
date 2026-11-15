@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createHash } from 'node:crypto';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
-import { isSupabaseConfigured, persistLicense, recordTransaction, supabaseRead } from '@/lib/supabaseAdmin';
+import { isSupabaseConfigured, persistLicense, supabaseRead } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
@@ -91,15 +91,6 @@ export async function GET(request: Request) {
       });
       license = { license_key: licenseKey, mt5_account: mt5Account, tier: plan === 'LIFETIME' ? 'INSTITUTIONAL_LIFETIME' : 'INSTITUTIONAL_MONTHLY', expires_at: expiresAt };
     }
-
-    await recordTransaction({
-      reference,
-      email: customerEmail,
-      amount: Number(payment.amount) / 100,
-      currency,
-      status: 'success',
-      mt5_account: mt5Account,
-    });
 
     return NextResponse.json({
       success: true,
