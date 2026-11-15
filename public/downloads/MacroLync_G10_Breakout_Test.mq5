@@ -13,7 +13,7 @@
 CTrade trade;
 
 input group "=== ALGOLYNX CLOUD LICENSE & TELEMETRY ==="
-input string InpLicenseKey      = "ALGOLYNX-FREE-TEST"; 
+input string InpLicenseKey      = "ALGOLYNX-FREE-TEST";
 input string InpServerOrigin    = "https://fidulync.vercel.app";
 input bool   InpEnforceCloud    = false;
 
@@ -38,7 +38,7 @@ bool CheckCloudLicense()
    string payload = StringFormat("{\"license_key\":\"%s\",\"mt5_account\":%I64d}", InpLicenseKey, AccountInfoInteger(ACCOUNT_LOGIN));
    StringToCharArray(payload, post, 0, StringLen(payload), CP_UTF8);
    int code = WebRequest("POST", url, headers, 4000, post, result, resHeaders);
-   if(code != 200) { Print("MacroLync Cloud Gate: Whitelist ", InpServerOrigin, " in MT5 Options."); return false; }
+   if(code != 200) return false;
    string body = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
    return (StringFind(body, "\"valid\":true") != -1);
 }
@@ -78,7 +78,7 @@ void OnTick()
    double tpDist = atr[0] * InpTpAtrMult;
 
    if(prevClose > highestHigh)
-      trade.Buy(0.01, _Symbol, ask, NormalizeDouble(ask - slDist, _Digits), NormalizeDouble(ask + tpDist, _Digits), "MacroLync Breakout Long");
+      trade.Buy(0.01, _Symbol, ask, NormalizeDouble(ask - slDist, _Digits), NormalizeDouble(ask + tpDist, _Digits), "Breakout Long");
    else if(prevClose < lowestLow)
-      trade.Sell(0.01, _Symbol, bid, NormalizeDouble(bid + slDist, _Digits), NormalizeDouble(bid - tpDist, _Digits), "MacroLync Breakout Short");
+      trade.Sell(0.01, _Symbol, bid, NormalizeDouble(bid + slDist, _Digits), NormalizeDouble(bid - tpDist, _Digits), "Breakout Short");
 }
