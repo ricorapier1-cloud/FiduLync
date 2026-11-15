@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { isAlgoApiConfigured, isAlgoAuthorized } from '@/lib/algoAuth';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { getCustomerHeartbeat, saveCustomerHeartbeat, validateCustomerLicense } from '@/lib/customerTelemetry';
+import { saveHeartbeat } from '@/lib/eaHeartbeat';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,6 +65,11 @@ export async function POST(request: Request) {
       mt5_account: account, license_key: licenseKey, ea_name: eaName,
       balance, equity, floating_pnl: floating, drawdown_pct: drawdown,
       open_positions: positions, status,
+    });
+    // Preserve the existing operator fleet heartbeat cache without exposing it through customer GETs.
+    await saveHeartbeat({
+      ea_name: eaName, account_number: String(account), balance, equity,
+      floating_pnl: floating, drawdown_pct: drawdown, open_positions: positions, status,
     });
     return NextResponse.json({ ok: true, server_utc: new Date().toISOString(), ttl_seconds: 900 }, { status: 202, headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
