@@ -62,7 +62,7 @@ export async function POST(request: Request) {
   }
 
   // Explicit demo artifacts remain available for sandbox testing only.
-  if (DEMO_LICENSE_KEYS.has(licenseKey)) {
+  if (process.env.ENABLE_DEMO_LICENSES === 'true' && DEMO_LICENSE_KEYS.has(licenseKey)) {
     return NextResponse.json({
       valid: true,
       message: 'AlgoLync sandbox demo artifact verified.',
