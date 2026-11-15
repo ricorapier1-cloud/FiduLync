@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 
 type Heartbeat = {
   mt5_account: number; ea_name: string; balance: number; equity: number;
@@ -49,7 +49,7 @@ export default function LiveAccountMonitor() {
     }
   }, [bound, account, license]);
 
-  async function bindAccount(event: React.FormEvent<HTMLFormElement>) {
+  async function bindAccount(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!/^\d{1,20}$/.test(account.trim()) || !license.trim()) {
       setError('Enter a valid MT5 account number and license key.');
@@ -57,7 +57,6 @@ export default function LiveAccountMonitor() {
     }
     setLoading(true);
     setError('');
-    setBound(true);
     try {
       const verification = await fetch('/api/v1/lookup-license', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -65,7 +64,7 @@ export default function LiveAccountMonitor() {
       });
       const verificationData = await verification.json();
       if (!verification.ok || verificationData.valid !== true) throw new Error(verificationData.error || 'License does not authorize this MT5 account.');
-      await refresh();
+      setBound(true);
     } catch (e) {
       setBound(false);
       setError(e instanceof Error ? e.message : 'Account verification failed.');
