@@ -1,6 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
-import { isSupabaseConfigured, persistLicense, recordTransaction, supabaseRead } from '@/lib/supabaseAdmin';
+import { isSupabaseConfigured, persistLicense, supabaseRead } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
@@ -85,14 +85,6 @@ export async function POST(request: Request) {
       });
     }
 
-    await recordTransaction({
-      reference,
-      email,
-      amount: Number(payment.amount) / 100,
-      currency,
-      status: 'success',
-      mt5_account: mt5Account,
-    });
     return NextResponse.json({ status: 'success' }, { status: 200 });
   } catch (error) {
     console.error('Paystack webhook provisioning failed:', error);
