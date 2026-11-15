@@ -31,10 +31,10 @@ export default function LiveAccountMonitor() {
   const refresh = useCallback(async () => {
     if (!bound || !account || !license) return;
     try {
-      const params = new URLSearchParams({ mt5_account: account, license_key: license });
+      const params = new URLSearchParams({ mt5_account: account });
       const [hbRes, tradeRes] = await Promise.all([
-        fetch('/api/v1/ea-heartbeat?' + params.toString(), { cache: 'no-store' }),
-        fetch('/api/v1/trade-log?' + params.toString(), { cache: 'no-store' }),
+        fetch('/api/v1/ea-heartbeat?' + params.toString(), { cache: 'no-store', headers: { 'x-license-key': license } }),
+        fetch('/api/v1/trade-log?' + params.toString(), { cache: 'no-store', headers: { 'x-license-key': license } }),
       ]);
       const [hbData, tradeData] = await Promise.all([hbRes.json(), tradeRes.json()]);
       if (!hbRes.ok || !tradeRes.ok) throw new Error(hbData.error || tradeData.error || 'Account telemetry is unavailable.');
@@ -59,8 +59,8 @@ export default function LiveAccountMonitor() {
     setError('');
     setBound(true);
     try {
-      const params = new URLSearchParams({ mt5_account: account.trim(), license_key: license.trim() });
-      const response = await fetch('/api/v1/ea-heartbeat?' + params.toString(), { cache: 'no-store' });
+      const params = new URLSearchParams({ mt5_account: account.trim() });
+      const response = await fetch('/api/v1/ea-heartbeat?' + params.toString(), { cache: 'no-store', headers: { 'x-license-key': license.trim() } });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Account verification failed.');
       await refresh();
