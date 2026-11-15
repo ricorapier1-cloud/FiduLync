@@ -84,17 +84,19 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
   const [signalError, setSignalError] = useState('');
   const [testing, setTesting] = useState(false);
   const [copyState, setCopyState] = useState('');
-  const [licenseKeyInput, setLicenseKeyInput] = useState('ALGOLYNX-PRO-98421');
+  const [licenseKeyInput, setLicenseKeyInput] = useState('');
   const [mt5AccountInput, setMt5AccountInput] = useState('');
   const [verifyingLicense, setVerifyingLicense] = useState(false);
   const [licenseResponse, setLicenseResponse] = useState<{
     valid: boolean;
     message?: string;
     account?: string;
+    mt5_account?: string | number;
     license_type?: string;
     tier?: string;
     expires_at?: string | null;
     error?: string;
+    reason?: string;
   } | null>(null);
 
   async function testLicenseVerification() {
@@ -501,13 +503,13 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-slate-300">
-                    {licenseResponse.message || licenseResponse.error}
+                    {licenseResponse.message || licenseResponse.error || licenseResponse.reason || 'No additional verification details were returned.'}
                   </p>
                   {licenseResponse.valid && (
                     <div className="mt-3 grid grid-cols-2 gap-2 border-t border-white/[0.06] pt-3 font-mono text-[10px]">
                       <div>
                         <span className="text-slate-500">BOUND ACCOUNT:</span>
-                        <div className="text-slate-200">{licenseResponse.account}</div>
+                        <div className="text-slate-200">{licenseResponse.account ?? licenseResponse.mt5_account ?? '—'}</div>
                       </div>
                       <div>
                         <span className="text-slate-500">LICENSE DURATION:</span>
