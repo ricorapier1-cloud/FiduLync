@@ -72,33 +72,12 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    const licenseKey = `ALGOLYNX-${plan === 'LIFETIME' ? 'LT' : 'MO'}-${mt5Account}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
-
-    if (isSupabaseConfigured()) {
-      try {
-        await persistLicense({
-          license_key: licenseKey,
-          mt5_account: mt5Account,
-          email,
-          tier: plan === 'LIFETIME' ? 'INSTITUTIONAL_LIFETIME' : 'INSTITUTIONAL_MONTHLY',
-          status: 'active',
-          expires_at: plan === 'LIFETIME' ? null : new Date(Date.now() + 30 * 86400000).toISOString(),
-        });
-      } catch (dbErr) {
-        console.warn('Sandbox license DB insert non-critical warning:', dbErr);
-      }
-    }
-
+    // Never mint or activate a license without a Paystack transaction.
+    // Test payments are supported through a Paystack test secret; no offline bypass exists.
     return NextResponse.json({
-      success: true,
-      mode: 'sandbox_instant',
-      license_key: licenseKey,
-      download_url: '/downloads/AlgoLync_EA_README.txt',
-      plan,
-      currency,
-      email,
-      mt5_account: mt5Account,
-    });
+      success: false,
+      error: 'Online payment is not configured yet. Please try again later.',
+    }, { status: 503 });
   } catch (err: unknown) {
     const message = err instanceof Error ? errorToString(err) : 'Checkout initialization failed';
     return NextResponse.json({ success: false, error: message }, { status: 500 });
