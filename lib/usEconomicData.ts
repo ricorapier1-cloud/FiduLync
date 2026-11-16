@@ -126,7 +126,7 @@ async function getBeaGdpGrowth(apiKey: string): Promise<Pick<UsEconomicIndicator
   const rows = payload.BEAAPI.Results.Data.filter((item) => isRecord(item)
     && String(item.LineNumber) === '1'
     && typeof item.TimePeriod === 'string'
-    && /^\\d{4}Q[1-4]$/.test(item.TimePeriod));
+    && /^\d{4}Q[1-4]$/.test(item.TimePeriod));
   rows.sort((a, b) => String((b as JsonRecord).TimePeriod).localeCompare(String((a as JsonRecord).TimePeriod)));
   const latest = rows[0];
   if (!isRecord(latest)) throw new Error('BEA returned no quarterly real GDP observations for NIPA table T10101.');
