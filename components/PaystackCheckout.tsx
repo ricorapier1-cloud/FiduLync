@@ -12,6 +12,7 @@ export function PaystackCheckout() {
   const [licenseKey, setLicenseKey] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string>('/downloads/AlgoLync_EA_README.txt');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [deliveryNotice, setDeliveryNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const reference = new URLSearchParams(window.location.search).get('ref');
@@ -27,6 +28,7 @@ export function PaystackCheckout() {
         }
         if (active) {
           setLicenseKey(data.license_key);
+          setDeliveryNotice(data.email_sent ? 'A copy of your license has also been sent to your payment email.' : (data.email_notice || 'Save your license key now. Email delivery is not yet configured.'));
           if (typeof data.download_url === 'string') setDownloadUrl(data.download_url);
           window.history.replaceState({}, '', '/store');
         }
@@ -51,6 +53,7 @@ export function PaystackCheckout() {
     if (!email || !mt5Account) return;
     setLoading(true);
     setErrorMsg(null);
+    setDeliveryNotice(null);
 
     try {
       const res = await fetch('/api/v1/create-checkout', {
