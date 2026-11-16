@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { getCachedData } from '@/lib/redisCache';
+import { getCachedData } from '@/lib/redisCache';\nimport { getSupabaseAdmin } from '@/lib/serverSupabase';
 
 export type Candle = {
   timestamp: number;
@@ -87,7 +87,40 @@ function parseCandle(value: unknown): Candle | null {
   return candle;
 }
 
+async function fetchMt5Candles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promise<Candle[]> {
+  const supabase = getSupabaseAdmin();
+  const { data: installation, error: installationError } = await supabase.from('mt5_installations')
+    .select('id,last_seen_at')
+    .eq('status', 'active')
+    .not('last_seen_at', 'is', null)
+    .order('last_seen_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (installationError) throw installationError;
+  if (!installation?.last_seen_at || Date.now() - Date.parse(installation.last_seen_at) > 180_000) return [];
+
+  const { data, error } = await supabase.from('mt5_market_candles')
+    .select('bar_time,open,high,low,close')
+    .eq('installation_id', installation.id)
+    .eq('symbol', pair)
+    .eq('timeframe', timeframe)
+    .eq('is_closed', true)
+    .order('bar_time', { ascending: false })
+    .limit(MAX_CANDLES);
+  if (error) throw error;
+  if (!data?.length) return [];
+  return data.map((row) => parseCandle({
+    timestamp: row.bar_time, open: row.open, high: row.high, low: row.low, close: row.close,
+  })).filter((candle): candle is Candle => candle !== null).reverse();
+}
+
 async function fetchCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promise<Candle[]> {
+  try {
+    const brokerCandles = await fetchMt5Candles(pair, timeframe);
+    if (brokerCandles.length >= 200) return brokerCandles;
+  } catch (error) {
+    console.warn(`MT5 broker candles unavailable for ${pair} ${timeframe}; checking external provider.`, error);
+  }
   const endpoint = process.env.MARKET_DATA_PROVIDER_URL?.trim();
   if (!endpoint) return [];
 
