@@ -26,7 +26,15 @@ Project → Settings → Environment Variables → Add New → Production (and P
 Do not add them before the matching code is deployed. Never send the key in an email or commit it to GitHub.
 
 ### 3. Owner email delivery
-Owner OTP uses Supabase Auth. Test sign-in at https://fidulync.vercel.app/owner only after a deployment includes the latest owner-access code. If no email arrives, the owner must configure a trusted SMTP sender in Supabase Auth settings. Keep owner login restricted to `ricorapier1@gmail.com`. Customer support remains `fidulync@gmail.com`.
+Owner OTP uses Supabase Auth. Test sign-in at https://fidulync.vercel.app/owner only after a deployment includes the latest owner-access code.
+
+In Supabase Dashboard → Authentication → URL Configuration:
+- Set the Site URL to `https://fidulync.vercel.app`.
+- Allow the production owner callback URL `https://fidulync.vercel.app/owner` (and only the exact preview callback URL when preview testing is necessary).
+
+In Authentication → Email Templates, ensure the email OTP template includes the six-digit token variable `{{ .Token }}`; a template that only contains `{{ .ConfirmationURL }}` sends a link rather than the six-digit code expected by the owner page. Configure a trusted SMTP sender before relying on production sign-in, then test delivery and code verification.
+
+Keep owner login restricted to `ricorapier1@gmail.com`. Customer support remains `fidulync@gmail.com`.
 
 ### 4. Broker MT5 data bridge
 No laptop is needed to prepare the cloud architecture, but actual broker-specific candles and execution telemetry require a running MT5 terminal/EA. When a laptop is available, install the FiduLync bridge EA, enable WebRequest to the FiduLync domain, and connect the chosen demo broker account. Do not enable live trading during the first validation stage.
