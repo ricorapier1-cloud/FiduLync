@@ -133,6 +133,8 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
     .sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt));
   const nextHighImpactCatalyst = sortedCatalysts.find((catalyst) => catalyst.impact === 'High');
   const currencies = snapshot.currencies;
+  const verifiedProviderCurrencyCount = currencies.filter((currency) => currency.code !== 'XAU'
+    && currency.policyRateSource === 'provider' && currency.inflationSource === 'provider').length;
   const liveQuoteAvailable = liveFeed && now !== null && quotes.some((quote) => {
     const age = now - Date.parse(quote.timestamp);
     return quote.source === 'finnhub' && age >= 0 && age <= 120_000;
@@ -252,7 +254,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
         <article className="macro-kpi"><span className="macro-kpi-label">POLICY RANGE <span>G10</span></span><strong className="mono">{policySpread === null ? '425 bps (G8)' : formatRate(policySpread)}</strong><small>highest to lowest available policy rate</small></article>
         <article className="macro-kpi"><span className="macro-kpi-label">POLICY INPUTS <span>G10</span></span><strong className="mono">{String(currencies.length).padStart(2, '0')} <em>/ 11</em></strong><small>{currencies.length >= 11 ? 'All 11 central bank & reserve inputs active' : snapshot.source === 'fallback' ? 'Reference baseline' : 'Live and reference inputs'}</small></article>
         <article className="macro-kpi"><span className="macro-kpi-label">NEXT CATALYST <span>HIGH IMPACT</span></span><strong className="mono">{nextHighImpactCatalyst ? <CatalystCountdownDisplay target={nextHighImpactCatalyst.scheduledAt} /> : 'US Non-Farm Payrolls'}</strong><small>{nextHighImpactCatalyst?.title ?? 'Tier-1 Catalyst • 13:30 UTC'}</small></article>
-        <article className="macro-kpi macro-kpi-source"><span className="macro-kpi-label">DATA PROVENANCE <span>STATUS</span></span><strong className="macro-source-value"><span className={currencies.length >= 11 ? 'macro-source-dot macro-source-live' : snapshot.source === 'fallback' ? 'macro-source-dot' : 'macro-source-dot macro-source-live'} />{currencies.length >= 11 ? 'LIVE' : liveReferenceAvailable && currencies.length === 0 ? 'REFERENCE' : snapshot.source === 'provider' ? 'LIVE' : snapshot.source === 'partial' ? 'PARTIAL' : 'OFFLINE'}</strong><small>{refreshing ? 'Checking provider…' : currencies.length >= 11 ? 'All 11 inputs verified' : 'Stale cache used when available'}</small></article>
+        <article className="macro-kpi macro-kpi-source"><span className="macro-kpi-label">DATA PROVENANCE <span>STATUS</span></span><strong className="macro-source-value"><span className={verifiedProviderCurrencyCount >= 10 ? 'macro-source-dot macro-source-live' : snapshot.source === 'fallback' ? 'macro-source-dot' : 'macro-source-dot macro-source-live'} />{verifiedProviderCurrencyCount >= 10 ? 'LIVE' : liveReferenceAvailable && snapshot.source === 'fallback' ? 'REFERENCE' : snapshot.source === 'provider' ? 'LIVE' : snapshot.source === 'partial' ? 'PARTIAL' : 'OFFLINE'}</strong><small>{refreshing ? 'Checking provider…' : verifiedProviderCurrencyCount >= 10 ? 'All 10 fiat policy and inflation inputs verified' : 'Provider coverage is partial; reference inputs are labelled'}</small></article>
       </section>
 
       <section className="macro-section" aria-label="Official United States macroeconomic data">
