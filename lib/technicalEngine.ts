@@ -36,6 +36,7 @@ export type TechnicalSignal = {
 };
 
 const LIVE_PRICE_TTL_SECONDS = 60;
+const TIMEFRAME_SECONDS: Record<'H1' | 'H4' | 'D1', number> = { H1: 3600, H4: 14400, D1: 86400 };
 const MAX_CANDLES = 1_000;
 
 function unavailableSignal(): TechnicalSignal {
@@ -109,9 +110,15 @@ async function fetchMt5Candles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Pro
     .limit(MAX_CANDLES);
   if (error) throw error;
   if (!data?.length) return [];
-  return data.map((row) => parseCandle({
+  const candles = data.map((row) => parseCandle({
     timestamp: row.bar_time, open: row.open, high: row.high, low: row.low, close: row.close,
   })).filter((candle): candle is Candle => candle !== null).reverse();
+  if (candles.length < 200) return [];
+  const periodSeconds = TIMEFRAME_SECONDS[timeframe];
+  const latestAge = Math.floor(Date.now() / 1000) - (candles.at(-1)!.timestamp + periodSeconds);
+  const maxAge = timeframe === 'H1' ? 8 * 3600 : timeframe === 'H4' ? 36 * 3600 : 5 * 86400;
+  if (latestAge < -periodSeconds || latestAge > maxAge) return [];
+  return candles;
 }
 
 async function fetchCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promise<Candle[]> {
@@ -156,7 +163,6 @@ async function fetchCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promis
 }
 
 async function getCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1') {
-  if (!process.env.MARKET_DATA_PROVIDER_URL?.trim()) return [];
   return getCachedData(`market:candles:${pair}:${timeframe}`, () => fetchCandles(pair, timeframe), LIVE_PRICE_TTL_SECONDS);
 }
 
@@ -447,7 +453,6 @@ export function calculateTechnicalSignal(pair: string, h1: Candle[], h4: Candle[
 }
 
 export async function getTechnicalSignal(pair: string): Promise<TechnicalSignal> {
-  if (!process.env.MARKET_DATA_PROVIDER_URL?.trim()) return unavailableSignal();
   try {
     return await getCachedData(`technical:signal:${pair}`, async () => {
       const [h1, h4, d1] = await Promise.all([
