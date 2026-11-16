@@ -6,6 +6,49 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 const OWNER_EMAIL = 'ricorapier1@gmail.com';
 
+async function ownerFromRequest(request: Request) {
+  const auth = request.headers.get('authorization') || '';
+  const accessToken = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+  if (!accessToken) return null;
+  const { data, error } = await getSupabaseAdmin().auth.getUser(accessToken);
+  if (error || !data.user || data.user.email?.toLowerCase() !== OWNER_EMAIL) return null;
+  return data.user;
+}
+
+export async function GET(request: Request) {
+  try {
+    const user = await ownerFromRequest(request);
+    if (!user) return NextResponse.json({ error: 'Owner access denied.' }, { status: 403 });
+    const { data, error } = await getSupabaseAdmin().from('mt5_installations')
+      .select('id,label,status,created_at,last_seen_at,broker,server')
+      .eq('user_id', user.id).order('created_at', { ascending: false }).limit(20);
+    if (error) throw error;
+    return NextResponse.json({ installations: data ?? [] }, { headers: { 'Cache-Control': 'no-store' } });
+  } catch (error) {
+    console.error('MT5 installation listing failed:', error);
+    return NextResponse.json({ error: 'Unable to list MT5 installations.' }, { status: 503 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const user = await ownerFromRequest(request);
+    if (!user) return NextResponse.json({ error: 'Owner access denied.' }, { status: 403 });
+    const body: unknown = await request.json().catch(() => null);
+    if (!body || typeof body !== 'object' || !('installation_id' in body)
+      || typeof body.installation_id !== 'string') return NextResponse.json({ error: 'Installation ID required.' }, { status: 400 });
+    const { data, error } = await getSupabaseAdmin().from('mt5_installations')
+      .update({ status: 'revoked' }).eq('id', body.installation_id).eq('user_id', user.id)
+      .select('id').maybeSingle();
+    if (error) throw error;
+    if (!data) return NextResponse.json({ error: 'Installation not found.' }, { status: 404 });
+    return NextResponse.json({ revoked: true });
+  } catch (error) {
+    console.error('MT5 installation revocation failed:', error);
+    return NextResponse.json({ error: 'Unable to revoke MT5 installation.' }, { status: 503 });
+  }
+}
+
 export async function POST(request: Request) {
   const auth = request.headers.get('authorization') || '';
   const accessToken = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
