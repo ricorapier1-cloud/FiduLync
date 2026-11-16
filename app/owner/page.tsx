@@ -24,6 +24,7 @@ export default function OwnerAccessPage() {
   const [installations, setInstallations] = useState<Mt5Installation[]>([]);
   const [connectorToken, setConnectorToken] = useState('');
   const [connectorBusy, setConnectorBusy] = useState(false);
+  const visibleMessage = message || (!supabase ? 'Owner sign-in is not configured. The public Supabase URL and publishable key must be present.' : '');
 
   async function verifyOwner(current: Session) {
     const response = await fetch('/api/owner/verify', {
@@ -46,10 +47,7 @@ export default function OwnerAccessPage() {
 
   useEffect(() => {
     let active = true;
-    if (!supabase) {
-      setMessage('Owner sign-in is not configured. The public Supabase URL and publishable key must be present.');
-      return;
-    }
+    if (!supabase) return;
     supabase.auth.getSession().then(({ data }) => {
       if (active && data.session) void verifyOwner(data.session);
     });
@@ -156,7 +154,7 @@ export default function OwnerAccessPage() {
             </form>
           </div>
         )}
-        {message && <p role="status" className="mt-5 rounded-lg border border-white/10 bg-black/20 p-3 text-xs leading-5 text-slate-300">{message}</p>}
+        {visibleMessage && <p role="status" className="mt-5 rounded-lg border border-white/10 bg-black/20 p-3 text-xs leading-5 text-slate-300">{visibleMessage}</p>}
         <div className="mt-7 border-t border-white/[0.08] pt-5 text-[11px] leading-5 text-slate-500">If the code does not arrive, Supabase Auth email delivery / SMTP must be configured for this project. Customer-facing support contact is unchanged.</div>
       </div>
     </main>
