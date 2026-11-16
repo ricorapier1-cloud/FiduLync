@@ -46,7 +46,7 @@ export async function POST(request: Request) {
   for (const value of payload.candles) {
     if (!record(value)) return NextResponse.json({ error: 'Invalid candle record.' }, { status: 400 });
     const c = value as unknown as CandleInput;
-    if (typeof c.symbol !== 'string' || !/^[A-Z0-9._-]{3,32}$/.test(c.symbol) || typeof c.timeframe !== 'string' || !(c.timeframe in TIMEFRAME_SECONDS)
+    if (typeof c.symbol !== 'string' || !/^[A-Z0-9._-]{3,32}$/.test(c.symbol) || typeof c.timeframe !== 'string' || !Object.hasOwn(TIMEFRAME_SECONDS, c.timeframe)
       || typeof c.bar_time !== 'string' || !Number.isFinite(Date.parse(c.bar_time))
       || c.is_closed !== true || ![c.open,c.high,c.low,c.close].every(finite)
       || c.low <= 0 || c.high < c.low || c.open < c.low || c.open > c.high || c.close < c.low || c.close > c.high
