@@ -19,7 +19,7 @@ Set server-side values in `.env.local` or the deployment secret manager:
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL for persisted macro snapshots |
 | `SUPABASE_SERVICE_ROLE_KEY` | Optional server-only Supabase persistence access; never expose to a browser |
 | `FINNHUB_API_KEY` | Optional FX quotes and economic calendar |
-| `FRED_API_KEY` | Optional Federal Reserve policy-rate and inflation observations |
+| `FRED_API_KEY` | Optional Federal Reserve policy-rate, Core PCE, CPI, and 2-year Treasury observations |\n| `BEA_API_KEY` | Optional server-only BEA key for quarterly real GDP growth (NIPA table T10101) |\n| `BLS_API_KEY` | Optional server-only BLS Public Data API v2 registration key for headline/core CPI, unemployment, and nonfarm payrolls |
 | `ALPHA_VANTAGE_API_KEY` | Optional fallback US policy-rate and CPI observations |
 | `FMP_API_KEY` | Optional economic calendar provider |
 | `MACRO_DATA_PROVIDER_URL` | Optional HTTPS endpoint returning validated currencies, COT positions, and catalysts |
@@ -70,7 +70,7 @@ Download [`public/mql5/MacroLyncBridge.mqh`](./public/mql5/MacroLyncBridge.mqh) 
 
 ## Data providers and deployment
 
-The macro adapter validates upstream policy rates, inflation, COT positioning, and catalysts; live data can be combined with a persisted Supabase snapshot. The CFTC adapter calculates non-commercial net-position percentiles. Candle provider responses must contain at least 200 chronologically valid candles per requested timeframe for EMA alignment and technical calculations.
+The macro adapter validates upstream policy rates, inflation, COT positioning, and catalysts; live data can be combined with a persisted Supabase snapshot. When configured, the official BEA adapter retrieves quarterly real GDP growth from NIPA table T10101, while the official BLS v2 adapter retrieves seasonally adjusted CPI-U, core CPI, unemployment, and total nonfarm payroll series. BLS year-over-year CPI is calculated from the same month one year earlier; monthly payroll change is calculated from adjacent monthly observations. The MacroLync dashboard labels these as BEA/BLS observations and displays their observation periods separately from fetch time. Provider keys remain server-side and are never sent to the browser. BEA and BLS indicators are contextual macro inputs; they do not by themselves change the execution gate, which still requires verified policy/inflation inputs for the traded pair, a provider calendar, and valid technical data. The CFTC adapter calculates non-commercial net-position percentiles. Candle provider responses must contain at least 200 chronologically valid candles per requested timeframe for EMA alignment and technical calculations.
 
 The scheduled `/api/cron/sync-macro` route uses `CRON_SECRET`. Upstash provides shared EA heartbeat telemetry; when not configured, the dashboard reports process-local fallback storage.
 
