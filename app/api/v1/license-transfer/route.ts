@@ -1,4 +1,4 @@
-import { createHash, randomInt, randomUUID } from 'node:crypto';
+import { createHmac, randomInt, randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { validateCustomerLicense } from '@/lib/customerTelemetry';
@@ -12,7 +12,7 @@ function hashCode(requestId: string, code: string) {
 }
 
 export async function POST(request: Request) {
-  if (!isSupabaseConfigured()) return NextResponse.json({ error: 'License transfer is not configured.' }, { status: 503 });
+  const pepper = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();\n  if (!isSupabaseConfigured() || !pepper) return NextResponse.json({ error: 'License transfer is not configured.' }, { status: 503 });
   if (!checkRateLimit(getClientIp(request), 5, 60 * 60_000)) {
     return NextResponse.json({ error: 'Too many transfer attempts. Try again later.' }, { status: 429 });
   }
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
       const inserted = await supabaseInsert('license_transfer_requests', {
         id, license_key: licenseKey, current_mt5_account: currentAccount,
         new_mt5_account: newAccount, email: owner.email.toLowerCase(),
-        code_hash: hashCode(id, code), expires_at: new Date(Date.now() + 10 * 60_000).toISOString(),
+        code_hash: hashCode(id, code, pepper), expires_at: new Date(Date.now() + 10 * 60_000).toISOString(),
       });
       if (!inserted) return NextResponse.json({ error: 'Unable to create a transfer request.' }, { status: 503 });
       const sent = await sendTransferCodeEmail(owner.email, code, id);
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
         { method: 'POST', body: {
           p_request_id: requestId, p_license_key: licenseKey,
           p_current_mt5_account: currentAccount, p_new_mt5_account: newAccount,
-          p_code_hash: hashCode(requestId, code),
+          p_code_hash: hashCode(requestId, code, pepper),
         } }
       );
       const rpcPayload = result as unknown as { complete_license_transfer?: { success: boolean; reason?: string; mt5_account?: number }; success?: boolean; reason?: string; mt5_account?: number } | Array<{ complete_license_transfer?: { success: boolean; reason?: string; mt5_account?: number } }> | null;
