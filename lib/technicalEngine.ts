@@ -453,6 +453,20 @@ export function calculateTechnicalSignal(pair: string, h1: Candle[], h4: Candle[
   };
 }
 
+async function hasFreshBrokerQuote(pair: string): Promise<boolean> {
+  const supabase = getSupabaseAdmin();
+  const { data: installation, error: installationError } = await supabase.from('mt5_installations')
+    .select('id,last_seen_at').eq('status', 'active').not('last_seen_at', 'is', null)
+    .order('last_seen_at', { ascending: false }).limit(1).maybeSingle();
+  if (installationError || !installation?.last_seen_at
+    || Date.now() - Date.parse(installation.last_seen_at) > 180_000) return false;
+  const { data: quote, error } = await supabase.from('mt5_market_quotes')
+    .select('bid,ask,quote_time').eq('installation_id', installation.id).eq('symbol', pair)
+    .gte('quote_time', new Date(Date.now() - 120_000).toISOString())
+    .lte('quote_time', new Date(Date.now() + 60_000).toISOString()).maybeSingle();
+  return !error && !!quote && Number(quote.bid) > 0 && Number(quote.ask) >= Number(quote.bid);
+}
+
 export async function getTechnicalSignal(pair: string): Promise<TechnicalSignal> {
   try {
     return await getCachedData(`technical:signal:${pair}`, async () => {
@@ -461,7 +475,14 @@ export async function getTechnicalSignal(pair: string): Promise<TechnicalSignal>
         getCandles(pair, 'H4'),
         getCandles(pair, 'D1'),
       ]);
-      return calculateTechnicalSignal(pair, h1, h4, d1);
+      const signal = calculateTechnicalSignal(pair, h1, h4, d1);
+      if (!signal.available) return signal;
+      const quoteFresh = await hasFreshBrokerQuote(pair);
+      if (quoteFresh) return signal;
+      return {
+        ...signal,
+        execution_filter: { allow_buys: false, allow_sells: false, recommended_lot_multiplier: 0 },
+      };
     }, LIVE_PRICE_TTL_SECONDS);
   } catch (error) {
     console.warn(`Technical data unavailable for ${pair}; execution filters are disabled.`, error);
