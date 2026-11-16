@@ -2,8 +2,8 @@
 //| AlgoLync_Moving_Average_Lab.mq5                                  |
 //| Copyright 2026, AkinsootoFx                                      |
 //| https://fidulync.vercel.app                                      |
-//| Original educational sandbox EA. No trade execution.             |
-//| Licensed under MIT; see TEST_EA_LICENSE.txt.                     |
+//| Original educational sandbox EA. Analysis only; no trade orders. |
+//| MIT licence applies to this file; see TEST_EA_LICENSE.txt.       |
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2026, AkinsootoFx"
 #property link      "https://fidulync.vercel.app"
@@ -28,19 +28,15 @@ int OnInit()
       Print("AlgoLync MA Lab: fast period must be >= 2 and lower than slow period.");
       return INIT_PARAMETERS_INCORRECT;
    }
-
    g_fast_handle = iMA(_Symbol, PERIOD_CURRENT, InpFastPeriod, 0, InpMethod, InpPrice);
    g_slow_handle = iMA(_Symbol, PERIOD_CURRENT, InpSlowPeriod, 0, InpMethod, InpPrice);
-
    if(g_fast_handle == INVALID_HANDLE || g_slow_handle == INVALID_HANDLE)
    {
-      Print("AlgoLync MA Lab: unable to create indicator handles. Error=", GetLastError());
+      Print("AlgoLync MA Lab: indicator initialization failed. Error=", GetLastError());
       return INIT_FAILED;
    }
-
    g_last_bar = 0;
-   Comment("AlgoLync Moving Average Lab\nINITIALIZING — analysis only; no orders are sent.");
-   Print("AlgoLync Moving Average Lab initialized on ", _Symbol, " / ", EnumToString((ENUM_TIMEFRAMES)_Period));
+   Comment("AlgoLync Moving Average Lab\nInitializing — analysis only; no orders are sent.");
    return INIT_SUCCEEDED;
 }
 
@@ -61,7 +57,6 @@ void OnTick()
    double slow_values[];
    ArraySetAsSeries(fast_values, true);
    ArraySetAsSeries(slow_values, true);
-
    if(CopyBuffer(g_fast_handle, 0, 1, 2, fast_values) != 2 ||
       CopyBuffer(g_slow_handle, 0, 1, 2, slow_values) != 2)
    {
