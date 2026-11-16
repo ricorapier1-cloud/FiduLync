@@ -519,8 +519,10 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     console.warn('Finnhub economic calendar unavailable; checking configured calendar adapters:', finnhubResult.reason);
   }
   if (frankfurterResult.status === 'fulfilled' && isRecord(frankfurterResult.value)) {
+    // Frankfurter is an ECB-derived daily reference-rate source, not a live
+    // market quote or a fresh macroeconomic observation. Keep it separate
+    // from the macro-provider health status and execution eligibility.
     snapshot.ecbRates = frankfurterResult.value;
-    hasLiveData = true;
   } else if (frankfurterResult.status === 'rejected') {
     console.warn('ECB benchmark exchange rates are unavailable:', frankfurterResult.reason);
   }
@@ -650,7 +652,13 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     console.error('COT provider unavailable; retaining cached positioning:', cotResult.reason);
   }
   if (hasLiveData) {
-    snapshot.source = snapshot.currencies.length >= 11 ? 'provider' : 'partial';
+    const g10 = snapshot.currencies.filter((currency) =>
+      ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'SEK', 'NOK'].includes(currency.code));
+    const completeG10MacroCoverage = g10.length === 10 && g10.every((currency) =>
+      currency.policyRateSource === 'provider' && currency.inflationSource === 'provider');
+    // Fallback rows are merged for display continuity. Their presence must
+    // never make a partial provider snapshot appear fully provider-backed.
+    snapshot.source = completeG10MacroCoverage ? 'provider' : 'partial';
   }
   return hasLiveData ? snapshot : null;
 }
