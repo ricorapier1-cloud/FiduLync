@@ -128,6 +128,7 @@ function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies'
     currencies: value.currencies,
     cot: value.cot,
     catalysts: value.catalysts,
+    ...(value.usIndicators && isUsEconomicIndicators(value.usIndicators) ? { usIndicators: value.usIndicators } : {}),
   };
 }
 
@@ -472,6 +473,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     getBankOfCanadaMacroInputs(),
     getBankOfEnglandPolicyRate(),
     getWorldBankG10Inflation(),
+    getUsEconomicIndicators(),
   ]);
   let hasLiveData = false;
   if (fredResult.status === 'fulfilled' && isRecord(fredResult.value)) {
