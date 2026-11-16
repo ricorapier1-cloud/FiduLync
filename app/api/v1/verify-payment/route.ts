@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createHash } from 'node:crypto';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { isSupabaseConfigured, persistLicense, supabaseRead } from '@/lib/supabaseAdmin';
+import { sendLicenseDeliveryEmail } from '@/lib/transactionalEmail';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,9 +71,9 @@ export async function GET(request: Request) {
 
     const digest = createHash('sha256').update(reference).digest('hex').slice(0, 12).toUpperCase();
     const licenseKey = `ALGOLYNX-${plan === 'LIFETIME' ? 'LT' : 'MO'}-${mt5Account}-${digest}`;
-    const existing = await supabaseRead<Array<{ license_key: string; mt5_account: number; tier: string; expires_at: string | null }>>(
+    const existing = await supabaseRead<Array<{ license_key: string; mt5_account: number; tier: string; expires_at: string | null; email?: string }>>(
       'licenses',
-      `license_key=eq.${encodeURIComponent(licenseKey)}&select=license_key,mt5_account,tier,expires_at&limit=1`
+      `license_key=eq.${encodeURIComponent(licenseKey)}&select=license_key,mt5_account,tier,expires_at,email&limit=1`
     );
     if (existing === null) {
       return NextResponse.json({ success: false, error: 'License storage is temporarily unavailable.' }, { status: 503, headers });
@@ -89,8 +90,20 @@ export async function GET(request: Request) {
         status: 'active',
         expires_at: expiresAt,
       });
-      license = { license_key: licenseKey, mt5_account: mt5Account, tier: plan === 'LIFETIME' ? 'INSTITUTIONAL_LIFETIME' : 'INSTITUTIONAL_MONTHLY', expires_at: expiresAt };
+      license = { license_key: licenseKey, mt5_account: mt5Account, tier: plan === 'LIFETIME' ? 'INSTITUTIONAL_LIFETIME' : 'INSTITUTIONAL_MONTHLY', expires_at: expiresAt, email: customerEmail };
     }
+
+    const emailSent = await sendLicenseDeliveryEmail({
+      email: license.email || customerEmail,
+      licenseKey: license.license_key,
+      mt5Account: license.mt5_account,
+      tier: license.tier,
+      expiresAt: license.expires_at,
+      reference,
+    }).catch((error: unknown) => {
+      console.error('License email delivery failed:', error);
+      return false;
+    });
 
     return NextResponse.json({
       success: true,
@@ -98,6 +111,8 @@ export async function GET(request: Request) {
       mt5_account: license.mt5_account,
       tier: license.tier,
       expires_at: license.expires_at,
+      email_sent: emailSent,
+      email_notice: emailSent ? undefined : 'License created. Email delivery is not configured yet; save the key shown here.',
       download_url: '/downloads/AlgoLync_EA_README.txt',
     }, { status: 200, headers });
   } catch (error) {
