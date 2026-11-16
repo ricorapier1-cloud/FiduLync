@@ -1,6 +1,7 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { isSupabaseConfigured, persistLicense, supabaseRead } from '@/lib/supabaseAdmin';
+import { sendLicenseDeliveryEmail } from '@/lib/transactionalEmail';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,9 +27,7 @@ export async function POST(request: Request) {
   }
 
   let payload: unknown;
-  try {
-    payload = JSON.parse(bodyText);
-  } catch {
+  try { payload = JSON.parse(bodyText); } catch {
     return NextResponse.json({ error: 'Invalid JSON payload.' }, { status: 400 });
   }
   if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
@@ -67,13 +66,14 @@ export async function POST(request: Request) {
   try {
     const digest = createHash('sha256').update(reference).digest('hex').slice(0, 12).toUpperCase();
     const licenseKey = `ALGOLYNX-${plan === 'LIFETIME' ? 'LT' : 'MO'}-${mt5Account}-${digest}`;
-    const existing = await supabaseRead<Array<{ license_key: string }>>(
+    const existing = await supabaseRead<Array<{ license_key: string; mt5_account: number; tier: string; expires_at: string | null; email?: string }>>(
       'licenses',
-      `license_key=eq.${encodeURIComponent(licenseKey)}&select=license_key&limit=1`
+      `license_key=eq.${encodeURIComponent(licenseKey)}&select=license_key,mt5_account,tier,expires_at,email&limit=1`
     );
     if (existing === null) throw new Error('License database is unavailable.');
 
-    if (!existing[0]) {
+    let license = existing[0];
+    if (!license) {
       const expiresAt = plan === 'LIFETIME' ? null : new Date(Date.now() + 30 * 86_400_000).toISOString();
       await persistLicense({
         license_key: licenseKey,
@@ -83,12 +83,24 @@ export async function POST(request: Request) {
         status: 'active',
         expires_at: expiresAt,
       });
+      license = { license_key: licenseKey, mt5_account: mt5Account, tier: plan === 'LIFETIME' ? 'INSTITUTIONAL_LIFETIME' : 'INSTITUTIONAL_MONTHLY', expires_at: expiresAt, email };
     }
 
-    return NextResponse.json({ status: 'success' }, { status: 200 });
+    const emailSent = await sendLicenseDeliveryEmail({
+      email: license.email || email,
+      licenseKey: license.license_key,
+      mt5Account: license.mt5_account,
+      tier: license.tier,
+      expiresAt: license.expires_at,
+      reference,
+    }).catch((error: unknown) => {
+      console.error('Webhook license email delivery failed:', error);
+      return false;
+    });
+
+    return NextResponse.json({ status: 'success', email_sent: emailSent }, { status: 200 });
   } catch (error) {
     console.error('Paystack webhook provisioning failed:', error);
-    // Non-2xx tells Paystack to retry instead of silently losing a paid order.
     return NextResponse.json({ error: 'Payment provisioning failed; retry is required.' }, { status: 503 });
   }
 }
