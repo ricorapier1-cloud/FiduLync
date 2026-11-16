@@ -8,7 +8,7 @@ import { sendTransferCodeEmail } from '@/lib/transactionalEmail';
 export const dynamic = 'force-dynamic';
 
 function hashCode(requestId: string, code: string, pepper: string) {
-  return createHmac('sha256', pepper).update(`${requestId}:${code}`).digest('hex');
+  return createHmac('sha256', pepper).update(requestId + ':' + code).digest('hex');
 }
 
 export async function POST(request: Request) {
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   if (!isSupabaseConfigured() || !pepper) {
     return NextResponse.json({ error: 'License transfer is not configured.' }, { status: 503 });
   }
-  if (!checkRateLimit(getClientIp(request), 5, 60 *  60_000)) {
+  if (!checkRateLimit(getClientIp(request), 5, 60 * 60_000)) {
     return NextResponse.json({ error: 'Too many transfer attempts. Try again later.' }, { status: 429 });
   }
 
@@ -35,8 +35,8 @@ export async function POST(request: Request) {
   const licenseKey = typeof input.license_key === 'string' ? input.license_key.trim() : '';
   const currentText = String(input.current_mt5_account ?? '').trim();
   const newText = String(input.new_mt5_account ?? '').trim();
-  const currentAccount = /^\\d{1,20}$/.test(currentText) ? Number(currentText) : Number.NaN;
-  const newAccount = /^\\d{1,20}$/.test(newText) ? Number(newText) : Number.NaN;
+  const currentAccount = /^\d{1,20}$/.test(currentText) ? Number(currentText) : Number.NaN;
+  const newAccount = /^\d{1,20}$/.test(newText) ? Number(newText) : Number.NaN;
 
   if (!licenseKey || licenseKey.length > 128 || !Number.isSafeInteger(currentAccount) || currentAccount <= 0
     || !Number.isSafeInteger(newAccount) || newAccount <= 0 || currentAccount === newAccount) {
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
 
     const licenseRows = await supabaseRead<Array<{ email: string; status: string; expires_at: string | null }>>(
       'licenses',
-      `license_key=eq.${encodeURIComponent(licenseKey)}&mt5_account=eq.${currentAccount}&select=email,status,expires_at&limit=1`
+      'license_key=eq.' + encodeURIComponent(licenseKey) + '&mt5_account=eq.' + currentAccount + '&select=email,status,expires_at&limit=1'
     );
     const owner = licenseRows?.[0];
     if (!owner?.email) {
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
 
       const sent = await sendTransferCodeEmail(owner.email, code, id);
       if (!sent) {
-        await supabaseQuery('license_transfer_requests', `id=eq.${id}`, {
+        await supabaseQuery('license_transfer_requests', 'id=eq.' + id, {
           method: 'DELETE',
           prefer: 'return=minimal',
         });
@@ -95,7 +95,7 @@ export async function POST(request: Request) {
     if (action === 'confirm') {
       const requestId = typeof input.request_id === 'string' ? input.request_id : '';
       const code = typeof input.code === 'string' ? input.code.trim() : '';
-      if (!/^[0-9a-f-]{36}$/i.test(requestId) || !/^\\d{6}$/.test(code)) {
+      if (!/^[0-9a-f-]{36}$/i.test(requestId) || !/^\d{6}$/.test(code)) {
         return NextResponse.json({ error: 'Enter the six-digit code from your email.' }, { status: 400 });
       }
 
