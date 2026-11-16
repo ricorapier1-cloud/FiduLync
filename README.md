@@ -19,7 +19,9 @@ Set server-side values in `.env.local` or the deployment secret manager:
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL for persisted macro snapshots |
 | `SUPABASE_SERVICE_ROLE_KEY` | Optional server-only Supabase persistence access; never expose to a browser |
 | `FINNHUB_API_KEY` | Optional FX quotes and economic calendar |
-| `FRED_API_KEY` | Optional Federal Reserve policy-rate, Core PCE, CPI, and 2-year Treasury observations |\n| `BEA_API_KEY` | Optional server-only BEA key for quarterly real GDP growth (NIPA table T10101) |\n| `BLS_API_KEY` | Optional server-only BLS Public Data API v2 registration key for headline/core CPI, unemployment, and nonfarm payrolls |
+| `FRED_API_KEY` | Optional Federal Reserve policy-rate, Core PCE, CPI, and 2-year Treasury observations |
+| `BEA_API_KEY` | Optional server-only BEA key for quarterly real GDP growth (NIPA table T10101) |
+| `BLS_API_KEY` | Optional server-only BLS Public Data API v2 registration key for headline/core CPI, unemployment, and nonfarm payrolls |
 | `ALPHA_VANTAGE_API_KEY` | Optional fallback US policy-rate and CPI observations |
 | `FMP_API_KEY` | Optional economic calendar provider |
 | `MACRO_DATA_PROVIDER_URL` | Optional HTTPS endpoint returning validated currencies, COT positions, and catalysts |
