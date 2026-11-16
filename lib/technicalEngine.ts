@@ -1,6 +1,7 @@
 import 'server-only';
 
-import { getCachedData } from '@/lib/redisCache';\nimport { getSupabaseAdmin } from '@/lib/serverSupabase';
+import { getCachedData } from '@/lib/redisCache';
+import { getSupabaseAdmin } from '@/lib/serverSupabase';
 
 export type Candle = {
   timestamp: number;
