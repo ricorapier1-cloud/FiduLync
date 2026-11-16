@@ -46,7 +46,7 @@ export async function POST(request: Request) {
   for (const value of payload.candles) {
     if (!record(value)) return NextResponse.json({ error: 'Invalid candle record.' }, { status: 400 });
     const c = value as unknown as CandleInput;
-    if (!/^[A-Z0-9._-]{3,32}$/.test(c.symbol) || !(c.timeframe in TIMEFRAME_SECONDS)
+    if (typeof c.symbol !== 'string' || !/^[A-Z0-9._-]{3,32}$/.test(c.symbol) || typeof c.timeframe !== 'string' || !(c.timeframe in TIMEFRAME_SECONDS)
       || typeof c.bar_time !== 'string' || !Number.isFinite(Date.parse(c.bar_time))
       || c.is_closed !== true || ![c.open,c.high,c.low,c.close].every(finite)
       || c.low <= 0 || c.high < c.low || c.open < c.low || c.open > c.high || c.close < c.low || c.close > c.high
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Candle failed market-data validation.' }, { status: 400 });
     }
     const barMs = Date.parse(c.bar_time);
-    if (barMs > Date.now() + 60_000 || Date.now() - barMs > 6 * 86_400_000) {
+    if (barMs > Date.now() + 60_000 || Date.now() - barMs > 45 * 86_400_000) {
       return NextResponse.json({ error: 'Candle timestamp is future-dated or too stale.' }, { status: 400 });
     }
     candles.push(c);
@@ -82,6 +82,13 @@ export async function POST(request: Request) {
       .select('id,status').eq('token_hash', tokenHash).maybeSingle();
     if (authError) throw authError;
     if (!installation || installation.status !== 'active') return NextResponse.json({ error: 'Connector revoked or unknown.' }, { status: 401 });
+
+    const { count: recentCount, error: rateError } = await supabase.from('mt5_ingest_nonces')
+      .select('nonce', { count: 'exact', head: true })
+      .eq('installation_id', installation.id)
+      .gt('created_at', new Date(Date.now() - 60_000).toISOString());
+    if (rateError) throw rateError;
+    if ((recentCount ?? 0) >= 30) return NextResponse.json({ error: 'Connector rate limit exceeded.' }, { status: 429 });
 
     const { error: nonceError } = await supabase.from('mt5_ingest_nonces')
       .insert({ installation_id: installation.id, nonce: payload.nonce });
