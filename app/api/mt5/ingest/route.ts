@@ -55,7 +55,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Candle failed market-data validation.' }, { status: 400 });
     }
     const barMs = Date.parse(c.bar_time);
-    if (barMs > Date.now() + 60_000 || Date.now() - barMs > 45 * 86_400_000) {
+    if (barMs > Date.now() + 60_000 || Date.now() - barMs > 400 * 86_400_000) {
       return NextResponse.json({ error: 'Candle timestamp is future-dated or too stale.' }, { status: 400 });
     }
     candles.push(c);
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
       .eq('installation_id', installation.id)
       .gt('created_at', new Date(Date.now() - 60_000).toISOString());
     if (rateError) throw rateError;
-    if ((recentCount ?? 0) >= 30) return NextResponse.json({ error: 'Connector rate limit exceeded.' }, { status: 429 });
+    if ((recentCount ?? 0) >= 40) return NextResponse.json({ error: 'Connector rate limit exceeded.' }, { status: 429 });
 
     const { error: nonceError } = await supabase.from('mt5_ingest_nonces')
       .insert({ installation_id: installation.id, nonce: payload.nonce });
