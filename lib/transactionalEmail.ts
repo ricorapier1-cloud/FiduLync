@@ -41,9 +41,14 @@ export async function sendTransactionalEmail(input: EmailInput): Promise<boolean
 }
 
 export function escapeEmailHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (character) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  })[character] ?? character);
+  const entities: { [key: string]: string } = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  };
+  return value.replace(/[&<>"']/g, (character) => entities[character] ?? character);
 }
 
 export async function sendLicenseDeliveryEmail(input: {
