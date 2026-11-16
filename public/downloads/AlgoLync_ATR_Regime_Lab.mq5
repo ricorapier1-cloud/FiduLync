@@ -2,8 +2,8 @@
 //| AlgoLync_ATR_Regime_Lab.mq5                                      |
 //| Copyright 2026, AkinsootoFx                                      |
 //| https://fidulync.vercel.app                                      |
-//| Original educational sandbox EA. No trade execution.             |
-//| Licensed under MIT; see TEST_EA_LICENSE.txt.                     |
+//| Original educational sandbox EA. Analysis only; no trade orders. |
+//| MIT licence applies to this file; see TEST_EA_LICENSE.txt.       |
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2026, AkinsootoFx"
 #property link      "https://fidulync.vercel.app"
@@ -28,17 +28,14 @@ int OnInit()
       Print("AlgoLync ATR Lab: invalid parameters.");
       return INIT_PARAMETERS_INCORRECT;
    }
-
    g_atr_handle = iATR(_Symbol, PERIOD_CURRENT, InpATRPeriod);
    if(g_atr_handle == INVALID_HANDLE)
    {
-      Print("AlgoLync ATR Lab: unable to create ATR handle. Error=", GetLastError());
+      Print("AlgoLync ATR Lab: indicator initialization failed. Error=", GetLastError());
       return INIT_FAILED;
    }
-
    g_last_bar = 0;
-   Comment("AlgoLync ATR Regime Lab\nINITIALIZING — analysis only; no orders are sent.");
-   Print("AlgoLync ATR Regime Lab initialized on ", _Symbol, " / ", EnumToString((ENUM_TIMEFRAMES)_Period));
+   Comment("AlgoLync ATR Regime Lab\nInitializing — analysis only; no orders are sent.");
    return INIT_SUCCEEDED;
 }
 
@@ -64,9 +61,7 @@ void OnTick()
    }
 
    double baseline = 0.0;
-   for(int i = 1; i < required; i++)
-      baseline += atr_values[i];
-
+   for(int i = 1; i < required; i++) baseline += atr_values[i];
    baseline /= (double)InpBaselineBars;
    if(baseline <= 0.0)
    {
