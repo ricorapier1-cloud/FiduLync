@@ -75,8 +75,9 @@ export async function POST(request: Request) {
 
       const sent = await sendTransferCodeEmail(owner.email, code, id);
       if (!sent) {
-        await supabaseQuery('license_transfer_requests', 'id=eq.' + id, {
+        await supabaseQuery('license_transfer_requests', {
           method: 'DELETE',
+          query: 'id=eq.' + encodeURIComponent(id),
           prefer: 'return=minimal',
         });
         return NextResponse.json({
