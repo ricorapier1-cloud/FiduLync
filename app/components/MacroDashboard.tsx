@@ -44,7 +44,7 @@ function formatContracts(value: number) {
 }
 
 function formatCountdown(target: string, now: number) {
-  const seconds = Math.max(0, Math.floor((Date.parse(target) - now) / 1100));
+  const seconds = Math.max(0, Math.floor((Date.parse(target) - now) / 1000));
   const days = Math.floor(seconds / 86_400);
   const hours = Math.floor((seconds % 86_400) / 3_600);
   const minutes = Math.floor((seconds % 3_600) / 60);
@@ -157,8 +157,9 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
   const realYieldDifferentialBps = baseCurrency && quoteCurrency
     ? Math.round(((baseCurrency.policyRate - baseCurrency.inflation) - (quoteCurrency.policyRate - quoteCurrency.inflation)) * 100)
     : null;
-  const policySpread = currencies.length > 1
-    ? Math.max(...currencies.map((currency) => currency.policyRate)) - Math.min(...currencies.map((currency) => currency.policyRate))
+  const g10Currencies = currencies.filter((currency) => currency.code !== 'XAU');
+  const policySpread = g10Currencies.length > 1
+    ? Math.max(...g10Currencies.map((currency) => currency.policyRate)) - Math.min(...g10Currencies.map((currency) => currency.policyRate))
     : null;
 
   useEffect(() => {
@@ -249,8 +250,8 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
       </section>
 
       <section className="macro-kpis" aria-label="Macro overview">
-        <article className="macro-kpi"><span className="macro-kpi-label">POLICY RANGE <span>G10</span></span><strong className="mono">{policySpread === null ? '425 bps (G8)' : formatRate(policySpread)}</strong><small>highest to lowest available policy rate</small></article>
-        <article className="macro-kpi"><span className="macro-kpi-label">POLICY INPUTS <span>G10</span></span><strong className="mono">{String(currencies.length).padStart(2, '0')} <em>/ 11</em></strong><small>{currencies.length >= 11 ? 'All 11 central bank & reserve inputs active' : snapshot.source === 'fallback' ? 'Reference baseline' : 'Live and reference inputs'}</small></article>
+        <article className="macro-kpi"><span className="macro-kpi-label">POLICY RANGE <span>G10 FX</span></span><strong className="mono">{policySpread === null ? '425 bps (G8)' : formatRate(policySpread)}</strong><small>highest to lowest available policy rate</small></article>
+        <article className="macro-kpi"><span className="macro-kpi-label">G10 COVERAGE <span>FX UNIVERSE</span></span><strong className="mono">{String(g10Currencies.length).padStart(2, '0')} <em>/ 10</em></strong><small>{g10Currencies.length >= 10 ? 'All 10 G10 currency inputs present' : 'Incomplete G10 coverage'}</small></article>
         <article className="macro-kpi"><span className="macro-kpi-label">NEXT CATALYST <span>HIGH IMPACT</span></span><strong className="mono">{nextHighImpactCatalyst ? <CatalystCountdownDisplay target={nextHighImpactCatalyst.scheduledAt} /> : 'US Non-Farm Payrolls'}</strong><small>{nextHighImpactCatalyst?.title ?? 'Tier-1 Catalyst • 13:30 UTC'}</small></article>
         <article className="macro-kpi macro-kpi-source"><span className="macro-kpi-label">DATA PROVENANCE <span>STATUS</span></span><strong className="macro-source-value"><span className={currencies.length >= 11 ? 'macro-source-dot macro-source-live' : snapshot.source === 'fallback' ? 'macro-source-dot' : 'macro-source-dot macro-source-live'} />{currencies.length >= 11 ? 'LIVE' : liveReferenceAvailable && currencies.length === 0 ? 'REFERENCE' : snapshot.source === 'provider' ? 'LIVE' : snapshot.source === 'partial' ? 'PARTIAL' : 'OFFLINE'}</strong><small>{refreshing ? 'Checking provider…' : currencies.length >= 11 ? 'All 11 inputs verified' : 'Stale cache used when available'}</small></article>
       </section>
