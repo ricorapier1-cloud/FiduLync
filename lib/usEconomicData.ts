@@ -56,10 +56,10 @@ async function getBlsIndicators(apiKey: string): Promise<Pick<UsEconomicIndicato
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({
-      seriesid: ['CUSR0000SA0', 'CUSR0000SA0L1E', 'LNS14000000', 'CES0000000001'],
+      seriesid: ['CUUR0000SA0', 'CUUR0000SA0L1E', 'LNS14000000', 'CES0000000001'],
       startyear: String(currentYear - 2),
       endyear: String(currentYear),
-      registrationkey: apiKey,
+      registrationKey: apiKey,
     }),
     cache: 'no-store',
     signal: AbortSignal.timeout(10_000),
@@ -76,8 +76,8 @@ async function getBlsIndicators(apiKey: string): Promise<Pick<UsEconomicIndicato
     const row = series.find((item) => isRecord(item) && item.seriesID === id);
     return isRecord(row) ? latestMonthly(row.data) : [];
   };
-  const headline = find('CUSR0000SA0');
-  const core = find('CUSR0000SA0L1E');
+  const headline = find('CUUR0000SA0');
+  const core = find('CUUR0000SA0L1E');
   const unemployment = find('LNS14000000');
   const payroll = find('CES0000000001');
   const latestPayroll = payroll[0];
