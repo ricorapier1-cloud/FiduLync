@@ -668,7 +668,10 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     console.error('COT provider unavailable; retaining cached positioning:', cotResult.reason);
   }
   if (hasLiveData) {
-    snapshot.source = snapshot.currencies.length >= 11 ? 'provider' : 'partial';
+    const verifiedFiatCurrencies = snapshot.currencies.filter((currency) => currency.code !== 'XAU'
+      && currency.policyRateSource === 'provider'
+      && currency.inflationSource === 'provider').length;
+    snapshot.source = verifiedFiatCurrencies >= 10 ? 'provider' : 'partial';
   }
   return hasLiveData ? snapshot : null;
 }
