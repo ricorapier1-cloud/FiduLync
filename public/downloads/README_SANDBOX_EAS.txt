@@ -6,7 +6,7 @@ Included:
 - TEST_EA_LICENSE.txt (MIT licence for these two original sample files only)
 
 Purpose:
-These are original educational diagnostic Expert Advisors to test the FiduLync download catalogue and, when you have access to MetaEditor, the MT5 import/compile/attach workflow.
+Original educational diagnostic Expert Advisors to test the FiduLync download catalogue and, when MetaEditor is available, the MT5 import/compile/attach workflow.
 
 Important:
 - Both EAs are analysis-only. They do not open, modify or close trades.
@@ -14,7 +14,7 @@ Important:
 - They are source files (.mq5), not compiled MT5 binaries (.ex5).
 - They have not been compiled or run in MetaTrader 5 in this environment.
 - Test on a demo terminal first. Review the source before compiling.
-- The MIT licence in TEST_EA_LICENSE.txt applies only to these two named sandbox EAs.
+- The MIT licence applies only to the two named sandbox EAs.
 - The external GitHub research link in the store is not owned or redistributed by FiduLync; inspect that repository's own licence and each project's code before use.
 
 Install:
