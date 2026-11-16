@@ -11,6 +11,7 @@ const links = [
   { href: '/', label: 'MacroLync', icon: 'shield' },
   { href: '/store', label: 'AlgoLync Vault', icon: 'chart' },
   { href: '/account', label: 'My License', icon: 'shield' },
+  { href: '/owner', label: 'Owner', icon: 'shield-alert' },
   { href: '/faq', label: 'FAQ', icon: 'activity' },
   { href: '/terms', label: 'Terms & Risk', icon: 'shield-alert' },
 ] as const satisfies readonly { href: string; label: string; icon: BrandGlyphName }[];
@@ -22,6 +23,7 @@ const macroLinks = [
   { href: '#positioning', label: 'Positioning', icon: 'radio' },
   { href: '/store', label: 'AlgoLync Vault', icon: 'chart' },
   { href: '/account', label: 'My License', icon: 'shield' },
+  { href: '/owner', label: 'Owner', icon: 'shield-alert' },
   { href: '/faq', label: 'FAQ', icon: 'activity' },
   { href: '/terms', label: 'Terms & Risk', icon: 'shield-alert' },
 ] as const satisfies readonly { href: string; label: string; icon: BrandGlyphName }[];
