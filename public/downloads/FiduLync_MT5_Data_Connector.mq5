@@ -128,7 +128,7 @@ void SendSnapshot()
    {
       string symbol=g_symbols[i];
       if(!SymbolSelect(symbol,true)) { Print("Symbol unavailable: ",symbol); continue; }
-      PostBatch(symbol,PERIOD_H1,"H1",1,MathMin(150,bars),true);
+      PostBatch(symbol,PERIOD_H1,"H1",1,(int)MathMin(150,bars),true);
       if(bars>150) PostBatch(symbol,PERIOD_H1,"H1",151,bars-150,false);
       PostBatch(symbol,PERIOD_H4,"H4",1,MathMin(150,bars),false);
       if(bars>150) PostBatch(symbol,PERIOD_H4,"H4",151,bars-150,false);
