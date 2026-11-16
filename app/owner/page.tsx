@@ -10,7 +10,7 @@ const supabase = supabaseUrl && supabaseKey
   ? createClient(supabaseUrl, supabaseKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } })
   : null;
 
-type OwnerStatus = { authenticated: boolean; email?: string; role?: string };
+type OwnerStatus = { authenticated: boolean; email?: string; role?: string };\ntype Mt5Installation = { id: string; label: string; status: 'active' | 'revoked'; created_at: string; last_seen_at: string | null; broker: string | null; server: string | null };
 
 export default function OwnerAccessPage() {
   const [email, setEmail] = useState(OWNER_EMAIL);
@@ -18,7 +18,7 @@ export default function OwnerAccessPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [status, setStatus] = useState<OwnerStatus | null>(null);
   const [message, setMessage] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(false);\n  const [installationLabel, setInstallationLabel] = useState('My MT5 terminal');\n  const [installations, setInstallations] = useState<Mt5Installation[]>([]);\n  const [connectorToken, setConnectorToken] = useState('');\n  const [connectorBusy, setConnectorBusy] = useState(false);
 
   async function verifyOwner(current: Session) {
     const response = await fetch('/api/owner/verify', {
@@ -55,7 +55,7 @@ export default function OwnerAccessPage() {
     return () => { active = false; listener.subscription.unsubscribe(); };
   }, []);
 
-  async function sendCode(event: React.FormEvent) {
+  async function loadInstallations(current: Session) {\n    const response = await fetch('/api/mt5/installations', { headers: { Authorization: 'Bearer ' + current.access_token }, cache: 'no-store' });\n    if (response.ok) { const result = await response.json() as { installations: Mt5Installation[] }; setInstallations(result.installations); }\n  }\n  async function createConnector() {\n    if (!session) return;\n    setConnectorBusy(true); setConnectorToken(''); setMessage('');\n    try {\n      const response = await fetch('/api/mt5/installations', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token }, body: JSON.stringify({ label: installationLabel }) });\n      const result = await response.json() as { token?: string; error?: string };\n      if (!response.ok || !result.token) throw new Error(result.error || 'Unable to create connector.');\n      setConnectorToken(result.token); await loadInstallations(session); setMessage('Connector created. Copy the token now; it is not stored or shown again.');\n    } catch (error) { setMessage(error instanceof Error ? error.message : 'Connector creation failed.'); }\n    finally { setConnectorBusy(false); }\n  }\n  async function revokeConnector(id: string) {\n    if (!session || !window.confirm('Revoke this MT5 connector? It will immediately stop accepting uploads.')) return;\n    const response = await fetch('/api/mt5/installations', { method: 'DELETE', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token }, body: JSON.stringify({ installation_id: id }) });\n    if (response.ok) await loadInstallations(session); else setMessage('Could not revoke this connector.');\n  }\n  async function sendCode(event: React.FormEvent) {
     event.preventDefault();
     if (!supabase || email.trim().toLowerCase() !== OWNER_EMAIL) {
       setMessage('Only the configured owner email can request access.');
@@ -106,7 +106,7 @@ export default function OwnerAccessPage() {
             <div className="text-sm font-semibold text-emerald-200">Owner identity verified</div>
             <div className="mt-2 text-xs text-slate-300">{status.email}</div>
             <div className="mt-1 font-mono text-[10px] text-slate-500">ROLE: {status.role?.toUpperCase()}</div>
-            <p className="mt-4 text-xs leading-5 text-slate-400">This establishes private owner identity. It does not yet expose customer financial records or change payment settings.</p>
+            <p className="mt-4 text-xs leading-5 text-slate-400">Private owner access. Create a unique, data-only MT5 connector credential for each terminal. Never share it.</p>\n            <div className="mt-5 rounded-xl border border-white/10 bg-black/20 p-4">\n              <div className="text-sm font-semibold text-white">MT5 market-data connector</div>\n              <p className="mt-1 text-xs leading-5 text-slate-400">One-time token issuance. No trading permissions or MT5 account password are requested.</p>\n              <div className="mt-3 flex flex-col gap-2 sm:flex-row"><input value={installationLabel} onChange={(event) => setInstallationLabel(event.target.value)} maxLength={80} aria-label="MT5 installation label" className="h-10 min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-3 text-sm text-white" /><button type="button" disabled={connectorBusy} onClick={createConnector} className="rounded-lg bg-emerald-300 px-4 py-2 text-xs font-semibold text-[#07120d] disabled:opacity-50">{connectorBusy ? 'Creating…' : 'Create connector token'}</button></div>\n              {connectorToken && <div className="mt-3 space-y-2"><div className="break-all rounded-lg border border-amber-300/20 bg-amber-300/[0.06] p-3 font-mono text-xs text-amber-100">{connectorToken}</div><button type="button" onClick={() => void navigator.clipboard.writeText(connectorToken)} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-white">Copy one-time token</button><p className="text-[11px] text-amber-200">Shown only now. If lost, revoke and create a replacement.</p></div>}\n              <div className="mt-4 space-y-2">{installations.map((item) => <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-white/[0.08] pt-3 text-xs"><div><div className="text-slate-200">{item.label} · {item.status}</div><div className="mt-1 text-[10px] text-slate-500">{item.broker || 'Broker pending'} · {item.server || 'Server pending'} · Last seen: {item.last_seen_at ? new Date(item.last_seen_at).toLocaleString() : 'Never'}</div></div>{item.status === 'active' && <button type="button" onClick={() => void revokeConnector(item.id)} className="rounded-md border border-red-300/20 px-3 py-1.5 text-red-200">Revoke</button>}</div>)}</div>\n            </div>
             <button type="button" onClick={signOut} className="mt-5 rounded-lg border border-white/10 px-4 py-2 text-xs text-slate-200 hover:bg-white/5">Sign out</button>
           </div>
         ) : (
