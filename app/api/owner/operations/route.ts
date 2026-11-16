@@ -23,7 +23,8 @@ export async function GET(request: Request) {
       .eq('user_id', userId).order('created_at', { ascending: false }).limit(20);
     if (installationError) throw installationError;
 
-    const installationIds = (installations ?? []).map((item) => item.id);
+    const activeInstallations = (installations ?? []).filter((item) => item.status === 'active');
+    const installationIds = activeInstallations.map((item) => item.id);
     let candleData: { id: string; bar_time: string; symbol: string; timeframe: string; broker: string; server: string } | null = null;
     let quoteData: { symbol: string; quote_time: string; broker: string; server: string } | null = null;
     if (installationIds.length) {
@@ -42,7 +43,6 @@ export async function GET(request: Request) {
     const now = Date.now();
     const candleAgeMs = candleData ? now - Date.parse(candleData.bar_time) : null;
     const quoteAgeMs = quoteData ? now - Date.parse(quoteData.quote_time) : null;
-    const activeInstallations = (installations ?? []).filter((item) => item.status === 'active');
     const latestHeartbeat = activeInstallations
       .map((item) => item.last_seen_at ? Date.parse(item.last_seen_at) : 0)
       .reduce((latest, value) => Math.max(latest, value), 0);
