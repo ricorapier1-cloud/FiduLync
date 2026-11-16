@@ -53,7 +53,6 @@ bool AppendBars(string &json,const string symbol,const ENUM_TIMEFRAMES timeframe
    double tickSize=SymbolInfoDouble(symbol,SYMBOL_TRADE_TICK_SIZE);
    double tickValue=SymbolInfoDouble(symbol,SYMBOL_TRADE_TICK_VALUE);
    double contract=SymbolInfoDouble(symbol,SYMBOL_TRADE_CONTRACT_SIZE);
-   long spread=SymbolInfoInteger(symbol,SYMBOL_SPREAD);
    bool appended=false;
    for(int i=0;i<copied;i++)
    {
