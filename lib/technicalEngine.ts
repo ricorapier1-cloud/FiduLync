@@ -24,6 +24,11 @@ export type TechnicalSignal = {
   gaussian_z_score: number | null;
   kaufman_efficiency_ratio: number | null;
   adx: number | null;
+  kama: number | null;
+  alma: number | null;
+  hurst_exponent: number | null;
+  regression_r_squared: number | null;
+  structure: 'BULLISH' | 'BEARISH' | 'MIXED' | 'UNAVAILABLE';
   regime: MarketRegime;
   execution_filter: ExecutionFilter;
   atr_stop_pips: number | null;
@@ -40,6 +45,11 @@ function unavailableSignal(): TechnicalSignal {
     gaussian_z_score: null,
     kaufman_efficiency_ratio: null,
     adx: null,
+    kama: null,
+    alma: null,
+    hurst_exponent: null,
+    regression_r_squared: null,
+    structure: 'UNAVAILABLE',
     regime: 'UNAVAILABLE',
     execution_filter: { allow_buys: false, allow_sells: false, recommended_lot_multiplier: 0 },
     atr_stop_pips: null,
@@ -140,6 +150,110 @@ function kaufmanEfficiencyRatio(values: number[], period = 10) {
   return volatility === 0 ? 0 : change / volatility;
 }
 
+function kaufmanAdaptiveMovingAverage(values: number[], period = 10, fast = 2, slow = 30): number | null {
+  if (values.length < period + 1) return null;
+  const fastAlpha = 2 / (fast + 1);
+  const slowAlpha = 2 / (slow + 1);
+  let result = values[0];
+  for (let index = 1; index < values.length; index += 1) {
+    const start = Math.max(0, index - period);
+    const change = Math.abs(values[index] - values[start]);
+    let volatility = 0;
+    for (let j = start + 1; j <= index; j += 1) volatility += Math.abs(values[j] - values[j - 1]);
+    const efficiency = volatility === 0 ? 0 : change / volatility;
+    const smoothing = (efficiency * (fastAlpha - slowAlpha) + slowAlpha) ** 2;
+    result += smoothing * (values[index] - result);
+  }
+  return result;
+}
+
+function arnaudLegouxMovingAverage(values: number[], period = 21, offset = 0.85, sigma = 6): number | null {
+  if (values.length < period) return null;
+  const window = values.slice(-period);
+  const center = offset * (period - 1);
+  const width = period / sigma;
+  let weighted = 0;
+  let total = 0;
+  for (let index = 0; index < period; index += 1) {
+    const weight = Math.exp(-((index - center) ** 2) / (2 * width * width));
+    weighted += window[index] * weight;
+    total += weight;
+  }
+  return total === 0 ? null : weighted / total;
+}
+
+function regressionRSquared(values: number[], period = 50): number | null {
+  if (values.length < period) return null;
+  const window = values.slice(-period);
+  const meanY = window.reduce((sum, value) => sum + value, 0) / period;
+  const meanX = (period - 1) / 2;
+  let covariance = 0;
+  let varianceX = 0;
+  let varianceY = 0;
+  for (let index = 0; index < period; index += 1) {
+    const dx = index - meanX;
+    const dy = window[index] - meanY;
+    covariance += dx * dy;
+    varianceX += dx * dx;
+    varianceY += dy * dy;
+  }
+  if (varianceX === 0 || varianceY === 0) return 0;
+  return Math.max(0, Math.min(1, (covariance * covariance) / (varianceX * varianceY)));
+}
+
+function estimateHurstExponent(values: number[]): number | null {
+  if (values.length < 120) return null;
+  const returns = values.slice(1).map((value, index) => Math.log(value / values[index]));
+  const lags = [2, 3, 4, 6, 8, 12, 16, 24];
+  const points: Array<{ x: number; y: number }> = [];
+  for (const lag of lags) {
+    if (returns.length < lag * 4) continue;
+    const deviations: number[] = [];
+    for (let start = 0; start + lag <= returns.length; start += lag) {
+      const block = returns.slice(start, start + lag);
+      const mean = block.reduce((sum, value) => sum + value, 0) / block.length;
+      let cumulative = 0;
+      let high = Number.NEGATIVE_INFINITY;
+      let low = Number.POSITIVE_INFINITY;
+      for (const value of block) {
+        cumulative += value - mean;
+        high = Math.max(high, cumulative);
+        low = Math.min(low, cumulative);
+      }
+      const variance = block.reduce((sum, value) => sum + (value - mean) ** 2, 0) / block.length;
+      const standardDeviation = Math.sqrt(variance);
+      if (standardDeviation > 0) deviations.push((high - low) / standardDeviation);
+    }
+    if (deviations.length) {
+      const rs = deviations.reduce((sum, value) => sum + value, 0) / deviations.length;
+      if (rs > 0) points.push({ x: Math.log(lag), y: Math.log(rs) });
+    }
+  }
+  if (points.length < 4) return null;
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  const meanX = xs.reduce((sum, value) => sum + value, 0) / xs.length;
+  const meanY = ys.reduce((sum, value) => sum + value, 0) / ys.length;
+  const numerator = xs.reduce((sum, value, index) => sum + (value - meanX) * (ys[index] - meanY), 0);
+  const denominator = xs.reduce((sum, value) => sum + (value - meanX) ** 2, 0);
+  if (denominator === 0) return null;
+  return Math.max(0, Math.min(1, numerator / denominator));
+}
+
+function marketStructure(candles: Candle[], lookback = 5): 'BULLISH' | 'BEARISH' | 'MIXED' {
+  if (candles.length < lookback * 4) return 'MIXED';
+  const window = candles.slice(-lookback * 4);
+  const first = window.slice(0, lookback * 2);
+  const last = window.slice(-lookback * 2);
+  const firstHigh = Math.max(...first.map((candle) => candle.high));
+  const lastHigh = Math.max(...last.map((candle) => candle.high));
+  const firstLow = Math.min(...first.map((candle) => candle.low));
+  const lastLow = Math.min(...last.map((candle) => candle.low));
+  if (lastHigh > firstHigh && lastLow > firstLow) return 'BULLISH';
+  if (lastHigh < firstHigh && lastLow < firstLow) return 'BEARISH';
+  return 'MIXED';
+}
+
 function trueRanges(candles: Candle[]) {
   return candles.slice(1).map((candle, index) => {
     const previousClose = candles[index].close;
@@ -221,6 +335,11 @@ export function calculateTechnicalSignal(pair: string, h1: Candle[], h4: Candle[
   const h1ZScore = gaussianZScore(h1Values);
   const h4ZScore = gaussianZScore(h4Values);
   const ker = kaufmanEfficiencyRatio(h1Values);
+  const kama = kaufmanAdaptiveMovingAverage(h1Values);
+  const alma = arnaudLegouxMovingAverage(h1Values);
+  const hurst = estimateHurstExponent(h1Values);
+  const rSquared = regressionRSquared(h1Values);
+  const structure = marketStructure(h1);
   const adx = averageDirectionalIndex(h1);
   const atr = averageTrueRange(h1);
   if (adx === null || atr === null) return unavailableSignal();
@@ -236,8 +355,11 @@ export function calculateTechnicalSignal(pair: string, h1: Candle[], h4: Candle[
 
   const normalizedZ = Math.max(-3, Math.min(3, h1ZScore * 0.6 + h4ZScore * 0.4));
   const trendDirection = Math.sign(h1Values.at(-1)! - h1Values.at(-11)!);
-  const directionalScore = h4Alignment * 20 + d1Alignment * 25
-    + trendDirection * ker * 20 + normalizedZ * 10;
+  const adaptiveTrend = kama !== null && alma !== null ? Math.sign(kama - alma) : 0;
+  const structureDirection = structure === 'BULLISH' ? 1 : structure === 'BEARISH' ? -1 : 0;
+  const directionalScore = h4Alignment * 18 + d1Alignment * 22
+    + trendDirection * ker * 18 + adaptiveTrend * 12 + structureDirection * 10
+    + (rSquared ?? 0) * trendDirection * 10 + normalizedZ * 10;
   const reversionScore = -normalizedZ * 25 + (h1Alignment + h4Alignment) * 5;
   const rawScore = regime === 'TRENDING_EXPANSION'
     ? directionalScore
@@ -263,6 +385,11 @@ export function calculateTechnicalSignal(pair: string, h1: Candle[], h4: Candle[
     gaussian_z_score: Number(normalizedZ.toFixed(3)),
     kaufman_efficiency_ratio: Number(ker.toFixed(3)),
     adx: Number(adx.toFixed(2)),
+    kama: kama === null ? null : Number(kama.toFixed(6)),
+    alma: alma === null ? null : Number(alma.toFixed(6)),
+    hurst_exponent: hurst === null ? null : Number(hurst.toFixed(3)),
+    regression_r_squared: rSquared === null ? null : Number(rSquared.toFixed(3)),
+    structure,
     regime,
     execution_filter: {
       allow_buys: allowBuys,
