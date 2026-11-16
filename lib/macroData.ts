@@ -8,6 +8,7 @@ import {
   getWorldBankG10Inflation,
 } from '@/lib/internationalMacro';
 import { getCachedData } from '@/lib/redisCache';
+import { getUsEconomicIndicators } from '@/lib/usEconomicData';
 
 export const EMPTY_SNAPSHOT: MacroSnapshot = {
   asOf: '',
@@ -107,13 +108,22 @@ function isCatalyst(value: unknown): value is EconomicCatalyst {
     && (typeof value.actual === 'string' || value.actual === null);
 }
 
-function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies' | 'cot' | 'catalysts'> | null {
+function isUsEconomicIndicators(value: unknown): value is NonNullable<MacroSnapshot['usIndicators']> {
+  if (!isRecord(value) || typeof value.fetchedAt !== 'string' || !Number.isFinite(Date.parse(value.fetchedAt))
+    || typeof value.beaAvailable !== 'boolean' || typeof value.blsAvailable !== 'boolean') return false;
+  const numericKeys = ['realGdpGrowthAnnualizedPct', 'headlineCpiYoYPct', 'coreCpiYoYPct', 'unemploymentRatePct', 'nonfarmPayrollChangeThousands'];
+  return numericKeys.every((key) => value[key] === undefined || isFiniteNumber(value[key]))
+    && ['gdpPeriod', 'headlineCpiPeriod', 'coreCpiPeriod', 'laborPeriod'].every((key) => value[key] === undefined || typeof value[key] === 'string');
+}
+
+function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies' | 'cot' | 'catalysts' | 'usIndicators'> | null {
   if (!isRecord(value)
     || !Array.isArray(value.currencies)
     || !Array.isArray(value.cot)
     || !Array.isArray(value.catalysts)) return null;
 
-  if (!value.currencies.every(isCurrency) || !value.cot.every(isCotPosition) || !value.catalysts.every(isCatalyst)) return null;
+  if (!value.currencies.every(isCurrency) || !value.cot.every(isCotPosition) || !value.catalysts.every(isCatalyst)
+    || (value.usIndicators !== undefined && !isUsEconomicIndicators(value.usIndicators))) return null;
   return {
     currencies: value.currencies,
     cot: value.cot,
@@ -450,7 +460,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     asOf: new Date().toISOString(),
     source: cachedSnapshot.source === 'fallback' ? 'fallback' : 'partial',
   };
-  const [fredResult, finnhubResult, alphaResult, fmpResult, cotResult, frankfurterResult, calendarResult, ecbResult, bocResult, boeResult, worldBankResult] = await Promise.allSettled([
+  const [fredResult, finnhubResult, alphaResult, fmpResult, cotResult, frankfurterResult, calendarResult, ecbResult, bocResult, boeResult, worldBankResult, usIndicatorsResult] = await Promise.allSettled([
     fredApiKey ? getFredUsdUpdates(fredApiKey) : Promise.resolve(null),
     finnhubApiKey ? getFinnhubCatalysts(finnhubApiKey) : Promise.resolve(null),
     alphaVantageKey ? getAlphaVantageUsdUpdates(alphaVantageKey) : Promise.resolve(null),
@@ -600,6 +610,12 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     }
   } else {
     console.warn('World Bank G10 inflation data is unavailable:', worldBankResult.reason);
+  }
+  if (usIndicatorsResult.status === 'fulfilled' && usIndicatorsResult.value) {
+    snapshot.usIndicators = usIndicatorsResult.value;
+    hasLiveData = true;
+  } else if (usIndicatorsResult.status === 'rejected') {
+    console.warn('BEA/BLS US macro indicators are unavailable:', usIndicatorsResult.reason);
   }
   if (!fredApiKey && alphaVantageKey) {
     if (alphaResult.status === 'fulfilled' && isRecord(alphaResult.value)) {
