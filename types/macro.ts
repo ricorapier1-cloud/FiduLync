@@ -30,12 +30,28 @@ export type EconomicCatalyst = {
   actual: string | null;
 };
 
+export type UsEconomicIndicators = {
+  realGdpGrowthAnnualizedPct?: number;
+  headlineCpiYoYPct?: number;
+  coreCpiYoYPct?: number;
+  unemploymentRatePct?: number;
+  nonfarmPayrollChangeThousands?: number;
+  gdpPeriod?: string;
+  headlineCpiPeriod?: string;
+  coreCpiPeriod?: string;
+  laborPeriod?: string;
+  fetchedAt: string;
+  beaAvailable: boolean;
+  blsAvailable: boolean;
+};
+
 export type MacroSnapshot = {
   asOf: string;
   source: 'fallback' | 'provider' | 'partial';
   cotSource?: 'unavailable' | 'provider';
   calendarSource?: 'reference' | 'provider';
   ecbRates?: Record<string, number>;
+  usIndicators?: UsEconomicIndicators;
   currencies: MacroCurrency[];
   cot: CotPosition[];
   catalysts: EconomicCatalyst[];
