@@ -81,10 +81,11 @@ async function getBlsIndicators(apiKey: string): Promise<Pick<UsEconomicIndicato
   const unemployment = find('LNS14000000');
   const payroll = find('CES0000000001');
   const latestPayroll = payroll[0];
-  const previousPayroll = latestPayroll && payroll.find((point) => point.year === latestPayroll.year
-    && Number(point.period.slice(1)) === Number(latestPayroll.period.slice(1)) - 1
-    || latestPayroll && Number(point.year) === Number(latestPayroll.year) - 1
-      && latestPayroll.period === 'M01' && point.period === 'M12');
+  const previousPayroll = latestPayroll ? payroll.find((point) => {
+    const latestMonth = Number(latestPayroll.period.slice(1));
+    return (point.year === latestPayroll.year && Number(point.period.slice(1)) === latestMonth - 1)
+      || (latestMonth === 1 && Number(point.year) === Number(latestPayroll.year) - 1 && point.period === 'M12');
+  }) : undefined;
   return {
     headlineCpiYoYPct: yearOverYear(headline),
     coreCpiYoYPct: yearOverYear(core),
