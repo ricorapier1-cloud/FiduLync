@@ -1,6 +1,6 @@
 # MacroLync MT5 Market-Data Bridge — Implementation Contract
 
-Status: architecture contract and quantitative engine integration. The production MT5 ingest endpoint and per-customer credential issuance are not yet enabled. Do not label an MT5 connection as live until a terminal has authenticated and its observations have passed validation.
+Status: MT5 ingest schema, authenticated owner token provisioning/revocation, ingestion API, data-only EA source, and MT5-first technical candle retrieval are implemented on the feature branch. A terminal connection is not live until a Windows MT5 terminal is running the connector and fresh broker observations have passed validation. The EA source still requires MetaEditor compilation and terminal-side smoke testing.
 
 ## Decision
 
