@@ -294,11 +294,14 @@ bool LogClosedTrade(
    const int confluence_score,
    const string regime,
    const string closed_at_utc,
-   const int timeout_ms = 5000
+   const int timeout_ms = 5000,
+   const long mt5_account = 0,
+   const string license_key = ""
 )
 {
    string root = ML_BaseUrl(base_url);
    if(root == "" || api_key == "" || ticket == "" || symbol == ""
+      || mt5_account <= 0 || license_key == ""
       || (direction != "LONG" && direction != "SHORT")
       || !MathIsValidNumber(entry_price) || entry_price <= 0.0
       || !MathIsValidNumber(exit_price) || exit_price <= 0.0
@@ -306,7 +309,9 @@ bool LogClosedTrade(
       || closed_at_utc == "" || StringSubstr(closed_at_utc, StringLen(closed_at_utc) - 1, 1) != "Z"
       || confluence_score < -100 || confluence_score > 100)
       return false;
-   string body = "{\"ticket\":\"" + ML_JsonEscape(ticket)
+   string body = "{\"mt5_account\":" + IntegerToString(mt5_account)
+      + ",\"license_key\":\"" + ML_JsonEscape(license_key)
+      + "\",\"ticket\":\"" + ML_JsonEscape(ticket)
       + "\",\"symbol\":\"" + ML_JsonEscape(symbol)
       + "\",\"direction\":\"" + direction
       + "\",\"entry_price\":" + DoubleToString(entry_price, 8)
@@ -347,12 +352,16 @@ bool MacroLyncSendHeartbeat(
    const double drawdown_pct,
    const int open_positions,
    const string status = "RUNNING",
-   const int timeout_ms = 5000
+   const int timeout_ms = 5000,
+   const string license_key = ""
 )
 {
    string root = ML_BaseUrl(base_url);
-   if(root == "" || api_key == "") return false;
-   string body = "{\"ea_name\":\"" + ML_JsonEscape(ea_name)
+   long accountLogin = AccountInfoInteger(ACCOUNT_LOGIN);
+   if(root == "" || api_key == "" || license_key == "" || accountLogin <= 0) return false;
+   string body = "{\"mt5_account\":" + IntegerToString(accountLogin)
+      + ",\"license_key\":\"" + ML_JsonEscape(license_key)
+      + "\",\"ea_name\":\"" + ML_JsonEscape(ea_name)
       + "\",\"account_number\":\"" + ML_JsonEscape(account_number)
       + "\",\"balance\":" + DoubleToString(balance, 2)
       + ",\"equity\":" + DoubleToString(equity, 2)
@@ -390,7 +399,8 @@ void MacroLyncHeartbeatEveryFiveMinutes(
    const double floating_pnl,
    const double drawdown_pct,
    const int open_positions,
-   const string status = "RUNNING"
+   const string status = "RUNNING",
+   const string license_key = ""
 )
 {
    static datetime last_attempt = 0;
@@ -407,12 +417,16 @@ void MacroLyncHeartbeatEveryFiveMinutes(
       floating_pnl,
       drawdown_pct,
       open_positions,
-      status
+      status,
+      5000,
+      license_key
    );
 }
 
-#endif
 
+// Optional legacy tester helpers depend on the host EA's MacroSignal type.
+// Define MACRO_LYNC_ENABLE_LEGACY_TESTER_SIMULATOR only when that type is available.
+#ifdef MACRO_LYNC_ENABLE_LEGACY_TESTER_SIMULATOR
 
 //+------------------------------------------------------------------+
 //| Local UTC Rollover Guard (20:45 - 22:15 UTC)                     |
@@ -496,3 +510,6 @@ bool SimulateTesterSignal(const string symbol, MacroSignal &outSignal)
    IndicatorRelease(hAdx);  IndicatorRelease(hAtr);
    return true;
 }
+
+#endif // MACRO_LYNC_ENABLE_LEGACY_TESTER_SIMULATOR
+#endif // MACRO_LYNC_BRIDGE_MQH

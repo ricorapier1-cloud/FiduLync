@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
-import { isSupabaseConfigured, persistLicense } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,15 +31,15 @@ export async function POST(req: Request) {
     const currency: CurrencyCode = body?.currency === 'USD' ? 'USD' : 'NGN';
     const plan: PlanTier = body?.plan === 'LIFETIME' ? 'LIFETIME' : 'MONTHLY';
 
-    if (!email.includes('@') || !Number.isFinite(mt5Account) || mt5Account <= 0) {
+    if (!email.includes('@') || !Number.isSafeInteger(mt5Account) || mt5Account <= 0) {
       return NextResponse.json({ success: false, error: 'Enter a valid email and MT5 account number.' }, { status: 400 });
     }
 
     const paystackSecret = (process.env.PAYSTACK_SECRET_KEY || '').trim();
-    const reference = `ALGO_${plan}_${currency}_${mt5Account}_${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+    const reference = `ALGO_${plan}_${currency}_${mt5Account}_${crypto.randomBytes(16).toString('hex').toUpperCase()}`;
 
     if (paystackSecret.startsWith('sk_')) {
-      const origin = req.headers.get('origin') || 'https://fidulync.vercel.app';
+      const origin = (process.env.NEXT_PUBLIC_APP_URL || 'https://fidulync.vercel.app').trim().replace(/\/+$/, '');
       const psRes = await fetch('https://api.paystack.co/transaction/initialize', {
         method: 'POST',
         headers: {
@@ -72,33 +71,12 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    const licenseKey = `ALGOLYNX-${plan === 'LIFETIME' ? 'LT' : 'MO'}-${mt5Account}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
-
-    if (isSupabaseConfigured()) {
-      try {
-        await persistLicense({
-          license_key: licenseKey,
-          mt5_account: mt5Account,
-          email,
-          tier: plan === 'LIFETIME' ? 'INSTITUTIONAL_LIFETIME' : 'INSTITUTIONAL_MONTHLY',
-          status: 'active',
-          expires_at: plan === 'LIFETIME' ? null : new Date(Date.now() + 30 * 86400000).toISOString(),
-        });
-      } catch (dbErr) {
-        console.warn('Sandbox license DB insert non-critical warning:', dbErr);
-      }
-    }
-
+    // Never mint or activate a license without a Paystack transaction.
+    // Test payments are supported through a Paystack test secret; no offline bypass exists.
     return NextResponse.json({
-      success: true,
-      mode: 'sandbox_instant',
-      license_key: licenseKey,
-      download_url: '/downloads/AlgoLync_EA_README.txt',
-      plan,
-      currency,
-      email,
-      mt5_account: mt5Account,
-    });
+      success: false,
+      error: 'Online payment is not configured yet. Please try again later.',
+    }, { status: 503 });
   } catch (err: unknown) {
     const message = err instanceof Error ? errorToString(err) : 'Checkout initialization failed';
     return NextResponse.json({ success: false, error: message }, { status: 500 });
