@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import BrandGlyph from '@/components/BrandGlyph';
 import { PaystackCheckout } from '@/components/PaystackCheckout';
 import { QuantStrategyCatalog } from '@/components/QuantStrategyCatalog';
+import { MarketplaceCatalog } from '@/app/components/MarketplaceCatalog';
 import LiveAccountMonitor from '@/components/LiveAccountMonitor';
 import type { HeartbeatRecord } from '@/lib/eaHeartbeat';
 import { getCurrencyStrengthIndex, type getLiquiditySession } from '@/lib/currencyStrength';
@@ -254,6 +255,8 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
         <section className="mt-11" aria-labelledby="strategies-heading">
           <QuantStrategyCatalog />
         </section>
+
+        <MarketplaceCatalog />
 
         <section className="mt-11 grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]" aria-label="Signal tester and MT5 connection">
           <div className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-5 sm:p-6">
