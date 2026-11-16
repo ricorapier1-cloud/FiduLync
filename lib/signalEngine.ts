@@ -89,7 +89,13 @@ export async function getMacroSignal(symbol: string, now = Date.now()): Promise<
     const csiSpread = baseStrength !== undefined && quoteStrength !== undefined ? baseStrength - quoteStrength : 0;
     const newsLockout = isNewsLockout(snapshot, now, normalizedSymbol);
     const edgeQualified = Math.abs(csiSpread) >= 60 && Math.abs(score) >= 45;
-    const bias = edgeQualified ? (score > 0 ? 'LONG' : 'SHORT') : 'NEUTRAL';
+    // Never emit a directional bias from fallback/reference macro values or
+    // without validated technical candles. The payload remains neutral until
+    // both independent research legs have usable provider-backed inputs.
+    const directionQualified = verifiedPolicyInputs && technical.available;
+    const bias = directionQualified && edgeQualified
+      ? (score > 0 ? 'LONG' : 'SHORT')
+      : 'NEUTRAL';
     const [base, quote] = [normalizedSymbol.slice(0, 3), normalizedSymbol.slice(3)];
     const correlationGroup = base === 'JPY' || quote === 'JPY'
       ? 'JPY_CROSS'

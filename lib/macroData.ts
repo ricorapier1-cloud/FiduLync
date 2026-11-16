@@ -39,12 +39,7 @@ export function getFallbackSnapshot(): MacroSnapshot {
       { code: 'XAU', centralBank: 'Global Reserve Asset', policyRate: 0.0, inflation: 0.0, twoYearYield: 0.0, twoYearYieldSource: 'reference', inflationLabel: 'Real Yield Proxy', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Sovereign Hedge' },
     ],
     cot: [],
-    catalysts: [
-      { id: 'us-cpi-nov', region: 'US', title: 'Consumer Price Index', scheduledAt: '2026-11-12T13:30:00.000Z', impact: 'High', consensus: '2.8% y/y', actual: null },
-      { id: 'us-nfp-dec', region: 'US', title: 'Non-Farm Payrolls', scheduledAt: '2026-12-04T13:30:00.000Z', impact: 'High', consensus: '+145k', actual: null },
-      { id: 'fomc-dec', region: 'US', title: 'FOMC Rate Decision', scheduledAt: '2026-12-09T19:00:00.000Z', impact: 'High', consensus: 'Hold', actual: null },
-      { id: 'ecb-dec', region: 'EU', title: 'ECB Policy Decision', scheduledAt: '2026-12-17T13:15:00.000Z', impact: 'High', consensus: 'Hold', actual: null },
-    ],
+    catalysts: [],
   };
 }
 
@@ -57,7 +52,7 @@ function mergeWithFallback(snapshot: MacroSnapshot): MacroSnapshot {
     ...snapshot,
     currencies: [...currencies.values()],
     cot: snapshot.cot,
-    catalysts: snapshot.catalysts.length > 0 ? snapshot.catalysts : fallback.catalysts,
+    catalysts: snapshot.catalysts,
   };
 }
 
@@ -519,8 +514,10 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     console.warn('Finnhub economic calendar unavailable; checking configured calendar adapters:', finnhubResult.reason);
   }
   if (frankfurterResult.status === 'fulfilled' && isRecord(frankfurterResult.value)) {
+    // Frankfurter is an ECB-derived daily reference-rate source, not a live
+    // market quote or a fresh macroeconomic observation. Keep it separate
+    // from the macro-provider health status and execution eligibility.
     snapshot.ecbRates = frankfurterResult.value;
-    hasLiveData = true;
   } else if (frankfurterResult.status === 'rejected') {
     console.warn('ECB benchmark exchange rates are unavailable:', frankfurterResult.reason);
   }
@@ -650,7 +647,13 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     console.error('COT provider unavailable; retaining cached positioning:', cotResult.reason);
   }
   if (hasLiveData) {
-    snapshot.source = snapshot.currencies.length >= 11 ? 'provider' : 'partial';
+    const g10 = snapshot.currencies.filter((currency) =>
+      ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'SEK', 'NOK'].includes(currency.code));
+    const completeG10MacroCoverage = g10.length === 10 && g10.every((currency) =>
+      currency.policyRateSource === 'provider' && currency.inflationSource === 'provider');
+    // Fallback rows are merged for display continuity. Their presence must
+    // never make a partial provider snapshot appear fully provider-backed.
+    snapshot.source = completeG10MacroCoverage ? 'provider' : 'partial';
   }
   return hasLiveData ? snapshot : null;
 }

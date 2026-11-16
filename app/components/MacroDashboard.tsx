@@ -44,7 +44,7 @@ function formatContracts(value: number) {
 }
 
 function formatCountdown(target: string, now: number) {
-  const seconds = Math.max(0, Math.floor((Date.parse(target) - now) / 1100));
+  const seconds = Math.max(0, Math.floor((Date.parse(target) - now) / 1000));
   const days = Math.floor(seconds / 86_400);
   const hours = Math.floor((seconds % 86_400) / 3_600);
   const minutes = Math.floor((seconds % 3_600) / 60);
@@ -133,6 +133,8 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
     .sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt));
   const nextHighImpactCatalyst = sortedCatalysts.find((catalyst) => catalyst.impact === 'High');
   const currencies = snapshot.currencies;
+  const verifiedProviderCurrencyCount = currencies.filter((currency) => currency.code !== 'XAU'
+    && currency.policyRateSource === 'provider' && currency.inflationSource === 'provider').length;
   const liveQuoteAvailable = liveFeed && now !== null && quotes.some((quote) => {
     const age = now - Date.parse(quote.timestamp);
     return quote.source === 'finnhub' && age >= 0 && age <= 120_000;
@@ -157,8 +159,10 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
   const realYieldDifferentialBps = baseCurrency && quoteCurrency
     ? Math.round(((baseCurrency.policyRate - baseCurrency.inflation) - (quoteCurrency.policyRate - quoteCurrency.inflation)) * 100)
     : null;
-  const policySpread = currencies.length > 1
-    ? Math.max(...currencies.map((currency) => currency.policyRate)) - Math.min(...currencies.map((currency) => currency.policyRate))
+  const g10Currencies = currencies.filter((currency) => currency.code !== 'XAU');
+  const providerPolicyCurrencies = g10Currencies.filter((currency) => currency.policyRateSource === 'provider');
+  const policySpread = providerPolicyCurrencies.length > 1
+    ? Math.max(...providerPolicyCurrencies.map((currency) => currency.policyRate)) - Math.min(...providerPolicyCurrencies.map((currency) => currency.policyRate))
     : null;
 
   useEffect(() => {
@@ -249,10 +253,10 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
       </section>
 
       <section className="macro-kpis" aria-label="Macro overview">
-        <article className="macro-kpi"><span className="macro-kpi-label">POLICY RANGE <span>G10</span></span><strong className="mono">{policySpread === null ? '425 bps (G8)' : formatRate(policySpread)}</strong><small>highest to lowest available policy rate</small></article>
-        <article className="macro-kpi"><span className="macro-kpi-label">POLICY INPUTS <span>G10</span></span><strong className="mono">{String(currencies.length).padStart(2, '0')} <em>/ 11</em></strong><small>{currencies.length >= 11 ? 'All 11 central bank & reserve inputs active' : snapshot.source === 'fallback' ? 'Reference baseline' : 'Live and reference inputs'}</small></article>
-        <article className="macro-kpi"><span className="macro-kpi-label">NEXT CATALYST <span>HIGH IMPACT</span></span><strong className="mono">{nextHighImpactCatalyst ? <CatalystCountdownDisplay target={nextHighImpactCatalyst.scheduledAt} /> : 'US Non-Farm Payrolls'}</strong><small>{nextHighImpactCatalyst?.title ?? 'Tier-1 Catalyst • 13:30 UTC'}</small></article>
-        <article className="macro-kpi macro-kpi-source"><span className="macro-kpi-label">DATA PROVENANCE <span>STATUS</span></span><strong className="macro-source-value"><span className={currencies.length >= 11 ? 'macro-source-dot macro-source-live' : snapshot.source === 'fallback' ? 'macro-source-dot' : 'macro-source-dot macro-source-live'} />{currencies.length >= 11 ? 'LIVE' : liveReferenceAvailable && currencies.length === 0 ? 'REFERENCE' : snapshot.source === 'provider' ? 'LIVE' : snapshot.source === 'partial' ? 'PARTIAL' : 'OFFLINE'}</strong><small>{refreshing ? 'Checking provider…' : currencies.length >= 11 ? 'All 11 inputs verified' : 'Stale cache used when available'}</small></article>
+        <article className="macro-kpi"><span className="macro-kpi-label">POLICY RANGE <span>G10 FX</span></span><strong className="mono">{policySpread === null ? '—' : formatRate(policySpread)}</strong><small>highest to lowest available policy rate</small></article>
+        <article className="macro-kpi"><span className="macro-kpi-label">G10 COVERAGE <span>FX UNIVERSE</span></span><strong className="mono">{String(verifiedProviderCurrencyCount).padStart(2, '0')} <em>/ 10</em></strong><small>{verifiedProviderCurrencyCount >= 10 ? 'All 10 G10 policy + inflation inputs provider-verified' : 'Incomplete provider-verified G10 coverage'}</small></article>
+        <article className="macro-kpi"><span className="macro-kpi-label">NEXT CATALYST <span>HIGH IMPACT</span></span><strong className="mono">{nextHighImpactCatalyst ? <CatalystCountdownDisplay target={nextHighImpactCatalyst.scheduledAt} /> : 'Unavailable'}</strong><small>{nextHighImpactCatalyst?.title ?? 'No verified provider event'}</small></article>
+        <article className="macro-kpi macro-kpi-source"><span className="macro-kpi-label">DATA PROVENANCE <span>STATUS</span></span><strong className="macro-source-value"><span className={currencies.length >= 11 ? 'macro-source-dot macro-source-live' : snapshot.source === 'fallback' ? 'macro-source-dot' : 'macro-source-dot macro-source-live'} />{verifiedProviderCurrencyCount >= 10 ? 'PROVIDER' : verifiedProviderCurrencyCount > 0 ? 'PARTIAL' : liveReferenceAvailable ? 'REFERENCE' : 'OFFLINE'}</strong><small>{refreshing ? 'Checking provider…' : `Policy + inflation provider inputs: ${verifiedProviderCurrencyCount}/10 G10`}</small></article>
       </section>
 
       <section className="macro-intelligence-grid" aria-label="Currency strength and AI desk brief">
@@ -318,7 +322,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
               <div className="macro-event-info"><div><span className="macro-region mono">{catalyst.region}</span><span className={`macro-impact macro-impact-${catalyst.impact.toLowerCase()}`}>{catalyst.impact}</span></div><h3>{catalyst.title}</h3><p>Consensus <b className="mono">{catalyst.consensus}</b><span>Actual <b className="mono">{catalyst.actual ?? 'Pending'}</b></span></p></div>
               <span className="macro-countdown mono">{now ? formatCountdown(catalyst.scheduledAt, now) : 'Syncing'}</span>
             </article>)}
-            <div className="macro-calendar-note"><BrandGlyph name="clock" size={14} /><span>{activeNewsLockout ? 'A high-impact event for this pair is inside the 30-minute pre/post window; the signal API enforces news lockout.' : snapshot.calendarSource === 'provider' ? 'Provider calendar consensus and actuals may be revised; confirm official release details before positioning.' : 'Curated reference schedule only. Listed high-impact events enforce a 30-minute pre/post lockout; verify release details.'}</span></div>
+            <div className="macro-calendar-note"><BrandGlyph name="clock" size={14} /><span>{activeNewsLockout ? 'A high-impact event for this pair is inside the 30-minute pre/post window; the signal API enforces news lockout.' : snapshot.calendarSource === 'provider' ? 'Provider calendar consensus and actuals may be revised; confirm official release details before positioning.' : 'No verified provider calendar is available. Event lockout cannot be assumed; check the official release calendar before trading.'}</span></div>
           </div>
         </section>
       </div>
@@ -334,7 +338,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
             </div>)}
             <div className="macro-panel-foot"><span>{snapshot.cotSource === 'provider' ? 'CFTC report data validated; positioning is weekly and can lag market conditions.' : 'No current CFTC positioning snapshot is available.'}</span><span className="mono">POSITIONING ≠ SIGNAL</span></div>
           </div>
-          <aside className="macro-cot-callout"><div className="macro-callout-icon"><BrandGlyph name="trend" size={18} /></div><span className="eyebrow">CROWDING WATCH</span><h3>Extremes can amplify reversals.</h3><p>High percentiles flag crowded exposure, not a timing trigger. Compare positioning with policy repricing and the catalyst calendar.</p><div className="macro-callout-stat"><span>TOP POSITIONING EXTREME</span><strong className="mono">{snapshot.cot.length > 0 ? `${snapshot.cot.reduce((highest, current) => current.percentile > highest.percentile ? current : highest, snapshot.cot[0]).market} ${Math.max(...snapshot.cot.map((position) => position.percentile))}%` : '425 bps (G8)'}</strong></div></aside>
+          <aside className="macro-cot-callout"><div className="macro-callout-icon"><BrandGlyph name="trend" size={18} /></div><span className="eyebrow">CROWDING WATCH</span><h3>Extremes can amplify reversals.</h3><p>High percentiles flag crowded exposure, not a timing trigger. Compare positioning with policy repricing and the catalyst calendar.</p><div className="macro-callout-stat"><span>TOP POSITIONING EXTREME</span><strong className="mono">{snapshot.cot.length > 0 ? `${snapshot.cot.reduce((highest, current) => current.percentile > highest.percentile ? current : highest, snapshot.cot[0]).market} ${Math.max(...snapshot.cot.map((position) => position.percentile))}%` : 'Unavailable'}</strong></div></aside>
         </div>
       </section>
 

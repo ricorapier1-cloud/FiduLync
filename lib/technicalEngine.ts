@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { getCachedData } from '@/lib/redisCache';
+import { getSupabaseAdmin } from '@/lib/serverSupabase';
 
 export type Candle = {
   timestamp: number;
@@ -24,6 +25,11 @@ export type TechnicalSignal = {
   gaussian_z_score: number | null;
   kaufman_efficiency_ratio: number | null;
   adx: number | null;
+  kama: number | null;
+  alma: number | null;
+  hurst_exponent: number | null;
+  regression_r_squared: number | null;
+  structure: 'BULLISH' | 'BEARISH' | 'MIXED' | 'UNAVAILABLE';
   regime: MarketRegime;
   execution_filter: ExecutionFilter;
   atr_stop_pips: number | null;
@@ -31,6 +37,7 @@ export type TechnicalSignal = {
 };
 
 const LIVE_PRICE_TTL_SECONDS = 60;
+const TIMEFRAME_SECONDS: Record<'H1' | 'H4' | 'D1', number> = { H1: 3600, H4: 14400, D1: 86400 };
 const MAX_CANDLES = 1_000;
 
 function unavailableSignal(): TechnicalSignal {
@@ -40,6 +47,11 @@ function unavailableSignal(): TechnicalSignal {
     gaussian_z_score: null,
     kaufman_efficiency_ratio: null,
     adx: null,
+    kama: null,
+    alma: null,
+    hurst_exponent: null,
+    regression_r_squared: null,
+    structure: 'UNAVAILABLE',
     regime: 'UNAVAILABLE',
     execution_filter: { allow_buys: false, allow_sells: false, recommended_lot_multiplier: 0 },
     atr_stop_pips: null,
@@ -58,8 +70,9 @@ function parseCandle(value: unknown): Candle | null {
     : typeof value.timestamp === 'string'
       ? Date.parse(value.timestamp)
       : Number.NaN;
+  const normalizedTimestamp = timestamp > 1_000_000_000_000 ? timestamp / 1000 : timestamp;
   const candle = {
-    timestamp,
+    timestamp: normalizedTimestamp,
     open: Number(value.open),
     high: Number(value.high),
     low: Number(value.low),
@@ -76,7 +89,46 @@ function parseCandle(value: unknown): Candle | null {
   return candle;
 }
 
+async function fetchMt5Candles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promise<Candle[]> {
+  const supabase = getSupabaseAdmin();
+  const { data: installation, error: installationError } = await supabase.from('mt5_installations')
+    .select('id,last_seen_at')
+    .eq('status', 'active')
+    .not('last_seen_at', 'is', null)
+    .order('last_seen_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (installationError) throw installationError;
+  if (!installation?.last_seen_at || Date.now() - Date.parse(installation.last_seen_at) > 180_000) return [];
+
+  const { data, error } = await supabase.from('mt5_market_candles')
+    .select('bar_time,open,high,low,close')
+    .eq('installation_id', installation.id)
+    .eq('symbol', pair)
+    .eq('timeframe', timeframe)
+    .eq('is_closed', true)
+    .order('bar_time', { ascending: false })
+    .limit(MAX_CANDLES);
+  if (error) throw error;
+  if (!data?.length) return [];
+  const candles = data.map((row) => parseCandle({
+    timestamp: row.bar_time, open: row.open, high: row.high, low: row.low, close: row.close,
+  })).filter((candle): candle is Candle => candle !== null).reverse();
+  if (candles.length < 200) return [];
+  const periodSeconds = TIMEFRAME_SECONDS[timeframe];
+  const latestAge = Math.floor(Date.now() / 1000) - (candles.at(-1)!.timestamp + periodSeconds);
+  const maxAge = timeframe === 'H1' ? 8 * 3600 : timeframe === 'H4' ? 36 * 3600 : 5 * 86400;
+  if (latestAge < -periodSeconds || latestAge > maxAge) return [];
+  return candles;
+}
+
 async function fetchCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promise<Candle[]> {
+  try {
+    const brokerCandles = await fetchMt5Candles(pair, timeframe);
+    if (brokerCandles.length >= 200) return brokerCandles;
+  } catch (error) {
+    console.warn(`MT5 broker candles unavailable for ${pair} ${timeframe}; checking external provider.`, error);
+  }
   const endpoint = process.env.MARKET_DATA_PROVIDER_URL?.trim();
   if (!endpoint) return [];
 
@@ -99,11 +151,19 @@ async function fetchCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promis
   if (!candles.every((candle): candle is Candle => candle !== null)) {
     throw new Error('Market data provider returned an invalid candle.');
   }
-  return candles.sort((left, right) => left.timestamp - right.timestamp).slice(-MAX_CANDLES);
+  const ordered = candles.sort((left, right) => left.timestamp - right.timestamp);
+  const unique = ordered.filter((candle, index) => index === 0 || candle.timestamp > ordered[index - 1].timestamp);
+  if (unique.length < 200) throw new Error('Market data provider returned fewer than 200 unique candles.');
+  const timeframeSeconds = timeframe === 'H1' ? 3_600 : timeframe === 'H4' ? 14_400 : 86_400;
+  const latestClosedBarAge = Math.floor(Date.now() / 1000) - (unique.at(-1)!.timestamp + timeframeSeconds);
+  const maximumAgeSeconds = timeframe === 'H1' ? 8 * 3_600 : timeframe === 'H4' ? 36 * 3_600 : 5 * 86_400;
+  if (latestClosedBarAge < -timeframeSeconds || latestClosedBarAge > maximumAgeSeconds) {
+    throw new Error(`Market data is stale or future-dated for ${pair} ${timeframe}.`);
+  }
+  return unique.slice(-MAX_CANDLES);
 }
 
 async function getCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1') {
-  if (!process.env.MARKET_DATA_PROVIDER_URL?.trim()) return [];
   return getCachedData(`market:candles:${pair}:${timeframe}`, () => fetchCandles(pair, timeframe), LIVE_PRICE_TTL_SECONDS);
 }
 
@@ -138,6 +198,110 @@ function kaufmanEfficiencyRatio(values: number[], period = 10) {
   const change = Math.abs(window.at(-1)! - window[0]);
   const volatility = window.slice(1).reduce((sum, value, index) => sum + Math.abs(value - window[index]), 0);
   return volatility === 0 ? 0 : change / volatility;
+}
+
+function kaufmanAdaptiveMovingAverage(values: number[], period = 10, fast = 2, slow = 30): number | null {
+  if (values.length < period + 1) return null;
+  const fastAlpha = 2 / (fast + 1);
+  const slowAlpha = 2 / (slow + 1);
+  let result = values[0];
+  for (let index = 1; index < values.length; index += 1) {
+    const start = Math.max(0, index - period);
+    const change = Math.abs(values[index] - values[start]);
+    let volatility = 0;
+    for (let j = start + 1; j <= index; j += 1) volatility += Math.abs(values[j] - values[j - 1]);
+    const efficiency = volatility === 0 ? 0 : change / volatility;
+    const smoothing = (efficiency * (fastAlpha - slowAlpha) + slowAlpha) ** 2;
+    result += smoothing * (values[index] - result);
+  }
+  return result;
+}
+
+function arnaudLegouxMovingAverage(values: number[], period = 21, offset = 0.85, sigma = 6): number | null {
+  if (values.length < period) return null;
+  const window = values.slice(-period);
+  const center = offset * (period - 1);
+  const width = period / sigma;
+  let weighted = 0;
+  let total = 0;
+  for (let index = 0; index < period; index += 1) {
+    const weight = Math.exp(-((index - center) ** 2) / (2 * width * width));
+    weighted += window[index] * weight;
+    total += weight;
+  }
+  return total === 0 ? null : weighted / total;
+}
+
+function regressionRSquared(values: number[], period = 50): number | null {
+  if (values.length < period) return null;
+  const window = values.slice(-period);
+  const meanY = window.reduce((sum, value) => sum + value, 0) / period;
+  const meanX = (period - 1) / 2;
+  let covariance = 0;
+  let varianceX = 0;
+  let varianceY = 0;
+  for (let index = 0; index < period; index += 1) {
+    const dx = index - meanX;
+    const dy = window[index] - meanY;
+    covariance += dx * dy;
+    varianceX += dx * dx;
+    varianceY += dy * dy;
+  }
+  if (varianceX === 0 || varianceY === 0) return 0;
+  return Math.max(0, Math.min(1, (covariance * covariance) / (varianceX * varianceY)));
+}
+
+function estimateHurstExponent(values: number[]): number | null {
+  if (values.length < 120) return null;
+  const returns = values.slice(1).map((value, index) => Math.log(value / values[index]));
+  const lags = [2, 3, 4, 6, 8, 12, 16, 24];
+  const points: Array<{ x: number; y: number }> = [];
+  for (const lag of lags) {
+    if (returns.length < lag * 4) continue;
+    const deviations: number[] = [];
+    for (let start = 0; start + lag <= returns.length; start += lag) {
+      const block = returns.slice(start, start + lag);
+      const mean = block.reduce((sum, value) => sum + value, 0) / block.length;
+      let cumulative = 0;
+      let high = Number.NEGATIVE_INFINITY;
+      let low = Number.POSITIVE_INFINITY;
+      for (const value of block) {
+        cumulative += value - mean;
+        high = Math.max(high, cumulative);
+        low = Math.min(low, cumulative);
+      }
+      const variance = block.reduce((sum, value) => sum + (value - mean) ** 2, 0) / block.length;
+      const standardDeviation = Math.sqrt(variance);
+      if (standardDeviation > 0) deviations.push((high - low) / standardDeviation);
+    }
+    if (deviations.length) {
+      const rs = deviations.reduce((sum, value) => sum + value, 0) / deviations.length;
+      if (rs > 0) points.push({ x: Math.log(lag), y: Math.log(rs) });
+    }
+  }
+  if (points.length < 4) return null;
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  const meanX = xs.reduce((sum, value) => sum + value, 0) / xs.length;
+  const meanY = ys.reduce((sum, value) => sum + value, 0) / ys.length;
+  const numerator = xs.reduce((sum, value, index) => sum + (value - meanX) * (ys[index] - meanY), 0);
+  const denominator = xs.reduce((sum, value) => sum + (value - meanX) ** 2, 0);
+  if (denominator === 0) return null;
+  return Math.max(0, Math.min(1, numerator / denominator));
+}
+
+function marketStructure(candles: Candle[], lookback = 5): 'BULLISH' | 'BEARISH' | 'MIXED' {
+  if (candles.length < lookback * 4) return 'MIXED';
+  const window = candles.slice(-lookback * 4);
+  const first = window.slice(0, lookback * 2);
+  const last = window.slice(-lookback * 2);
+  const firstHigh = Math.max(...first.map((candle) => candle.high));
+  const lastHigh = Math.max(...last.map((candle) => candle.high));
+  const firstLow = Math.min(...first.map((candle) => candle.low));
+  const lastLow = Math.min(...last.map((candle) => candle.low));
+  if (lastHigh > firstHigh && lastLow > firstLow) return 'BULLISH';
+  if (lastHigh < firstHigh && lastLow < firstLow) return 'BEARISH';
+  return 'MIXED';
 }
 
 function trueRanges(candles: Candle[]) {
@@ -221,6 +385,11 @@ export function calculateTechnicalSignal(pair: string, h1: Candle[], h4: Candle[
   const h1ZScore = gaussianZScore(h1Values);
   const h4ZScore = gaussianZScore(h4Values);
   const ker = kaufmanEfficiencyRatio(h1Values);
+  const kama = kaufmanAdaptiveMovingAverage(h1Values);
+  const alma = arnaudLegouxMovingAverage(h1Values);
+  const hurst = estimateHurstExponent(h1Values);
+  const rSquared = regressionRSquared(h1Values);
+  const structure = marketStructure(h1);
   const adx = averageDirectionalIndex(h1);
   const atr = averageTrueRange(h1);
   if (adx === null || atr === null) return unavailableSignal();
@@ -236,8 +405,11 @@ export function calculateTechnicalSignal(pair: string, h1: Candle[], h4: Candle[
 
   const normalizedZ = Math.max(-3, Math.min(3, h1ZScore * 0.6 + h4ZScore * 0.4));
   const trendDirection = Math.sign(h1Values.at(-1)! - h1Values.at(-11)!);
-  const directionalScore = h4Alignment * 20 + d1Alignment * 25
-    + trendDirection * ker * 20 + normalizedZ * 10;
+  const adaptiveTrend = kama !== null && alma !== null ? Math.sign(kama - alma) : 0;
+  const structureDirection = structure === 'BULLISH' ? 1 : structure === 'BEARISH' ? -1 : 0;
+  const directionalScore = h4Alignment * 18 + d1Alignment * 22
+    + trendDirection * ker * 18 + adaptiveTrend * 12 + structureDirection * 10
+    + (rSquared ?? 0) * trendDirection * 10 + normalizedZ * 10;
   const reversionScore = -normalizedZ * 25 + (h1Alignment + h4Alignment) * 5;
   const rawScore = regime === 'TRENDING_EXPANSION'
     ? directionalScore
@@ -263,6 +435,11 @@ export function calculateTechnicalSignal(pair: string, h1: Candle[], h4: Candle[
     gaussian_z_score: Number(normalizedZ.toFixed(3)),
     kaufman_efficiency_ratio: Number(ker.toFixed(3)),
     adx: Number(adx.toFixed(2)),
+    kama: kama === null ? null : Number(kama.toFixed(6)),
+    alma: alma === null ? null : Number(alma.toFixed(6)),
+    hurst_exponent: hurst === null ? null : Number(hurst.toFixed(3)),
+    regression_r_squared: rSquared === null ? null : Number(rSquared.toFixed(3)),
+    structure,
     regime,
     execution_filter: {
       allow_buys: allowBuys,
@@ -276,8 +453,21 @@ export function calculateTechnicalSignal(pair: string, h1: Candle[], h4: Candle[
   };
 }
 
+async function hasFreshBrokerQuote(pair: string): Promise<boolean> {
+  const supabase = getSupabaseAdmin();
+  const { data: installation, error: installationError } = await supabase.from('mt5_installations')
+    .select('id,last_seen_at').eq('status', 'active').not('last_seen_at', 'is', null)
+    .order('last_seen_at', { ascending: false }).limit(1).maybeSingle();
+  if (installationError || !installation?.last_seen_at
+    || Date.now() - Date.parse(installation.last_seen_at) > 180_000) return false;
+  const { data: quote, error } = await supabase.from('mt5_market_quotes')
+    .select('bid,ask,quote_time').eq('installation_id', installation.id).eq('symbol', pair)
+    .gte('quote_time', new Date(Date.now() - 120_000).toISOString())
+    .lte('quote_time', new Date(Date.now() + 60_000).toISOString()).maybeSingle();
+  return !error && !!quote && Number(quote.bid) > 0 && Number(quote.ask) >= Number(quote.bid);
+}
+
 export async function getTechnicalSignal(pair: string): Promise<TechnicalSignal> {
-  if (!process.env.MARKET_DATA_PROVIDER_URL?.trim()) return unavailableSignal();
   try {
     return await getCachedData(`technical:signal:${pair}`, async () => {
       const [h1, h4, d1] = await Promise.all([
@@ -285,7 +475,14 @@ export async function getTechnicalSignal(pair: string): Promise<TechnicalSignal>
         getCandles(pair, 'H4'),
         getCandles(pair, 'D1'),
       ]);
-      return calculateTechnicalSignal(pair, h1, h4, d1);
+      const signal = calculateTechnicalSignal(pair, h1, h4, d1);
+      if (!signal.available) return signal;
+      const quoteFresh = await hasFreshBrokerQuote(pair);
+      if (quoteFresh) return signal;
+      return {
+        ...signal,
+        execution_filter: { allow_buys: false, allow_sells: false, recommended_lot_multiplier: 0 },
+      };
     }, LIVE_PRICE_TTL_SECONDS);
   } catch (error) {
     console.warn(`Technical data unavailable for ${pair}; execution filters are disabled.`, error);
