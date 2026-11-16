@@ -60,6 +60,7 @@ bool AppendBars(string &json,const string symbol,const ENUM_TIMEFRAMES timeframe
       if(bar.time<=0 || bar.low<=0 || bar.high<bar.low ||
          bar.open<bar.low || bar.open>bar.high || bar.close<bar.low || bar.close>bar.high)
          continue;
+      long spread=(long)bar.spread;
       if(StringLen(json)>0) json+=",";
       json+="{\"symbol\":\""+JsonEscape(symbol)+"\",\"timeframe\":\""+timeframeName+"\",";
       json+="\"bar_time\":\""+IsoTime(bar.time)+"\",";
