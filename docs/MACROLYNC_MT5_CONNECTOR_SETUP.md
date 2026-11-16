@@ -59,3 +59,28 @@ The MT5 terminal and connector must run on Windows (local PC or Windows VPS) and
 - Revoke old installations from the owner console.
 - Supabase service-role credentials remain server-only. The three MT5 tables have RLS enabled and no anon/authenticated table grants.
 - Rotate/revoke credentials immediately if a terminal or VPS is compromised.
+
+
+## Private owner operations centre
+
+The private `/owner` route now presents an owner-only operations control plane with these modules:
+
+- **Command overview:** database reachability, connector count, latest owner-linked broker quote/candle and observed heartbeat.
+- **Platform governance:** owner identity, customer-support separation and current authorization scope.
+- **Market-data operations:** per-terminal connector issuance, status, broker/server identity, last-seen timestamp and revocation.
+- **Quant research oversight:** technical-engine provenance and explicit validation gaps.
+- **Risk control centre:** fail-closed operating principles and explicit gaps in portfolio risk telemetry.
+- **Security and audit:** owner authentication and one-time hashed connector credentials, with outstanding audit/MFA controls identified.
+- **System reliability:** observed Supabase and MT5 feed health, with unprobed services labelled as such.
+
+The dashboard reads live data from the authenticated `GET /api/owner/operations` endpoint. That endpoint independently verifies the Supabase access token and restricts candle/quote telemetry to the authenticated owner's active installation IDs. Revoked installations are excluded from live feed telemetry. The browser must not be treated as the authorization boundary.
+
+**Important:** This is a first operational governance layer, not a completed institutional control framework. Immutable audit logging, passkey/strong MFA step-up, dual approval, model approval registry, central risk telemetry, Vercel deployment observability and incident alerting remain outstanding. No fake green states or unconnected control buttons are presented. Owner access cannot override strategy, account or execution risk gates.
+
+## Release and validation state
+
+- Latest owner-console preview commit: `9e93b716895913c725b515923976c1b511102e23`.
+- Vercel preview build completed successfully, including Next.js compilation, TypeScript, page generation and route manifest generation.
+- Preview URL: `https://fidulync-hebzt4o4l-ricorapier1-5780.vercel.app`.
+- The preview has not been promoted to production. The production alias `https://fidulync.vercel.app` remains unchanged until the pull request is reviewed, merged and a production deployment is verified.
+- Live MT5 data remains unverified until a Windows MT5 terminal runs the connector and actual candles/quotes arrive.
