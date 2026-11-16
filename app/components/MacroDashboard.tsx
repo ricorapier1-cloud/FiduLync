@@ -160,8 +160,9 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
     ? Math.round(((baseCurrency.policyRate - baseCurrency.inflation) - (quoteCurrency.policyRate - quoteCurrency.inflation)) * 100)
     : null;
   const g10Currencies = currencies.filter((currency) => currency.code !== 'XAU');
-  const policySpread = g10Currencies.length > 1
-    ? Math.max(...g10Currencies.map((currency) => currency.policyRate)) - Math.min(...g10Currencies.map((currency) => currency.policyRate))
+  const providerPolicyCurrencies = g10Currencies.filter((currency) => currency.policyRateSource === 'provider');
+  const policySpread = providerPolicyCurrencies.length > 1
+    ? Math.max(...providerPolicyCurrencies.map((currency) => currency.policyRate)) - Math.min(...providerPolicyCurrencies.map((currency) => currency.policyRate))
     : null;
 
   useEffect(() => {
@@ -253,7 +254,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
 
       <section className="macro-kpis" aria-label="Macro overview">
         <article className="macro-kpi"><span className="macro-kpi-label">POLICY RANGE <span>G10 FX</span></span><strong className="mono">{policySpread === null ? '—' : formatRate(policySpread)}</strong><small>highest to lowest available policy rate</small></article>
-        <article className="macro-kpi"><span className="macro-kpi-label">G10 COVERAGE <span>FX UNIVERSE</span></span><strong className="mono">{String(g10Currencies.length).padStart(2, '0')} <em>/ 10</em></strong><small>{g10Currencies.length >= 10 ? 'All 10 G10 currency inputs present' : 'Incomplete G10 coverage'}</small></article>
+        <article className="macro-kpi"><span className="macro-kpi-label">G10 COVERAGE <span>FX UNIVERSE</span></span><strong className="mono">{String(verifiedProviderCurrencyCount).padStart(2, '0')} <em>/ 10</em></strong><small>{verifiedProviderCurrencyCount >= 10 ? 'All 10 G10 policy + inflation inputs provider-verified' : 'Incomplete provider-verified G10 coverage'}</small></article>
         <article className="macro-kpi"><span className="macro-kpi-label">NEXT CATALYST <span>HIGH IMPACT</span></span><strong className="mono">{nextHighImpactCatalyst ? <CatalystCountdownDisplay target={nextHighImpactCatalyst.scheduledAt} /> : 'Unavailable'}</strong><small>{nextHighImpactCatalyst?.title ?? 'No verified provider event'}</small></article>
         <article className="macro-kpi macro-kpi-source"><span className="macro-kpi-label">DATA PROVENANCE <span>STATUS</span></span><strong className="macro-source-value"><span className={currencies.length >= 11 ? 'macro-source-dot macro-source-live' : snapshot.source === 'fallback' ? 'macro-source-dot' : 'macro-source-dot macro-source-live'} />{verifiedProviderCurrencyCount >= 10 ? 'PROVIDER' : verifiedProviderCurrencyCount > 0 ? 'PARTIAL' : liveReferenceAvailable ? 'REFERENCE' : 'OFFLINE'}</strong><small>{refreshing ? 'Checking provider…' : `Policy + inflation provider inputs: ${verifiedProviderCurrencyCount}/10 G10`}</small></article>
       </section>
