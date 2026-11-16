@@ -68,8 +68,9 @@ function parseCandle(value: unknown): Candle | null {
     : typeof value.timestamp === 'string'
       ? Date.parse(value.timestamp)
       : Number.NaN;
+  const normalizedTimestamp = timestamp > 1_000_000_000_000 ? timestamp / 1000 : timestamp;
   const candle = {
-    timestamp,
+    timestamp: normalizedTimestamp,
     open: Number(value.open),
     high: Number(value.high),
     low: Number(value.low),
@@ -109,7 +110,16 @@ async function fetchCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promis
   if (!candles.every((candle): candle is Candle => candle !== null)) {
     throw new Error('Market data provider returned an invalid candle.');
   }
-  return candles.sort((left, right) => left.timestamp - right.timestamp).slice(-MAX_CANDLES);
+  const ordered = candles.sort((left, right) => left.timestamp - right.timestamp);
+  const unique = ordered.filter((candle, index) => index === 0 || candle.timestamp > ordered[index - 1].timestamp);
+  if (unique.length < 200) throw new Error('Market data provider returned fewer than 200 unique candles.');
+  const timeframeSeconds = timeframe === 'H1' ? 3_600 : timeframe === 'H4' ? 14_400 : 86_400;
+  const latestClosedBarAge = Math.floor(Date.now() / 1000) - (unique.at(-1)!.timestamp + timeframeSeconds);
+  const maximumAgeSeconds = timeframe === 'H1' ? 8 * 3_600 : timeframe === 'H4' ? 36 * 3_600 : 5 * 86_400;
+  if (latestClosedBarAge < -timeframeSeconds || latestClosedBarAge > maximumAgeSeconds) {
+    throw new Error(`Market data is stale or future-dated for ${pair} ${timeframe}.`);
+  }
+  return unique.slice(-MAX_CANDLES);
 }
 
 async function getCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1') {
