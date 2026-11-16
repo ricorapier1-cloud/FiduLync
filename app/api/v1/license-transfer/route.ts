@@ -77,7 +77,8 @@ export async function POST(request: Request) {
           p_code_hash: hashCode(requestId, code),
         } }
       );
-      const outcome = Array.isArray(result) ? result[0]?.complete_license_transfer : null;
+      const rpcPayload = result as unknown as { complete_license_transfer?: { success: boolean; reason?: string; mt5_account?: number }; success?: boolean; reason?: string; mt5_account?: number } | Array<{ complete_license_transfer?: { success: boolean; reason?: string; mt5_account?: number } }> | null;
+      const outcome = Array.isArray(rpcPayload) ? rpcPayload[0]?.complete_license_transfer : rpcPayload && 'complete_license_transfer' in rpcPayload ? rpcPayload.complete_license_transfer : rpcPayload;
       if (!outcome?.success) return NextResponse.json({ error: outcome?.reason || 'Transfer could not be completed.' }, { status: 400 });
       return NextResponse.json({ success: true, mt5_account: outcome.mt5_account, message: 'License transferred. Re-enter your license in the EA on the new MT5 account.' });
     }
