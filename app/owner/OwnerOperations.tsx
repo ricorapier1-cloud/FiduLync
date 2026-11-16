@@ -76,10 +76,12 @@ export default function OwnerOperations({ accessToken, email, role, onSignOut }:
 
   const activeModule = useMemo(() => modules.find((item) => item.id === active) ?? modules[0], [active]);
   const market = overview?.market_data;
-  const quoteFresh = market?.latest_quote_age_seconds !== null && market?.latest_quote_age_seconds !== undefined && market.latest_quote_age_seconds <= 120;
+  const quoteAgeSeconds = market?.latest_quote_age_seconds ?? null;
+  const quoteFresh = quoteAgeSeconds !== null && quoteAgeSeconds <= 120;
   const heartbeatFresh = Boolean(market?.latest_heartbeat && Date.now() - Date.parse(market.latest_heartbeat) <= 180_000);
-  const candleFresh = market?.latest_candle_age_minutes !== null && market?.latest_candle_age_minutes !== undefined
-    && market.latest_candle_age_minutes <= (market.latest_candle?.timeframe === 'H1' ? 480 : market.latest_candle?.timeframe === 'H4' ? 2160 : 7200);
+  const candleAgeMinutes = market?.latest_candle_age_minutes ?? null;
+  const candleTimeframe = market?.latest_candle?.timeframe;
+  const candleFresh = candleAgeMinutes !== null && candleAgeMinutes <= (candleTimeframe === 'H1' ? 480 : candleTimeframe === 'H4' ? 2160 : 7200);
 
   async function createConnector() {
     setCreating(true); setToken(''); setNotice('');
