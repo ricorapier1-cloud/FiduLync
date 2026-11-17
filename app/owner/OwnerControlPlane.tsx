@@ -6,6 +6,7 @@ type License = { id:string; license_key:string; email:string; mt5_account:number
 type Provider = { id:string; configured:boolean; approved:boolean; state:string };
 type Snapshot = { generated_at:string; metrics:{customers:number;licenses:number;active_licenses:number;paid_entitlements:number;unbound_licenses:number;expired_or_inactive:number}; licenses:License[]; providers:Provider[]; capabilities:Record<string,string> };
 type Props = { accessToken:string };
+type Diagnostics = { checked_at:string; overall:string; summary:{checks:number;errors:number;blockers:number}; checks:Record<string,{status:string;detail:string}> };
 const sections = ['Overview','Customers & licenses','Payments','Data providers','Release governance','Security & audit'] as const;
 type Section = typeof sections[number];
 
@@ -21,6 +22,7 @@ function Metric({label,value,detail}:{label:string;value:number;detail:string}) 
 export default function OwnerControlPlane({accessToken}:Props) {
  const [section,setSection]=useState<Section>('Overview');
  const [snapshot,setSnapshot]=useState<Snapshot|null>(null);
+ const [diagnostics,setDiagnostics]=useState<Diagnostics|null>(null);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState('');
  const [query,setQuery]=useState('');
@@ -32,6 +34,8 @@ export default function OwnerControlPlane({accessToken}:Props) {
    const body=await response.json() as Snapshot & {error?:string};
    if(!response.ok) throw new Error(body.error||'Control-plane request failed.');
    setSnapshot(body);
+   const probe=await fetch('/api/owner/diagnostics',{headers:{Authorization:'Bearer '+accessToken},cache:'no-store'});
+   if(probe.ok) setDiagnostics(await probe.json() as Diagnostics);
   } catch(e) { setError(e instanceof Error?e.message:'Unable to load owner data.'); }
   finally { setLoading(false); }
  },[accessToken]);
@@ -74,7 +78,8 @@ export default function OwnerControlPlane({accessToken}:Props) {
    {snapshot.licenses.filter(x=>x.payment_reference).slice(0,20).map(x=><div key={x.id} className="flex flex-col gap-1 rounded-lg border border-white/[0.07] p-3 sm:flex-row sm:justify-between"><span className="text-slate-300">{x.email} · {x.tier}</span><span className="font-mono text-[10px] text-slate-500">{x.payment_reference}</span></div>)}
   </div>}
   {snapshot&&section==='Data providers'&&<div className="mt-5 space-y-2">
-   {snapshot.providers.map(p=><div key={p.id} className="flex flex-col gap-2 rounded-lg border border-white/[0.07] p-3 sm:flex-row sm:items-center sm:justify-between"><div><div className="text-xs font-medium text-slate-200">{p.id.replaceAll('_',' ')}</div><div className="mt-1 text-[10px] text-slate-500">Credential presence: {p.configured?'configured':'missing'} · Commercial approval: {p.approved?'approved':'not approved'}</div></div><State value={p.state}/></div>)}
+   <div className="mb-3 rounded-lg border border-white/[0.08] bg-white/[0.02] p-3 text-[11px] text-slate-300">Live diagnostics: {diagnostics?diagnostics.overall+' · '+diagnostics.summary.errors+' errors · '+diagnostics.summary.blockers+' blockers':'Not yet probed'}</div>
+   {snapshot.providers.map(p=>{const live=diagnostics?.checks[p.id];return <div key={p.id} className="flex flex-col gap-2 rounded-lg border border-white/[0.07] p-3 sm:flex-row sm:items-center sm:justify-between"><div><div className="text-xs font-medium text-slate-200">{p.id.replaceAll('_',' ')}</div><div className="mt-1 text-[10px] text-slate-500">Credential presence: {p.configured?'configured':'missing'} · Commercial approval: {p.approved?'approved':'not approved'}</div>{live&&<div className="mt-1 text-[10px] text-slate-400">{live.detail}</div>}</div><State value={live?.status??p.state}/></div>})}
    <p className="pt-2 text-[10px] leading-5 text-slate-500">Configured means only that an environment variable exists. It does not mean the provider was successfully queried, data is fresh, or commercial redistribution rights are verified. Use Provider Diagnostics for authenticated live probes.</p>
   </div>}
   {snapshot&&section==='Release governance'&&<div className="mt-5 space-y-2">
