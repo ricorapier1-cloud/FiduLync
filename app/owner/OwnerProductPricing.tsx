@@ -16,18 +16,17 @@ export default function OwnerProductPricing({accessToken}:{accessToken:string}) 
   const [products,setProducts]=useState<Product[]>([]);
   const [fx,setFx]=useState('');
   const [assetCoverage,setAssetCoverage]=useState<Record<string,string>>({});
-  const [busy,setBusy]=useState('');
+  const [busy,setBusy]=useState('loading');
   const [message,setMessage]=useState('');
   const [error,setError]=useState('');
   const [artifactFiles,setArtifactFiles]=useState<Record<string,File|null>>({});
 
   const load=useCallback(async()=>{
-    setBusy('loading');setError('');
     try{
       const response=await fetch('/api/owner/products',{headers:{Authorization:'Bearer '+accessToken},cache:'no-store'});
       const result=await response.json();
       if(!response.ok)throw new Error(result.error||'Catalog load failed.');
-      setProducts(result.products||[]);
+      setProducts(result.products||[]);setError('');
     }catch(e){setError(e instanceof Error?e.message:'Catalog unavailable.');}
     finally{setBusy('');}
   },[accessToken]);
