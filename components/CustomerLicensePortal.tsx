@@ -155,7 +155,8 @@ export default function CustomerLicensePortal() {
       });
       const result = await response.json();
       if(!response.ok || result.success === false) throw new Error(result.error || 'Seat binding rejected.');
-      const refreshed = await fetch('/api/v1/customer-portal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mt5_account:account,license_key:license})});
+      const boundLogin=seatNew; setAccount(boundLogin);
+      const refreshed = await fetch('/api/v1/customer-portal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mt5_account:boundLogin,license_key:license})});
       const portal = await refreshed.json();
       if(refreshed.ok) setData(portal);
       setSeatMessage(result.rebind_available_at ? 'Account slot updated. Rebinding is locked for 72 hours.' : 'Account slot updated.');
