@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { isAlgoAuthorized } from '@/lib/algoAuth';
+import { timingSafeEqual } from 'node:crypto';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
