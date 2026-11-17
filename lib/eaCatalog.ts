@@ -25,6 +25,7 @@ export type EaProduct = {
   maxDemoAccounts: number;
   equityCurvePoints: number[];
   provenanceNote: string;
+  artifactReady?: boolean;
 };
 
 export const EA_CATALOG: EaProduct[] = [
