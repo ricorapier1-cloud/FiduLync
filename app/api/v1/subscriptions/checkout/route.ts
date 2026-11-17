@@ -32,6 +32,8 @@ export async function POST(request: Request) {
     if (!product || product.is_active !== true || eaSlug === 'macro-atr-breakout' || !artifact?.data?.release_approved || !artifact.data.storage_path || !artifact.data.sha256 || !artifact.data.size_bytes) {
       return NextResponse.json({success:false,error:'This commercial EA is not approved for sale yet or its compiled .ex5 release artifact is missing or unapproved.'},{status:409});
     }
+    const artifactProof=await getSupabaseAdmin().storage.from('algolync-artifacts').createSignedUrl(artifact.data.storage_path,60);
+    if(artifactProof.error||!artifactProof.data?.signedUrl) return NextResponse.json({success:false,error:'The approved .ex5 binary is missing from private storage.'},{status:409});
     const monthlyBase = currency === 'NGN' ? Number(product.monthly_price_ngn) : Number(product.monthly_price_usd);
     const annualBase = currency === 'NGN' ? Number(product.annual_price_ngn) : Number(product.annual_price_usd);
     if (cycle === 'ANNUAL' && (annualBase <= 0 || annualBase > monthlyBase * 10)) {
