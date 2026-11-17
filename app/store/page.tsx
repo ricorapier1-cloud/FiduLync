@@ -17,7 +17,7 @@ type ProductRow = {
   ex5_artifact_url:string|null; is_active:boolean;
 };
 
-function mapProduct(row:ProductRow):EaProduct {
+function mapProduct(row:ProductRow,artifactReady:boolean):EaProduct {
   const metrics=row.metrics_json || {};
   const category=row.category.toUpperCase();
   const tierCategory=category==='SANDBOX'?'SANDBOX':category==='MOMENTUM'?'MOMENTUM':'FLAGSHIP';
@@ -34,15 +34,19 @@ function mapProduct(row:ProductRow):EaProduct {
     demoDownloadUrl:tierCategory==='SANDBOX'?'/downloads/MacroLync_G10_Breakout_Test.mq5':(row.ex5_artifact_url || ''),
     demoFilename:tierCategory==='SANDBOX'?'MacroLync_G10_Breakout_Test.mq5':`${row.slug}.ex5`,
     mqhDownloadUrl:'',maxLiveAccounts:row.included_live_seats,maxDemoAccounts:row.included_demo_seats,
-    equityCurvePoints:curve.length>1?curve:[100,100],provenanceNote:String(metrics.provenance ?? 'No independently verified performance report is published.'),
+    equityCurvePoints:curve.length>1?curve:[100,100],provenanceNote:String(metrics.provenance ?? 'No independently verified performance report is published.'),artifactReady,
   };
 }
 
 export default async function AlgoLyncStorePage() {
   let products:EaProduct[] = [];
   try {
-    const rows=await supabaseRead<ProductRow[]>('ea_products','is_active=eq.true&select=slug,name,tagline,version,category,monthly_price_ngn,monthly_price_usd,annual_price_ngn,annual_price_usd,extra_seat_price_ngn,extra_seat_price_usd,demo_days,included_live_seats,included_demo_seats,metrics_json,ex5_artifact_url,is_active&order=category.asc');
-    products=(rows || []).map(mapProduct);
+    const [rows,artifacts]=await Promise.all([
+      supabaseRead<ProductRow[]>('ea_products','is_active=eq.true&select=slug,name,tagline,version,category,monthly_price_ngn,monthly_price_usd,annual_price_ngn,annual_price_usd,extra_seat_price_ngn,extra_seat_price_usd,demo_days,included_live_seats,included_demo_seats,metrics_json,ex5_artifact_url,is_active&order=category.asc'),
+      supabaseRead<Array<{ea_slug:string}>>('ea_product_artifacts','release_approved=eq.true&select=ea_slug'),
+    ]);
+    const approved=new Set((artifacts||[]).map(item=>item.ea_slug));
+    products=(rows || []).map(row=>mapProduct(row,approved.has(row.slug)));
   } catch(error) { console.error('Dynamic EA catalog unavailable:',error); }
   return <StoreTerminal products={products.length?products:EA_CATALOG} />;
 }
