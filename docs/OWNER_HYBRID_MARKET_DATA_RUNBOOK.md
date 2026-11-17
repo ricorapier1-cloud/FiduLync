@@ -21,6 +21,17 @@
 5. Spot quotes prefer fresh MT5 broker quotes; Finnhub and existing reference providers remain independent fallback sources. Reference-rate sources must never be represented as real-time executable broker prices.
 6. Signals remain fail-closed when required macro/technical data is missing, stale, or incomplete.
 
+### Windows VPS publisher
+
+The repository includes `scripts/mt5_market_publisher.py`. It uses the official MetaTrader5 Python module against an already logged-in Windows MT5 terminal; no MetaEditor compilation is required for this publisher.
+
+1. Install Python 3.11+ and MetaTrader 5 on a Windows VPS. Log in to the broker terminal manually and confirm Market Watch symbols are available.
+2. Install the Python package: `py -m pip install MetaTrader5`.
+3. Create a publisher token in `/owner`, then set it only in the VPS environment as `FIDULYNC_PUBLISHER_TOKEN`.
+4. Set `MT5_SYMBOL_MAP` if the broker uses suffixes, for example `EURUSD=EURUSD.a,GBPUSD=GBPUSD.a,USDJPY=USDJPY.a,XAUUSD=XAUUSD.a`.
+5. Run `py scripts/mt5_market_publisher.py`. It sends the initial 200 closed bars for H1/H4/D1, then only new closed bars, plus refreshed quotes. It never opens or modifies trades.
+6. Check the owner console's publisher last-seen time and market diagnostics. If the publisher is stopped, quotes become stale and technical signals must fail closed.
+
 No broker master/investor passwords are collected or stored. A Windows MT5 terminal on a VPS or PC must run the publisher before MT5 candles/quotes can appear; Vercel cannot host the MT5 terminal itself.
 
 ## Paystack
