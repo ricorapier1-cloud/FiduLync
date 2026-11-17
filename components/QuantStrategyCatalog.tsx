@@ -63,6 +63,8 @@ function InteractiveSparkline({ points, color }: { points: number[]; color: 'eme
 
 export function QuantStrategyCatalog({ onSelectEa, products }: { onSelectEa?: (slug: string) => void; products?: EaProduct[] }) {
   const catalog = products?.length ? products : EA_CATALOG;
+  const [categoryFilter, setCategoryFilter] = useState<'ALL'|'FLAGSHIP'|'MOMENTUM'|'SANDBOX'>('ALL');
+  const visibleCatalog = categoryFilter === 'ALL' ? catalog : catalog.filter(product => product.tierCategory === categoryFilter);
   const [demoModalEa, setDemoModalEa] = useState<EaProduct | null>(null);
   const [generatedDemoKey, setGeneratedDemoKey] = useState<string | null>(null);
   const [loadingDemo, setLoadingDemo] = useState(false);
@@ -151,8 +153,13 @@ export function QuantStrategyCatalog({ onSelectEa, products }: { onSelectEa?: (s
         </div>
       </div>
 
+      <div className="mb-5 flex flex-wrap items-center gap-2 rounded-xl border border-white/[0.08] bg-[#0c1017] p-3">
+        {([['ALL','All strategies'],['FLAGSHIP','Flagship'],['MOMENTUM','Momentum'],['SANDBOX','Sandbox']] as const).map(([value,label]) =>
+          <button key={value} type="button" onClick={()=>setCategoryFilter(value)} className={`rounded-lg border px-3 py-2 text-[10px] font-semibold ${categoryFilter===value?'border-emerald-300/40 bg-emerald-300/10 text-emerald-200':'border-white/10 text-slate-400 hover:text-white'}`}>{label}</button>
+        )}
+      </div>
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-        {catalog.map((strategy) => {
+        {visibleCatalog.map((strategy) => {
           const badgeStyles =
             strategy.badgeColor === 'emerald'
               ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
