@@ -10,7 +10,7 @@ type Intent = {
 type Subscription = {
   id:string; initial_reference:string; license_key:string; subscription_code:string|null;
   email:string; ea_slug:string; billing_cycle:'MONTHLY'|'ANNUAL'; currency:'NGN'|'USD';
-  extra_live_seats:number; status:string; period_ends_at:string;
+  extra_live_seats:number; status:string; period_ends_at:string; amount_minor:number; paystack_plan_code:string|null;
 };
 
 function objectRecord(value: unknown): Record<string,unknown> {
@@ -54,13 +54,11 @@ export async function provisionOrExtendLicense(referenceInput:string, explicitSu
     extraSeats=Number(intent.extra_live_seats);expectedAmount=Number(intent.amount_minor);
   } else if(subscriptionCode) {
     const rows=await supabaseRead<Subscription[]>('ea_subscriptions',
-      `subscription_code=eq.${encodeURIComponent(subscriptionCode)}&select=id,initial_reference,license_key,subscription_code,email,ea_slug,billing_cycle,currency,extra_live_seats,status,period_ends_at&limit=1`);
+      `subscription_code=eq.${encodeURIComponent(subscriptionCode)}&select=id,initial_reference,license_key,subscription_code,email,ea_slug,billing_cycle,currency,extra_live_seats,status,period_ends_at,amount_minor,paystack_plan_code&limit=1`);
     const subscription=rows?.[0];
     if(!subscription) throw new Error('No matching AlgoLync subscription record exists for this payment.');
     email=subscription.email;eaSlug=subscription.ea_slug;cycle=subscription.billing_cycle;currency=subscription.currency;extraSeats=Number(subscription.extra_live_seats);
-    const plans=await supabaseRead<Array<{amount_minor:number}>>('paystack_subscription_plans',
-      `ea_slug=eq.${encodeURIComponent(eaSlug)}&billing_cycle=eq.${cycle}&currency=eq.${currency}&extra_live_seats=eq.${extraSeats}&select=amount_minor&limit=1`);
-    expectedAmount=Number(plans?.[0]?.amount_minor ?? 0);
+    expectedAmount=Number(subscription.amount_minor ?? 0);
   } else {
     throw new Error('No matching AlgoLync subscription intent or subscription code exists for this payment.');
   }
