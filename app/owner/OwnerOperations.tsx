@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import OwnerControlPlane from './OwnerControlPlane';
+import OwnerProductPricing from './OwnerProductPricing';
 
 type Props = { accessToken: string; email: string; role: string; onSignOut: () => void };
 type Installation = { id: string; label: string; status: 'active' | 'revoked'; created_at: string; last_seen_at: string | null; broker: string | null; server: string | null };
@@ -12,10 +13,11 @@ type Overview = {
   database: { reachable: boolean; installation_records: number };
   governance: { audit_log: string; multi_role_access: string; step_up_authentication: string; model_validation_registry: string; portfolio_risk_telemetry: string };
 };
-type ModuleId = 'overview' | 'governance' | 'market' | 'research' | 'risk' | 'security' | 'reliability';
+type ModuleId = 'overview' | 'catalog' | 'governance' | 'market' | 'research' | 'risk' | 'security' | 'reliability';
 
 const modules: { id: ModuleId; label: string; short: string; description: string }[] = [
   { id: 'overview', label: 'Command overview', short: 'Overview', description: 'Operational posture and critical exceptions' },
+  { id: 'catalog', label: 'Monetization & EA catalog', short: 'EA pricing', description: 'Recurring prices, seat entitlements and artifact release control' },
   { id: 'governance', label: 'Platform governance', short: 'Governance', description: 'Identity, privileged access and platform policy' },
   { id: 'market', label: 'Market data operations', short: 'Market data', description: 'Broker connectors, freshness and feed integrity' },
   { id: 'research', label: 'Quant research oversight', short: 'Quant research', description: 'Model provenance, validation and release controls' },
@@ -124,6 +126,8 @@ export default function OwnerOperations({ accessToken, email, role, onSignOut }:
         <div><div className="text-[9px] font-medium uppercase tracking-[0.18em] text-emerald-300">{activeModule.label}</div><p className="mt-1 text-xs text-slate-500">{activeModule.description}</p></div>
         {error && <div role="alert" className="rounded-xl border border-rose-300/20 bg-rose-300/[0.06] p-4 text-xs text-rose-100">{error}</div>}
         {loading && !overview ? <div className="rounded-xl border border-white/[0.08] bg-[#0c131c] p-8 text-center text-xs text-slate-400">Loading verified operations data…</div> : null}
+
+        {active === 'catalog' && <OwnerProductPricing accessToken={accessToken} />}
 
         {active === 'overview' && overview && <div className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Database" value={overview.database.reachable ? 'Reachable' : 'Unavailable'} detail="Authenticated server-side connectivity check" tone={overview.database.reachable ? 'good' : 'bad'} /><Metric label="Active MT5 installs" value={String(market?.active_installations ?? 0)} detail="Owner-linked, non-revoked connector credentials" tone={(market?.active_installations ?? 0) > 0 ? 'good' : 'warn'} /><Metric label="Latest quote" value={market?.latest_quote ? ageLabel(Math.round((market.latest_quote_age_seconds ?? 0) / 60)) : 'Not received'} detail={market?.latest_quote ? market.latest_quote.symbol + ' · ' + market.latest_quote.broker : 'No broker quote has reached the platform'} tone={quoteFresh ? 'good' : 'warn'} /><Metric label="Latest candle" value={ageLabel(market?.latest_candle_age_minutes ?? null)} detail={market?.latest_candle ? market.latest_candle.symbol + ' ' + market.latest_candle.timeframe + ' · ' + market.latest_candle.broker : 'No MT5 candle has been ingested'} tone={candleFresh ? 'good' : 'warn'} /></div>

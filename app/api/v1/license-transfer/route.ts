@@ -44,6 +44,11 @@ export async function POST(request: Request) {
   }
 
   try {
+    const licenseKind = await supabaseRead<Array<{ea_slug:string|null}>>('licenses',
+      'license_key=eq.' + encodeURIComponent(licenseKey) + '&select=ea_slug&limit=1');
+    if (licenseKind?.[0]?.ea_slug) {
+      return NextResponse.json({error:'Subscription licenses must be rebound through the MT5 Account Slots manager. The 72-hour cooldown is enforced there.'},{status:409});
+    }
     if (!await validateCustomerLicense(currentAccount, licenseKey)) {
       return NextResponse.json({ error: 'The existing license/account pair could not be verified.' }, { status: 401 });
     }

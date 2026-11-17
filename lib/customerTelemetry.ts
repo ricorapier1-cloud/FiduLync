@@ -38,19 +38,29 @@ async function supabaseWrite(table: string, query: string, body: Record<string, 
 
 export async function validateCustomerLicense(mt5Account: number, licenseKey: string): Promise<boolean> {
   if (!Number.isSafeInteger(mt5Account) || mt5Account <= 0 || !licenseKey.trim()) return false;
-  const query = new URLSearchParams({
-    select: 'license_key,mt5_account,status,expires_at',
-    mt5_account: `eq.${mt5Account}`,
-    license_key: `eq.${licenseKey.trim()}`,
-    status: 'eq.active',
-    limit: '1',
-  });
-  const rows = await supabaseRows<{ license_key: string; mt5_account: number | string; status: string; expires_at: string | null }>('licenses', query.toString());
-  if (rows.length !== 1) return false;
-  const row = rows[0];
-  return Number(row.mt5_account) === mt5Account && row.license_key === licenseKey.trim()
-    && row.status === 'active'
-    && (!row.expires_at || Date.parse(row.expires_at) > Date.now());
+  const key=licenseKey.trim().toUpperCase();
+  const licenses=await supabaseRows<{license_key:string;status:string;expires_at:string|null;grace_until:string|null;period_ends_at:string|null;mt5_account:number|string|null;ea_slug:string|null}>(
+    'licenses',new URLSearchParams({select:'license_key,status,expires_at,grace_until,period_ends_at,mt5_account,ea_slug',license_key:`eq.${key}`,limit:'1'}).toString()
+  );
+  const license=licenses[0];
+  if(!license || license.license_key.toUpperCase()!==key) return false;
+  const status=String(license.status).toUpperCase();
+  const expiry=license.expires_at ? Date.parse(license.expires_at) : null;
+  const grace=license.grace_until ? Date.parse(license.grace_until) : null;
+  const periodEnd=license.period_ends_at ? Date.parse(license.period_ends_at) : expiry;
+  const active=status==='ACTIVE' || (status==='PAST_DUE' && grace!==null && grace>Date.now())
+    || (status==='CANCEL_AT_PERIOD_END' && periodEnd!==null && periodEnd>Date.now());
+  if(!active || (expiry!==null && expiry<=Date.now() && !(status==='PAST_DUE' && grace!==null && grace>Date.now()))) return false;
+  if(Number(license.mt5_account)===mt5Account) return true;
+  const seats=await supabaseRows<{mt5_login:number|string;slot_type:string}>(
+    'ea_license_seats',new URLSearchParams({select:'mt5_login,slot_type',license_key:`eq.${key}`,mt5_login:`eq.${mt5Account}`,limit:'1'}).toString()
+  );
+  if(seats.some(seat=>Number(seat.mt5_login)===mt5Account)) return true;
+  if(license.ea_slug) return false;
+  const legacy=await supabaseRows<{account_number:number|string}>(
+    'license_bound_accounts',new URLSearchParams({select:'account_number',license_key:`eq.${key}`,account_number:`eq.${mt5Account}`,limit:'1'}).toString()
+  );
+  return legacy.some(row=>Number(row.account_number)===mt5Account);
 }
 
 export type CustomerHeartbeat = {
