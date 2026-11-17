@@ -139,7 +139,7 @@ export async function provisionOrExtendLicense(referenceInput:string, explicitSu
 export async function attachPaystackSubscription(subscriptionCode:string, customerEmail:string, planCode:string) {
   if(!isSupabaseConfigured() || !subscriptionCode) return false;
   const intents=await supabaseRead<Intent[]>('ea_subscription_intents',
-    `email=eq.${encodeURIComponent(customerEmail.toLowerCase())}&paystack_plan_code=eq.${encodeURIComponent(planCode)}&status=eq.PENDING&select=reference,email,ea_slug,billing_cycle,currency,extra_live_seats,amount_minor,paystack_plan_code,subscription_code,status&order=created_at.desc&limit=5`);
+    `email=eq.${encodeURIComponent(customerEmail.toLowerCase())}&paystack_plan_code=eq.${encodeURIComponent(planCode)}&status=in.(PENDING,ACTIVE)&select=reference,email,ea_slug,billing_cycle,currency,extra_live_seats,amount_minor,paystack_plan_code,subscription_code,status&order=created_at.desc&limit=5`);
   const intent=intents?.[0];
   if(!intent) return false;
   await supabaseQuery('ea_subscription_intents',{method:'PATCH',query:`reference=eq.${encodeURIComponent(intent.reference)}`,body:{subscription_code:subscriptionCode,updated_at:new Date().toISOString()}});
