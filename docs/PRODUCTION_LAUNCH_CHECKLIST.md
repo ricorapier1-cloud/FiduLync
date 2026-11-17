@@ -24,7 +24,7 @@ In Vercel → Project → Settings → Environment Variables, configure the foll
 | `RESEND_API_KEY` | Server-only transactional email API key for license delivery and transfer verification |
 | `LICENSE_FROM_EMAIL` | Verified sender identity/domain configured with the email provider (for example, `AlgoLync <licenses@your-verified-domain>`) |
 | `PAYSTACK_PUBLIC_KEY` and/or `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | Paystack public key if the checkout UI requires it |
-| `ALGO_PRIVATE_API_KEY` | Long random secret shared only with trusted EA clients for private heartbeat/trade ingestion |
+| `ALGOLYNC_PRIVATE_KEY` (or legacy `ALGO_PRIVATE_API_KEY`) | Long random secret shared only with trusted EA clients for private heartbeat/trade ingestion |
 | `CRON_SECRET` | Long random secret used to authorize the scheduled macro refresh |
 | `NEXT_PUBLIC_APP_URL` | Set to `https://fidulync.vercel.app` |
 
@@ -47,7 +47,7 @@ The checkout currently prices subscriptions in minor currency units: NGN 65,000 
 
 ## MT5 / EA bridge setup (when a laptop is available)
 
-1. Set the same strong `ALGO_PRIVATE_API_KEY` in Vercel and the EA's private request configuration. Do not hardcode it into a public downloadable source file.
+1. Set the same strong `ALGOLYNC_PRIVATE_KEY` in Vercel and the EA's private request configuration (the legacy `ALGO_PRIVATE_API_KEY` alias is also accepted). Do not hardcode it into a public downloadable source file.
 2. Add `https://fidulync.vercel.app` to MT5 Tools → Options → Expert Advisors → Allow WebRequest for listed URL.
 3. Compile the EA in MetaEditor and resolve all compiler errors and warnings.
 4. Verify license validation against a real purchased test license and the correct MT5 account.
