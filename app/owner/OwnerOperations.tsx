@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import OwnerControlPlane from './OwnerControlPlane';
 
 type Props = { accessToken: string; email: string; role: string; onSignOut: () => void };
 type Installation = { id: string; label: string; status: 'active' | 'revoked'; created_at: string; last_seen_at: string | null; broker: string | null; server: string | null };
@@ -108,6 +109,7 @@ export default function OwnerOperations({ accessToken, email, role, onSignOut }:
   }
 
   return <main className="mx-auto min-h-[75vh] w-full max-w-7xl px-4 py-7 text-slate-100 sm:px-6 lg:px-8">
+    <OwnerControlPlane accessToken={accessToken} />
     <header className="mb-6 flex flex-col gap-4 border-b border-white/[0.08] pb-6 sm:flex-row sm:items-end sm:justify-between">
       <div><div className="font-mono text-[9px] tracking-[0.22em] text-emerald-300">FIDULYNC / INSTITUTIONAL OPERATIONS</div><h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Governance & control centre</h1><p className="mt-2 max-w-2xl text-xs leading-6 text-slate-400">A private control plane for platform integrity, market-data operations, research governance and risk oversight.</p></div>
       <div className="flex flex-wrap items-center gap-2"><Status tone="good">Owner identity verified</Status><button onClick={() => void refresh()} disabled={refreshing} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-slate-200 hover:bg-white/5 disabled:opacity-50">{refreshing ? 'Refreshing…' : 'Refresh data'}</button><button onClick={onSignOut} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-slate-300 hover:bg-white/5">Sign out</button></div>
