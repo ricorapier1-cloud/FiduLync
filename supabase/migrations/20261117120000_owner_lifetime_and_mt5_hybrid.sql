@@ -1,5 +1,25 @@
 -- FiduLync owner entitlement audit and safe hybrid MT5 ingestion hardening.
 -- Existing license, installation, quote and candle tables are retained.
+
+-- The live profiles table currently contains id/email but not the legacy full_name/role columns.
+-- Keep Supabase Auth signup working without granting client-controlled role fields.
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $function$
+BEGIN
+  INSERT INTO public.profiles (id, email)
+  VALUES (NEW.id, NEW.email)
+  ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email;
+  RETURN NEW;
+END;
+$function$;
+
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM anon;
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM authenticated;
 CREATE TABLE IF NOT EXISTS public.fidulync_owner_audit (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_email text NOT NULL CHECK (lower(owner_email) = 'ricorapier1@gmail.com'),
