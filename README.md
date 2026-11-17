@@ -1,6 +1,6 @@
 # MacroLync Institutional Terminal
 
-MacroLync is a single-operator quantitative FX and macro terminal. AlgoLync is its proprietary strategy vault and MT5 VPS telemetry monitor. The browser has no account or subscription flow; MT5/EA API requests use a private `x-algo-key` header.
+MacroLync is a quantitative FX and macro research terminal. AlgoLync is its EA marketplace, recurring subscription ledger, MT5 account-seat manager and cloud authorization gate. Customer licensing and account telemetry are accessed through the private `/portal` workspace; owner operations are restricted to the owner identity.
 
 ## Local development
 
@@ -13,7 +13,8 @@ Set server-side values in `.env.local` or the deployment secret manager:
 
 | Variable | Purpose |
 | --- | --- |
-| `ALGOLYNC_PRIVATE_KEY` (legacy alias: `ALGO_PRIVATE_API_KEY`) | Static secret for authenticated signal and EA heartbeat API requests; not required for same-origin Store signal previews |
+| `ALGOLYNC_PRIVATE_KEY` (legacy alias: `ALGO_PRIVATE_API_KEY`) | Static secret for authenticated EA-to-server telemetry requests |
+| `ALGOLYNC_LEASE_SIGNING_SECRET` | Server-only HMAC key (minimum 32 characters) for signing 24-hour MT5 authorization leases |
 | `UPSTASH_REDIS_REST_URL` | Upstash REST endpoint for shared caching, EA heartbeat state, and closed-trade history; in-process fallback is used if unavailable |
 | `UPSTASH_REDIS_REST_TOKEN` | Server-only Upstash REST token |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL for persisted macro snapshots |
@@ -72,7 +73,7 @@ Live quotes and technical calculations use a 60-second Upstash TTL. Macro snapsh
 
 The shipped `public/mql5/MacroLyncBridge.mqh` has optional trailing `license_key` arguments on `MacroLyncSendHeartbeat` and `MacroLyncHeartbeatEveryFiveMinutes`; pass the buyer's EA license key. `LogClosedTrade` additionally requires the MT5 login and license key in its trailing `mt5_account` and `license_key` arguments. Example heartbeat call: `MacroLyncHeartbeatEveryFiveMinutes(..., "RUNNING", InpLicenseKey)`. Example close call: `LogClosedTrade(..., closedAtUtc, 5000, AccountInfoInteger(ACCOUNT_LOGIN), InpLicenseKey)`. Keep `ALGOLYNC_PRIVATE_KEY` server-side and in the EA configuration; it is distinct from the customer's license key. The customer Live Account Monitor polls every 15 seconds and displays only the bound account.
 
-Download [`public/mql5/MacroLyncBridge.mqh`](./public/mql5/MacroLyncBridge.mqh) from `/store`; the displayed source and clipboard action use that exact file. It has no DLL dependencies, uses `char[]` buffers for `WebRequest()` and UTF-8 conversion buffers for JSON, and defaults signal execution to defensive hold on network errors, timeouts, non-200 or empty responses, malformed responses, or news lockout. `LogClosedTrade(...)` sends a validated close record; call it from the EA's `OnTradeTransaction` handler after the EA has determined the trade's realized USD P&amp;L, R multiple, confluence, regime, and UTC close timestamp. Set `#property strict` in the consuming `.mq5` EA; MQL5 ignores program properties placed in `.mqh` include files. Configure MetaTrader 5 **Tools → Options → Expert Advisors → Allow WebRequest for listed URL** with the deployed HTTPS origin.
+Commercial MQL5 helper source is stored outside the public web root and is served only after license and bound-account authorization in `/portal`. The free MacroLync G10 ATR Breakout sandbox is the only EA source distributed publicly. Compiled commercial `.ex5` packages must be release-approved and registered before a download is enabled. `LogClosedTrade(...)` sends a validated close record; call it from the EA's `OnTradeTransaction` handler after the EA has determined the trade's realized USD P&amp;L, R multiple, confluence, regime, and UTC close timestamp. Set `#property strict` in the consuming `.mq5` EA; MQL5 ignores program properties placed in `.mqh` include files. Configure MetaTrader 5 **Tools → Options → Expert Advisors → Allow WebRequest for listed URL** with the deployed HTTPS origin.
 
 ## Data providers and deployment
 
@@ -90,3 +91,16 @@ npm run build
 ```
 
 Trading involves substantial risk. Signals are research and execution inputs, not guarantees; EAs must retain independent account-level exposure, equity, and drawdown controls.
+
+
+## AlgoLync recurring subscriptions and Cloud Gate
+
+The marketplace catalog is backed by `public.ea_products`. Commercial products remain unavailable for sale until the owner has approved a verified compiled `.ex5` artifact and set the catalog product active. Prices are stored in NGN and USD for monthly and annual billing; annual prices represent ten monthly payments (two months free). Extra live seats are configured per checkout.
+
+Recurring checkout is handled by `POST /api/v1/subscriptions/checkout`. The route creates or reuses a Paystack recurring plan, stores a server-side subscription intent, and redirects the customer to Paystack. Configure the Paystack webhook at `/api/paystack/webhook` (the legacy `/api/v1/paystack-webhook` path forwards to the same handler). Charge verification, subscription creation, failed invoices and cancellation events update the subscription and license ledger idempotently.
+
+The private `/portal` workspace contains subscriptions, MT5 account slots and account-isolated telemetry. Seat changes are performed through the service-only database binding function and enforce a 72-hour rebind cooldown. The MT5 license endpoint is `POST /api/v1/license/verify`; requests must supply the exact license key, MT5 login, account mode and EA slug. The server issues an HS256-signed 24-hour lease token. Keep `ALGOLYNC_LEASE_SIGNING_SECRET` private and never place it in an EA or browser bundle.
+
+Demo issuance requires a valid email, an MT5 demo login, a product with an approved compiled demo artifact, and uniqueness per email/EA and MT5 login. No placeholder demo keys are generated. The database rejects reuse and the Cloud Gate rejects demo entitlements on real accounts.
+
+The recurring subscription flow is not considered production-live until Paystack test-mode subscription create/renewal/failure/cancellation events have been exercised end to end, Resend/Supabase Auth delivery is configured, and commercial artifacts have been compiled, hashed and release-approved.
