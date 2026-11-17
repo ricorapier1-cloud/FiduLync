@@ -33,6 +33,10 @@ ALTER TABLE public.fidulync_owner_audit ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.fidulync_owner_audit FROM anon, authenticated;
 GRANT ALL ON public.fidulync_owner_audit TO service_role;
 
+CREATE UNIQUE INDEX IF NOT EXISTS licenses_owner_lifetime_account_unique
+  ON public.licenses (email, mt5_account)
+  WHERE tier = 'OWNER_LIFETIME' AND status = 'active';
+
 CREATE INDEX IF NOT EXISTS mt5_market_candles_signal_lookup_idx
   ON public.mt5_market_candles (symbol, timeframe, bar_time DESC)
   WHERE is_closed = true;
