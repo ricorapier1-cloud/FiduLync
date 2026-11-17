@@ -8,8 +8,22 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - name: Ping MacroLync Cron Endpoint
+      - name: Validate cron secret
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          curl -fsS -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            https://fidulync.vercel.app/api/cron/sync-macro || true
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET is not configured in GitHub Actions secrets."
+            exit 1
+          fi
+      - name: Ping MacroLync Cron Endpoint
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl --fail-with-body --show-error --silent \
+            --retry 3 --retry-all-errors --retry-delay 5 \
+            --max-time 30 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            https://fidulync.vercel.app/api/cron/sync-macro

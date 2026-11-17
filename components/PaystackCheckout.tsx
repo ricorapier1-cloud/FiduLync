@@ -19,8 +19,10 @@ export function PaystackCheckout() {
     if (!reference) return;
 
     let active = true;
-    setLoading(true);
-    fetch(`/api/v1/verify-payment?reference=${encodeURIComponent(reference)}`, { cache: 'no-store' })
+    void Promise.resolve().then(() => {
+      if (active) setLoading(true);
+      return fetch(`/api/v1/verify-payment?reference=${encodeURIComponent(reference)}`, { cache: 'no-store' });
+    })
       .then(async (response) => {
         const data = await response.json();
         if (!response.ok || !data.success || typeof data.license_key !== 'string') {
@@ -184,6 +186,8 @@ export function PaystackCheckout() {
           {errorMsg}
         </div>
       )}
+
+      {deliveryNotice && <p role="status" className="mb-3 rounded border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs text-emerald-200">{deliveryNotice}</p>}
 
       {licenseKey ? (
         <div className="bg-emerald-950/60 border border-emerald-500/50 p-4 rounded-lg text-center space-y-3">

@@ -28,8 +28,8 @@ export default function LiveAccountMonitor() {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [lastRefresh, setLastRefresh] = useState('');
 
-  const refresh = useCallback(async () => {
-    if (!bound || !account || !license) return;
+  const refresh = useCallback(async (force = false) => {
+    if ((!bound && !force) || !account || !license) return;
     try {
       const params = new URLSearchParams({ mt5_account: account });
       const [hbRes, tradeRes] = await Promise.all([
@@ -65,6 +65,7 @@ export default function LiveAccountMonitor() {
       const verificationData = await verification.json();
       if (!verification.ok || verificationData.valid !== true) throw new Error(verificationData.error || 'License does not authorize this MT5 account.');
       setBound(true);
+      await refresh(true);
     } catch (e) {
       setBound(false);
       setError(e instanceof Error ? e.message : 'Account verification failed.');
@@ -75,7 +76,6 @@ export default function LiveAccountMonitor() {
 
   useEffect(() => {
     if (!bound) return;
-    void refresh();
     const timer = window.setInterval(() => void refresh(), 15_000);
     return () => window.clearInterval(timer);
   }, [bound, refresh]);
