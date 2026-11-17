@@ -203,7 +203,7 @@ export default function CustomerLicensePortal() {
           <button key={tab} type="button" onClick={()=>setActiveTab(tab)} className={`rounded-lg px-2 py-3 text-[10px] font-semibold sm:text-xs ${activeTab===tab?'bg-cyan-300 text-slate-950':'text-slate-400 hover:bg-white/5'}`}>{label}</button>
         )}
       </nav>
-      <section className={`${activeTab==='subscriptions'?'mt-5':'hidden'} grid gap-3 sm:grid-cols-2 lg:grid-cols-5`}>
+      <section className={activeTab === 'subscriptions' ? 'mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5' : 'hidden'}>
         {[
           ['LICENSE STATUS',data.license.status.toUpperCase()],
           ['EA',data.license.ea_slug || 'Legacy license'],
@@ -212,7 +212,7 @@ export default function CustomerLicensePortal() {
           ['NEXT BILLING',data.license.period_ends_at?new Date(data.license.period_ends_at).toLocaleDateString():data.license.expires_at?new Date(data.license.expires_at).toLocaleDateString():'Not scheduled'],
         ].map(([label,value])=><div key={label} className="rounded-xl border border-white/10 bg-[#0a111b] p-4"><p className="font-mono text-[9px] text-slate-500">{label}</p><p className="mt-2 text-sm font-semibold">{label==='LICENSE STATUS'?<span className={`rounded px-2 py-1 text-[10px] ${value==='ACTIVE'?'bg-emerald-300/10 text-emerald-200':value==='PAST_DUE'?'bg-amber-300/10 text-amber-200':'bg-slate-300/10 text-slate-200'}`}>{value}</span>:value}</p></div>)}
       </section>
-      <section className={`${activeTab==='subscriptions'?'mt-4':'hidden'} rounded-xl border border-white/10 bg-[#0a111b] p-5">
+      <section className={activeTab === 'subscriptions' ? 'mt-4 rounded-xl border border-white/10 bg-[#0a111b] p-5' : 'hidden'}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><h2 className="font-semibold">License artifacts</h2><p className="mt-1 text-xs text-slate-500">Downloads are authorized against this EA license and bound MT5 account.</p></div>
           <div className="flex flex-wrap gap-2">
@@ -223,7 +223,7 @@ export default function CustomerLicensePortal() {
         {helperMessage && <p role="status" className="mt-3 text-xs text-slate-400">{helperMessage}</p>}
         {artifactMessage && <p role="status" className="mt-2 text-xs text-slate-400">{artifactMessage}</p>}
       </section>
-      <section className={`${activeTab==='telemetry'?'mt-5':'hidden'} rounded-xl border border-white/10 bg-[#0a111b] p-5`}>
+      <section className={activeTab === 'telemetry' ? 'mt-5 rounded-xl border border-white/10 bg-[#0a111b] p-5' : 'hidden'}>
         <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-semibold">MT5 connection</h2><p className="mt-1 text-xs text-slate-500">Read-only telemetry · {data.heartbeat?.ea_name || 'No EA heartbeat received yet'}</p></div><span className="rounded border border-white/10 px-3 py-1 font-mono text-xs">{data.heartbeat?.connection_status || 'STANDBY'}</span></div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {[
@@ -236,7 +236,7 @@ export default function CustomerLicensePortal() {
         </div>
         {data.heartbeat && <p className="mt-3 text-[10px] text-slate-500">Last update: {new Date(data.heartbeat.updated_at).toLocaleString()}</p>}
       </section>
-      <section className={`${activeTab==='telemetry'?'mt-5':'hidden'} rounded-xl border border-white/10 bg-[#0a111b] p-5`}>
+      <section className={activeTab === 'telemetry' ? 'mt-5 rounded-xl border border-white/10 bg-[#0a111b] p-5' : 'hidden'}>
         <h2 className="font-semibold">MT5 WebRequest setup</h2>
         <ol className="mt-3 space-y-2 text-xs leading-5 text-slate-300">
           <li>1. In MT5, open Tools → Options → Expert Advisors.</li>
@@ -246,11 +246,11 @@ export default function CustomerLicensePortal() {
         </ol>
         <p className="mt-2 text-[10px] text-slate-500">Never add private API keys to the public Store or share your broker password.</p>
       </section>
-      <section className={`${activeTab==='telemetry'?'mt-5':'hidden'} rounded-xl border border-white/10 bg-[#0a111b] p-5`}>
+      <section className={activeTab === 'telemetry' ? 'mt-5 rounded-xl border border-white/10 bg-[#0a111b] p-5' : 'hidden'}>
         <h2 className="font-semibold">Recent closed trades</h2>
         <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[500px] text-left text-xs"><thead className="text-slate-500"><tr>{['CLOSED UTC','SYMBOL','SIDE','P&L USD','R MULTIPLE'].map(x=><th key={x} className="pb-3 pr-4 font-mono text-[9px] font-normal">{x}</th>)}</tr></thead><tbody className="divide-y divide-white/5">{data.trades.map(t=><tr key={t.ticket+t.symbol}><td className="py-3 pr-4 text-slate-400">{new Date(t.closed_at_utc).toLocaleString('en-GB',{timeZone:'UTC'})}</td><td className="py-3 pr-4">{t.symbol}</td><td className="py-3 pr-4">{t.direction}</td><td className="py-3 pr-4">{money(t.profit_usd)}</td><td className="py-3 pr-4">{t.r_multiple.toFixed(2)}R</td></tr>)}{data.trades.length===0&&<tr><td colSpan={5} className="py-5 text-center text-slate-500">No closed trades received for this account yet.</td></tr>}</tbody></table></div>
       </section>
-      <section className={`${activeTab==='seats'?'mt-5':'hidden'} rounded-xl border border-white/10 bg-[#0a111b] p-5`}>
+      <section className={activeTab === 'seats' ? 'mt-5 rounded-xl border border-white/10 bg-[#0a111b] p-5' : 'hidden'}>
         <h2 className="font-semibold">MT5 account slots</h2>
         <p className="mt-1 text-xs text-slate-400">Entitlements: {data.license.included_live_seats ?? 1} live + {data.license.included_demo_seats ?? 2} demo + {data.license.extra_live_seats ?? 0} extra live seats.</p>
         <div className="mt-4 grid gap-2 sm:grid-cols-2">{data.seats.map(seat=><div key={seat.id} className="rounded-lg border border-white/10 bg-black/20 p-3"><p className="font-mono text-[10px] text-slate-500">{seat.slot_type} SLOT {seat.slot_number}</p><p className="mt-1 text-sm text-white">{seat.mt5_login ?? 'Unbound'}</p><p className="mt-1 text-[10px] text-slate-500">{seat.rebind_available_at ? 'Rebind after '+new Date(seat.rebind_available_at).toLocaleString() : 'Available for binding'}</p></div>)}</div>
@@ -265,7 +265,7 @@ export default function CustomerLicensePortal() {
           {seatMessage && <p role="status" className="text-xs text-slate-400 sm:col-span-2">{seatMessage}</p>}
         </form>
       </section>
-      <section className={`${activeTab==='seats'?'mt-5':'hidden'} rounded-xl border border-cyan-300/20 bg-[#0a111b] p-5`}>
+      <section className={activeTab === 'seats' ? 'mt-5 rounded-xl border border-cyan-300/20 bg-[#0a111b] p-5' : 'hidden'}>
         <h2 className="font-semibold">72-hour rebind protection</h2>
         <p className="mt-2 text-xs leading-5 text-slate-400">Every MT5 slot is protected by a server-side 72-hour rebind cooldown. A rebind requires the current slot login and cannot be bypassed through the legacy license-transfer route. The next eligible rebind time is displayed on each slot above.</p>
       </section>
