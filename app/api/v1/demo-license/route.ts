@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { isSupabaseConfigured, supabaseInsert, supabaseRead } from '@/lib/supabaseAdmin';
+import { getSupabaseAdmin } from '@/lib/serverSupabase';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
@@ -23,13 +24,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'A valid email, EA and positive demo MT5 login are required.' }, { status: 400, headers });
     }
 
-    const products = await supabaseRead<Array<{ slug: string; is_active: boolean; demo_days: number; ex5_artifact_url: string | null }>>(
+    const products = await supabaseRead<Array<{ slug: string; is_active: boolean; demo_days: number }>>(
       'ea_products',
-      `slug=eq.${encodeURIComponent(eaSlug)}&select=slug,is_active,demo_days,ex5_artifact_url&limit=1`
+      `slug=eq.${encodeURIComponent(eaSlug)}&select=slug,is_active,demo_days&limit=1`
     );
     const product = products?.[0];
     if (!product || !product.is_active) return NextResponse.json({ success: false, error: 'This EA is not currently available for demo.' }, { status: 404, headers });
-    if (!product.ex5_artifact_url) return NextResponse.json({ success: false, error: 'The verified compiled .ex5 demo artifact has not been published yet. No demo key was created.' }, { status: 409, headers });
+    const artifact = await getSupabaseAdmin().from('ea_product_artifacts').select('storage_path,sha256,size_bytes,release_approved').eq('ea_slug',eaSlug).maybeSingle();
+    if (!artifact.data?.release_approved || !artifact.data.storage_path || !artifact.data.sha256 || !artifact.data.size_bytes) {
+      return NextResponse.json({ success: false, error: 'The verified compiled .ex5 demo artifact has not been published yet. No demo key was created.' }, { status: 409, headers });
+    }
 
     const emailTrials = await supabaseRead<Array<{ id: string }>>('ea_demo_trials', `email=eq.${encodeURIComponent(email)}&ea_slug=eq.${encodeURIComponent(eaSlug)}&select=id&limit=1`);
     const loginTrials = await supabaseRead<Array<{ id: string }>>('ea_demo_trials', `mt5_login=eq.${mt5Login}&select=id&limit=1`);
@@ -42,9 +46,11 @@ export async function POST(request: Request) {
     await supabaseInsert('ea_demo_trials', {
       email, ea_slug: eaSlug, mt5_login: mt5Login, license_key: licenseKey, expires_at: expiresAt,
     });
+    const signed = await getSupabaseAdmin().storage.from('algolync-artifacts').createSignedUrl(artifact.data.storage_path,300);
+    if(signed.error || !signed.data?.signedUrl) return NextResponse.json({success:false,error:'Demo artifact download could not be authorized.'},{status:503,headers});
     return NextResponse.json({
       success: true, license_key: licenseKey, ea_slug: eaSlug, account_mode: 'DEMO',
-      mt5_login: mt5Login, expires_at: expiresAt, download_url: product.ex5_artifact_url,
+      mt5_login: mt5Login, expires_at: expiresAt, download_url: signed.data.signedUrl,
     }, { status: 201, headers });
   } catch (error) {
     console.error('Demo license provisioning failed:', error);
