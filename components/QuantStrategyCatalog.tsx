@@ -61,7 +61,8 @@ function InteractiveSparkline({ points, color }: { points: number[]; color: 'eme
   );
 }
 
-export function QuantStrategyCatalog({ onSelectEa }: { onSelectEa?: (slug: string) => void }) {
+export function QuantStrategyCatalog({ onSelectEa, products }: { onSelectEa?: (slug: string) => void; products?: EaProduct[] }) {
+  const catalog = products?.length ? products : EA_CATALOG;
   const [demoModalEa, setDemoModalEa] = useState<EaProduct | null>(null);
   const [generatedDemoKey, setGeneratedDemoKey] = useState<string | null>(null);
   const [loadingDemo, setLoadingDemo] = useState(false);
@@ -151,7 +152,7 @@ export function QuantStrategyCatalog({ onSelectEa }: { onSelectEa?: (slug: strin
       </div>
 
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-        {EA_CATALOG.map((strategy) => {
+        {catalog.map((strategy) => {
           const badgeStyles =
             strategy.badgeColor === 'emerald'
               ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
@@ -236,16 +237,18 @@ export function QuantStrategyCatalog({ onSelectEa }: { onSelectEa?: (slug: strin
               {/* DUAL ACTION BUTTON WORKFLOW */}
               <div className="mt-5 space-y-2 pt-3 border-t border-white/[0.08]">
                 {/* Button A: Instant 1-Click Demo Key & Download */}
-                <button
-                  type="button"
-                  onClick={() => handleGenerateDemo(strategy)}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2.5 text-xs font-semibold text-slate-200 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
-                >
-                  <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                  </svg>
-                  Get Free Demo (.ex5)
-                </button>
+                {strategy.tierCategory !== 'SANDBOX' && (
+                  <button
+                    type="button"
+                    onClick={() => handleGenerateDemo(strategy)}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2.5 text-xs font-semibold text-slate-200 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+                  >
+                    <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                    </svg>
+                    Get Free Demo (.ex5)
+                  </button>
+                )}
 
                 {/* Button B: Provision Real EA License (Anchored to checkout) */}
                 {strategy.tierCategory === 'SANDBOX' ? (
