@@ -5,6 +5,7 @@
 DO $$
 DECLARE
   table_name text;
+  has_rows boolean;
   empty_tables text[] := ARRAY[
     'escrow_deals',
     'escrow_vaults',
@@ -20,8 +21,8 @@ BEGIN
   FOREACH table_name IN ARRAY empty_tables LOOP
     IF to_regclass(format('public.%I', table_name)) IS NOT NULL THEN
       EXECUTE format('SELECT EXISTS (SELECT 1 FROM public.%I LIMIT 1)', table_name)
-        INTO STRICT table_name;
-      IF table_name::boolean THEN
+        INTO has_rows;
+      IF has_rows THEN
         RAISE EXCEPTION 'Refusing to drop public.% because it contains records', table_name;
       END IF;
     END IF;
