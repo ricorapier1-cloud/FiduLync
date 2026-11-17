@@ -3,10 +3,11 @@
 import { useState } from 'react';
 
 type PortalData = {
-  license: { mt5_account: number; tier: string; status: string; expires_at: string | null; created_at: string };
+  license: { mt5_account: number; tier: string; status: string; expires_at: string | null; created_at: string; ea_slug: string | null; billing_cycle: string | null; included_live_seats: number; included_demo_seats: number; extra_live_seats: number };
   masked_email: string;
   heartbeat: null | { connection_status: string; ea_name: string; balance: number; equity: number; floating_pnl: number; drawdown_pct: number; open_positions: number; updated_at: string };
   trades: Array<{ ticket: string; symbol: string; direction: string; profit_usd: number; r_multiple: number; closed_at_utc: string }>;
+  seats: Array<{ id:string; slot_type:string; slot_number:number; mt5_login:number|null; broker_server:string|null; rebind_available_at:string|null }>;
 };
 
 export default function CustomerLicensePortal() {
@@ -19,6 +20,9 @@ export default function CustomerLicensePortal() {
   const [requestId, setRequestId] = useState('');
   const [code, setCode] = useState('');
   const [transferMessage, setTransferMessage] = useState('');
+  const [activeTab, setActiveTab] = useState<'subscriptions'|'seats'|'telemetry'>('subscriptions');
+  const [helperBusy, setHelperBusy] = useState(false);
+  const [helperMessage, setHelperMessage] = useState('');
 
   async function load(event: React.FormEvent) {
     event.preventDefault(); setBusy(true); setError(''); setData(null);
@@ -29,7 +33,7 @@ export default function CustomerLicensePortal() {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Unable to open your license dashboard.');
-      setData(result);
+      setData(result); setActiveTab('subscriptions');
     } catch (e) { setError(e instanceof Error ? e.message : 'Dashboard unavailable.'); }
     finally { setBusy(false); }
   }
@@ -59,6 +63,23 @@ export default function CustomerLicensePortal() {
     finally { setBusy(false); }
   }
 
+  async function downloadLicenseHelper() {
+    if (!data?.license.ea_slug) { setHelperMessage('This legacy license is not yet mapped to an EA product. Contact support.'); return; }
+    setHelperBusy(true); setHelperMessage('');
+    try {
+      const response = await fetch('/api/v1/license/helper', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({license_key:license,mt5_login:account,ea_slug:data.license.ea_slug}),
+      });
+      if (!response.ok) { const result=await response.json(); throw new Error(result.error || 'Download denied.'); }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a'); anchor.href=url; anchor.download='MacroLyncLicense.mqh'; anchor.click();
+      URL.revokeObjectURL(url); setHelperMessage('Private license helper downloaded.');
+    } catch (error) { setHelperMessage(error instanceof Error ? error.message : 'Private download unavailable.'); }
+    finally { setHelperBusy(false); }
+  }
+
   const money = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return <div className="mx-auto max-w-5xl px-4 py-10 text-slate-100 sm:px-6">
@@ -81,12 +102,20 @@ export default function CustomerLicensePortal() {
       <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
           ['LICENSE STATUS',data.license.status.toUpperCase()],
-          ['PLAN',data.license.tier.replaceAll('_',' ')],
+          ['EA',data.license.ea_slug || 'Legacy license'],
+          ['PLAN',data.license.billing_cycle || data.license.tier.replaceAll('_',' ')],
           ['BOUND MT5 ACCOUNT',String(data.license.mt5_account)],
           ['EXPIRES',data.license.expires_at?new Date(data.license.expires_at).toLocaleDateString():'LIFETIME'],
         ].map(([label,value])=><div key={label} className="rounded-xl border border-white/10 bg-[#0a111b] p-4"><p className="font-mono text-[9px] text-slate-500">{label}</p><p className="mt-2 text-sm font-semibold">{value}</p></div>)}
       </section>
-      <section className="mt-5 rounded-xl border border-white/10 bg-[#0a111b] p-5">
+      <section className="mt-4 rounded-xl border border-white/10 bg-[#0a111b] p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><h2 className="font-semibold">License artifacts</h2><p className="mt-1 text-xs text-slate-500">Downloads are authorized against this EA license and bound MT5 account.</p></div>
+          <button type="button" onClick={()=>void downloadLicenseHelper()} disabled={helperBusy || !data.license.ea_slug} className="rounded-lg border border-cyan-300/30 px-3 py-2 text-xs text-cyan-200 disabled:opacity-40">{helperBusy?'Preparing…':'Download MacroLyncLicense.mqh'}</button>
+        </div>
+        {helperMessage && <p role="status" className="mt-3 text-xs text-slate-400">{helperMessage}</p>}
+      </section>
+      <section className={`${activeTab==='telemetry'?'mt-5':'hidden'} rounded-xl border border-white/10 bg-[#0a111b] p-5`}>
         <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-semibold">MT5 connection</h2><p className="mt-1 text-xs text-slate-500">Read-only telemetry · {data.heartbeat?.ea_name || 'No EA heartbeat received yet'}</p></div><span className="rounded border border-white/10 px-3 py-1 font-mono text-xs">{data.heartbeat?.connection_status || 'STANDBY'}</span></div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {[
@@ -99,11 +128,17 @@ export default function CustomerLicensePortal() {
         </div>
         {data.heartbeat && <p className="mt-3 text-[10px] text-slate-500">Last update: {new Date(data.heartbeat.updated_at).toLocaleString()}</p>}
       </section>
-      <section className="mt-5 rounded-xl border border-white/10 bg-[#0a111b] p-5">
+      <section className={`${activeTab==='telemetry'?'mt-5':'hidden'} rounded-xl border border-white/10 bg-[#0a111b] p-5`}>
         <h2 className="font-semibold">Recent closed trades</h2>
         <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[500px] text-left text-xs"><thead className="text-slate-500"><tr>{['CLOSED UTC','SYMBOL','SIDE','P&L USD','R MULTIPLE'].map(x=><th key={x} className="pb-3 pr-4 font-mono text-[9px] font-normal">{x}</th>)}</tr></thead><tbody className="divide-y divide-white/5">{data.trades.map(t=><tr key={t.ticket+t.symbol}><td className="py-3 pr-4 text-slate-400">{new Date(t.closed_at_utc).toLocaleString('en-GB',{timeZone:'UTC'})}</td><td className="py-3 pr-4">{t.symbol}</td><td className="py-3 pr-4">{t.direction}</td><td className="py-3 pr-4">{money(t.profit_usd)}</td><td className="py-3 pr-4">{t.r_multiple.toFixed(2)}R</td></tr>)}{data.trades.length===0&&<tr><td colSpan={5} className="py-5 text-center text-slate-500">No closed trades received for this account yet.</td></tr>}</tbody></table></div>
       </section>
-      <section className="mt-5 rounded-xl border border-amber-300/20 bg-[#11100c] p-5">
+      <section className={`${activeTab==='seats'?'mt-5':'hidden'} rounded-xl border border-white/10 bg-[#0a111b] p-5`}>
+        <h2 className="font-semibold">MT5 account slots</h2>
+        <p className="mt-1 text-xs text-slate-400">Entitlements: {data.license.included_live_seats ?? 1} live + {data.license.included_demo_seats ?? 2} demo + {data.license.extra_live_seats ?? 0} extra live seats.</p>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">{data.seats.map(seat=><div key={seat.id} className="rounded-lg border border-white/10 bg-black/20 p-3"><p className="font-mono text-[10px] text-slate-500">{seat.slot_type} SLOT {seat.slot_number}</p><p className="mt-1 text-sm text-white">{seat.mt5_login ?? 'Unbound'}</p><p className="mt-1 text-[10px] text-slate-500">{seat.rebind_available_at ? 'Rebind after '+new Date(seat.rebind_available_at).toLocaleString() : 'Available for binding'}</p></div>)}</div>
+        {data.seats.length===0 && <p className="mt-3 text-xs text-slate-500">Seat records are being provisioned for this legacy license. Your current account remains verified.</p>}
+      </section>
+      <section className={`${activeTab==='seats'?'mt-5':'hidden'} rounded-xl border border-amber-300/20 bg-[#11100c] p-5`}>
         <h2 className="font-semibold">Move license to another MT5 account</h2>
         <p className="mt-1 text-xs leading-5 text-slate-400">A one-time code is sent to the registered email ({data.masked_email}). A successful transfer immediately moves this license and clears the previous account heartbeat. Only transfer to an account you control.</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
