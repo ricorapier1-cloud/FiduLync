@@ -99,7 +99,12 @@ export default function CustomerLicensePortal() {
     </form>
     {error && <p role="alert" className="mt-4 rounded border border-rose-400/20 bg-rose-400/5 p-3 text-sm text-rose-300">{error}</p>}
     {data && <>
-      <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <nav aria-label="Private workspace tabs" className="mt-6 grid grid-cols-3 gap-2 rounded-xl border border-white/10 bg-[#0a111b] p-2">
+        {([['subscriptions','Subscriptions'],['seats','MT5 account slots'],['telemetry','Private telemetry']] as const).map(([tab,label]) =>
+          <button key={tab} type="button" onClick={()=>setActiveTab(tab)} className={`rounded-lg px-2 py-3 text-[10px] font-semibold sm:text-xs ${activeTab===tab?'bg-cyan-300 text-slate-950':'text-slate-400 hover:bg-white/5'}`}>{label}</button>
+        )}
+      </nav>
+      <section className={`${activeTab==='subscriptions'?'mt-5':'hidden'} grid gap-3 sm:grid-cols-2 lg:grid-cols-5`}>
         {[
           ['LICENSE STATUS',data.license.status.toUpperCase()],
           ['EA',data.license.ea_slug || 'Legacy license'],
@@ -108,7 +113,7 @@ export default function CustomerLicensePortal() {
           ['EXPIRES',data.license.expires_at?new Date(data.license.expires_at).toLocaleDateString():'LIFETIME'],
         ].map(([label,value])=><div key={label} className="rounded-xl border border-white/10 bg-[#0a111b] p-4"><p className="font-mono text-[9px] text-slate-500">{label}</p><p className="mt-2 text-sm font-semibold">{value}</p></div>)}
       </section>
-      <section className="mt-4 rounded-xl border border-white/10 bg-[#0a111b] p-5">
+      <section className={`${activeTab==='subscriptions'?'mt-4':'hidden'} rounded-xl border border-white/10 bg-[#0a111b] p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><h2 className="font-semibold">License artifacts</h2><p className="mt-1 text-xs text-slate-500">Downloads are authorized against this EA license and bound MT5 account.</p></div>
           <button type="button" onClick={()=>void downloadLicenseHelper()} disabled={helperBusy || !data.license.ea_slug} className="rounded-lg border border-cyan-300/30 px-3 py-2 text-xs text-cyan-200 disabled:opacity-40">{helperBusy?'Preparing…':'Download MacroLyncLicense.mqh'}</button>
@@ -127,6 +132,16 @@ export default function CustomerLicensePortal() {
           ].map(([label,value])=><div key={label} className="rounded-lg bg-white/[0.03] p-3"><p className="font-mono text-[9px] text-slate-500">{label}</p><p className="mt-2 font-mono text-sm">{value}</p></div>)}
         </div>
         {data.heartbeat && <p className="mt-3 text-[10px] text-slate-500">Last update: {new Date(data.heartbeat.updated_at).toLocaleString()}</p>}
+      </section>
+      <section className={`${activeTab==='telemetry'?'mt-5':'hidden'} rounded-xl border border-white/10 bg-[#0a111b] p-5`}>
+        <h2 className="font-semibold">MT5 WebRequest setup</h2>
+        <ol className="mt-3 space-y-2 text-xs leading-5 text-slate-300">
+          <li>1. In MT5, open Tools → Options → Expert Advisors.</li>
+          <li>2. Enable “Allow WebRequest for listed URL”.</li>
+          <li>3. Add <code className="text-cyan-200">https://fidulync.vercel.app</code> exactly.</li>
+          <li>4. Restart the EA and verify its license heartbeat in this workspace.</li>
+        </ol>
+        <p className="mt-2 text-[10px] text-slate-500">Never add private API keys to the public Store or share your broker password.</p>
       </section>
       <section className={`${activeTab==='telemetry'?'mt-5':'hidden'} rounded-xl border border-white/10 bg-[#0a111b] p-5`}>
         <h2 className="font-semibold">Recent closed trades</h2>
