@@ -91,7 +91,7 @@ export async function POST(req: Request) {
     }
 
     // 1. Check license validity
-    const licenses = await supabaseRead<any[]>('licenses', `license_key=eq.${encodeURIComponent(licenseKey)}&select=license_key,status,expires_at,max_live_slots,max_demo_slots`);
+    const licenses = await supabaseRead<LicenseRow[]>('licenses', `license_key=eq.${encodeURIComponent(licenseKey)}&select=license_key,status,expires_at,max_live_slots,max_demo_slots`);
     if (!licenses || licenses.length === 0) {
       return NextResponse.json({ error: 'License key not found' }, { status: 404 });
     }
@@ -108,7 +108,7 @@ export async function POST(req: Request) {
     const maxDemo = license.max_demo_slots ?? 2;
 
     // 2. Fetch current bound accounts
-    const bound = await supabaseRead<any[]>(
+    const bound = await supabaseRead<BoundAccountRow[]>(
       'license_bound_accounts',
       `license_key=eq.${encodeURIComponent(licenseKey)}&select=id,account_number,account_type,rebind_cooldown_until`
     );
