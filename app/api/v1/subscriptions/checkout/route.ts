@@ -40,10 +40,9 @@ export async function POST(request: Request) {
     const amountMinor = Math.round((base + seatPrice * extraSeats) * 100);
     if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0) return NextResponse.json({success:false,error:'Invalid subscription amount.'},{status:400});
 
-    const planQuery = `ea_slug=eq.${encodeURIComponent(eaSlug)}&billing_cycle=eq.${cycle}&currency=eq.${currency}&extra_live_seats=eq.${extraSeats}&select=paystack_plan_code,amount_minor&limit=1`;
+    const planQuery = `ea_slug=eq.${encodeURIComponent(eaSlug)}&billing_cycle=eq.${cycle}&currency=eq.${currency}&extra_live_seats=eq.${extraSeats}&amount_minor=eq.${amountMinor}&select=paystack_plan_code,amount_minor&limit=1`;
     let plans = await supabaseRead<Array<{paystack_plan_code:string;amount_minor:number}>>('paystack_subscription_plans',planQuery);
     let plan = plans?.[0];
-    if (plan && Number(plan.amount_minor) !== amountMinor) return NextResponse.json({success:false,error:'Subscription price changed. Please contact support to refresh the plan.'},{status:409});
     if (!plan) {
       const planResponse = await fetch('https://api.paystack.co/plan',{
         method:'POST',
