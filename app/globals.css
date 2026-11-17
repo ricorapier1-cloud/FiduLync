@@ -373,7 +373,7 @@ button { color: inherit; }
   .market-quotes { justify-content: end; }
   .inquiry-section { gap: 25px; padding: 23px; }
 }
-@media (max-width: 720px) {
+@media (max-width: 767px) {
   .portfolio-page { width: calc(100% - 32px); }
   .portfolio-section { padding-top: 52px; }
   .topbar-inner .desktop-nav { display: none; }
@@ -438,7 +438,7 @@ button { color: inherit; }
   .case-architecture i { width: 7px; }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 767px) {
   .topbar-inner { width: calc(100% - 32px); height: 64px; gap: 10px; }
   .desktop-nav { display: none; }
   .menu-toggle { display: inline-flex; }
