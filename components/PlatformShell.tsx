@@ -21,7 +21,7 @@ const macroLinks = [
   { href: '#catalysts', label: 'Catalysts', icon: 'calendar' },
   { href: '#positioning', label: 'Positioning', icon: 'radio' },
   { href: '/store', label: 'AlgoLync Vault', icon: 'chart' },
-  { href: '/account', label: 'My License', icon: 'shield' },
+  { href: '/portal', label: 'My License', icon: 'shield' },
   { href: '/faq', label: 'FAQ', icon: 'activity' },
   { href: '/terms', label: 'Terms & Risk', icon: 'shield-alert' },
 ] as const satisfies readonly { href: string; label: string; icon: BrandGlyphName }[];
