@@ -121,11 +121,17 @@ async function fetchTwelveDataCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1
   if (!candles.every((candle): candle is Candle => candle !== null)) {
     throw new Error('Twelve Data returned an invalid candle series.');
   }
-  const ordered = candles.sort((left, right) => left.timestamp - right.timestamp).slice(-MAX_CANDLES);
+  // Exclude the still-forming candle: only completed bars may enter indicators.
+  const nowSeconds = Date.now() / 1000;
+  const barSeconds = timeframe === 'H1' ? 60 * 60 : timeframe === 'H4' ? 4 * 60 * 60 : 24 * 60 * 60;
+  const ordered = candles
+    .sort((left, right) => left.timestamp - right.timestamp)
+    .filter((candle) => candle.timestamp + barSeconds <= nowSeconds)
+    .slice(-MAX_CANDLES);
   const latest = ordered.at(-1)?.timestamp;
   const maxAgeSeconds = timeframe === 'H1' ? 2 * 60 * 60
     : timeframe === 'H4' ? 8 * 60 * 60 : 48 * 60 * 60;
-  if (latest === undefined || Date.now() / 1000 - latest > maxAgeSeconds || latest > Date.now() / 1000 + 300) {
+  if (latest === undefined || nowSeconds - (latest + barSeconds) > maxAgeSeconds || latest > nowSeconds + 300) {
     throw new Error(`Twelve Data returned stale ${timeframe} candles for ${pair}.`);
   }
   return ordered;
