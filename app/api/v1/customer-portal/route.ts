@@ -27,14 +27,15 @@ export async function POST(request: Request) {
     if (!await validateCustomerLicense(mt5Account, licenseKey)) {
       return NextResponse.json({ error: 'This license does not authorize that MT5 account.' }, { status: 401 });
     }
-    const rows = await supabaseRead<Array<{ license_key: string; mt5_account: number; email: string; tier: string; status: string; expires_at: string | null; created_at: string }>>(
+    const rows = await supabaseRead<Array<{ license_key: string; mt5_account: number; email: string; tier: string; status: string; expires_at: string | null; created_at: string; ea_slug: string | null; billing_cycle: string | null; included_live_seats: number; included_demo_seats: number; extra_live_seats: number }>>(
       'licenses',
-      `license_key=eq.${encodeURIComponent(licenseKey)}&mt5_account=eq.${mt5Account}&select=license_key,mt5_account,email,tier,status,expires_at,created_at&limit=1`
+      `license_key=eq.${encodeURIComponent(licenseKey)}&mt5_account=eq.${mt5Account}&select=license_key,mt5_account,email,tier,status,expires_at,created_at,ea_slug,billing_cycle,included_live_seats,included_demo_seats,extra_live_seats&limit=1`
     );
     if (!rows?.[0]) return NextResponse.json({ error: 'License details are temporarily unavailable.' }, { status: 503 });
-    const [heartbeat, trades] = await Promise.all([
+    const [heartbeat, trades, seats] = await Promise.all([
       getCustomerHeartbeat(mt5Account, licenseKey),
       getCustomerTrades(mt5Account, licenseKey),
+      supabaseRead<Array<{id:string;slot_type:string;slot_number:number;mt5_login:number|null;broker_server:string|null;rebind_available_at:string|null}>>('ea_license_seats', `license_key=eq.${encodeURIComponent(licenseKey)}&select=id,slot_type,slot_number,mt5_login,broker_server,rebind_available_at&order=slot_type.asc,slot_number.asc`),
     ]);
     const { email, ...license } = rows[0];
     return NextResponse.json({
@@ -42,6 +43,7 @@ export async function POST(request: Request) {
       masked_email: email.replace(/^(.).+(@.*)$/, '$1••••$2'),
       heartbeat,
       trades,
+      seats: seats || [],
     }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
   } catch (error) {
     console.error('Customer license dashboard failed:', error);
