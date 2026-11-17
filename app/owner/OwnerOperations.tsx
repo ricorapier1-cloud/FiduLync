@@ -7,7 +7,7 @@ type Props = { accessToken: string; email: string; role: string; onSignOut: () =
 type Installation = { id: string; label: string; status: 'active' | 'revoked'; created_at: string; last_seen_at: string | null; broker: string | null; server: string | null };
 type Overview = {
   generated_at: string;
-  market_data: { active_installations: number; total_installations: number; latest_heartbeat: string | null; latest_candle: { symbol: string; timeframe: string; bar_time: string; broker: string; server: string } | null; latest_candle_age_minutes: number | null; latest_quote: { symbol: string; quote_time: string; broker: string; server: string } | null; latest_quote_age_seconds: number | null };
+  market_data: { active_installations: number; total_installations: number; latest_heartbeat: string | null; latest_heartbeat_age_seconds: number | null; latest_candle: { symbol: string; timeframe: string; bar_time: string; broker: string; server: string } | null; latest_candle_age_minutes: number | null; latest_quote: { symbol: string; quote_time: string; broker: string; server: string } | null; latest_quote_age_seconds: number | null };
   installations: Installation[];
   database: { reachable: boolean; installation_records: number };
   governance: { audit_log: string; multi_role_access: string; step_up_authentication: string; model_validation_registry: string; portfolio_risk_telemetry: string };
@@ -73,13 +73,13 @@ export default function OwnerOperations({ accessToken, email, role, onSignOut }:
     finally { setLoading(false); setRefreshing(false); }
   }, [accessToken]);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => { const task = Promise.resolve().then(() => refresh()); return () => { void task; }; }, [refresh]);
 
   const activeModule = useMemo(() => modules.find((item) => item.id === active) ?? modules[0], [active]);
   const market = overview?.market_data;
   const quoteAgeSeconds = market?.latest_quote_age_seconds ?? null;
   const quoteFresh = quoteAgeSeconds !== null && quoteAgeSeconds <= 120;
-  const heartbeatFresh = Boolean(market?.latest_heartbeat && Date.now() - Date.parse(market.latest_heartbeat) <= 180_000);
+  const heartbeatFresh = market?.latest_heartbeat_age_seconds !== null && market?.latest_heartbeat_age_seconds !== undefined && market.latest_heartbeat_age_seconds <= 180;
   const candleAgeMinutes = market?.latest_candle_age_minutes ?? null;
   const candleTimeframe = market?.latest_candle?.timeframe;
   const candleFresh = candleAgeMinutes !== null && candleAgeMinutes <= (candleTimeframe === 'H1' ? 480 : candleTimeframe === 'H4' ? 2160 : 7200);
