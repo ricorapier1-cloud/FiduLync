@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { timingSafeEqual } from 'node:crypto';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { requireOwner } from '@/lib/ownerAuth';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -30,14 +31,18 @@ async function requestOk(url: URL | string, init?: RequestInit) {
 }
 
 export async function GET(request: Request) {
+  const owner = await requireOwner(request);
   const expectedKey = process.env.ALGO_PRIVATE_API_KEY?.trim() ?? '';
   const providedKey = request.headers.get('x-algo-key')?.trim() ?? '';
   const expected = Buffer.from(expectedKey);
   const provided = Buffer.from(providedKey);
-  if (!expected.length || expected.length !== provided.length || !timingSafeEqual(expected, provided)) {
-    return NextResponse.json({ error: 'Unauthorized.' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
+  const serviceAuthorized = expected.length > 0
+    && expected.length === provided.length
+    && timingSafeEqual(expected, provided);
+  if (!owner && !serviceAuthorized) {
+    return NextResponse.json({ error: 'Owner authentication required.' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
   }
-  if (!checkRateLimit(getClientIp(request), 5, 60_000)) {
+  if (!checkRateLimit(owner?.id ?? getClientIp(request), 5, 60_000)) {
     return NextResponse.json({ error: 'Diagnostics rate limit exceeded.' }, { status: 429, headers: { 'Cache-Control': 'no-store' } });
   }
 
