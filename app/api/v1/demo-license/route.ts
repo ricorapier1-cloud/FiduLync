@@ -41,13 +41,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'A free demo has already been issued for this email/EA or MT5 login.' }, { status: 409, headers });
     }
 
+    const signed = await getSupabaseAdmin().storage.from('algolync-artifacts').createSignedUrl(artifact.data.storage_path,300);
+    if(signed.error || !signed.data?.signedUrl) return NextResponse.json({success:false,error:'Demo artifact download could not be authorized.'},{status:503,headers});
     const licenseKey = `ALGOLYNX-DEMO-${randomBytes(5).toString('hex').toUpperCase()}`;
     const expiresAt = new Date(Date.now() + product.demo_days * 86_400_000).toISOString();
     await supabaseInsert('ea_demo_trials', {
       email, ea_slug: eaSlug, mt5_login: mt5Login, license_key: licenseKey, expires_at: expiresAt,
     });
-    const signed = await getSupabaseAdmin().storage.from('algolync-artifacts').createSignedUrl(artifact.data.storage_path,300);
-    if(signed.error || !signed.data?.signedUrl) return NextResponse.json({success:false,error:'Demo artifact download could not be authorized.'},{status:503,headers});
     return NextResponse.json({
       success: true, license_key: licenseKey, ea_slug: eaSlug, account_mode: 'DEMO',
       mt5_login: mt5Login, expires_at: expiresAt, download_url: signed.data.signedUrl,
