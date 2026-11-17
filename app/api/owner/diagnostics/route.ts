@@ -32,7 +32,7 @@ async function requestOk(url: URL | string, init?: RequestInit) {
 
 export async function GET(request: Request) {
   const owner = await requireOwner(request);
-  const expectedKey = process.env.ALGO_PRIVATE_API_KEY?.trim() ?? '';
+  const expectedKey = (process.env.ALGOLYNC_PRIVATE_KEY || process.env.ALGO_PRIVATE_API_KEY || '').trim();
   const providedKey = request.headers.get('x-algo-key')?.trim() ?? '';
   const expected = Buffer.from(expectedKey);
   const provided = Buffer.from(providedKey);
@@ -201,9 +201,9 @@ export async function GET(request: Request) {
   checks.cron = process.env.CRON_SECRET?.trim()
     ? { status: 'ok', detail: 'Cron authorization secret is configured.' }
     : { status: 'not_configured', detail: 'CRON_SECRET is missing.' };
-  checks.algo_api = process.env.ALGO_PRIVATE_API_KEY?.trim()
+  checks.algo_api = (process.env.ALGOLYNC_PRIVATE_KEY || process.env.ALGO_PRIVATE_API_KEY)?.trim()
     ? { status: 'ok', detail: 'Private MT5 API authentication key is configured.' }
-    : { status: 'not_configured', detail: 'ALGO_PRIVATE_API_KEY is missing.' };
+    : { status: 'not_configured', detail: 'ALGOLYNC_PRIVATE_KEY (legacy alias ALGO_PRIVATE_API_KEY) is missing.' };
 
   const values = Object.values(checks);
   const errors = values.filter((item) => item.status === 'error').length;
