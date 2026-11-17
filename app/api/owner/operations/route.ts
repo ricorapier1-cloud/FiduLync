@@ -54,6 +54,7 @@ export async function GET(request: Request) {
         active_installations: activeInstallations.length,
         total_installations: installations?.length ?? 0,
         latest_heartbeat: latestHeartbeat ? new Date(latestHeartbeat).toISOString() : null,
+        latest_heartbeat_age_seconds: latestHeartbeat ? Math.max(0, Math.round((now - latestHeartbeat) / 1000)) : null,
         latest_candle: candleData,
         latest_candle_age_minutes: candleAgeMs === null ? null : Math.max(0, Math.round(candleAgeMs / 60000)),
         latest_quote: quoteData,
