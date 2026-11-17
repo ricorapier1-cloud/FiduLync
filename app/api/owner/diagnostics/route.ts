@@ -173,7 +173,15 @@ export async function GET(request: Request) {
     ? { status: 'unknown', detail: 'Key is present, but no provider-specific FX_API_KEY adapter is wired into the current application.' }
     : { status: 'not_configured', detail: 'FX_API_KEY is not configured.' };
 
-  checks.market_candles = process.env.MARKET_DATA_PROVIDER_URL?.trim()
+  checks.macro_provider = process.env.MACRO_DATA_PROVIDER_URL?.trim() && process.env.MACRO_DATA_PROVIDER_LICENSE_APPROVED !== 'true'
+    ? { status: 'license_blocked', detail: 'Custom macro provider is disabled until commercial display, storage and derived-data rights are documented.' }
+    : process.env.MACRO_DATA_PROVIDER_URL?.trim()
+      ? { status: 'unknown', detail: 'Custom macro endpoint is configured; live schema, timestamps, completeness and licence scope must be validated.' }
+      : { status: 'not_configured', detail: 'No custom macro provider endpoint is configured.' };
+
+  checks.market_candles = process.env.MARKET_DATA_PROVIDER_URL?.trim() && process.env.MARKET_DATA_PROVIDER_LICENSE_APPROVED !== 'true'
+    ? { status: 'license_blocked', detail: 'Custom market candles are disabled until commercial display and exchange/derived-data rights are documented.' }
+    : process.env.MARKET_DATA_PROVIDER_URL?.trim()
     ? { status: 'unknown', detail: 'Market candle endpoint is configured; full symbol/timeframe validation is performed by the signal engine.' }
     : { status: 'not_configured', detail: 'MARKET_DATA_PROVIDER_URL is missing. Technical signals remain unavailable and trading must stay disabled.' };
 
