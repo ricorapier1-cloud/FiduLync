@@ -244,7 +244,7 @@ export function QuantStrategyCatalog({ products }: { products?: EaProduct[] }) {
               {/* DUAL ACTION BUTTON WORKFLOW */}
               <div className="mt-5 space-y-2 pt-3 border-t border-white/[0.08]">
                 {/* Button A: Instant 1-Click Demo Key & Download */}
-                {strategy.tierCategory !== 'SANDBOX' && (
+                {strategy.tierCategory !== 'SANDBOX' && (strategy.artifactReady ? (
                   <button
                     type="button"
                     onClick={() => handleGenerateDemo(strategy)}
@@ -255,17 +255,17 @@ export function QuantStrategyCatalog({ products }: { products?: EaProduct[] }) {
                     </svg>
                     Get Free Demo (.ex5)
                   </button>
-                )}
+                ) : <button type="button" disabled className="w-full rounded-lg border border-white/10 bg-white/[0.02] px-4 py-2.5 text-xs text-slate-500">Demo release pending</button>)}
 
                 {/* Button B: Provision Real EA License (Anchored to checkout) */}
                 {strategy.tierCategory === 'SANDBOX' ? (
                   <a href={strategy.demoDownloadUrl} download={strategy.demoFilename} className="flex w-full items-center justify-center rounded-lg border border-amber-400/30 bg-amber-400/10 px-4 py-2.5 text-xs font-semibold text-amber-200">Download Open-Source Sandbox (.mq5)</a>
-                ) : (
+                ) : strategy.artifactReady ? (
                   <button type="button" onClick={() => { setCheckoutEa(strategy); setCheckoutError(''); }} className="flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-4 py-2.5 text-xs font-bold text-emerald-300 transition-all hover:bg-emerald-500 hover:text-black">
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                     Subscribe Live
                   </button>
-                )}
+                ) : <button type="button" disabled className="w-full rounded-lg border border-white/10 bg-white/[0.02] px-4 py-2.5 text-xs text-slate-500">Commercial release pending</button>}
               </div>
             </article>
           );
