@@ -65,26 +65,36 @@ export function QuantStrategyCatalog({ onSelectEa }: { onSelectEa?: (slug: strin
   const [demoModalEa, setDemoModalEa] = useState<EaProduct | null>(null);
   const [generatedDemoKey, setGeneratedDemoKey] = useState<string | null>(null);
   const [loadingDemo, setLoadingDemo] = useState(false);
+  const [demoEmail, setDemoEmail] = useState('');
+  const [demoLogin, setDemoLogin] = useState('');
+  const [demoError, setDemoError] = useState('');
+  const [demoDownloadUrl, setDemoDownloadUrl] = useState('');
 
-  const handleGenerateDemo = async (ea: EaProduct) => {
+  const handleGenerateDemo = (ea: EaProduct) => {
     setDemoModalEa(ea);
-    setLoadingDemo(true);
     setGeneratedDemoKey(null);
+    setDemoDownloadUrl('');
+    setDemoError('');
+  };
 
+  const submitDemoRequest = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!demoModalEa) return;
+    setLoadingDemo(true);
+    setDemoError('');
     try {
-      const res = await fetch('/api/v1/provision-demo-license', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ea_slug: ea.slug }),
+      const res = await fetch('/api/v1/demo-license', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ea_slug: demoModalEa.slug, email: demoEmail, mt5_login: demoLogin }),
       });
       const data = await res.json();
-      if (data.success && data.license_key) {
-        setGeneratedDemoKey(data.license_key);
-      } else {
-        setGeneratedDemoKey(`ALGO-DEMO-${ea.slug.split('-')[0].toUpperCase()}-PREVIEW`);
+      if (!res.ok || !data.success || !data.license_key || !data.download_url) {
+        throw new Error(data.error || 'Demo could not be provisioned.');
       }
-    } catch {
-      setGeneratedDemoKey(`ALGO-DEMO-${ea.slug.split('-')[0].toUpperCase()}-OFFLINE`);
+      setGeneratedDemoKey(data.license_key);
+      setDemoDownloadUrl(data.download_url);
+    } catch (error) {
+      setDemoError(error instanceof Error ? error.message : 'Demo service unavailable.');
     } finally {
       setLoadingDemo(false);
     }
@@ -231,76 +241,30 @@ export function QuantStrategyCatalog({ onSelectEa }: { onSelectEa?: (slug: strin
 
       {/* 1-CLICK DEMO PROVISIONING MODAL */}
       {demoModalEa && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl border border-emerald-500/40 bg-[#07130e] p-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-emerald-500/20 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                <h3 className="font-mono text-sm font-bold text-emerald-400 uppercase tracking-wider">
-                  Instant Demo License Provisioned
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDemoModalEa(null)}
-                className="text-slate-400 hover:text-white font-mono text-sm"
-              >
-                ✕
-              </button>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" onClick={() => setDemoModalEa(null)}>
+          <section role="dialog" aria-modal="true" aria-labelledby="demo-title" className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#0b1119] p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div><p className="font-mono text-[10px] tracking-widest text-emerald-300">ALGOLYNC / DEMO ACCESS</p><h3 id="demo-title" className="mt-1 text-lg font-semibold text-white">Get a free 14-day demo</h3></div>
+              <button type="button" onClick={() => setDemoModalEa(null)} className="text-slate-400 hover:text-white" aria-label="Close">✕</button>
             </div>
-
-            <div className="mt-4 space-y-4 font-mono">
-              <div>
-                <span className="text-[10px] text-slate-400 uppercase block">Selected Algorithm</span>
-                <p className="text-sm font-bold text-white">{demoModalEa.name} ({demoModalEa.version})</p>
+            <p className="mt-4 text-xs leading-5 text-slate-400">{demoModalEa.name} is locked to the MT5 demo account login you provide. One demo per email/EA and one per MT5 login.</p>
+            {!generatedDemoKey ? (
+              <form onSubmit={submitDemoRequest} className="mt-5 space-y-3">
+                <label className="block text-xs text-slate-400">Email address<input required type="email" autoComplete="email" value={demoEmail} onChange={event=>setDemoEmail(event.target.value)} className="mt-2 h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-sm text-white" placeholder="you@example.com"/></label>
+                <label className="block text-xs text-slate-400">MT5 demo account login<input required inputMode="numeric" pattern="[0-9]+" value={demoLogin} onChange={event=>setDemoLogin(event.target.value.replace(/\D/g,''))} className="mt-2 h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3 font-mono text-sm text-white" placeholder="Demo account number"/></label>
+                {demoError && <p role="alert" className="rounded-lg border border-rose-400/20 bg-rose-400/5 p-3 text-xs text-rose-300">{demoError}</p>}
+                <button disabled={loadingDemo} className="h-11 w-full rounded-lg bg-emerald-300 px-4 text-sm font-semibold text-[#07120d] disabled:opacity-50">{loadingDemo?'Checking eligibility…':'Create demo license'}</button>
+              </form>
+            ) : (
+              <div className="mt-5 space-y-4">
+                <div className="rounded-lg border border-emerald-400/20 bg-emerald-400/5 p-4"><p className="font-mono text-[10px] text-emerald-300">DEMO KEY · 14 DAYS</p><code className="mt-2 block select-all break-all text-sm font-bold text-white">{generatedDemoKey}</code><p className="mt-2 text-[10px] text-slate-400">Authorized for the registered demo login only. Real-account mode is rejected server-side.</p></div>
+                <a href={demoDownloadUrl} className="flex h-11 items-center justify-center rounded-lg bg-emerald-300 px-4 text-sm font-semibold text-[#07120d]">Download verified demo (.ex5)</a>
               </div>
-
-              <div className="rounded-lg border border-emerald-500/30 bg-black/70 p-3">
-                <span className="text-[10px] text-emerald-400/80 uppercase block mb-1">
-                  14-Day Sandbox Demo License Key
-                </span>
-                {loadingDemo ? (
-                  <div className="py-2 text-xs text-emerald-300/60 animate-pulse">
-                    Generating cryptographic sandbox entitlement…
-                  </div>
-                ) : (
-                  <code className="block select-all text-sm font-bold text-emerald-400">
-                    {generatedDemoKey}
-                  </code>
-                )}
-                <span className="mt-1 block text-[9px] text-slate-500">
-                  * Bound exclusively to MT5 Demo accounts (`ACCOUNT_TRADE_MODE_DEMO`). Real accounts blocked.
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                <a
-                  href={demoModalEa.demoDownloadUrl}
-                  download={demoModalEa.demoFilename}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-xs font-bold text-black hover:bg-emerald-400 transition-colors"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  Download {demoModalEa.demoFilename}
-                </a>
-
-                <a
-                  href="/downloads/MacroLyncLicense.mqh"
-                  download="MacroLyncLicense.mqh"
-                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-white/10 transition-colors"
-                >
-                  Download Cloud Gate Helper (MacroLyncLicense.mqh)
-                </a>
-              </div>
-
-              <div className="rounded border border-white/5 bg-white/[0.02] p-2.5 text-[10px] text-slate-400 leading-relaxed">
-                <strong>Quick MT5 Setup:</strong> Copy your EA into MT5 <code className="text-slate-300">MQL5/Experts</code>, copy the <code className="text-slate-300">.mqh</code> file into <code className="text-slate-300">MQL5/Include</code>, and whitelist <code className="text-emerald-400">https://fidulync.vercel.app</code> in MT5 Tools → Options → Expert Advisors → Allow WebRequest.
-              </div>
-            </div>
-          </div>
+            )}
+            <p className="mt-4 text-[10px] leading-5 text-slate-500">A compiled demo artifact must be published and approved before the server issues a key. No placeholder keys or source-code binaries are generated.</p>
+          </section>
         </div>
-      )}
+      )}}
     </div>
   );
 }
