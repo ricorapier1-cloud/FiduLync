@@ -47,7 +47,6 @@ export default function OwnerConsole() {
       void loadInstallations(session.access_token);
       void loadDiagnostics(session.access_token);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.access_token, session?.user.email]);
 
   async function loadInstallations(token: string) {
