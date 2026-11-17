@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     const status = String(license.status ?? '').toUpperCase();
     const expiresAt = license.expires_at ? new Date(String(license.expires_at)).getTime() : null;
     const graceUntil = license.grace_until ? new Date(String(license.grace_until)).getTime() : null;
-    if (!['ACTIVE', 'PAST_DUE'].includes(status) || (expiresAt !== null && expiresAt <= Date.now() && !(status === 'PAST_DUE' && graceUntil && graceUntil > Date.now()))) {
+    if (!['ACTIVE', 'PAST_DUE', 'CANCEL_AT_PERIOD_END'].includes(status) || (expiresAt !== null && expiresAt <= Date.now() && !(status === 'PAST_DUE' && graceUntil && graceUntil > Date.now()))) {
       return NextResponse.json({ valid: false, error: 'License is inactive or expired.' }, { status: 403, headers });
     }
     if (String(license.ea_slug ?? '') !== eaSlug) return NextResponse.json({ valid: false, error: 'This license is not entitled to the requested EA.' }, { status: 403, headers });
