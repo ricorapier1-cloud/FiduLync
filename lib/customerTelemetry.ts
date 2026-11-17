@@ -39,8 +39,8 @@ async function supabaseWrite(table: string, query: string, body: Record<string, 
 export async function validateCustomerLicense(mt5Account: number, licenseKey: string): Promise<boolean> {
   if (!Number.isSafeInteger(mt5Account) || mt5Account <= 0 || !licenseKey.trim()) return false;
   const key=licenseKey.trim().toUpperCase();
-  const licenses=await supabaseRows<{license_key:string;status:string;expires_at:string|null;grace_until:string|null;period_ends_at:string|null;mt5_account:number|string|null}>(
-    'licenses',new URLSearchParams({select:'license_key,status,expires_at,grace_until,period_ends_at,mt5_account',license_key:`eq.${key}`,limit:'1'}).toString()
+  const licenses=await supabaseRows<{license_key:string;status:string;expires_at:string|null;grace_until:string|null;period_ends_at:string|null;mt5_account:number|string|null;ea_slug:string|null}>(
+    'licenses',new URLSearchParams({select:'license_key,status,expires_at,grace_until,period_ends_at,mt5_account,ea_slug',license_key:`eq.${key}`,limit:'1'}).toString()
   );
   const license=licenses[0];
   if(!license || license.license_key.toUpperCase()!==key) return false;
@@ -56,6 +56,7 @@ export async function validateCustomerLicense(mt5Account: number, licenseKey: st
     'ea_license_seats',new URLSearchParams({select:'mt5_login,slot_type',license_key:`eq.${key}`,mt5_login:`eq.${mt5Account}`,limit:'1'}).toString()
   );
   if(seats.some(seat=>Number(seat.mt5_login)===mt5Account)) return true;
+  if(license.ea_slug) return false;
   const legacy=await supabaseRows<{account_number:number|string}>(
     'license_bound_accounts',new URLSearchParams({select:'account_number',license_key:`eq.${key}`,account_number:`eq.${mt5Account}`,limit:'1'}).toString()
   );
