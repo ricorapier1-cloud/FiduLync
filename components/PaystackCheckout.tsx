@@ -245,6 +245,22 @@ export function PaystackCheckout() {
               {licenseKey}
             </code>
           </div>
+          {!licenseBound ? (
+            <form onSubmit={handleBindAccount} className="space-y-2 text-left">
+              <p className="text-xs text-emerald-200">Your purchase is active. Bind your MT5 login now, or return later and use your license key and purchase email.</p>
+              <label className="block text-[10px] font-mono text-emerald-300">MT5 ACCOUNT LOGIN</label>
+              <input type="number" required min="1" value={bindAccount} onChange={(e) => setBindAccount(e.target.value)} placeholder="Enter your MT5 login" className="w-full rounded border border-emerald-500/30 bg-black/60 px-3 py-2 text-xs text-white" />
+              {bindRequestId && <>
+                <label className="block text-[10px] font-mono text-emerald-300">EMAIL VERIFICATION CODE</label>
+                <input inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required value={bindCode} onChange={(e) => setBindCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6-digit code" className="w-full rounded border border-emerald-500/30 bg-black/60 px-3 py-2 text-xs text-white" />
+              </>}
+              <button type="submit" disabled={loading} className="w-full rounded bg-emerald-500 px-3 py-2 text-xs font-bold text-black disabled:opacity-50">
+                {loading ? 'PROCESSING…' : bindRequestId ? 'CONFIRM MT5 ACCOUNT BINDING' : 'SEND EMAIL VERIFICATION CODE'}
+              </button>
+            </form>
+          ) : (
+            <p className="rounded border border-emerald-500/30 bg-emerald-500/10 p-2 text-xs text-emerald-200">MT5 account {mt5Account || bindAccount} is bound to this license.</p>
+          )}
           <a
             href={downloadUrl}
             download
@@ -274,7 +290,7 @@ export function PaystackCheckout() {
             <label className="block text-xs font-mono mb-1 text-emerald-300">Existing License Key</label>
             <input type="text" required value={recoveryLicenseKey} onChange={(e) => setRecoveryLicenseKey(e.target.value.toUpperCase())} placeholder="ALGOLYNX-..." className="w-full bg-black/60 border border-emerald-500/30 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-400 font-mono" />
           </div>}
-          <div>
+          {tab === 'RECOVER' && <div>
             <label className="block text-xs font-mono mb-1 text-emerald-300">MT5 Account Number</label>
             <input
               type="number"
@@ -284,7 +300,8 @@ export function PaystackCheckout() {
               placeholder="12345678"
               className="w-full bg-black/60 border border-emerald-500/30 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-400 font-mono"
             />
-          </div>
+          </div>}
+          {tab === 'BUY' && <p className="text-[10px] leading-4 text-emerald-400/70">MT5 account binding is completed after payment using a one-time code sent to your purchase email.</p>}
           <button
             type="submit"
             disabled={loading}
