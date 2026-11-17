@@ -48,92 +48,39 @@ export async function provisionOrExtendLicense(referenceInput:string, explicitSu
     `reference=eq.${encodeURIComponent(reference)}&select=reference,email,ea_slug,billing_cycle,currency,extra_live_seats,amount_minor,paystack_plan_code,subscription_code,status&limit=1`);
   const intent=intentRows?.[0] ?? null;
   const subscriptionCode=subscriptionCodeFrom(payment,explicitSubscriptionCode || intent?.subscription_code || null);
-  let subscription:Subscription|null=null;
-  if(subscriptionCode) {
+  let email:string,eaSlug:string,cycle:'MONTHLY'|'ANNUAL',currency:'NGN'|'USD',extraSeats:number,expectedAmount:number;
+  if(intent) {
+    email=intent.email;eaSlug=intent.ea_slug;cycle=intent.billing_cycle;currency=intent.currency;
+    extraSeats=Number(intent.extra_live_seats);expectedAmount=Number(intent.amount_minor);
+  } else if(subscriptionCode) {
     const rows=await supabaseRead<Subscription[]>('ea_subscriptions',
       `subscription_code=eq.${encodeURIComponent(subscriptionCode)}&select=id,initial_reference,license_key,subscription_code,email,ea_slug,billing_cycle,currency,extra_live_seats,status,period_ends_at&limit=1`);
-    subscription=rows?.[0] ?? null;
-  }
-  if(!subscription && intent) {
-    const rows=await supabaseRead<Subscription[]>('ea_subscriptions',
-      `initial_reference=eq.${encodeURIComponent(intent.reference)}&select=id,initial_reference,license_key,subscription_code,email,ea_slug,billing_cycle,currency,extra_live_seats,status,period_ends_at&limit=1`);
-    subscription=rows?.[0] ?? null;
-  }
-  const prior=await supabaseRead<Array<{reference:string;subscription_id:string}>>('ea_subscription_payments',
-    `reference=eq.${encodeURIComponent(reference)}&select=reference,subscription_id&limit=1`);
-  if(prior?.[0]) return {license_key:subscription?.license_key ?? null,created:false,idempotent_replay:true,period_ends_at:subscription?.period_ends_at ?? null};
-
-  let email:string, eaSlug:string, cycle:'MONTHLY'|'ANNUAL', currency:'NGN'|'USD', extraSeats:number, expectedAmount:number;
-  if(subscription) {
-    email=subscription.email; eaSlug=subscription.ea_slug; cycle=subscription.billing_cycle; currency=subscription.currency; extraSeats=subscription.extra_live_seats;
+    const subscription=rows?.[0];
+    if(!subscription) throw new Error('No matching AlgoLync subscription record exists for this payment.');
+    email=subscription.email;eaSlug=subscription.ea_slug;cycle=subscription.billing_cycle;currency=subscription.currency;extraSeats=Number(subscription.extra_live_seats);
     const plans=await supabaseRead<Array<{amount_minor:number}>>('paystack_subscription_plans',
       `ea_slug=eq.${encodeURIComponent(eaSlug)}&billing_cycle=eq.${cycle}&currency=eq.${currency}&extra_live_seats=eq.${extraSeats}&select=amount_minor&limit=1`);
     expectedAmount=Number(plans?.[0]?.amount_minor ?? 0);
-  } else if(intent) {
-    email=intent.email; eaSlug=intent.ea_slug; cycle=intent.billing_cycle; currency=intent.currency; extraSeats=intent.extra_live_seats; expectedAmount=Number(intent.amount_minor);
   } else {
-    throw new Error('No matching AlgoLync subscription intent or subscription record exists for this payment.');
+    throw new Error('No matching AlgoLync subscription intent or subscription code exists for this payment.');
   }
-  if(payment.currency !== currency || Number(payment.amount) !== expectedAmount || expectedAmount <= 0) {
+  const customer=objectRecord(payment.customer);
+  const paidEmail=String(customer.email || '').trim().toLowerCase();
+  if(!paidEmail || paidEmail!==email.toLowerCase()) throw new Error('Paystack payer email does not match the subscription intent.');
+  if(payment.currency!==currency || Number(payment.amount)!==expectedAmount || expectedAmount<=0) {
     throw new Error('Verified payment amount or currency does not match the stored subscription price.');
   }
-
-  const now=new Date();
-  const periodStart=subscription && new Date(subscription.period_ends_at).getTime()>now.getTime() ? new Date(subscription.period_ends_at) : now;
-  const days=cycle==='ANNUAL'?365:30;
-  const periodEnd=new Date(periodStart.getTime()+days*86400000);
-  let licenseKey:string;
-  let subscriptionId:string;
-  if(subscription) {
-    licenseKey=subscription.license_key;
-    subscriptionId=subscription.id;
-    await supabaseQuery('ea_subscriptions',{
-      method:'PATCH',query:`id=eq.${encodeURIComponent(subscription.id)}`,
-      body:{period_ends_at:periodEnd.toISOString(),status:'ACTIVE',grace_until:null,renewal_reminder_due:false,cancel_at_period_end:false,subscription_code:subscriptionCode || subscription.subscription_code,updated_at:now.toISOString()},
-    });
-    await supabaseQuery('licenses',{
-      method:'PATCH',query:`license_key=eq.${encodeURIComponent(licenseKey)}`,
-      body:{status:'ACTIVE',expires_at:periodEnd.toISOString(),period_ends_at:periodEnd.toISOString(),grace_until:null,renewal_reminder_due:false,paystack_subscription_code:subscriptionCode || subscription.subscription_code,updated_at:now.toISOString()},
-    });
-  } else {
-    const licenseCandidate=`ALGOLYNX-SUB-${randomBytes(8).toString('hex').toUpperCase()}`;
-    const provisioned=await supabaseQuery<Record<string,unknown>|Array<Record<string,unknown>>>('rpc/provision_algolync_license',{
-      method:'POST',body:{
-        p_payment_reference:reference,p_license_key:licenseCandidate,p_mt5_account:null,p_email:email,
-        p_tier:'INSTITUTIONAL_SUBSCRIPTION',p_expires_at:periodEnd.toISOString(),
-      },
-    });
-    const record=Array.isArray(provisioned)?provisioned[0]:provisioned;
-    licenseKey=String(record?.license_key || licenseCandidate);
-    await supabaseQuery('licenses',{
-      method:'PATCH',query:`license_key=eq.${encodeURIComponent(licenseKey)}`,
-      body:{
-        ea_slug:eaSlug,billing_cycle:cycle,currency,included_live_seats:1,included_demo_seats:2,
-        extra_live_seats:extraSeats,status:'ACTIVE',expires_at:periodEnd.toISOString(),period_ends_at:periodEnd.toISOString(),
-        paystack_subscription_code:subscriptionCode,renewal_reminder_due:false,grace_until:null,account_mode:null,
-      },
-    });
-    const created=await supabaseInsert<Record<string,unknown>>('ea_subscriptions',{
-      initial_reference:reference,license_key:licenseKey,subscription_code:subscriptionCode,email,ea_slug:eaSlug,
-      billing_cycle:cycle,currency,extra_live_seats:extraSeats,status:'ACTIVE',period_ends_at:periodEnd.toISOString(),
-    });
-    const row=Array.isArray(created)?created[0]:created;
-    subscriptionId=String(row?.id || '');
-    if(!subscriptionId) {
-      const rows=await supabaseRead<Array<{id:string}>>('ea_subscriptions',`initial_reference=eq.${encodeURIComponent(reference)}&select=id&limit=1`);
-      subscriptionId=rows?.[0]?.id || '';
-    }
-    if(!subscriptionId) throw new Error('Subscription record could not be confirmed after license provisioning.');
-  }
-  await supabaseInsert('ea_subscription_payments',{
-    reference,subscription_id:subscriptionId,amount_minor:expectedAmount,currency,paid_at:now.toISOString(),
-    period_start:periodStart.toISOString(),period_end:periodEnd.toISOString(),
+  const candidate=`ALGOLYNX-SUB-${randomBytes(8).toString('hex').toUpperCase()}`;
+  const result=await supabaseQuery<Record<string,unknown>>('rpc/provision_or_extend_ea_subscription',{
+    method:'POST',
+    body:{
+      p_reference:reference,p_subscription_code:subscriptionCode,p_email:email,p_ea_slug:eaSlug,
+      p_billing_cycle:cycle,p_currency:currency,p_extra_live_seats:extraSeats,
+      p_amount_minor:expectedAmount,p_license_key_candidate:candidate,
+    },
   });
-  if(intent) await supabaseQuery('ea_subscription_intents',{
-    method:'PATCH',query:`reference=eq.${encodeURIComponent(intent.reference)}`,
-    body:{subscription_code:subscriptionCode || intent.subscription_code,status:'ACTIVE',updated_at:now.toISOString()},
-  });
-  return {license_key:licenseKey,created:!subscription,idempotent_replay:false,period_ends_at:periodEnd.toISOString(),email,ea_slug:eaSlug};
+  if(!result || !result.license_key) throw new Error('Atomic subscription provisioning did not return a license.');
+  return {...result,email,ea_slug:eaSlug};
 }
 
 export async function attachPaystackSubscription(subscriptionCode:string, customerEmail:string, planCode:string) {
