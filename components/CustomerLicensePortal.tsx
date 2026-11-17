@@ -264,14 +264,9 @@ export default function CustomerLicensePortal() {
           {seatMessage && <p role="status" className="text-xs text-slate-400 sm:col-span-2">{seatMessage}</p>}
         </form>
       </section>
-      <section className={`${activeTab==='seats'?'mt-5':'hidden'} rounded-xl border border-amber-300/20 bg-[#11100c] p-5`}>
-        <h2 className="font-semibold">Move license to another MT5 account</h2>
-        <p className="mt-1 text-xs leading-5 text-slate-400">A one-time code is sent to the registered email ({data.masked_email}). A successful transfer immediately moves this license and clears the previous account heartbeat. Only transfer to an account you control.</p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
-          <label className="text-xs text-slate-400">New MT5 account number<input value={newAccount} onChange={e=>setNewAccount(e.target.value)} inputMode="numeric" className="mt-2 h-10 w-full rounded border border-white/10 bg-black/30 px-3 font-mono text-sm text-white" placeholder="New MT5 login"/></label>
-          {!requestId?<button disabled={busy||!newAccount} onClick={()=>void transfer('request')} className="mt-5 rounded border border-amber-300/30 px-4 py-2 text-xs text-amber-100 disabled:opacity-40">SEND EMAIL CODE</button>:<div className="flex gap-2"><input value={code} onChange={e=>setCode(e.target.value)} inputMode="numeric" maxLength={6} placeholder="6-digit code" className="mt-5 min-w-0 rounded border border-white/10 bg-black/30 px-3 font-mono text-sm text-white"/><button disabled={busy||code.length!==6} onClick={()=>void transfer('confirm')} className="mt-5 rounded bg-amber-300 px-4 py-2 text-xs font-semibold text-black disabled:opacity-40">CONFIRM</button></div>}
-        </div>
-        {transferMessage&&<p className="mt-3 text-xs text-emerald-300">{transferMessage}</p>}
+      <section className={`${activeTab==='seats'?'mt-5':'hidden'} rounded-xl border border-cyan-300/20 bg-[#0a111b] p-5`}>
+        <h2 className="font-semibold">72-hour rebind protection</h2>
+        <p className="mt-2 text-xs leading-5 text-slate-400">Every MT5 slot is protected by a server-side 72-hour rebind cooldown. A rebind requires the current slot login and cannot be bypassed through the legacy license-transfer route. The next eligible rebind time is displayed on each slot above.</p>
       </section>
     </>}
     <p className="mt-7 text-center text-[11px] text-slate-600">Protect your license key. FiduLync will never ask for your MT5 investor or master password.</p>
