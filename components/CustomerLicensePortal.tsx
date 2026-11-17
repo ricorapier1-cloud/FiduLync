@@ -16,10 +16,6 @@ export default function CustomerLicensePortal() {
   const [data, setData] = useState<PortalData | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [newAccount, setNewAccount] = useState('');
-  const [requestId, setRequestId] = useState('');
-  const [code, setCode] = useState('');
-  const [transferMessage, setTransferMessage] = useState('');
   const [activeTab, setActiveTab] = useState<'subscriptions'|'seats'|'telemetry'>('subscriptions');
   const [helperBusy, setHelperBusy] = useState(false);
   const [helperMessage, setHelperMessage] = useState('');
@@ -71,30 +67,6 @@ export default function CustomerLicensePortal() {
     finally { setBusy(false); }
   }
 
-  async function transfer(action: 'request' | 'confirm') {
-    setBusy(true); setTransferMessage(''); setError('');
-    try {
-      const response = await fetch('/api/v1/license-transfer', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action, license_key: license, current_mt5_account: account,
-          new_mt5_account: newAccount, request_id: requestId, code,
-        }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Transfer could not be completed.');
-      if (action === 'request') {
-        setRequestId(result.request_id);
-        setTransferMessage(`A confirmation code was sent to ${result.masked_email}. It expires in 10 minutes.`);
-      } else {
-        setAccount(String(result.mt5_account));
-        setRequestId(''); setCode(''); setNewAccount('');
-        setTransferMessage(result.message || 'Account transfer completed.');
-        setData(null);
-      }
-    } catch (e) { setError(e instanceof Error ? e.message : 'Transfer unavailable.'); }
-    finally { setBusy(false); }
-  }
 
   async function downloadEaArtifact() {
     if(!data?.license.ea_slug) { setArtifactMessage('This legacy license is not mapped to an EA.'); return; }
