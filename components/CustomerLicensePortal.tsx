@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 
 type PortalData = {
-  license: { mt5_account: number; tier: string; status: string; expires_at: string | null; created_at: string; ea_slug: string | null; billing_cycle: string | null; included_live_seats: number; included_demo_seats: number; extra_live_seats: number };
+  license: { mt5_account: number; tier: string; status: string; expires_at: string | null; created_at: string; ea_slug: string | null; billing_cycle: string | null; period_ends_at: string | null; included_live_seats: number; included_demo_seats: number; extra_live_seats: number };
   masked_email: string;
   heartbeat: null | { connection_status: string; ea_name: string; balance: number; equity: number; floating_pnl: number; drawdown_pct: number; open_positions: number; updated_at: string };
   trades: Array<{ ticket: string; symbol: string; direction: string; profit_usd: number; r_multiple: number; closed_at_utc: string }>;
@@ -209,8 +209,8 @@ export default function CustomerLicensePortal() {
           ['EA',data.license.ea_slug || 'Legacy license'],
           ['PLAN',data.license.billing_cycle || data.license.tier.replaceAll('_',' ')],
           ['BOUND MT5 ACCOUNT',String(data.license.mt5_account)],
-          ['EXPIRES',data.license.expires_at?new Date(data.license.expires_at).toLocaleDateString():'LIFETIME'],
-        ].map(([label,value])=><div key={label} className="rounded-xl border border-white/10 bg-[#0a111b] p-4"><p className="font-mono text-[9px] text-slate-500">{label}</p><p className="mt-2 text-sm font-semibold">{value}</p></div>)}
+          ['NEXT BILLING',data.license.period_ends_at?new Date(data.license.period_ends_at).toLocaleDateString():data.license.expires_at?new Date(data.license.expires_at).toLocaleDateString():'Not scheduled'],
+        ].map(([label,value])=><div key={label} className="rounded-xl border border-white/10 bg-[#0a111b] p-4"><p className="font-mono text-[9px] text-slate-500">{label}</p><p className="mt-2 text-sm font-semibold">{label==='LICENSE STATUS'?<span className={`rounded px-2 py-1 text-[10px] ${value==='ACTIVE'?'bg-emerald-300/10 text-emerald-200':value==='PAST_DUE'?'bg-amber-300/10 text-amber-200':'bg-slate-300/10 text-slate-200'}`}>{value}</span>:value}</p></div>)}
       </section>
       <section className={`${activeTab==='subscriptions'?'mt-4':'hidden'} rounded-xl border border-white/10 bg-[#0a111b] p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
