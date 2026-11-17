@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { getCachedData } from '@/lib/redisCache';
+import { supabaseRead } from '@/lib/supabaseAdmin';
 
 export type Candle = {
   timestamp: number;
@@ -102,9 +103,62 @@ async function fetchCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promis
   return candles.sort((left, right) => left.timestamp - right.timestamp).slice(-MAX_CANDLES);
 }
 
+type StoredCandle = {
+  installation_id: string;
+  bar_time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+};
+
+async function fetchActiveMt5Candles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promise<Candle[]> {
+  const query = new URLSearchParams({
+    select: 'installation_id,bar_time,open,high,low,close,installation:mt5_installations!inner(status)',
+    symbol: `eq.${pair}`,
+    timeframe: `eq.${timeframe}`,
+    is_closed: 'eq.true',
+    'installation.status': 'eq.active',
+    order: 'bar_time.desc',
+    limit: String(MAX_CANDLES * 3),
+  });
+  const rows = await supabaseRead<Array<StoredCandle>>('mt5_market_candles', query.toString());
+  if (!rows?.length) return [];
+
+  // Never mix bars from different brokers/terminals in one indicator calculation.
+  const byInstallation = new Map<string, StoredCandle[]>();
+  for (const row of rows) {
+    const group = byInstallation.get(row.installation_id) ?? [];
+    group.push(row);
+    byInstallation.set(row.installation_id, group);
+  }
+  const selected = [...byInstallation.values()]
+    .sort((a, b) => Date.parse(b[0].bar_time) - Date.parse(a[0].bar_time))[0];
+  if (!selected) return [];
+
+  const maxAgeMs = timeframe === 'H1' ? 2 * 60 * 60_000
+    : timeframe === 'H4' ? 8 * 60 * 60_000 : 48 * 60 * 60_000;
+  const latest = Date.parse(selected[0].bar_time);
+  if (!Number.isFinite(latest) || Date.now() - latest > maxAgeMs || latest > Date.now() + 5 * 60_000) return [];
+
+  return selected
+    .map((row) => ({
+      timestamp: Date.parse(row.bar_time) / 1000,
+      open: Number(row.open), high: Number(row.high),
+      low: Number(row.low), close: Number(row.close),
+    }))
+    .filter((candle) => Object.values(candle).every(Number.isFinite))
+    .sort((a, b) => a.timestamp - b.timestamp)
+    .slice(-MAX_CANDLES);
+}
+
 async function getCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1') {
-  if (!process.env.MARKET_DATA_PROVIDER_URL?.trim()) return [];
-  return getCachedData(`market:candles:${pair}:${timeframe}`, () => fetchCandles(pair, timeframe), LIVE_PRICE_TTL_SECONDS);
+  return getCachedData(`market:candles:${pair}:${timeframe}`, async () => {
+    const mt5Candles = await fetchActiveMt5Candles(pair, timeframe);
+    if (mt5Candles.length >= 200) return mt5Candles;
+    // Preserve the independent HTTPS provider as a fallback; signal gating still rejects stale/incomplete inputs.
+    return fetchCandles(pair, timeframe);
+  }, LIVE_PRICE_TTL_SECONDS);
 }
 
 function ema(values: number[], period: number): number | null {
@@ -277,7 +331,6 @@ export function calculateTechnicalSignal(pair: string, h1: Candle[], h4: Candle[
 }
 
 export async function getTechnicalSignal(pair: string): Promise<TechnicalSignal> {
-  if (!process.env.MARKET_DATA_PROVIDER_URL?.trim()) return unavailableSignal();
   try {
     return await getCachedData(`technical:signal:${pair}`, async () => {
       const [h1, h4, d1] = await Promise.all([
