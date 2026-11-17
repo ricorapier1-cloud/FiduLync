@@ -244,14 +244,17 @@ bool MacroLyncGetSignal(
    int confluence_score = (int)StringToInteger(response_score);
    double csi_spread = StringToDouble(response_csi_spread);
    double risk_multiplier = StringToDouble(response_risk_multiplier);
+   // Match the server's conservative pilot ceilings. The server returns zero
+   // until data, execution quality, model validation and explicit enablement pass.
    double expected_risk_multiplier = response_news == "true" || response_regime == "HIGH_VOL_CHOP"
       || response_regime == "UNAVAILABLE"
       ? 0.0
-      : response_regime == "TRENDING_EXPANSION" ? 1.0 : 0.5;
+      : response_regime == "TRENDING_EXPANSION" ? 0.5
+      : response_regime == "MEAN_REVERTING" ? 0.25 : 0.0;
    bool atr_values_valid = (response_sl == "null" || ML_IsNumber(response_sl))
       && (response_tp == "null" || ML_IsNumber(response_tp));
    if(confluence_score < -100 || confluence_score > 100 || MathAbs(csi_spread) > 200.0
-      || risk_multiplier != expected_risk_multiplier
+      || (response_safe == "true" ? risk_multiplier != expected_risk_multiplier : risk_multiplier != 0.0)
       || !atr_values_valid
       || (response_safe == "true" && (response_sl == "null" || response_tp == "null"
          || response_news == "true" || response_bias == "NEUTRAL"

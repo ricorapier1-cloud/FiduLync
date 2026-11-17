@@ -21,6 +21,9 @@ export type MarketRegime = 'TRENDING_EXPANSION' | 'MEAN_REVERTING' | 'HIGH_VOL_C
 
 export type TechnicalSignal = {
   available: boolean;
+  data_source: 'mt5' | 'configured_provider' | 'twelve_data' | 'unavailable' | 'unknown';
+  latest_candle_at: string | null;
+  candle_counts: { h1: number; h4: number; d1: number };
   score: number;
   gaussian_z_score: number | null;
   kaufman_efficiency_ratio: number | null;
@@ -37,6 +40,9 @@ const MAX_CANDLES = 1_000;
 function unavailableSignal(): TechnicalSignal {
   return {
     available: false,
+    data_source: 'unavailable',
+    latest_candle_at: null,
+    candle_counts: { h1: 0, h4: 0, d1: 0 },
     score: 0,
     gaussian_z_score: null,
     kaufman_efficiency_ratio: null,
@@ -115,11 +121,17 @@ async function fetchTwelveDataCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1
   if (!candles.every((candle): candle is Candle => candle !== null)) {
     throw new Error('Twelve Data returned an invalid candle series.');
   }
-  const ordered = candles.sort((left, right) => left.timestamp - right.timestamp).slice(-MAX_CANDLES);
+  // Exclude the still-forming candle: only completed bars may enter indicators.
+  const nowSeconds = Date.now() / 1000;
+  const barSeconds = timeframe === 'H1' ? 60 * 60 : timeframe === 'H4' ? 4 * 60 * 60 : 24 * 60 * 60;
+  const ordered = candles
+    .sort((left, right) => left.timestamp - right.timestamp)
+    .filter((candle) => candle.timestamp + barSeconds <= nowSeconds)
+    .slice(-MAX_CANDLES);
   const latest = ordered.at(-1)?.timestamp;
   const maxAgeSeconds = timeframe === 'H1' ? 2 * 60 * 60
     : timeframe === 'H4' ? 8 * 60 * 60 : 48 * 60 * 60;
-  if (latest === undefined || Date.now() / 1000 - latest > maxAgeSeconds || latest > Date.now() / 1000 + 300) {
+  if (latest === undefined || nowSeconds - (latest + barSeconds) > maxAgeSeconds || latest > nowSeconds + 300) {
     throw new Error(`Twelve Data returned stale ${timeframe} candles for ${pair}.`);
   }
   return ordered;
@@ -207,20 +219,26 @@ async function fetchActiveMt5Candles(pair: string, timeframe: 'H1' | 'H4' | 'D1'
     .slice(-MAX_CANDLES);
 }
 
-async function getCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1') {
+type CandleSource = 'mt5' | 'configured_provider' | 'twelve_data' | 'unavailable';
+type CandleSeries = { candles: Candle[]; source: CandleSource };
+
+async function getCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promise<CandleSeries> {
   return getCachedData(`market:candles:${pair}:${timeframe}`, async () => {
     const mt5Candles = await fetchActiveMt5Candles(pair, timeframe);
-    if (mt5Candles.length >= 200) return mt5Candles;
+    if (mt5Candles.length >= 200) return { candles: mt5Candles, source: 'mt5' as const };
     // Keep providers isolated: never splice OHLC bars from different feeds into one indicator series.
     const configuredProvider = await fetchCandles(pair, timeframe).catch((error) => {
       console.warn(`Configured market data provider unavailable for ${pair} ${timeframe}.`, error);
       return [];
     });
-    if (configuredProvider.length >= 200) return configuredProvider;
-    return fetchTwelveDataCandles(pair, timeframe).catch((error) => {
+    if (configuredProvider.length >= 200) return { candles: configuredProvider, source: 'configured_provider' as const };
+    const twelveData = await fetchTwelveDataCandles(pair, timeframe).catch((error) => {
       console.warn(`Twelve Data unavailable for ${pair} ${timeframe}; technical execution remains disabled.`, error);
       return [];
     });
+    return twelveData.length >= 200
+      ? { candles: twelveData, source: 'twelve_data' as const }
+      : { candles: [], source: 'unavailable' as const };
   }, LIVE_PRICE_TTL_SECONDS);
 }
 
@@ -376,6 +394,9 @@ export function calculateTechnicalSignal(pair: string, h1: Candle[], h4: Candle[
 
   return {
     available: true,
+    data_source: 'unknown',
+    latest_candle_at: null,
+    candle_counts: { h1: h1.length, h4: h4.length, d1: d1.length },
     score,
     gaussian_z_score: Number(normalizedZ.toFixed(3)),
     kaufman_efficiency_ratio: Number(ker.toFixed(3)),
@@ -396,12 +417,37 @@ export function calculateTechnicalSignal(pair: string, h1: Candle[], h4: Candle[
 export async function getTechnicalSignal(pair: string): Promise<TechnicalSignal> {
   try {
     return await getCachedData(`technical:signal:${pair}`, async () => {
-      const [h1, h4, d1] = await Promise.all([
+      const [h1Series, h4Series, d1Series] = await Promise.all([
         getCandles(pair, 'H1'),
         getCandles(pair, 'H4'),
         getCandles(pair, 'D1'),
       ]);
-      return calculateTechnicalSignal(pair, h1, h4, d1);
+      const candleCounts = {
+        h1: h1Series.candles.length,
+        h4: h4Series.candles.length,
+        d1: d1Series.candles.length,
+      };
+      const sameSource = h1Series.source === h4Series.source && h4Series.source === d1Series.source;
+      if (!sameSource || h1Series.source === 'unavailable') {
+        console.warn(`Technical analysis for ${pair} blocked: timeframe data sources do not match.`);
+        return { ...unavailableSignal(), candle_counts: candleCounts };
+      }
+      const h1 = h1Series.candles;
+      const h4 = h4Series.candles;
+      const d1 = d1Series.candles;
+      const calculated = calculateTechnicalSignal(pair, h1, h4, d1);
+      if (!calculated.available) return { ...calculated, candle_counts: candleCounts };
+      const latestTimestamp = Math.min(
+        h1.at(-1)?.timestamp ?? 0,
+        h4.at(-1)?.timestamp ?? 0,
+        d1.at(-1)?.timestamp ?? 0,
+      );
+      return {
+        ...calculated,
+        data_source: h1Series.source,
+        latest_candle_at: latestTimestamp > 0 ? new Date(latestTimestamp * 1000).toISOString() : null,
+        candle_counts: candleCounts,
+      };
     }, LIVE_PRICE_TTL_SECONDS);
   } catch (error) {
     console.warn(`Technical data unavailable for ${pair}; execution filters are disabled.`, error);

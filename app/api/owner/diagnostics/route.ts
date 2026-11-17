@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { timingSafeEqual } from 'node:crypto';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { requireOwner } from '@/lib/ownerAuth';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -30,14 +31,18 @@ async function requestOk(url: URL | string, init?: RequestInit) {
 }
 
 export async function GET(request: Request) {
+  const owner = await requireOwner(request);
   const expectedKey = process.env.ALGO_PRIVATE_API_KEY?.trim() ?? '';
   const providedKey = request.headers.get('x-algo-key')?.trim() ?? '';
   const expected = Buffer.from(expectedKey);
   const provided = Buffer.from(providedKey);
-  if (!expected.length || expected.length !== provided.length || !timingSafeEqual(expected, provided)) {
-    return NextResponse.json({ error: 'Unauthorized.' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
+  const serviceAuthorized = expected.length > 0
+    && expected.length === provided.length
+    && timingSafeEqual(expected, provided);
+  if (!owner && !serviceAuthorized) {
+    return NextResponse.json({ error: 'Owner authentication required.' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
   }
-  if (!checkRateLimit(getClientIp(request), 5, 60_000)) {
+  if (!checkRateLimit(owner?.id ?? getClientIp(request), 5, 60_000)) {
     return NextResponse.json({ error: 'Diagnostics rate limit exceeded.' }, { status: 429, headers: { 'Cache-Control': 'no-store' } });
   }
 
@@ -83,6 +88,26 @@ export async function GET(request: Request) {
     const data = await response.json() as { status?: string; Results?: { series?: unknown[] } };
     if (data.status !== 'REQUEST_SUCCEEDED' || !Array.isArray(data.Results?.series)) {
       throw new Error('BLS rejected the request or returned no series.');
+    }
+  }));
+
+  if (process.env.TWELVE_DATA_API_KEY?.trim()) tasks.push(probe('twelve_data', async () => {
+    const url = new URL('https://api.twelvedata.com/time_series');
+    url.searchParams.set('symbol', 'EUR/USD');
+    url.searchParams.set('interval', '1h');
+    url.searchParams.set('outputsize', '2');
+    url.searchParams.set('timezone', 'UTC');
+    url.searchParams.set('apikey', required('TWELVE_DATA_API_KEY'));
+    const response = await requestOk(url);
+    const data = await response.json() as { status?: string; code?: number; message?: string; values?: Array<{ datetime?: string; open?: string; high?: string; low?: string; close?: string }> };
+    if (data.status === 'error' || !Array.isArray(data.values) || data.values.length < 1) {
+      // Do not return provider error text: some gateways echo request metadata.
+      throw new Error(data.code ? `Twelve Data rejected the request (provider code ${data.code}).` : 'Twelve Data returned no valid candles.');
+    }
+    const candle = data.values[0];
+    const prices = [candle.open, candle.high, candle.low, candle.close].map(Number);
+    if (!candle.datetime || !prices.every((value) => Number.isFinite(value) && value > 0)) {
+      throw new Error('Twelve Data response did not contain a valid OHLC candle.');
     }
   }));
 
@@ -134,7 +159,7 @@ export async function GET(request: Request) {
   for (const [name, check] of results) checks[name] = check;
 
   for (const [name, variable] of [
-    ['fred', 'FRED_API_KEY'], ['bea', 'BEA_API_KEY'], ['bls', 'BLS_API_KEY'],
+    ['fred', 'FRED_API_KEY'], ['bea', 'BEA_API_KEY'], ['bls', 'BLS_API_KEY'], ['twelve_data', 'TWELVE_DATA_API_KEY'],
     ['finnhub', 'FINNHUB_API_KEY'], ['gemini', 'GEMINI_API_KEY'],
     ['paystack', 'PAYSTACK_SECRET_KEY'],
   ] as const) {

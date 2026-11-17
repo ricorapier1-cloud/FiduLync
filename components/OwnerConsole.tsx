@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 type Session = { access_token: string; user: { email?: string } };
+type DiagnosticSummary = { checked_at: string; overall: string; summary: { checks: number; errors: number; blockers: number }; checks: Record<string, { status: string; detail: string }> };
 type Installation = { id: string; label: string; status: string; broker: string | null; server: string | null; last_seen_at: string | null; created_at: string };
 
 export default function OwnerConsole() {
@@ -19,6 +20,9 @@ export default function OwnerConsole() {
   const [broker, setBroker] = useState('IC Markets');
   const [server, setServer] = useState('');
   const [publisherToken, setPublisherToken] = useState('');
+  const [diagnostics, setDiagnostics] = useState<DiagnosticSummary | null>(null);
+  const [diagnosticsBusy, setDiagnosticsBusy] = useState(false);
+  const [diagnosticsError, setDiagnosticsError] = useState('');
 
   const supabase = useMemo<SupabaseClient | null>(() => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -41,6 +45,7 @@ export default function OwnerConsole() {
   useEffect(() => {
     if (session?.access_token && session.user.email?.toLowerCase() === 'ricorapier1@gmail.com') {
       void loadInstallations(session.access_token);
+      void loadDiagnostics(session.access_token);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.access_token, session?.user.email]);
@@ -52,6 +57,24 @@ export default function OwnerConsole() {
       if (!response.ok) throw new Error(data.error || 'Unable to load MT5 publishers.');
       setInstallations(data.installations ?? []);
     } catch (e) { setError(e instanceof Error ? e.message : 'MT5 publisher list unavailable.'); }
+  }
+
+  async function loadDiagnostics(token: string) {
+    setDiagnosticsBusy(true);
+    setDiagnosticsError('');
+    try {
+      const response = await fetch('/api/owner/diagnostics', {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Provider diagnostics are unavailable.');
+      setDiagnostics(data as DiagnosticSummary);
+    } catch (e) {
+      setDiagnosticsError(e instanceof Error ? e.message : 'Provider diagnostics are unavailable.');
+    } finally {
+      setDiagnosticsBusy(false);
+    }
   }
 
   async function sendLoginLink() {
@@ -170,6 +193,32 @@ export default function OwnerConsole() {
           <h3 className="font-mono text-[10px] text-slate-400">REGISTERED TERMINALS</h3>
           {installations.length===0 ? <p className="mt-3 text-xs text-slate-500">No publisher terminals registered.</p> : <div className="mt-3 space-y-2">{installations.map(item=><div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-white/10 p-3"><div><p className="text-sm">{item.label}</p><p className="mt-1 text-[10px] text-slate-500">{item.broker||'Broker pending'} · {item.server||'Server pending'} · Last seen: {item.last_seen_at?new Date(item.last_seen_at).toLocaleString():'Never'}</p></div><div className="flex items-center gap-3"><span className={item.status==='active'?'text-emerald-300':'text-rose-300'}>{item.status.toUpperCase()}</span>{item.status==='active'&&<button disabled={busy} onClick={()=>void revokePublisher(item.id)} className="rounded border border-rose-300/20 px-2 py-1 text-[10px] text-rose-200 disabled:opacity-40">Revoke</button>}</div></div>)}</div>}
         </div>
+      </section>
+      <section className="mb-5 rounded-xl border border-white/10 bg-[#0a111b] p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="font-mono text-[10px] text-violet-300">03 / PROVIDER HEALTH & READINESS</p>
+            <h2 className="mt-2 text-lg font-semibold">Secure integration diagnostics</h2>
+            <p className="mt-1 text-xs text-slate-400">Server-side credential checks. Secret values are never displayed.</p>
+          </div>
+          <button disabled={diagnosticsBusy} onClick={()=>session?.access_token && void loadDiagnostics(session.access_token)} className="rounded border border-white/15 px-3 py-2 text-xs text-slate-200 disabled:opacity-40">{diagnosticsBusy?'CHECKING…':'REFRESH CHECKS'}</button>
+        </div>
+        {diagnosticsError && <p role="alert" className="mt-3 text-xs text-rose-300">{diagnosticsError}</p>}
+        {diagnostics && <>
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <div className="rounded border border-white/10 p-3"><p className="text-[10px] text-slate-500">CHECKS</p><p className="mt-1 text-xl font-semibold">{diagnostics.summary.checks}</p></div>
+            <div className="rounded border border-white/10 p-3"><p className="text-[10px] text-slate-500">ERRORS</p><p className="mt-1 text-xl font-semibold text-rose-300">{diagnostics.summary.errors}</p></div>
+            <div className="rounded border border-white/10 p-3"><p className="text-[10px] text-slate-500">BLOCKERS</p><p className="mt-1 text-xl font-semibold text-amber-200">{diagnostics.summary.blockers}</p></div>
+          </div>
+          <p className="mt-3 text-[10px] font-mono text-slate-500">OVERALL: {diagnostics.overall.toUpperCase()} · {new Date(diagnostics.checked_at).toLocaleString()}</p>
+          <div className="mt-3 space-y-2">
+            {Object.entries(diagnostics.checks).map(([name, check])=><div key={name} className="flex flex-wrap items-start justify-between gap-2 rounded border border-white/10 p-3">
+              <div className="min-w-0 flex-1"><p className="text-xs font-medium uppercase tracking-wide">{name.replaceAll('_',' ')}</p><p className="mt-1 break-words text-[11px] leading-4 text-slate-400">{check.detail}</p></div>
+              <span className={`rounded px-2 py-1 text-[9px] font-semibold uppercase ${check.status==='ok'?'bg-emerald-300/10 text-emerald-200':check.status==='error'?'bg-rose-300/10 text-rose-200':check.status==='unknown'?'bg-sky-300/10 text-sky-200':'bg-amber-300/10 text-amber-200'}`}>{check.status.replaceAll('_',' ')}</span>
+            </div>)}
+          </div>
+        </>}
+        {!diagnostics && !diagnosticsError && <p className="mt-4 text-xs text-slate-500">Loading secure provider checks…</p>}
       </section>
     </>}
     <p className="text-xs leading-5 text-slate-600">Trading signals remain disabled when MT5 candles are missing, stale, incomplete, or fail technical and macro validation. API access alone does not mean a live market feed is connected.</p>

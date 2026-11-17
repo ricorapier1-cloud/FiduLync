@@ -35,6 +35,11 @@ type SignalResult = {
   correlation_group: string;
   news_lockout: boolean;
   safe_to_trade: boolean;
+  execution_blockers: string[];
+  risk_mode: 'DISABLED' | 'PILOT_TREND' | 'PILOT_MEAN_REVERSION';
+  market_data_source: 'mt5' | 'configured_provider' | 'twelve_data' | 'unavailable' | 'unknown';
+  latest_market_candle_at: string | null;
+  market_candle_counts: { h1: number; h4: number; d1: number };
   timestamp_utc: string;
 };
 
@@ -74,6 +79,13 @@ function isSignalResult(value: unknown): value is SignalResult {
     && typeof result.correlation_group === 'string'
     && typeof result.news_lockout === 'boolean'
     && typeof result.safe_to_trade === 'boolean'
+    && Array.isArray(result.execution_blockers)
+    && result.execution_blockers.every((item) => typeof item === 'string')
+    && typeof result.risk_mode === 'string'
+    && typeof result.market_data_source === 'string'
+    && (result.latest_market_candle_at === null || typeof result.latest_market_candle_at === 'string')
+    && typeof result.market_candle_counts === 'object'
+    && result.market_candle_counts !== null
     && typeof result.timestamp_utc === 'string';
 }
 
@@ -281,10 +293,18 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
                   <Metric label="KILLZONE" value={signal.killzone_active} />
                   <Metric label="CSI SPREAD" value={String(signal.csi_spread)} />
                   <Metric label="RISK MULTIPLIER" value={`${signal.risk_multiplier.toFixed(2)}×`} />
+                  <Metric label="RISK MODE" value={signal.risk_mode} />
+                  <Metric label="CANDLE SOURCE" value={signal.market_data_source.toUpperCase()} />
+                  <Metric label="CANDLE COVERAGE" value={`H1 ${signal.market_candle_counts.h1} · H4 ${signal.market_candle_counts.h4} · D1 ${signal.market_candle_counts.d1}`} />
+                  <Metric label="LATEST CLOSED BAR" value={signal.latest_market_candle_at ? new Date(signal.latest_market_candle_at).toLocaleString() : "Unavailable"} />
                   <Metric label="CORRELATION GROUP" value={signal.correlation_group} />
                   <Metric label="ATR STOP" value={signal.atr_sl_pips === null ? '425 bps (G8)' : `${signal.atr_sl_pips} pips`} />
                   <Metric label="ATR TARGET" value={signal.atr_tp_pips === null ? '425 bps (G8)' : `${signal.atr_tp_pips} pips`} />
                 </div>
+                {!signal.safe_to_trade && <div className="mt-3 rounded border border-amber-300/15 bg-amber-300/5 p-3">
+                  <p className="font-mono text-[9px] tracking-wide text-amber-200">EXECUTION BLOCKERS</p>
+                  <p className="mt-1 text-[10px] leading-5 text-slate-300">{signal.execution_blockers.join(' · ') || 'Execution permission is not enabled.'}</p>
+                </div>}
               </div>
             )}
           </div>
