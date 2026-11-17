@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { isSupabaseConfigured, supabaseInsert, supabaseRead } from '@/lib/supabaseAdmin';
+import { getSupabaseAdmin } from '@/lib/serverSupabase';
 
 export const dynamic = 'force-dynamic';
 type Currency = 'NGN' | 'USD';
@@ -25,10 +26,11 @@ export async function POST(request: Request) {
       return NextResponse.json({success:false,error:'Valid email, EA slug and supported extra-seat quantity are required.'},{status:400});
     }
     const products = await supabaseRead<Array<Record<string, unknown>>>('ea_products',
-      `slug=eq.${encodeURIComponent(eaSlug)}&select=slug,name,is_active,monthly_price_ngn,monthly_price_usd,annual_price_ngn,annual_price_usd,extra_seat_price_ngn,extra_seat_price_usd,included_live_seats,included_demo_seats,ex5_artifact_url&limit=1`);
+      `slug=eq.${encodeURIComponent(eaSlug)}&select=slug,name,is_active,monthly_price_ngn,monthly_price_usd,annual_price_ngn,annual_price_usd,extra_seat_price_ngn,extra_seat_price_usd,included_live_seats,included_demo_seats&limit=1`);
     const product = products?.[0];
-    if (!product || product.is_active !== true || eaSlug === 'macro-atr-breakout' || !product.ex5_artifact_url) {
-      return NextResponse.json({success:false,error:'This commercial EA is not approved for sale yet or its compiled .ex5 release artifact is missing.'},{status:409});
+    const artifact = product ? await getSupabaseAdmin().from('ea_product_artifacts').select('release_approved,storage_path,sha256,size_bytes').eq('ea_slug',eaSlug).maybeSingle() : null;
+    if (!product || product.is_active !== true || eaSlug === 'macro-atr-breakout' || !artifact?.data?.release_approved || !artifact.data.storage_path || !artifact.data.sha256 || !artifact.data.size_bytes) {
+      return NextResponse.json({success:false,error:'This commercial EA is not approved for sale yet or its compiled .ex5 release artifact is missing or unapproved.'},{status:409});
     }
     const base = currency === 'NGN'
       ? Number(cycle === 'MONTHLY' ? product.monthly_price_ngn : product.annual_price_ngn)
