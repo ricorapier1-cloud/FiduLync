@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { requireOwner } from '@/lib/ownerAuth';
-import { supabaseInsert, supabaseRead } from '@/lib/supabaseAdmin';
+import { supabaseInsert, supabaseQuery, supabaseRead } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -40,10 +40,14 @@ export async function POST(request: Request) {
       status: 'active', broker, server,
     });
     if (!rows?.[0]?.id) throw new Error('Installation record was not created.');
-    await supabaseInsert('fidulync_owner_audit', {
-      owner_email: owner.email, action: 'MT5_INSTALLATION_CREATED', subject_id: rows[0].id,
-      metadata: { label, broker, server },
-    });
+    try {
+      await supabaseInsert('fidulync_owner_audit', {
+        owner_email: owner.email, action: 'MT5_INSTALLATION_CREATED', subject_id: rows[0].id,
+        metadata: { label, broker, server },
+      });
+    } catch (auditError) {
+      console.error('MT5 installation audit insert failed:', auditError);
+    }
     return NextResponse.json({
       success: true,
       installation: { id: rows[0].id, label },
@@ -53,5 +57,36 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('MT5 installation creation failed:', error);
     return NextResponse.json({ error: 'MT5 publisher could not be registered.' }, { status: 503 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  const owner = await requireOwner(request);
+  if (!owner) return NextResponse.json({ error: 'Owner authentication required.' }, { status: 401 });
+  let body: unknown;
+  try { body = await request.json(); } catch {
+    return NextResponse.json({ error: 'A valid JSON request is required.' }, { status: 400 });
+  }
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
+  const id = typeof (body as Record<string, unknown>).id === 'string' ? (body as Record<string, unknown>).id as string : '';
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ error: 'Invalid installation ID.' }, { status: 400 });
+  try {
+    const rows = await supabaseQuery<Array<{ id: string }>>('mt5_installations', {
+      method: 'PATCH',
+      query: `id=eq.${id}&user_id=eq.${owner.id}&status=eq.active`,
+      prefer: 'return=representation',
+      body: { status: 'revoked' },
+    });
+    if (!rows?.length) return NextResponse.json({ error: 'Active installation was not found for this owner.' }, { status: 404 });
+    try {
+      await supabaseInsert('fidulync_owner_audit', {
+        owner_email: owner.email, action: 'MT5_INSTALLATION_REVOKED', subject_id: id,
+        metadata: { revoked_at: new Date().toISOString() },
+      });
+    } catch (auditError) { console.error('MT5 revocation audit insert failed:', auditError); }
+    return NextResponse.json({ success: true, id, status: 'revoked' }, { headers: { 'Cache-Control': 'no-store' } });
+  } catch (error) {
+    console.error('MT5 installation revocation failed:', error);
+    return NextResponse.json({ error: 'Installation could not be revoked.' }, { status: 503 });
   }
 }
