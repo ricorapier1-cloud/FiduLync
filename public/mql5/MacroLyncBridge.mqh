@@ -254,7 +254,7 @@ bool MacroLyncGetSignal(
    bool atr_values_valid = (response_sl == "null" || ML_IsNumber(response_sl))
       && (response_tp == "null" || ML_IsNumber(response_tp));
    if(confluence_score < -100 || confluence_score > 100 || MathAbs(csi_spread) > 200.0
-      || risk_multiplier != expected_risk_multiplier
+      || (response_safe == "true" ? risk_multiplier != expected_risk_multiplier : risk_multiplier != 0.0)
       || !atr_values_valid
       || (response_safe == "true" && (response_sl == "null" || response_tp == "null"
          || response_news == "true" || response_bias == "NEUTRAL"
