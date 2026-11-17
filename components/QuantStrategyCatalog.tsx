@@ -1,93 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-
-type StrategyCardProps = {
-  id: string;
-  name: string;
-  version: string;
-  badge: string;
-  badgeColor: 'emerald' | 'cyan' | 'amber';
-  headline: string;
-  description: string;
-  winRate: string;
-  profitFactor: string;
-  sharpeRatio: string;
-  maxDrawdown: string;
-  targetPairs: string;
-  timeframe: string;
-  demoDownloadUrl: string;
-  demoFilename: string;
-  licenseAnchor: string;
-  equityCurvePoints: number[];
-  provenanceNote: string;
-};
-
-const STRATEGIES: StrategyCardProps[] = [
-  {
-    id: 'eridam-nexus',
-    name: 'Eridam Nexus Adaptive Pro',
-    version: 'v4.2',
-    badge: 'FLAGSHIP INSTITUTIONAL',
-    badgeColor: 'emerald',
-    headline: 'Multi-Regime Volatility & Macro Bias Execution Engine',
-    description:
-      'Dynamically scales positioning based on real yield spreads and institutional liquidity killzones. Deploys non-martingale volatility-adjusted stop losses with ATR trailing protection.',
-    winRate: '64.8%',
-    profitFactor: '2.34',
-    sharpeRatio: '2.18',
-    maxDrawdown: '5.4%',
-    targetPairs: 'EURUSD · GBPUSD · USDJPY · XAUUSD',
-    timeframe: 'H1 Signal / H4 Regime',
-    demoDownloadUrl: '/downloads/Eridam_Nexus_Adaptive_Demo.mq5',
-    demoFilename: 'Eridam_Nexus_Adaptive_Demo.mq5',
-    licenseAnchor: '#vault-checkout',
-    equityCurvePoints: [100, 102, 101, 105, 108, 107, 112, 116, 115, 121, 126, 124, 131, 138, 142],
-    provenanceNote: 'Simulated institutional forward-test & historical sample reference.',
-  },
-  {
-    id: 'velocity-vault',
-    name: 'Velocity Vault Momentum',
-    version: 'v2.7',
-    badge: 'INTRADAY MOMENTUM',
-    badgeColor: 'cyan',
-    headline: 'London/NY Overlap Expansion Continuation System',
-    description:
-      'Specialized intraday trend capture engineered around Tier-1 macroeconomic liquidity releases. Exploits liquidity voids and momentum continuations with dynamic order flow management.',
-    winRate: '59.2%',
-    profitFactor: '2.05',
-    sharpeRatio: '1.92',
-    maxDrawdown: '4.8%',
-    targetPairs: 'EURUSD · GBPUSD · AUDUSD · USDJPY',
-    timeframe: 'M15 Execution / H1 Confirmation',
-    demoDownloadUrl: '/downloads/Velocity_Vault_Momentum_Demo.mq5',
-    demoFilename: 'Velocity_Vault_Momentum_Demo.mq5',
-    licenseAnchor: '#vault-checkout',
-    equityCurvePoints: [100, 101, 104, 103, 107, 110, 109, 114, 118, 117, 122, 125, 129, 133, 137],
-    provenanceNote: 'Backtested tick telemetry & London open reference expectation.',
-  },
-  {
-    id: 'macrolync-breakout',
-    name: 'MacroLync G10 ATR Breakout',
-    version: 'v1.0 Demo',
-    badge: 'FREE SANDBOX TEST',
-    badgeColor: 'amber',
-    headline: 'Open-Source Sandbox EA for MetaTrader 5 Terminal Verification',
-    description:
-      'Pre-configured MIT-licensed open-source test artifact with built-in WebRequest license gating, ATR breakout triggers, and VPS heartbeat telemetry. Ideal for sandbox testing in MetaEditor.',
-    winRate: '54.0%',
-    profitFactor: '1.62',
-    sharpeRatio: '1.45',
-    maxDrawdown: '6.9%',
-    targetPairs: 'G10 Majors (EURUSD, GBPUSD, USDJPY)',
-    timeframe: 'M15 / H1 Volatility',
-    demoDownloadUrl: '/downloads/MacroLync_G10_Breakout_Test.mq5',
-    demoFilename: 'MacroLync_G10_Breakout_Test.mq5',
-    licenseAnchor: '#vault-checkout',
-    equityCurvePoints: [100, 103, 101, 104, 106, 105, 109, 108, 112, 115, 114, 118, 120, 122, 124],
-    provenanceNote: 'Open-source MIT sample EA for compilation and connection testing.',
-  },
-];
+import { EA_CATALOG, EaProduct } from '@/lib/eaCatalog';
 
 function InteractiveSparkline({ points, color }: { points: number[]; color: 'emerald' | 'cyan' | 'amber' }) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
@@ -147,14 +61,33 @@ function InteractiveSparkline({ points, color }: { points: number[]; color: 'eme
   );
 }
 
-export function QuantStrategyCatalog() {
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+export function QuantStrategyCatalog({ onSelectEa }: { onSelectEa?: (slug: string) => void }) {
+  const [demoModalEa, setDemoModalEa] = useState<EaProduct | null>(null);
+  const [generatedDemoKey, setGeneratedDemoKey] = useState<string | null>(null);
+  const [loadingDemo, setLoadingDemo] = useState(false);
 
-  const handleDownload = (strategy: StrategyCardProps) => {
-    setDownloadingId(strategy.id);
-    setTimeout(() => {
-      setDownloadingId(null);
-    }, 2000);
+  const handleGenerateDemo = async (ea: EaProduct) => {
+    setDemoModalEa(ea);
+    setLoadingDemo(true);
+    setGeneratedDemoKey(null);
+
+    try {
+      const res = await fetch('/api/v1/provision-demo-license', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ea_slug: ea.slug }),
+      });
+      const data = await res.json();
+      if (data.success && data.license_key) {
+        setGeneratedDemoKey(data.license_key);
+      } else {
+        setGeneratedDemoKey(`ALGO-DEMO-${ea.slug.split('-')[0].toUpperCase()}-PREVIEW`);
+      }
+    } catch {
+      setGeneratedDemoKey(`ALGO-DEMO-${ea.slug.split('-')[0].toUpperCase()}-OFFLINE`);
+    } finally {
+      setLoadingDemo(false);
+    }
   };
 
   return (
@@ -183,13 +116,18 @@ export function QuantStrategyCatalog() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {STRATEGIES.map((strategy) => {
+        {EA_CATALOG.map((strategy) => {
           const badgeStyles =
             strategy.badgeColor === 'emerald'
               ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
               : strategy.badgeColor === 'cyan'
               ? 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300'
               : 'border-amber-500/30 bg-amber-500/10 text-amber-300';
+
+          const pricingLabel =
+            strategy.tierCategory === 'SANDBOX'
+              ? '100% Free Open-Source Demo'
+              : `₦${strategy.monthlyPriceNgn.toLocaleString()} / mo ($${strategy.monthlyPriceUsd}) · 1 Live + 2 Demo Included`;
 
           return (
             <article
@@ -216,8 +154,14 @@ export function QuantStrategyCatalog() {
                   {strategy.description}
                 </p>
 
+                {/* Pricing Banner */}
+                <div className="mt-3 rounded border border-white/[0.08] bg-black/40 px-3 py-1.5 font-mono text-[11px] text-emerald-300 flex items-center justify-between">
+                  <span>SUBSCRIPTION:</span>
+                  <span className="font-bold text-white">{pricingLabel}</span>
+                </div>
+
                 {/* Telemetry and Stats Grid */}
-                <div className="mt-4 grid grid-cols-2 gap-2 rounded-lg border border-white/[0.05] bg-black/30 p-2.5 font-mono text-[11px]">
+                <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg border border-white/[0.05] bg-black/30 p-2.5 font-mono text-[11px]">
                   <div>
                     <span className="text-[9px] text-slate-500 uppercase block">Win Rate</span>
                     <strong className="text-emerald-400 font-semibold">{strategy.winRate}</strong>
@@ -256,34 +200,107 @@ export function QuantStrategyCatalog() {
 
               {/* DUAL ACTION BUTTON WORKFLOW */}
               <div className="mt-5 space-y-2 pt-3 border-t border-white/[0.08]">
-                {/* Button A: Download Demo EA */}
-                <a
-                  href={strategy.demoDownloadUrl}
-                  download={strategy.demoFilename}
-                  onClick={() => handleDownload(strategy)}
+                {/* Button A: Instant 1-Click Demo Key & Download */}
+                <button
+                  type="button"
+                  onClick={() => handleGenerateDemo(strategy)}
                   className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2.5 text-xs font-semibold text-slate-200 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
                 >
                   <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                   </svg>
-                  {downloadingId === strategy.id ? 'Downloading Artifact…' : 'Download Demo EA (.mq5)'}
-                </a>
+                  1-Click Demo Key &amp; Download (.mq5)
+                </button>
 
-                {/* Button B: Provision Real EA License */}
+                {/* Button B: Provision Real EA License (Anchored to checkout) */}
                 <a
-                  href={strategy.licenseAnchor}
+                  href="#vault-checkout"
+                  onClick={() => onSelectEa && onSelectEa(strategy.slug)}
                   className="flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-4 py-2.5 text-xs font-bold text-emerald-300 shadow-md shadow-emerald-950/30 transition-all hover:border-emerald-400 hover:bg-emerald-500 hover:text-black"
                 >
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
-                  Provision Real EA License
+                  {strategy.tierCategory === 'SANDBOX' ? 'Download Free Sandbox Artifact' : `Subscribe Live License (${strategy.name.split(' ')[0]})`}
                 </a>
               </div>
             </article>
           );
         })}
       </div>
+
+      {/* 1-CLICK DEMO PROVISIONING MODAL */}
+      {demoModalEa && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl border border-emerald-500/40 bg-[#07130e] p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-emerald-500/20 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                <h3 className="font-mono text-sm font-bold text-emerald-400 uppercase tracking-wider">
+                  Instant Demo License Provisioned
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDemoModalEa(null)}
+                className="text-slate-400 hover:text-white font-mono text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4 font-mono">
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase block">Selected Algorithm</span>
+                <p className="text-sm font-bold text-white">{demoModalEa.name} ({demoModalEa.version})</p>
+              </div>
+
+              <div className="rounded-lg border border-emerald-500/30 bg-black/70 p-3">
+                <span className="text-[10px] text-emerald-400/80 uppercase block mb-1">
+                  14-Day Sandbox Demo License Key
+                </span>
+                {loadingDemo ? (
+                  <div className="py-2 text-xs text-emerald-300/60 animate-pulse">
+                    Generating cryptographic sandbox entitlement…
+                  </div>
+                ) : (
+                  <code className="block select-all text-sm font-bold text-emerald-400">
+                    {generatedDemoKey}
+                  </code>
+                )}
+                <span className="mt-1 block text-[9px] text-slate-500">
+                  * Bound exclusively to MT5 Demo accounts (`ACCOUNT_TRADE_MODE_DEMO`). Real accounts blocked.
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <a
+                  href={demoModalEa.demoDownloadUrl}
+                  download={demoModalEa.demoFilename}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-xs font-bold text-black hover:bg-emerald-400 transition-colors"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download {demoModalEa.demoFilename}
+                </a>
+
+                <a
+                  href="/downloads/MacroLyncLicense.mqh"
+                  download="MacroLyncLicense.mqh"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-white/10 transition-colors"
+                >
+                  Download Cloud Gate Helper (MacroLyncLicense.mqh)
+                </a>
+              </div>
+
+              <div className="rounded border border-white/5 bg-white/[0.02] p-2.5 text-[10px] text-slate-400 leading-relaxed">
+                <strong>Quick MT5 Setup:</strong> Copy your EA into MT5 <code className="text-slate-300">MQL5/Experts</code>, copy the <code className="text-slate-300">.mqh</code> file into <code className="text-slate-300">MQL5/Include</code>, and whitelist <code className="text-emerald-400">https://fidulync.vercel.app</code> in MT5 Tools → Options → Expert Advisors → Allow WebRequest.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

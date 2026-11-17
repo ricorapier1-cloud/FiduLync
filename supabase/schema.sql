@@ -74,3 +74,40 @@ CREATE TABLE IF NOT EXISTS public.trade_ledger (
 CREATE INDEX IF NOT EXISTS trade_ledger_account_closed_idx ON public.trade_ledger (mt5_account, closed_at_utc DESC);
 CREATE INDEX IF NOT EXISTS ea_heartbeats_license_account_idx ON public.ea_heartbeats (license_key, mt5_account);
 ALTER TABLE public.trade_ledger ENABLE ROW LEVEL SECURITY;
+
+-- Expert Advisors Catalog
+CREATE TABLE IF NOT EXISTS public.expert_advisors (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  version TEXT NOT NULL DEFAULT '1.0.0',
+  description TEXT,
+  tier_category TEXT NOT NULL DEFAULT 'PRO',
+  monthly_price_ngn NUMERIC NOT NULL DEFAULT 65000,
+  monthly_price_usd NUMERIC NOT NULL DEFAULT 49,
+  lifetime_price_ngn NUMERIC DEFAULT 250000,
+  lifetime_price_usd NUMERIC DEFAULT 199,
+  paystack_plan_code_ngn TEXT,
+  max_live_accounts INT NOT NULL DEFAULT 1,
+  max_demo_accounts INT NOT NULL DEFAULT 2,
+  download_demo_path TEXT NOT NULL DEFAULT '/downloads/MacroLync_G10_Breakout_Test.mq5',
+  download_live_path TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Multi-Account Seat Binding with 72-Hour Cooldown
+CREATE TABLE IF NOT EXISTS public.license_bound_accounts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  license_key TEXT NOT NULL REFERENCES public.licenses(license_key) ON DELETE CASCADE,
+  account_number BIGINT NOT NULL,
+  account_type TEXT NOT NULL DEFAULT 'LIVE' CHECK (account_type IN ('LIVE', 'DEMO')),
+  broker_server TEXT,
+  rebind_cooldown_until TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT license_bound_account_unique UNIQUE (license_key, account_number)
+);
+
+ALTER TABLE public.expert_advisors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.license_bound_accounts ENABLE ROW LEVEL SECURITY;

@@ -90,6 +90,7 @@ function isSignalResult(value: unknown): value is SignalResult {
 }
 
 export default function StoreTerminal({ initialFleet, telemetryError, bridgeSource, initialSnapshot, initialTradeExpectancy, session }: StoreTerminalProps) {
+  const [selectedEaSlug, setSelectedEaSlug] = useState('eridam-nexus-pro');
   const router = useRouter();
   const [symbol, setSymbol] = useState('EURUSD');
   const endpoint = useSyncExternalStore(subscribeToOrigin, getBrowserOrigin, getServerOrigin);
@@ -260,7 +261,7 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
         <LiveAccountMonitor />
 
         <section className="mt-11" aria-labelledby="strategies-heading">
-          <QuantStrategyCatalog />
+          <QuantStrategyCatalog onSelectEa={(slug) => setSelectedEaSlug(slug)} />
         </section>
 
         <section className="mt-11 grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]" aria-label="Signal tester and MT5 connection">
@@ -401,7 +402,7 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
             </div>
           </div>
           <div className="rounded-xl border border-emerald-500/20 bg-[#06120E]/80 p-5 sm:p-6 shadow-2xl backdrop-blur-sm">
-            <PaystackCheckout />
+            <PaystackCheckout selectedEaSlug={selectedEaSlug} />
           </div>
         </section>
 

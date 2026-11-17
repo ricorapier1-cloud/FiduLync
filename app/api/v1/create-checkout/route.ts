@@ -1,22 +1,12 @@
 import { NextResponse } from 'next/server';
 import { randomBytes } from 'node:crypto';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { getEaBySlug } from '@/lib/eaCatalog';
 
 export const dynamic = 'force-dynamic';
 
 type PlanTier = 'MONTHLY' | 'LIFETIME';
 type CurrencyCode = 'NGN' | 'USD';
-
-const PRICING: Record<PlanTier, Record<CurrencyCode, { minorUnits: number; label: string }>> = {
-  MONTHLY: {
-    NGN: { minorUnits: 6500000, label: '₦65,000 / mo' },
-    USD: { minorUnits: 4900, label: '$49 / mo' },
-  },
-  LIFETIME: {
-    NGN: { minorUnits: 25000000, label: '₦250,000 Lifetime' },
-    USD: { minorUnits: 19900, label: '$199 Lifetime' },
-  },
-};
 
 export async function POST(req: Request) {
   if (!checkRateLimit(getClientIp(req), 20, 60_000)) {
@@ -28,6 +18,9 @@ export async function POST(req: Request) {
     const email = String(body?.email || '').trim().toLowerCase();
     const currency: CurrencyCode = body?.currency === 'USD' ? 'USD' : 'NGN';
     const plan: PlanTier = body?.plan === 'LIFETIME' ? 'LIFETIME' : 'MONTHLY';
+    const eaSlug = String(body?.ea_slug || 'eridam-nexus-pro').trim();
+    const ea = getEaBySlug(eaSlug);
+
     const rawAccount = body?.mt5_account;
     const mt5Account = rawAccount === undefined || rawAccount === null || rawAccount === ''
       ? null : Number(rawAccount);
@@ -39,6 +32,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'If supplied, the MT5 account number must be a valid positive integer.' }, { status: 400 });
     }
 
+    // Dynamic pricing lookup based on EA catalog
+    let amountInMinorUnits = 6500000; // default ₦65,000 NGN
+
+    if (currency === 'NGN') {
+      const priceNgn = plan === 'MONTHLY' ? (ea?.monthlyPriceNgn ?? 65000) : (ea?.lifetimePriceNgn ?? 250000);
+      amountInMinorUnits = priceNgn * 100;
+    } else {
+      const priceUsd = plan === 'MONTHLY' ? (ea?.monthlyPriceUsd ?? 49) : (ea?.lifetimePriceUsd ?? 199);
+      amountInMinorUnits = priceUsd * 100;
+    }
+
     const paystackSecret = (process.env.PAYSTACK_SECRET_KEY || '').trim();
     if (!paystackSecret.startsWith('sk_')) {
       return NextResponse.json({ success: false, error: 'Online payment is not configured yet. Please try again later.' }, { status: 503 });
@@ -47,8 +51,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Live payments are disabled while merchant compliance approval is pending.' }, { status: 503 });
     }
 
-    const reference = `ALGO_${plan}_${currency}_${randomBytes(16).toString('hex').toUpperCase()}`;
+    const shortSlug = eaSlug.split('-')[0].toUpperCase();
+    const reference = `ALGO_${shortSlug}_${plan}_${currency}_${randomBytes(8).toString('hex').toUpperCase()}`;
     const origin = (process.env.NEXT_PUBLIC_APP_URL || 'https://fidulync.vercel.app').trim().replace(/\/+$/, '');
+
     const psRes = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
@@ -57,15 +63,19 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         email,
-        amount: PRICING[plan][currency].minorUnits,
+        amount: amountInMinorUnits,
         currency,
         reference,
-        callback_url: `${origin}/store?ref=${reference}`,
+        callback_url: `${origin}/store?ref=${reference}&ea=${encodeURIComponent(eaSlug)}`,
         metadata: {
           product: 'ALGOLYNX_VAULT',
+          ea_slug: eaSlug,
+          ea_name: ea ? ea.name : 'AlgoLync Strategy',
           mt5_account: mt5Account,
           currency,
           tier: plan,
+          max_live_slots: 1,
+          max_demo_slots: 2,
         },
       }),
       cache: 'no-store',
@@ -88,7 +98,10 @@ export async function POST(req: Request) {
       mode: 'paystack_redirect',
       authorization_url: data.authorization_url,
       reference,
-      message: 'Complete payment using Paystack. Your MT5 account can be bound after purchase.',
+      ea_name: ea ? ea.name : 'AlgoLync Strategy',
+      amount_minor: amountInMinorUnits,
+      currency,
+      message: 'Complete payment using Paystack. 1 Live + 2 Demo MT5 accounts included free.',
     });
   } catch (error) {
     console.error('Paystack checkout initialization failed:', error);
