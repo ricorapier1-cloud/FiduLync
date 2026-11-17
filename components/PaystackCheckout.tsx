@@ -48,46 +48,6 @@ export function PaystackCheckout() {
         if (active) setLoading(false);
       });
 
-    const handleBindAccount = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!licenseKey || !email.trim() || !bindAccount.trim()) return;
-    setLoading(true);
-    setErrorMsg(null);
-    try {
-      const response = await fetch('/api/v1/license-bind', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: bindRequestId ? 'confirm' : 'request',
-          license_key: licenseKey,
-          email,
-          mt5_account: bindAccount,
-          request_id: bindRequestId || undefined,
-          code: bindCode || undefined,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok || !data.success) {
-        setErrorMsg(data.error || 'Account binding could not be completed.');
-        return;
-      }
-      if (!bindRequestId) {
-        setBindRequestId(data.request_id);
-        setDeliveryNotice(data.message || 'Check your purchase email for the one-time binding code.');
-      } else {
-        setLicenseBound(true);
-        setMt5Account(bindAccount);
-        setBindRequestId(null);
-        setBindCode('');
-        setDeliveryNotice(data.message || 'Your MT5 account is now bound to this license.');
-      }
-    } catch {
-      setErrorMsg('Network error during license binding.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return () => { active = false; };
   }, []);
 
@@ -156,6 +116,25 @@ export function PaystackCheckout() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleBindAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const key = (licenseKey || recoveryLicenseKey).trim().toUpperCase();
+    if (!key || !email.trim() || !bindAccount.trim()) return;
+    setLoading(true);
+    setErrorMsg(null);
+    try {
+      const response = await fetch('/api/v1/license-bind', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: bindRequestId ? 'confirm' : 'request', license_key: key, email, mt5_account: bindAccount, request_id: bindRequestId || undefined, code: bindCode || undefined }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) { setErrorMsg(data.error || 'Account binding could not be completed.'); return; }
+      if (!bindRequestId) { setBindRequestId(data.request_id); setDeliveryNotice(data.message || 'Check your purchase email for the one-time binding code.'); }
+      else { setLicenseKey(key); setLicenseBound(true); setMt5Account(bindAccount); setBindRequestId(null); setBindCode(''); setDeliveryNotice(data.message || 'Your MT5 account is now bound to this license.'); }
+    } catch { setErrorMsg('Network error during license binding.'); }
+    finally { setLoading(false); }
   };
 
   return (
