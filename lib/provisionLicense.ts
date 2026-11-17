@@ -115,23 +115,28 @@ export async function provisionLicenseForReference(referenceInput: string): Prom
   };
 
   try {
-    const inserted = await supabaseQuery<ProvisionedLicense[]>('licenses', {
+    const persisted = await supabaseQuery<ProvisionedLicense>('rpc/provision_algolync_license', {
       method: 'POST',
-      query: 'on_conflict=payment_reference',
-      prefer: 'resolution=ignore-duplicates,return=representation',
-      body: candidate,
+      body: {
+        p_payment_reference: reference,
+        p_license_key: candidate.license_key,
+        p_mt5_account: candidate.mt5_account,
+        p_email: candidate.email,
+        p_tier: candidate.tier,
+        p_expires_at: candidate.expires_at,
+      },
     });
-    if (inserted === null) throw new Error('Supabase returned no response for the license insert.');
-    if (inserted.length > 0) {
-      return { license: inserted[0], created: true, amount: expectedAmount, currency, plan };
+    if (!persisted || typeof persisted !== 'object' || !persisted.license_key
+      || persisted.payment_reference !== reference) {
+      throw new Error('Atomic Supabase provisioning RPC returned an invalid license record.');
     }
-
-    const existing = await supabaseRead<ProvisionedLicense[]>(
-      'licenses',
-      `payment_reference=eq.${encodeURIComponent(reference)}&select=license_key,payment_reference,mt5_account,email,tier,status,expires_at&limit=1`
-    );
-    if (!existing?.[0]) throw new Error('Idempotent insert returned no row and no existing payment license could be read.');
-    return { license: existing[0], created: false, amount: expectedAmount, currency, plan };
+    return {
+      license: persisted,
+      created: persisted.license_key === candidate.license_key,
+      amount: expectedAmount,
+      currency,
+      plan,
+    };
   } catch (error) {
     console.error(JSON.stringify({
       event: 'algolync_license_provisioning_write_failed',
