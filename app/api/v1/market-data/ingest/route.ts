@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
-import { supabaseInsert, supabaseRead } from '@/lib/supabaseAdmin';
+import { supabaseInsert, supabaseQuery, supabaseRead } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -81,19 +81,24 @@ export async function POST(request: Request) {
     }
 
     if (quotes.length) {
-      const result = await supabaseInsert('mt5_market_quotes', quotes.map((quote) => ({
-        ...quote, installation_id: installation.id,
-      })) as unknown as Record<string, unknown>);
+      const result = await supabaseQuery('mt5_market_quotes', {
+        method: 'POST', query: 'on_conflict=installation_id,symbol',
+        prefer: 'resolution=merge-duplicates,return=minimal',
+        body: quotes.map((quote) => ({ ...quote, installation_id: installation.id })),
+      });
       if (!result) throw new Error('Quote storage failed.');
     }
     if (candles.length) {
-      const result = await supabaseInsert('mt5_market_candles', candles.map((candle) => ({
-        ...candle, installation_id: installation.id,
-      })) as unknown as Record<string, unknown>);
+      const result = await supabaseQuery('mt5_market_candles', {
+        method: 'POST', query: 'on_conflict=installation_id,symbol,timeframe,bar_time',
+        prefer: 'resolution=merge-duplicates,return=minimal',
+        body: candles.map((candle) => ({ ...candle, installation_id: installation.id })),
+      });
       if (!result) throw new Error('Candle storage failed.');
     }
-    await supabaseInsert('mt5_installations', {
-      id: installation.id, last_seen_at: new Date().toISOString(),
+    await supabaseQuery('mt5_installations', {
+      method: 'PATCH', query: `id=eq.${installation.id}`,
+      prefer: 'return=minimal', body: { last_seen_at: new Date().toISOString() },
     });
     return NextResponse.json({
       accepted: true, installation_id: installation.id,
