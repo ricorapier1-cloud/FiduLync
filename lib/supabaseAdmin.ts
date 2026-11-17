@@ -1,8 +1,9 @@
-// Support both legacy Supabase service-role credentials and the newer secret-key
-// environment variable name. Never expose either key to browser bundles.
+import 'server-only';
+
+// Prefer the current Supabase secret API key; retain the legacy service-role key as a fallback.
 const SUPABASE_URL = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
 const SUPABASE_SERVICE_KEY = (
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || ''
+  process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 ).trim();
 
 export function isSupabaseConfigured(): boolean {

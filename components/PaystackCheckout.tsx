@@ -2,11 +2,15 @@
 import { useEffect, useState } from 'react';
 
 export function PaystackCheckout() {
-  const [tab, setTab] = useState<'BUY' | 'RECOVER'>('BUY');
+  const [tab, setTab] = useState<'BUY' | 'RECOVER' | 'BIND'>('BUY');
   const [plan, setPlan] = useState<'MONTHLY' | 'LIFETIME'>('MONTHLY');
   const [currency, setCurrency] = useState<'NGN' | 'USD'>('NGN');
   const [email, setEmail] = useState('');
   const [mt5Account, setMt5Account] = useState('');
+  const [bindAccount, setBindAccount] = useState('');
+  const [bindCode, setBindCode] = useState('');
+  const [bindRequestId, setBindRequestId] = useState<string | null>(null);
+  const [licenseBound, setLicenseBound] = useState(false);
   const [recoveryLicenseKey, setRecoveryLicenseKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [licenseKey, setLicenseKey] = useState<string | null>(null);
@@ -30,6 +34,8 @@ export function PaystackCheckout() {
         }
         if (active) {
           setLicenseKey(data.license_key);
+          if (typeof data.email === 'string') setEmail(data.email);
+          setLicenseBound(typeof data.mt5_account === 'number' && data.mt5_account > 0);
           setDeliveryNotice(data.email_sent ? 'A copy of your license has also been sent to your payment email.' : (data.email_notice || 'Save your license key now. Email delivery is not yet configured.'));
           if (typeof data.download_url === 'string') setDownloadUrl(data.download_url);
           window.history.replaceState({}, '', '/store');
@@ -42,7 +48,7 @@ export function PaystackCheckout() {
         if (active) setLoading(false);
       });
 
-    return () => { active = false; };
+  return () => { active = false; };
   }, []);
 
   const priceDisplay =
@@ -52,7 +58,7 @@ export function PaystackCheckout() {
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !mt5Account) return;
+    if (!email.trim()) return;
     setLoading(true);
     setErrorMsg(null);
     setDeliveryNotice(null);
@@ -61,7 +67,7 @@ export function PaystackCheckout() {
       const res = await fetch('/api/v1/create-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, mt5_account: Number(mt5Account), currency, plan }),
+        body: JSON.stringify({ email, currency, plan }),
       });
       const data = await res.json();
 
@@ -75,6 +81,7 @@ export function PaystackCheckout() {
       }
       if (data.license_key) {
         setLicenseKey(data.license_key);
+        setLicenseBound(typeof data.mt5_account === 'number' && data.mt5_account > 0);
         if (data.download_url) setDownloadUrl(data.download_url);
       }
     } catch {
@@ -102,12 +109,32 @@ export function PaystackCheckout() {
         return;
       }
       setLicenseKey(data.license_key);
+      setLicenseBound(true);
       if (data.download_url) setDownloadUrl(data.download_url);
     } catch {
       setErrorMsg('Network error while looking up license.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleBindAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const key = (licenseKey || recoveryLicenseKey).trim().toUpperCase();
+    if (!key || !email.trim() || !bindAccount.trim()) return;
+    setLoading(true);
+    setErrorMsg(null);
+    try {
+      const response = await fetch('/api/v1/license-bind', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: bindRequestId ? 'confirm' : 'request', license_key: key, email, mt5_account: bindAccount, request_id: bindRequestId || undefined, code: bindCode || undefined }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) { setErrorMsg(data.error || 'Account binding could not be completed.'); return; }
+      if (!bindRequestId) { setBindRequestId(data.request_id); setDeliveryNotice(data.message || 'Check your purchase email for the one-time binding code.'); }
+      else { setLicenseKey(key); setLicenseBound(true); setMt5Account(bindAccount); setBindRequestId(null); setBindCode(''); setDeliveryNotice(data.message || 'Your MT5 account is now bound to this license.'); }
+    } catch { setErrorMsg('Network error during license binding.'); }
+    finally { setLoading(false); }
   };
 
   return (
@@ -120,7 +147,7 @@ export function PaystackCheckout() {
       </div>
 
       {/* Mode Switcher: New License vs Download / Recover */}
-      <div className="grid grid-cols-2 gap-1.5 p-1 rounded-lg bg-black/50 border border-emerald-500/20 mb-4">
+      <div className="grid grid-cols-3 gap-1.5 p-1 rounded-lg bg-black/50 border border-emerald-500/20 mb-4">
         <button
           type="button"
           onClick={() => { setTab('BUY'); setLicenseKey(null); setErrorMsg(null); }}
@@ -139,6 +166,7 @@ export function PaystackCheckout() {
         >
           DOWNLOAD EA / KEY
         </button>
+        <button type="button" onClick={() => { setTab('BIND'); setLicenseKey(null); setErrorMsg(null); setBindRequestId(null); setBindCode(''); }} className="py-1.5 rounded font-mono text-xs text-emerald-300/70 hover:text-white">MY LICENSE</button>
       </div>
 
       {tab === 'BUY' && !licenseKey && (
@@ -197,6 +225,22 @@ export function PaystackCheckout() {
               {licenseKey}
             </code>
           </div>
+          {!licenseBound ? (
+            <form onSubmit={handleBindAccount} className="space-y-2 text-left">
+              <p className="text-xs text-emerald-200">Your purchase is active. Bind your MT5 login now, or return later and use your license key and purchase email.</p>
+              <label className="block text-[10px] font-mono text-emerald-300">MT5 ACCOUNT LOGIN</label>
+              <input type="number" required min="1" value={bindAccount} onChange={(e) => setBindAccount(e.target.value)} placeholder="Enter your MT5 login" className="w-full rounded border border-emerald-500/30 bg-black/60 px-3 py-2 text-xs text-white" />
+              {bindRequestId && <>
+                <label className="block text-[10px] font-mono text-emerald-300">EMAIL VERIFICATION CODE</label>
+                <input inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required value={bindCode} onChange={(e) => setBindCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6-digit code" className="w-full rounded border border-emerald-500/30 bg-black/60 px-3 py-2 text-xs text-white" />
+              </>}
+              <button type="submit" disabled={loading} className="w-full rounded bg-emerald-500 px-3 py-2 text-xs font-bold text-black disabled:opacity-50">
+                {loading ? 'PROCESSING…' : bindRequestId ? 'CONFIRM MT5 ACCOUNT BINDING' : 'SEND EMAIL VERIFICATION CODE'}
+              </button>
+            </form>
+          ) : (
+            <p className="rounded border border-emerald-500/30 bg-emerald-500/10 p-2 text-xs text-emerald-200">MT5 account {mt5Account || bindAccount} is bound to this license.</p>
+          )}
           <a
             href={downloadUrl}
             download
@@ -210,8 +254,8 @@ export function PaystackCheckout() {
           </p>
         </div>
       ) : (
-        <form onSubmit={tab === 'BUY' ? handleCheckout : handleRecover} className="space-y-4">
-          {tab === 'BUY' && <div>
+        <form onSubmit={tab === 'BUY' ? handleCheckout : tab === 'RECOVER' ? handleRecover : handleBindAccount} className="space-y-4">
+          {(tab === 'BUY' || tab === 'BIND') && <div>
             <label className="block text-xs font-mono mb-1 text-emerald-300">Subscriber Email</label>
             <input
               type="email"
@@ -222,11 +266,11 @@ export function PaystackCheckout() {
               className="w-full bg-black/60 border border-emerald-500/30 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-400 font-mono"
             />
           </div>}
-          {tab === 'RECOVER' && <div>
+          {(tab === 'RECOVER' || tab === 'BIND') && <div>
             <label className="block text-xs font-mono mb-1 text-emerald-300">Existing License Key</label>
             <input type="text" required value={recoveryLicenseKey} onChange={(e) => setRecoveryLicenseKey(e.target.value.toUpperCase())} placeholder="ALGOLYNX-..." className="w-full bg-black/60 border border-emerald-500/30 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-400 font-mono" />
           </div>}
-          <div>
+          {tab === 'RECOVER' && <div>
             <label className="block text-xs font-mono mb-1 text-emerald-300">MT5 Account Number</label>
             <input
               type="number"
@@ -236,7 +280,13 @@ export function PaystackCheckout() {
               placeholder="12345678"
               className="w-full bg-black/60 border border-emerald-500/30 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-400 font-mono"
             />
-          </div>
+          </div>}
+          {tab === 'BIND' && <div>
+            <label className="block text-xs font-mono mb-1 text-emerald-300">New MT5 Account Number</label>
+            <input type="number" required min="1" value={bindAccount} onChange={(e) => setBindAccount(e.target.value)} placeholder="Enter MT5 login" className="w-full bg-black/60 border border-emerald-500/30 rounded px-3 py-2 text-sm text-white" />
+            {bindRequestId && <><label className="mt-3 block text-xs font-mono mb-1 text-emerald-300">Email Verification Code</label><input inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required value={bindCode} onChange={(e) => setBindCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="6-digit code" className="w-full bg-black/60 border border-emerald-500/30 rounded px-3 py-2 text-sm text-white" /></>}
+          </div>}
+          {tab === 'BUY' && <p className="text-[10px] leading-4 text-emerald-400/70">MT5 account binding is completed after payment using a one-time code sent to your purchase email.</p>}
           <button
             type="submit"
             disabled={loading}
@@ -246,7 +296,7 @@ export function PaystackCheckout() {
               ? 'PROCESSING...'
               : tab === 'BUY'
               ? `PROVISION LICENSE • ${priceDisplay}`
-              : 'VERIFY LICENSE & GET INSTALL GUIDE'}
+              : tab === 'RECOVER' ? 'VERIFY LICENSE & GET INSTALL GUIDE' : bindRequestId ? 'CONFIRM MT5 ACCOUNT BINDING' : 'SEND EMAIL VERIFICATION CODE'}
           </button>
         </form>
       )}

@@ -54,13 +54,13 @@ export function escapeEmailHtml(value: string): string {
 export async function sendLicenseDeliveryEmail(input: {
   email: string;
   licenseKey: string;
-  mt5Account: number;
+  mt5Account: number | null;
   tier: string;
   expiresAt: string | null;
   reference: string;
 }): Promise<boolean> {
   const key = escapeEmailHtml(input.licenseKey);
-  const account = escapeEmailHtml(String(input.mt5Account));
+  const account = input.mt5Account === null ? 'Not bound yet — bind securely after purchase' : escapeEmailHtml(String(input.mt5Account));
   const tier = escapeEmailHtml(input.tier.replaceAll('_', ' '));
   const expiry = input.expiresAt
     ? escapeEmailHtml(new Date(input.expiresAt).toUTCString())
@@ -69,7 +69,7 @@ export async function sendLicenseDeliveryEmail(input: {
     to: input.email,
     subject: 'Your AlgoLync MT5 license is ready',
     idempotencyKey: `algolync-license-${input.reference}`,
-    html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#17202a"><h2>Your AlgoLync license is ready</h2><p>Your payment has been verified and your license has been bound to the MT5 account below.</p><p><strong>License key</strong><br><code style="display:inline-block;padding:12px;background:#eef5f1;font-size:16px">${key}</code></p><p><strong>MT5 account:</strong> ${account}<br><strong>Plan:</strong> ${tier}<br><strong>Expiry:</strong> ${expiry}</p><p>In MT5, allow WebRequest to <a href="https://fidulync.vercel.app">https://fidulync.vercel.app</a> under Tools → Options → Expert Advisors. Keep this key private.</p><p>Installation guide: <a href="https://fidulync.vercel.app/downloads/AlgoLync_EA_README.txt">Open guide</a></p><p>— FiduLync / AlgoLync</p></div>`,
+    html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#17202a"><h2>Your AlgoLync license is ready</h2><p>Your payment has been verified. Your MT5 account binding status is shown below.</p><p><strong>License key</strong><br><code style="display:inline-block;padding:12px;background:#eef5f1;font-size:16px">${key}</code></p><p><strong>MT5 account:</strong> ${account}<br><strong>Plan:</strong> ${tier}<br><strong>Expiry:</strong> ${expiry}</p><p>In MT5, allow WebRequest to <a href="https://fidulync.vercel.app">https://fidulync.vercel.app</a> under Tools → Options → Expert Advisors. Keep this key private.</p><p>Installation guide: <a href="https://fidulync.vercel.app/downloads/AlgoLync_EA_README.txt">Open guide</a></p><p>— FiduLync / AlgoLync</p></div>`,
   });
 }
 

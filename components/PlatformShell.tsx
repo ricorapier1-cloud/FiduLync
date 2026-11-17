@@ -13,6 +13,7 @@ const links = [
   { href: '/account', label: 'My License', icon: 'shield' },
   { href: '/faq', label: 'FAQ', icon: 'activity' },
   { href: '/terms', label: 'Terms & Risk', icon: 'shield-alert' },
+  { href: '/owner', label: 'Owner Console', icon: 'shield' },
 ] as const satisfies readonly { href: string; label: string; icon: BrandGlyphName }[];
 
 const macroLinks = [
@@ -24,6 +25,7 @@ const macroLinks = [
   { href: '/account', label: 'My License', icon: 'shield' },
   { href: '/faq', label: 'FAQ', icon: 'activity' },
   { href: '/terms', label: 'Terms & Risk', icon: 'shield-alert' },
+  { href: '/owner', label: 'Owner Console', icon: 'shield' },
 ] as const satisfies readonly { href: string; label: string; icon: BrandGlyphName }[];
 
 export default function PlatformShell({ children }: { children: React.ReactNode }) {

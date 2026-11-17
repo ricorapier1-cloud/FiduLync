@@ -3,7 +3,7 @@ import 'server-only';
 import { timingSafeEqual } from 'node:crypto';
 
 export function isAlgoAuthorized(request: Request) {
-  const expected = process.env.ALGO_PRIVATE_API_KEY?.trim();
+  const expected = (process.env.ALGOLYNC_PRIVATE_KEY || process.env.ALGO_PRIVATE_API_KEY || '').trim();
   const provided = request.headers.get('x-algo-key')?.trim()
     || new URL(request.url).searchParams.get('key')?.trim();
   if (!expected || !provided) return false;
@@ -26,5 +26,5 @@ export function isSameOriginBrowserRequest(request: Request) {
 }
 
 export function isAlgoApiConfigured() {
-  return Boolean(process.env.ALGO_PRIVATE_API_KEY?.trim());
+  return Boolean((process.env.ALGOLYNC_PRIVATE_KEY || process.env.ALGO_PRIVATE_API_KEY || '').trim());
 }

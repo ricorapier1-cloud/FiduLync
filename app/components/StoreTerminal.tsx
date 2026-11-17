@@ -143,10 +143,6 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
     }
   }
 
-  function generateSampleKey() {
-    const randomSuffix = Math.floor(10000 + Math.random() * 90000);
-    setLicenseKeyInput(`ALGOLYNX-VIP-${randomSuffix}`);
-  }
   const currencyStrength = getCurrencyStrengthIndex(initialSnapshot);
 
   useEffect(() => {
@@ -425,13 +421,6 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
             <div className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-5 sm:p-6">
               <div className="flex items-center justify-between">
                 <span className="font-mono text-[10px] uppercase tracking-wider text-emerald-300">License Verification Console</span>
-                <button
-                  type="button"
-                  onClick={generateSampleKey}
-                  className="font-mono text-[10px] text-slate-400 underline decoration-slate-600 transition hover:text-emerald-300"
-                >
-                  Generate Key
-                </button>
               </div>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
