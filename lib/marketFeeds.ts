@@ -2,6 +2,7 @@ import 'server-only';
 
 import { getCachedData } from '@/lib/redisCache';
 import type { MarketQuote } from '@/types/macro';
+import { supabaseRead } from '@/lib/supabaseAdmin';
 
 const QUOTE_CACHE_TTL_SECONDS = 60;
 const finnhubSymbols = [
@@ -114,7 +115,44 @@ async function getGoldQuote(): Promise<MarketQuote> {
   };
 }
 
+type StoredMt5Quote = {
+  symbol: string;
+  bid: number;
+  ask: number;
+  quote_time: string;
+  received_at: string;
+  installation: { status: string } | { status: string }[];
+};
+
+async function getMt5Quotes(): Promise<MarketQuote[]> {
+  const query = new URLSearchParams({
+    select: 'symbol,bid,ask,quote_time,received_at,installation:mt5_installations!inner(status)',
+    'installation.status': 'eq.active',
+    order: 'quote_time.desc',
+    limit: '100',
+  });
+  const rows = await supabaseRead<StoredMt5Quote[]>('mt5_market_quotes', query.toString());
+  if (!rows?.length) return [];
+  const latestBySymbol = new Map<string, StoredMt5Quote>();
+  for (const row of rows) {
+    if (!['EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD'].includes(row.symbol)) continue;
+    if (Date.now() - Date.parse(row.quote_time) > 120_000) continue;
+    if (!latestBySymbol.has(row.symbol)) latestBySymbol.set(row.symbol, row);
+  }
+  return [...latestBySymbol.values()].map((row) => ({
+    symbol: row.symbol as MarketQuote['symbol'],
+    price: (Number(row.bid) + Number(row.ask)) / 2,
+    changePercent: null,
+    timestamp: new Date(row.quote_time).toISOString(),
+    source: 'mt5' as const,
+  }));
+}
+
 async function fetchMarketQuotes(): Promise<MarketQuote[]> {
+  const mt5Quotes = await getMt5Quotes().catch((error) => {
+    console.warn('MT5 broker quotes are unavailable:', error);
+    return [];
+  });
   const apiKey = process.env.FINNHUB_API_KEY?.trim();
   let liveQuotes: MarketQuote[] = [];
   if (apiKey) {
@@ -125,9 +163,10 @@ async function fetchMarketQuotes(): Promise<MarketQuote[]> {
     }
   }
 
-  if (liveQuotes.length === finnhubSymbols.length) return liveQuotes;
-
-  const bySymbol = new Map(liveQuotes.map((quote) => [quote.symbol, quote]));
+  const bySymbol = new Map<MarketQuote['symbol'], MarketQuote>();
+  for (const quote of mt5Quotes) bySymbol.set(quote.symbol, quote);
+  for (const quote of liveQuotes) if (!bySymbol.has(quote.symbol)) bySymbol.set(quote.symbol, quote);
+  if (bySymbol.size === finnhubSymbols.length) return [...bySymbol.values()];
   const failures: unknown[] = [];
   for (const provider of [getFrankfurterQuotes, getExchangeRateQuotes]) {
     try {
