@@ -26,3 +26,9 @@ jobs:
         run: npm run lint
       - name: Production build
         run: npm run build
+      - name: Setup Python for MT5 publisher syntax check
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Validate MT5 publisher syntax
+        run: python -m py_compile scripts/mt5_market_publisher.py
