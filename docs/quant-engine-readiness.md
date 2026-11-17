@@ -77,3 +77,7 @@ The broker adapter must supply account-currency pip value per lot, stop distance
 ## External dependencies
 
 External API credentials, broker connectivity, data licensing, historical coverage and email/payment provider approval are environment/account prerequisites. The application must remain useful in RESEARCH mode while these are pending. Missing credentials must not be replaced with invented live values.
+
+## Macro provenance classification
+
+A snapshot is classified as fully provider-backed only when policy-rate and inflation observations for all ten tracked G10 currencies are provider-sourced. A live COT report, calendar, or reference exchange-rate table alone cannot upgrade a partial macro snapshot to fully verified. Missing provider coverage remains `partial`/`REFERENCE` and is not execution eligible.

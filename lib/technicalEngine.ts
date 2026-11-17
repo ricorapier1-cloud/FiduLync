@@ -85,7 +85,9 @@ function parseCandle(value: unknown): Candle | null {
 
 async function fetchTwelveDataCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promise<Candle[]> {
   const apiKey = process.env.TWELVE_DATA_API_KEY?.trim();
-  if (!apiKey) return [];
+  // Individual/free plans are not licensed for commercial third-party display.
+  // Enable only after the required business tier, exchange rights and display terms are approved.
+  if (!apiKey || process.env.TWELVE_DATA_COMMERCIAL_USE_APPROVED !== 'true') return [];
 
   const interval = timeframe === 'H1' ? '1h' : timeframe === 'H4' ? '4h' : '1day';
   const symbol = pair === 'XAUUSD' ? 'XAU/USD' : `${pair.slice(0, 3)}/${pair.slice(3)}`;
@@ -138,7 +140,7 @@ async function fetchTwelveDataCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1
 }
 
 async function fetchCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promise<Candle[]> {
-  const endpoint = process.env.MARKET_DATA_PROVIDER_URL?.trim();
+  const endpoint = process.env.MARKET_DATA_PROVIDER_LICENSE_APPROVED === 'true' ? process.env.MARKET_DATA_PROVIDER_URL?.trim() : undefined;
   if (!endpoint) return [];
 
   const providerUrl = new URL(endpoint);

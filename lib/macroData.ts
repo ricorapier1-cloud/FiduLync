@@ -39,12 +39,8 @@ export function getFallbackSnapshot(): MacroSnapshot {
       { code: 'XAU', centralBank: 'Global Reserve Asset', policyRate: 0.0, inflation: 0.0, twoYearYield: 0.0, twoYearYieldSource: 'reference', inflationLabel: 'Real Yield Proxy', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Sovereign Hedge' },
     ],
     cot: [],
-    catalysts: [
-      { id: 'us-cpi-nov', region: 'US', title: 'Consumer Price Index', scheduledAt: '2026-11-12T13:30:00.000Z', impact: 'High', consensus: '2.8% y/y', actual: null },
-      { id: 'us-nfp-dec', region: 'US', title: 'Non-Farm Payrolls', scheduledAt: '2026-12-04T13:30:00.000Z', impact: 'High', consensus: '+145k', actual: null },
-      { id: 'fomc-dec', region: 'US', title: 'FOMC Rate Decision', scheduledAt: '2026-12-09T19:00:00.000Z', impact: 'High', consensus: 'Hold', actual: null },
-      { id: 'ecb-dec', region: 'EU', title: 'ECB Policy Decision', scheduledAt: '2026-12-17T13:15:00.000Z', impact: 'High', consensus: 'Hold', actual: null },
-    ],
+    // No fabricated or stale economic events in reference/offline mode.
+    catalysts: [],
   };
 }
 
@@ -340,7 +336,7 @@ async function getFmpCatalysts(apiKey: string): Promise<EconomicCatalyst[]> {
 
 async function getCotProvider(urlValue: string, token?: string): Promise<CotPosition[]> {
   const providerUrl = new URL(urlValue);
-  if (providerUrl.protocol !== 'https:' && providerUrl.protocol !== 'http:') throw new Error('Unsupported COT provider protocol.');
+  if (providerUrl.protocol !== 'https:') throw new Error('COT provider must use HTTPS.');
   const response = await fetch(providerUrl, {
     cache: 'no-store',
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
@@ -435,11 +431,11 @@ async function getCftcCot(): Promise<CotPosition[]> {
 }
 
 async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallbackSnapshot()): Promise<MacroSnapshot | null> {
-  const fredApiKey = process.env.FRED_API_KEY?.trim();
-  const finnhubApiKey = process.env.FINNHUB_API_KEY?.trim();
-  const alphaVantageKey = process.env.ALPHA_VANTAGE_API_KEY?.trim();
-  const fmpKey = process.env.FMP_API_KEY?.trim();
-  const cotProviderUrl = process.env.COT_DATA_PROVIDER_URL?.trim();
+  const fredApiKey = process.env.FRED_COMMERCIAL_USE_APPROVED === 'true' ? process.env.FRED_API_KEY?.trim() : undefined;
+  const finnhubApiKey = process.env.FINNHUB_COMMERCIAL_USE_APPROVED === 'true' ? process.env.FINNHUB_API_KEY?.trim() : undefined;
+  const alphaVantageKey = process.env.ALPHA_VANTAGE_COMMERCIAL_USE_APPROVED === 'true' ? process.env.ALPHA_VANTAGE_API_KEY?.trim() : undefined;
+  const fmpKey = process.env.FMP_COMMERCIAL_USE_APPROVED === 'true' ? process.env.FMP_API_KEY?.trim() : undefined;
+  const cotProviderUrl = process.env.COT_DATA_PROVIDER_LICENSE_APPROVED === 'true' ? process.env.COT_DATA_PROVIDER_URL?.trim() : undefined;
   const cotProviderToken = process.env.COT_DATA_PROVIDER_TOKEN?.trim();
 
   const snapshot: MacroSnapshot = {
@@ -457,7 +453,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     fmpKey ? getFmpCatalysts(fmpKey) : Promise.resolve(null),
     cotProviderUrl ? getCotProvider(cotProviderUrl, cotProviderToken) : getCftcCot(),
     getFrankfurterRates(),
-    getFairEconomyCatalysts(),
+    process.env.FAIRECONOMY_COMMERCIAL_USE_APPROVED === 'true' ? getFairEconomyCatalysts() : Promise.resolve([]),
     getEcbMacroInputs(),
     getBankOfCanadaMacroInputs(),
     getBankOfEnglandPolicyRate(),
@@ -650,7 +646,14 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     console.error('COT provider unavailable; retaining cached positioning:', cotResult.reason);
   }
   if (hasLiveData) {
-    snapshot.source = snapshot.currencies.length >= 11 ? 'provider' : 'partial';
+    const coreG10 = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'SEK', 'NOK'];
+    const completeG10MacroCoverage = coreG10.every((code) => {
+      const currency = snapshot.currencies.find((item) => item.code === code);
+      return currency?.policyRateSource === 'provider' && currency.inflationSource === 'provider';
+    });
+    // A live calendar, COT report or reference FX rate cannot make a partial
+    // macro snapshot look fully provider-verified.
+    snapshot.source = completeG10MacroCoverage ? 'provider' : 'partial';
   }
   return hasLiveData ? snapshot : null;
 }
@@ -696,11 +699,11 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
 export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
   const persisted = await getPersistedSnapshot();
   const baseline = mergeWithFallback(persisted ?? getFallbackSnapshot());
-  const endpoint = process.env.MACRO_DATA_PROVIDER_URL?.trim();
+  const endpoint = process.env.MACRO_DATA_PROVIDER_LICENSE_APPROVED === 'true' ? process.env.MACRO_DATA_PROVIDER_URL?.trim() : undefined;
   if (endpoint) {
     try {
       const providerUrl = new URL(endpoint);
-      if (providerUrl.protocol !== 'https:' && providerUrl.protocol !== 'http:') throw new Error('Unsupported provider protocol.');
+      if (providerUrl.protocol !== 'https:') throw new Error('Macro provider must use HTTPS.');
 
       const token = process.env.MACRO_DATA_PROVIDER_TOKEN?.trim();
       const response = await fetch(providerUrl, {

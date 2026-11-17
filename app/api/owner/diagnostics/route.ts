@@ -6,7 +6,7 @@ import { requireOwner } from '@/lib/ownerAuth';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-type Check = { status: 'ok' | 'error' | 'not_configured' | 'not_integrated' | 'unknown'; detail: string };
+type Check = { status: 'ok' | 'error' | 'not_configured' | 'not_integrated' | 'unknown' | 'license_blocked'; detail: string };
 
 async function probe(name: string, fn: () => Promise<void>): Promise<[string, Check]> {
   try {
@@ -49,7 +49,7 @@ export async function GET(request: Request) {
   const checks: Record<string, Check> = {};
   const tasks: Array<Promise<[string, Check]>> = [];
 
-  if (process.env.FRED_API_KEY?.trim()) tasks.push(probe('fred', async () => {
+  if (process.env.FRED_API_KEY?.trim() && process.env.FRED_COMMERCIAL_USE_APPROVED === 'true') tasks.push(probe('fred', async () => {
     const url = new URL('https://api.stlouisfed.org/fred/series/observations');
     url.searchParams.set('series_id', 'DFF');
     url.searchParams.set('api_key', required('FRED_API_KEY'));
@@ -91,7 +91,7 @@ export async function GET(request: Request) {
     }
   }));
 
-  if (process.env.TWELVE_DATA_API_KEY?.trim()) tasks.push(probe('twelve_data', async () => {
+  if (process.env.TWELVE_DATA_API_KEY?.trim() && process.env.TWELVE_DATA_COMMERCIAL_USE_APPROVED === 'true') tasks.push(probe('twelve_data', async () => {
     const url = new URL('https://api.twelvedata.com/time_series');
     url.searchParams.set('symbol', 'EUR/USD');
     url.searchParams.set('interval', '1h');
@@ -111,7 +111,7 @@ export async function GET(request: Request) {
     }
   }));
 
-  if (process.env.FINNHUB_API_KEY?.trim()) tasks.push(probe('finnhub', async () => {
+  if (process.env.FINNHUB_API_KEY?.trim() && process.env.FINNHUB_COMMERCIAL_USE_APPROVED === 'true') tasks.push(probe('finnhub', async () => {
     const url = new URL('https://finnhub.io/api/v1/quote');
     url.searchParams.set('symbol', 'OANDA:EUR_USD');
     url.searchParams.set('token', required('FINNHUB_API_KEY'));
@@ -158,6 +158,18 @@ export async function GET(request: Request) {
   const results = await Promise.all(tasks);
   for (const [name, check] of results) checks[name] = check;
 
+  if (process.env.FRED_API_KEY?.trim() && process.env.FRED_COMMERCIAL_USE_APPROVED !== 'true') checks.fred = { status: 'license_blocked', detail: 'FRED is disabled until commercial use, storage/caching and display rights are reviewed and expressly approved.' };
+  if (process.env.TWELVE_DATA_API_KEY?.trim() && process.env.TWELVE_DATA_COMMERCIAL_USE_APPROVED !== 'true') checks.twelve_data = { status: 'license_blocked', detail: 'Twelve Data is disabled until the correct business tier, FX exchange rights and external display/derived-data terms are approved.' };
+
+  for (const [name, variable, approval] of [
+    ['finnhub', 'FINNHUB_API_KEY', 'FINNHUB_COMMERCIAL_USE_APPROVED'],
+    ['alpha_vantage', 'ALPHA_VANTAGE_API_KEY', 'ALPHA_VANTAGE_COMMERCIAL_USE_APPROVED'],
+    ['fmp', 'FMP_API_KEY', 'FMP_COMMERCIAL_USE_APPROVED'],
+  ] as const) {
+    if (process.env[variable]?.trim() && process.env[approval] !== 'true') checks[name] = { status: 'license_blocked', detail: `${variable} is disabled until the applicable commercial, display, storage and redistribution terms are reviewed and approved.` };
+    else if (!process.env[variable]?.trim()) checks[name] = { status: 'not_configured', detail: `${variable} is not configured.` };
+  }
+
   for (const [name, variable] of [
     ['fred', 'FRED_API_KEY'], ['bea', 'BEA_API_KEY'], ['bls', 'BLS_API_KEY'], ['twelve_data', 'TWELVE_DATA_API_KEY'],
     ['finnhub', 'FINNHUB_API_KEY'], ['gemini', 'GEMINI_API_KEY'],
@@ -170,7 +182,15 @@ export async function GET(request: Request) {
     ? { status: 'unknown', detail: 'Key is present, but no provider-specific FX_API_KEY adapter is wired into the current application.' }
     : { status: 'not_configured', detail: 'FX_API_KEY is not configured.' };
 
-  checks.market_candles = process.env.MARKET_DATA_PROVIDER_URL?.trim()
+  checks.macro_provider = process.env.MACRO_DATA_PROVIDER_URL?.trim() && process.env.MACRO_DATA_PROVIDER_LICENSE_APPROVED !== 'true'
+    ? { status: 'license_blocked', detail: 'Custom macro provider is disabled until commercial display, storage and derived-data rights are documented.' }
+    : process.env.MACRO_DATA_PROVIDER_URL?.trim()
+      ? { status: 'unknown', detail: 'Custom macro endpoint is configured; live schema, timestamps, completeness and licence scope must be validated.' }
+      : { status: 'not_configured', detail: 'No custom macro provider endpoint is configured.' };
+
+  checks.market_candles = process.env.MARKET_DATA_PROVIDER_URL?.trim() && process.env.MARKET_DATA_PROVIDER_LICENSE_APPROVED !== 'true'
+    ? { status: 'license_blocked', detail: 'Custom market candles are disabled until commercial display and exchange/derived-data rights are documented.' }
+    : process.env.MARKET_DATA_PROVIDER_URL?.trim()
     ? { status: 'unknown', detail: 'Market candle endpoint is configured; full symbol/timeframe validation is performed by the signal engine.' }
     : { status: 'not_configured', detail: 'MARKET_DATA_PROVIDER_URL is missing. Technical signals remain unavailable and trading must stay disabled.' };
 
@@ -187,7 +207,7 @@ export async function GET(request: Request) {
 
   const values = Object.values(checks);
   const errors = values.filter((item) => item.status === 'error').length;
-  const blockers = values.filter((item) => ['not_configured', 'not_integrated'].includes(item.status)).length;
+  const blockers = values.filter((item) => ['not_configured', 'not_integrated', 'license_blocked'].includes(item.status)).length;
   return NextResponse.json({
     checked_at: new Date().toISOString(),
     overall: errors > 0 ? 'degraded' : blockers > 0 ? 'incomplete' : 'operational',
