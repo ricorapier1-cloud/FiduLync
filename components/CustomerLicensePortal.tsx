@@ -23,6 +23,8 @@ export default function CustomerLicensePortal() {
   const [activeTab, setActiveTab] = useState<'subscriptions'|'seats'|'telemetry'>('subscriptions');
   const [helperBusy, setHelperBusy] = useState(false);
   const [helperMessage, setHelperMessage] = useState('');
+  const [artifactBusy,setArtifactBusy]=useState(false);
+  const [artifactMessage,setArtifactMessage]=useState('');
   const [slotType, setSlotType] = useState<'LIVE'|'DEMO'>('LIVE');
   const [slotNumber, setSlotNumber] = useState('1');
   const [seatCurrent, setSeatCurrent] = useState('');
@@ -92,6 +94,21 @@ export default function CustomerLicensePortal() {
       }
     } catch (e) { setError(e instanceof Error ? e.message : 'Transfer unavailable.'); }
     finally { setBusy(false); }
+  }
+
+  async function downloadEaArtifact() {
+    if(!data?.license.ea_slug) { setArtifactMessage('This legacy license is not mapped to an EA.'); return; }
+    setArtifactBusy(true);setArtifactMessage('');
+    try {
+      const seat=data.seats.find(item=>Number(item.mt5_login)===Number(account));
+      const mode=seat?.slot_type==='DEMO'?'DEMO':'REAL';
+      const response=await fetch('/api/v1/license/artifact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({license_key:license,mt5_login:account,account_mode:mode,ea_slug:data.license.ea_slug})});
+      const result=await response.json();
+      if(!response.ok||!result.download_url) throw new Error(result.error||'Artifact download denied.');
+      window.location.assign(result.download_url);
+      setArtifactMessage('Your short-lived authorized download link is ready.');
+    } catch(error) { setArtifactMessage(error instanceof Error?error.message:'Artifact download unavailable.'); }
+    finally { setArtifactBusy(false); }
   }
 
   async function downloadLicenseHelper() {
@@ -197,9 +214,13 @@ export default function CustomerLicensePortal() {
       <section className={`${activeTab==='subscriptions'?'mt-4':'hidden'} rounded-xl border border-white/10 bg-[#0a111b] p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><h2 className="font-semibold">License artifacts</h2><p className="mt-1 text-xs text-slate-500">Downloads are authorized against this EA license and bound MT5 account.</p></div>
-          <button type="button" onClick={()=>void downloadLicenseHelper()} disabled={helperBusy || !data.license.ea_slug} className="rounded-lg border border-cyan-300/30 px-3 py-2 text-xs text-cyan-200 disabled:opacity-40">{helperBusy?'Preparing…':'Download MacroLyncLicense.mqh'}</button>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={()=>void downloadEaArtifact()} disabled={artifactBusy || !data.license.ea_slug} className="rounded-lg bg-emerald-300 px-3 py-2 text-xs font-semibold text-slate-950 disabled:opacity-40">{artifactBusy?'Preparing…':'Download EA (.ex5)'}</button>
+            <button type="button" onClick={()=>void downloadLicenseHelper()} disabled={helperBusy || !data.license.ea_slug} className="rounded-lg border border-cyan-300/30 px-3 py-2 text-xs text-cyan-200 disabled:opacity-40">{helperBusy?'Preparing…':'Download MacroLyncLicense.mqh'}</button>
+          </div>
         </div>
         {helperMessage && <p role="status" className="mt-3 text-xs text-slate-400">{helperMessage}</p>}
+        {artifactMessage && <p role="status" className="mt-2 text-xs text-slate-400">{artifactMessage}</p>}
       </section>
       <section className={`${activeTab==='telemetry'?'mt-5':'hidden'} rounded-xl border border-white/10 bg-[#0a111b] p-5`}>
         <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-semibold">MT5 connection</h2><p className="mt-1 text-xs text-slate-500">Read-only telemetry · {data.heartbeat?.ea_name || 'No EA heartbeat received yet'}</p></div><span className="rounded border border-white/10 px-3 py-1 font-mono text-xs">{data.heartbeat?.connection_status || 'STANDBY'}</span></div>
