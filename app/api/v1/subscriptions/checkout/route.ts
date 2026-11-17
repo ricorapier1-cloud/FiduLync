@@ -65,6 +65,10 @@ export async function POST(request: Request) {
       }
     }
     const reference = `ALY_SUB_${randomBytes(12).toString('hex').toUpperCase()}`;
+    await supabaseInsert('ea_subscription_intents', {
+      reference,email,ea_slug:eaSlug,billing_cycle:cycle,currency,extra_live_seats:extraSeats,
+      amount_minor:amountMinor,paystack_plan_code:plan.paystack_plan_code,status:'PENDING',
+    });
     const origin = (process.env.NEXT_PUBLIC_APP_URL || 'https://fidulync.vercel.app').replace(/\/+$/,'');
     const initialized = await fetch('https://api.paystack.co/transaction/initialize',{
       method:'POST',
