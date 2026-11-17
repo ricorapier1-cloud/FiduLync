@@ -1,4 +1,4 @@
-import { createHmac } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { isSupabaseConfigured, supabaseRead } from '@/lib/supabaseAdmin';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
       }
       const now = Math.floor(Date.now() / 1000);
       const leaseExpires = now + 24 * 60 * 60;
-      const lease = signLease({ iss: 'fidulync', sub: licenseKey, ea: eaSlug, login: mt5Login, mode: 'DEMO', iat: now, exp: leaseExpires }, secret);
+      const lease = signLease({ iss: 'fidulync', sub: createHash('sha256').update(licenseKey).digest('hex'), ea: eaSlug, login: mt5Login, mode: 'DEMO', iat: now, exp: leaseExpires }, secret);
       return NextResponse.json({ valid: true, license_type: 'DEMO_TRIAL', lease_token: lease, lease_expires_unix: leaseExpires, lease_expires_at: new Date(leaseExpires * 1000).toISOString() }, { headers });
     }
 
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
     const now = Math.floor(Date.now() / 1000);
     const leaseExpires = now + 24 * 60 * 60;
     const lease = signLease({ iss: 'fidulync', sub: licenseKey, ea: eaSlug, login: mt5Login, mode: accountMode, iat: now, exp: leaseExpires }, secret);
-    return NextResponse.json({ valid: true, license_type: status, lease_token: lease, lease_expires_at: new Date(leaseExpires * 1000).toISOString() }, { headers });
+    return NextResponse.json({ valid: true, license_type: status, lease_token: lease, lease_expires_unix: leaseExpires, lease_expires_at: new Date(leaseExpires * 1000).toISOString() }, { headers });
   } catch (error) {
     console.error('License verification failed:', error);
     return NextResponse.json({ valid: false, error: 'License verification is temporarily unavailable.' }, { status: 503, headers });
