@@ -111,7 +111,7 @@ export async function GET(request: Request) {
     }
   }));
 
-  if (process.env.FINNHUB_API_KEY?.trim()) tasks.push(probe('finnhub', async () => {
+  if (process.env.FINNHUB_API_KEY?.trim() && process.env.FINNHUB_COMMERCIAL_USE_APPROVED === 'true') tasks.push(probe('finnhub', async () => {
     const url = new URL('https://finnhub.io/api/v1/quote');
     url.searchParams.set('symbol', 'OANDA:EUR_USD');
     url.searchParams.set('token', required('FINNHUB_API_KEY'));
@@ -160,6 +160,15 @@ export async function GET(request: Request) {
 
   if (process.env.FRED_API_KEY?.trim() && process.env.FRED_COMMERCIAL_USE_APPROVED !== 'true') checks.fred = { status: 'license_blocked', detail: 'FRED is disabled until commercial use, storage/caching and display rights are reviewed and expressly approved.' };
   if (process.env.TWELVE_DATA_API_KEY?.trim() && process.env.TWELVE_DATA_COMMERCIAL_USE_APPROVED !== 'true') checks.twelve_data = { status: 'license_blocked', detail: 'Twelve Data is disabled until the correct business tier, FX exchange rights and external display/derived-data terms are approved.' };
+
+  for (const [name, variable, approval] of [
+    ['finnhub', 'FINNHUB_API_KEY', 'FINNHUB_COMMERCIAL_USE_APPROVED'],
+    ['alpha_vantage', 'ALPHA_VANTAGE_API_KEY', 'ALPHA_VANTAGE_COMMERCIAL_USE_APPROVED'],
+    ['fmp', 'FMP_API_KEY', 'FMP_COMMERCIAL_USE_APPROVED'],
+  ] as const) {
+    if (process.env[variable]?.trim() && process.env[approval] !== 'true') checks[name] = { status: 'license_blocked', detail: `${variable} is disabled until the applicable commercial, display, storage and redistribution terms are reviewed and approved.` };
+    else if (!process.env[variable]?.trim()) checks[name] = { status: 'not_configured', detail: `${variable} is not configured.` };
+  }
 
   for (const [name, variable] of [
     ['fred', 'FRED_API_KEY'], ['bea', 'BEA_API_KEY'], ['bls', 'BLS_API_KEY'], ['twelve_data', 'TWELVE_DATA_API_KEY'],
