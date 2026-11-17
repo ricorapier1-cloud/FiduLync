@@ -7,7 +7,7 @@ type Product = {
   monthly_price_ngn:number; monthly_price_usd:number; annual_price_ngn:number; annual_price_usd:number;
   extra_seat_price_ngn:number; extra_seat_price_usd:number; demo_days:number;
   included_live_seats:number; included_demo_seats:number; metrics_json:Record<string,unknown>;
-  ex5_artifact_url:string|null; is_active:boolean;
+  artifact_path:string; artifact_sha256:string; artifact_size_bytes:number; artifact_version:string; release_approved:boolean; is_active:boolean;
 };
 const numericFields: Array<keyof Product> = ['monthly_price_ngn','monthly_price_usd','annual_price_ngn','annual_price_usd','extra_seat_price_ngn','extra_seat_price_usd','demo_days','included_live_seats','included_demo_seats'];
 const money=(value:number,currency:string)=>currency==='NGN'?'₦'+Math.round(value).toLocaleString('en-NG'):'$'+Number(value).toFixed(2);
@@ -84,17 +84,20 @@ export default function OwnerProductPricing({accessToken}:{accessToken:string}) 
         {numericFields.map(field=><label key={field} className="text-[10px] text-slate-500">{String(field).replaceAll('_',' ').toUpperCase()}<input type="number" min="0" step={field.includes('usd')?'0.01':'1'} value={Number(product[field]||0)} onChange={event=>patch(product.slug,field,Number(event.target.value))} className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-black/30 px-3 font-mono text-xs text-white"/></label>)}
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <label className="text-[10px] text-slate-500">COMPILED EX5 ARTIFACT URL<input value={product.ex5_artifact_url||''} onChange={event=>patch(product.slug,'ex5_artifact_url',event.target.value)} placeholder="https://…/strategy.ex5" className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-xs text-white"/></label>
+        <label className="text-[10px] text-slate-500">PRIVATE STORAGE PATH<input value={product.artifact_path||''} onChange={event=>patch(product.slug,'artifact_path',event.target.value)} placeholder="eridam-nexus-pro/v4.2.0.ex5" className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-xs text-white"/></label>
+        <label className="text-[10px] text-slate-500">ARTIFACT SHA-256<input value={product.artifact_sha256||''} onChange={event=>patch(product.slug,'artifact_sha256',event.target.value)} placeholder="64-character SHA-256 digest" className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-xs text-white"/></label>
+        <label className="text-[10px] text-slate-500">ARTIFACT VERSION<input value={product.artifact_version||product.version} onChange={event=>patch(product.slug,'artifact_version',event.target.value)} className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-xs text-white"/></label>
+        <label className="text-[10px] text-slate-500">FILE SIZE (BYTES)<input type="number" min="1" value={product.artifact_size_bytes||0} onChange={event=>patch(product.slug,'artifact_size_bytes',Number(event.target.value))} className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-xs text-white"/></label>
         <label className="text-[10px] text-slate-500">ASSET COVERAGE COUNT<input type="number" min="1" value={assetCoverage[product.slug]||'4'} onChange={event=>setAssetCoverage(current=>({...current,[product.slug]:event.target.value}))} className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-xs text-white"/></label>
       </div>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <label className="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" checked={product.is_active} onChange={event=>patch(product.slug,'is_active',event.target.checked)} /> Publish in public catalog</label>
+        <div className="flex flex-wrap gap-4"><label className="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" checked={product.release_approved} onChange={event=>patch(product.slug,'release_approved',event.target.checked)} /> Approve compiled artifact</label><label className="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" checked={product.is_active} onChange={event=>patch(product.slug,'is_active',event.target.checked)} /> Publish in public catalog</label></div>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={()=>estimate(product)} className="rounded-lg border border-cyan-300/30 px-3 py-2 text-xs text-cyan-200">Estimate pricing</button>
           <button type="button" disabled={busy===product.slug} onClick={()=>void save(product)} className="rounded-lg bg-emerald-300 px-4 py-2 text-xs font-semibold text-slate-950 disabled:opacity-50">{busy===product.slug?'Saving…':'Save product'}</button>
         </div>
       </div>
-      <p className="mt-3 text-[10px] leading-5 text-slate-600">Suggested monthly: {money(product.monthly_price_ngn,'NGN')} / {money(product.monthly_price_usd,'USD')} · Annual: {money(product.annual_price_ngn,'NGN')} / {money(product.annual_price_usd,'USD')}. Checkout remains blocked until a compiled artifact URL is registered.</p>
+      <p className="mt-3 text-[10px] leading-5 text-slate-600">Suggested monthly: {money(product.monthly_price_ngn,'NGN')} / {money(product.monthly_price_usd,'USD')} · Annual: {money(product.annual_price_ngn,'NGN')} / {money(product.annual_price_usd,'USD')}. Checkout and demo downloads remain blocked until the private artifact is uploaded, SHA-256 recorded and release approved.</p>
     </article>)}
   </section>;
 }
