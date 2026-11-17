@@ -30,8 +30,15 @@ async function requestOk(url: URL | string, init?: RequestInit) {
 }
 
 export async function GET(request: Request) {
-  if (!isAlgoAuthorized(request)) {
+  const expectedKey = process.env.ALGO_PRIVATE_API_KEY?.trim() ?? '';
+  const providedKey = request.headers.get('x-algo-key')?.trim() ?? '';
+  const expected = Buffer.from(expectedKey);
+  const provided = Buffer.from(providedKey);
+  if (!expected.length || expected.length !== provided.length || !timingSafeEqual(expected, provided)) {
     return NextResponse.json({ error: 'Unauthorized.' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
+  }
+  if (!checkRateLimit(getClientIp(request), 5, 60_000)) {
+    return NextResponse.json({ error: 'Diagnostics rate limit exceeded.' }, { status: 429, headers: { 'Cache-Control': 'no-store' } });
   }
 
   const checks: Record<string, Check> = {};
