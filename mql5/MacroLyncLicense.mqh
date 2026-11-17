@@ -66,7 +66,7 @@ bool VerifyAlgolyncLicense()
    string mode = AlgoLyncCurrentAccountIsDemo() ? "DEMO" : "REAL";
    if(g_AlgoLyncLeaseToken != "" && g_AlgoLyncLeaseKey == licenseKey
       && g_AlgoLyncLeaseSlug == eaSlug && g_AlgoLyncLeaseLogin == login
-      && TimeCurrent() < g_AlgoLyncLeaseExpiry - 300)
+      && TimeGMT() < g_AlgoLyncLeaseExpiry - 300)
       return true;
 
    string payload = StringFormat("{\"license_key\":\"%s\",\"mt5_login\":%I64d,\"account_mode\":\"%s\",\"ea_slug\":\"%s\"}",licenseKey,login,mode,eaSlug);
@@ -105,7 +105,7 @@ bool VerifyAlgolyncLicense()
    }
    string token = AlgoLyncJsonString(response,"lease_token");
    long expiry = AlgoLyncJsonInteger(response,"lease_expires_unix");
-   if(token == "" || expiry <= (long)TimeCurrent())
+   if(token == "" || expiry <= (long)TimeGMT())
    {
       Print("[AlgoLync] License response did not contain a valid signed lease.");
       return false;
@@ -120,7 +120,7 @@ bool VerifyAlgolyncLicense()
 }
 string AlgoLyncGetLeaseToken()
 {
-   if(g_AlgoLyncLeaseToken == "" || TimeCurrent() >= g_AlgoLyncLeaseExpiry) return "";
+   if(g_AlgoLyncLeaseToken == "" || TimeGMT() >= g_AlgoLyncLeaseExpiry) return "";
    return g_AlgoLyncLeaseToken;
 }
 #endif
