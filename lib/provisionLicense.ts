@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { createHash, randomBytes } from 'node:crypto';
-import { isSupabaseConfigured, supabaseQuery, supabaseRead } from '@/lib/supabaseAdmin';
+import { isSupabaseConfigured, supabaseQuery } from '@/lib/supabaseAdmin';
 
 const PRICES: Record<string, number> = {
   MONTHLY_NGN: 6_500_000,
