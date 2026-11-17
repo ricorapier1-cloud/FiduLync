@@ -5,6 +5,7 @@ import { getTechnicalSignal, type MarketRegime } from '@/lib/technicalEngine';
 import { getCurrencyStrengthIndex, getKillzoneActive, getLiquiditySession } from '@/lib/currencyStrength';
 import { getCachedData } from '@/lib/redisCache';
 import type { MacroSnapshot } from '@/types/macro';
+import { deriveRiskBudget } from '@/lib/quantRisk';
 
 const G10 = new Set(['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'SEK', 'NOK']);
 const REGION_BY_CURRENCY: Record<string, string> = {
@@ -36,6 +37,8 @@ export type MacroSignalPayload = {
   correlation_group: 'USD_BLOC' | 'JPY_CROSS' | 'EUR_BLOC' | 'COMMODITY_FX';
   news_lockout: boolean;
   safe_to_trade: boolean;
+  execution_blockers: string[];
+  risk_mode: 'DISABLED' | 'PILOT_TREND' | 'PILOT_MEAN_REVERSION';
   timestamp_utc: string;
 };
 
@@ -100,13 +103,33 @@ export async function getMacroSignal(symbol: string, now = Date.now()): Promise<
           : 'USD_BLOC';
     const session = getLiquiditySession(new Date(now));
     const killzoneActive = getKillzoneActive(new Date(now));
-    const maxRiskPct = newsLockout || technical.regime === 'HIGH_VOL_CHOP'
-      ? 0
-      : technical.regime === 'TRENDING_EXPANSION'
-        ? 1
-        : technical.regime === 'MEAN_REVERTING'
-          ? 0.5
-          : 0;
+    const directionAllowed = bias === 'LONG'
+      ? technical.execution_filter.allow_buys
+      : bias === 'SHORT'
+        ? technical.execution_filter.allow_sells
+        : false;
+    const validStops = technical.atr_stop_pips !== null && technical.atr_stop_pips > 0
+      && technical.atr_take_profit_pips !== null && technical.atr_take_profit_pips > 0;
+    const macroDataVerified = Boolean(fundamental)
+      && verifiedPolicyInputs
+      && snapshot.calendarSource === 'provider';
+    const riskBudget = deriveRiskBudget({
+      regime: technical.regime,
+      marketDataVerified: technical.available,
+      macroDataVerified,
+      executionQualityVerified: process.env.EXECUTION_QUALITY_VALIDATED === 'true',
+      modelValidated: process.env.SIGNAL_MODEL_VALIDATED === 'true',
+      executionEnabled: process.env.SIGNAL_EXECUTION_ENABLED === 'true',
+      newsLockout,
+    });
+    const executionBlockers = [...riskBudget.blockers];
+    if (session === 'OFF_HOURS') executionBlockers.push('OUTSIDE_APPROVED_LIQUIDITY_SESSION');
+    if (bias === 'NEUTRAL') executionBlockers.push('NO_DIRECTIONAL_CONFLUENCE');
+    if (!edgeQualified) executionBlockers.push('CONFLUENCE_BELOW_RESEARCH_THRESHOLD');
+    if (!validStops) executionBlockers.push('ATR_STOPS_UNAVAILABLE');
+    if (!directionAllowed) executionBlockers.push('DIRECTION_BLOCKED_BY_TECHNICAL_FILTER');
+    const safeToTrade = riskBudget.approved && executionBlockers.length === 0;
+    const maxRiskPct = safeToTrade ? riskBudget.riskPct : 0;
 
     return {
       symbol: normalizedSymbol,
@@ -122,19 +145,9 @@ export async function getMacroSignal(symbol: string, now = Date.now()): Promise<
       risk_multiplier: maxRiskPct,
       correlation_group: correlationGroup,
       news_lockout: newsLockout,
-      safe_to_trade: Boolean(fundamental)
-        && technical.available
-        && verifiedPolicyInputs
-        && snapshot.calendarSource === 'provider'
-        && !newsLockout
-        && technical.regime !== 'HIGH_VOL_CHOP'
-        && session !== 'OFF_HOURS'
-        && bias !== 'NEUTRAL'
-        && technical.atr_stop_pips !== null && technical.atr_stop_pips > 0
-        && technical.atr_take_profit_pips !== null && technical.atr_take_profit_pips > 0
-        && edgeQualified
-        && maxRiskPct > 0
-        && (bias === 'LONG' ? technical.execution_filter.allow_buys : technical.execution_filter.allow_sells),
+      safe_to_trade: safeToTrade,
+      execution_blockers: [...new Set(executionBlockers)],
+      risk_mode: riskBudget.mode,
       timestamp_utc: new Date(now).toISOString(),
     };
   };
