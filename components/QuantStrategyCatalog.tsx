@@ -69,6 +69,31 @@ export function QuantStrategyCatalog({ onSelectEa }: { onSelectEa?: (slug: strin
   const [demoLogin, setDemoLogin] = useState('');
   const [demoError, setDemoError] = useState('');
   const [demoDownloadUrl, setDemoDownloadUrl] = useState('');
+  const [checkoutEa, setCheckoutEa] = useState<EaProduct | null>(null);
+  const [checkoutEmail, setCheckoutEmail] = useState('');
+  const [billingCycle, setBillingCycle] = useState<'MONTHLY'|'ANNUAL'>('MONTHLY');
+  const [checkoutCurrency, setCheckoutCurrency] = useState<'NGN'|'USD'>('NGN');
+  const [extraSeats, setExtraSeats] = useState(0);
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [checkoutError, setCheckoutError] = useState('');
+
+  const submitSubscription = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!checkoutEa) return;
+    setCheckoutBusy(true);
+    setCheckoutError('');
+    try {
+      const response = await fetch('/api/v1/subscriptions/checkout', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({email:checkoutEmail,ea_slug:checkoutEa.slug,billing_cycle:billingCycle,currency:checkoutCurrency,extra_live_seats:extraSeats}),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success || !result.authorization_url) throw new Error(result.error || 'Checkout could not be initialized.');
+      window.location.assign(result.authorization_url);
+    } catch (error) {
+      setCheckoutError(error instanceof Error ? error.message : 'Subscription checkout unavailable.');
+    } finally { setCheckoutBusy(false); }
+  };
 
   const handleGenerateDemo = (ea: EaProduct) => {
     setDemoModalEa(ea);
@@ -125,7 +150,7 @@ export function QuantStrategyCatalog({ onSelectEa }: { onSelectEa?: (slug: strin
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
         {EA_CATALOG.map((strategy) => {
           const badgeStyles =
             strategy.badgeColor === 'emerald'
@@ -223,16 +248,14 @@ export function QuantStrategyCatalog({ onSelectEa }: { onSelectEa?: (slug: strin
                 </button>
 
                 {/* Button B: Provision Real EA License (Anchored to checkout) */}
-                <a
-                  href="#vault-checkout"
-                  onClick={() => onSelectEa && onSelectEa(strategy.slug)}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-4 py-2.5 text-xs font-bold text-emerald-300 shadow-md shadow-emerald-950/30 transition-all hover:border-emerald-400 hover:bg-emerald-500 hover:text-black"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  {strategy.tierCategory === 'SANDBOX' ? 'Download Free Sandbox Artifact' : `Subscribe Live License (${strategy.name.split(' ')[0]})`}
-                </a>
+                {strategy.tierCategory === 'SANDBOX' ? (
+                  <a href={strategy.demoDownloadUrl} download={strategy.demoFilename} className="flex w-full items-center justify-center rounded-lg border border-amber-400/30 bg-amber-400/10 px-4 py-2.5 text-xs font-semibold text-amber-200">Download Open-Source Sandbox (.mq5)</a>
+                ) : (
+                  <button type="button" onClick={() => { setCheckoutEa(strategy); setCheckoutError(''); }} className="flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-4 py-2.5 text-xs font-bold text-emerald-300 transition-all hover:bg-emerald-500 hover:text-black">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                    Subscribe Live
+                  </button>
+                )}
               </div>
             </article>
           );
@@ -262,6 +285,25 @@ export function QuantStrategyCatalog({ onSelectEa }: { onSelectEa?: (slug: strin
               </div>
             )}
             <p className="mt-4 text-[10px] leading-5 text-slate-500">A compiled demo artifact must be published and approved before the server issues a key. No placeholder keys or source-code binaries are generated.</p>
+          </section>
+        </div>
+      )}
+      {checkoutEa && (
+        <div className="fixed inset-0 z-[100] flex justify-end bg-black/75 backdrop-blur-sm" onClick={()=>setCheckoutEa(null)}>
+          <section role="dialog" aria-modal="true" aria-labelledby="checkout-title" className="h-full w-full max-w-md overflow-y-auto border-l border-white/10 bg-[#0b1119] p-6 shadow-2xl" onClick={event=>event.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div><p className="font-mono text-[10px] tracking-widest text-emerald-300">ALGOLYNC / SECURE CHECKOUT</p><h3 id="checkout-title" className="mt-1 text-xl font-semibold text-white">Subscribe to {checkoutEa.name}</h3></div>
+              <button type="button" onClick={()=>setCheckoutEa(null)} aria-label="Close checkout" className="text-slate-400">✕</button>
+            </div>
+            <form onSubmit={submitSubscription} className="mt-6 space-y-5">
+              <label className="block text-xs text-slate-400">Billing email<input required type="email" value={checkoutEmail} onChange={event=>setCheckoutEmail(event.target.value)} placeholder="you@example.com" className="mt-2 h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-sm text-white"/></label>
+              <div><p className="mb-2 text-xs text-slate-400">Billing cycle</p><div className="grid grid-cols-2 gap-2"><button type="button" onClick={()=>setBillingCycle('MONTHLY')} className={`h-10 rounded-lg border text-xs ${billingCycle==='MONTHLY'?'border-emerald-300 bg-emerald-300/10 text-emerald-200':'border-white/10 text-slate-400'}`}>Monthly</button><button type="button" onClick={()=>setBillingCycle('ANNUAL')} className={`h-10 rounded-lg border text-xs ${billingCycle==='ANNUAL'?'border-emerald-300 bg-emerald-300/10 text-emerald-200':'border-white/10 text-slate-400'}`}>Annual · 2 months free</button></div></div>
+              <div><p className="mb-2 text-xs text-slate-400">Currency</p><div className="grid grid-cols-2 gap-2"><button type="button" onClick={()=>setCheckoutCurrency('NGN')} className={`h-10 rounded-lg border text-xs ${checkoutCurrency==='NGN'?'border-emerald-300 bg-emerald-300/10 text-emerald-200':'border-white/10 text-slate-400'}`}>NGN ₦</button><button type="button" onClick={()=>setCheckoutCurrency('USD')} className={`h-10 rounded-lg border text-xs ${checkoutCurrency==='USD'?'border-emerald-300 bg-emerald-300/10 text-emerald-200':'border-white/10 text-slate-400'}`}>USD $</button></div></div>
+              <label className="block text-xs text-slate-400">Extra live account seats<select value={extraSeats} onChange={event=>setExtraSeats(Number(event.target.value))} className="mt-2 h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-sm text-white"><option value={0}>No extra seats</option><option value={1}>+1 seat</option><option value={3}>+3 seats</option><option value={5}>+5 seats</option></select><span className="mt-1 block text-[10px] text-slate-500">Includes 1 live and 2 demo seats where the product entitlement supports them.</span></label>
+              {checkoutError && <p role="alert" className="rounded-lg border border-rose-400/20 bg-rose-400/5 p-3 text-xs text-rose-300">{checkoutError}</p>}
+              <button disabled={checkoutBusy} className="h-12 w-full rounded-lg bg-emerald-300 px-4 text-sm font-semibold text-[#07120d] disabled:opacity-50">{checkoutBusy?'Connecting to Paystack…':'Continue to Paystack'}</button>
+              <p className="text-[10px] leading-5 text-slate-500">MT5 login is optional at checkout. Bind accounts later in your private portal. Recurring billing is managed by Paystack.</p>
+            </form>
           </section>
         </div>
       )}
