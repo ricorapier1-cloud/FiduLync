@@ -90,6 +90,22 @@ export default function OwnerConsole() {
     finally { setBusy(false); }
   }
 
+  async function revokePublisher(id: string) {
+    if (!session || !window.confirm('Revoke this MT5 publisher token? The terminal will stop ingesting data immediately.')) return;
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const response = await fetch('/api/owner/mt5-installations', {
+        method: 'DELETE', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Publisher revocation failed.');
+      setNotice('MT5 publisher token revoked. Its future ingestion requests will be rejected.');
+      await loadInstallations(session.access_token);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Publisher revocation unavailable.'); }
+    finally { setBusy(false); }
+  }
+
   async function createPublisher() {
     if (!session) return;
     setBusy(true); setError(''); setNotice(''); setPublisherToken('');
@@ -152,7 +168,7 @@ export default function OwnerConsole() {
         {publisherToken && <div className="mt-4 rounded border border-amber-300/20 bg-black/30 p-4"><p className="font-mono text-[10px] text-amber-200">PRIVATE PUBLISHER TOKEN — SHOWN ONCE</p><p className="mt-2 break-all font-mono text-xs">{publisherToken}</p><button onClick={()=>void navigator.clipboard.writeText(publisherToken)} className="mt-3 rounded border border-white/15 px-3 py-2 text-xs">Copy token</button></div>}
         <div className="mt-5 border-t border-white/10 pt-4">
           <h3 className="font-mono text-[10px] text-slate-400">REGISTERED TERMINALS</h3>
-          {installations.length===0 ? <p className="mt-3 text-xs text-slate-500">No publisher terminals registered.</p> : <div className="mt-3 space-y-2">{installations.map(item=><div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-white/10 p-3"><div><p className="text-sm">{item.label}</p><p className="mt-1 text-[10px] text-slate-500">{item.broker||'Broker pending'} · {item.server||'Server pending'} · Last seen: {item.last_seen_at?new Date(item.last_seen_at).toLocaleString():'Never'}</p></div><span className={item.status==='active'?'text-emerald-300':'text-rose-300'}>{item.status.toUpperCase()}</span></div>)}</div>}
+          {installations.length===0 ? <p className="mt-3 text-xs text-slate-500">No publisher terminals registered.</p> : <div className="mt-3 space-y-2">{installations.map(item=><div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-white/10 p-3"><div><p className="text-sm">{item.label}</p><p className="mt-1 text-[10px] text-slate-500">{item.broker||'Broker pending'} · {item.server||'Server pending'} · Last seen: {item.last_seen_at?new Date(item.last_seen_at).toLocaleString():'Never'}</p></div><div className="flex items-center gap-3"><span className={item.status==='active'?'text-emerald-300':'text-rose-300'}>{item.status.toUpperCase()}</span>{item.status==='active'&&<button disabled={busy} onClick={()=>void revokePublisher(item.id)} className="rounded border border-rose-300/20 px-2 py-1 text-[10px] text-rose-200 disabled:opacity-40">Revoke</button>}</div></div>)}</div>}
         </div>
       </section>
     </>}
