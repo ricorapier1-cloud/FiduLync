@@ -7,6 +7,10 @@ export function PaystackCheckout() {
   const [currency, setCurrency] = useState<'NGN' | 'USD'>('NGN');
   const [email, setEmail] = useState('');
   const [mt5Account, setMt5Account] = useState('');
+  const [bindAccount, setBindAccount] = useState('');
+  const [bindCode, setBindCode] = useState('');
+  const [bindRequestId, setBindRequestId] = useState<string | null>(null);
+  const [licenseBound, setLicenseBound] = useState(false);
   const [recoveryLicenseKey, setRecoveryLicenseKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [licenseKey, setLicenseKey] = useState<string | null>(null);
@@ -30,6 +34,8 @@ export function PaystackCheckout() {
         }
         if (active) {
           setLicenseKey(data.license_key);
+          if (typeof data.email === 'string') setEmail(data.email);
+          setLicenseBound(typeof data.mt5_account === 'number' && data.mt5_account > 0);
           setDeliveryNotice(data.email_sent ? 'A copy of your license has also been sent to your payment email.' : (data.email_notice || 'Save your license key now. Email delivery is not yet configured.'));
           if (typeof data.download_url === 'string') setDownloadUrl(data.download_url);
           window.history.replaceState({}, '', '/store');
@@ -42,7 +48,47 @@ export function PaystackCheckout() {
         if (active) setLoading(false);
       });
 
-    return () => { active = false; };
+    const handleBindAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!licenseKey || !email.trim() || !bindAccount.trim()) return;
+    setLoading(true);
+    setErrorMsg(null);
+    try {
+      const response = await fetch('/api/v1/license-bind', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: bindRequestId ? 'confirm' : 'request',
+          license_key: licenseKey,
+          email,
+          mt5_account: bindAccount,
+          request_id: bindRequestId || undefined,
+          code: bindCode || undefined,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        setErrorMsg(data.error || 'Account binding could not be completed.');
+        return;
+      }
+      if (!bindRequestId) {
+        setBindRequestId(data.request_id);
+        setDeliveryNotice(data.message || 'Check your purchase email for the one-time binding code.');
+      } else {
+        setLicenseBound(true);
+        setMt5Account(bindAccount);
+        setBindRequestId(null);
+        setBindCode('');
+        setDeliveryNotice(data.message || 'Your MT5 account is now bound to this license.');
+      }
+    } catch {
+      setErrorMsg('Network error during license binding.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return () => { active = false; };
   }, []);
 
   const priceDisplay =
@@ -52,7 +98,7 @@ export function PaystackCheckout() {
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !mt5Account) return;
+    if (!email.trim()) return;
     setLoading(true);
     setErrorMsg(null);
     setDeliveryNotice(null);
@@ -61,7 +107,7 @@ export function PaystackCheckout() {
       const res = await fetch('/api/v1/create-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, mt5_account: Number(mt5Account), currency, plan }),
+        body: JSON.stringify({ email, currency, plan }),
       });
       const data = await res.json();
 
@@ -75,6 +121,7 @@ export function PaystackCheckout() {
       }
       if (data.license_key) {
         setLicenseKey(data.license_key);
+        setLicenseBound(typeof data.mt5_account === 'number' && data.mt5_account > 0);
         if (data.download_url) setDownloadUrl(data.download_url);
       }
     } catch {
@@ -102,6 +149,7 @@ export function PaystackCheckout() {
         return;
       }
       setLicenseKey(data.license_key);
+      setLicenseBound(true);
       if (data.download_url) setDownloadUrl(data.download_url);
     } catch {
       setErrorMsg('Network error while looking up license.');
