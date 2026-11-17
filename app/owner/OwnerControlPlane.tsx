@@ -39,7 +39,7 @@ export default function OwnerControlPlane({accessToken}:Props) {
   } catch(e) { setError(e instanceof Error?e.message:'Unable to load owner data.'); }
   finally { setLoading(false); }
  },[accessToken]);
- useEffect(()=>{void refresh()},[refresh]);
+ useEffect(()=>{ const task=Promise.resolve().then(()=>refresh()); return ()=>{ void task; }; },[refresh]);
  const filtered=useMemo(()=>{
   const q=query.trim().toLowerCase();
   return (snapshot?.licenses??[]).filter(x=>!q||[x.email,x.license_key,x.payment_reference??'',String(x.mt5_account??'')].some(v=>v.toLowerCase().includes(q)));
