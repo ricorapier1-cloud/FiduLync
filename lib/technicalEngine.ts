@@ -77,6 +77,54 @@ function parseCandle(value: unknown): Candle | null {
   return candle;
 }
 
+async function fetchTwelveDataCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promise<Candle[]> {
+  const apiKey = process.env.TWELVE_DATA_API_KEY?.trim();
+  if (!apiKey) return [];
+
+  const interval = timeframe === 'H1' ? '1h' : timeframe === 'H4' ? '4h' : '1day';
+  const symbol = pair === 'XAUUSD' ? 'XAU/USD' : `${pair.slice(0, 3)}/${pair.slice(3)}`;
+  const url = new URL('https://api.twelvedata.com/time_series');
+  url.searchParams.set('symbol', symbol);
+  url.searchParams.set('interval', interval);
+  url.searchParams.set('outputsize', '500');
+  url.searchParams.set('timezone', 'UTC');
+  url.searchParams.set('apikey', apiKey);
+
+  const response = await fetch(url, {
+    cache: 'no-store',
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!response.ok) throw new Error(`Twelve Data candle request returned ${response.status}.`);
+
+  const payload: unknown = await response.json();
+  if (!isRecord(payload) || !Array.isArray(payload.values)) {
+    // Never include the request URL or credential in logs/errors.
+    const providerMessage = isRecord(payload) && typeof payload.message === 'string'
+      ? payload.message.slice(0, 160)
+      : 'Invalid Twelve Data response.';
+    throw new Error(providerMessage);
+  }
+
+  const candles = payload.values.map((item): Candle | null => {
+    if (!isRecord(item) || typeof item.datetime !== 'string') return null;
+    return parseCandle({
+      timestamp: Date.parse(item.datetime.endsWith('Z') ? item.datetime : `${item.datetime}Z`) / 1000,
+      open: item.open, high: item.high, low: item.low, close: item.close,
+    });
+  });
+  if (!candles.every((candle): candle is Candle => candle !== null)) {
+    throw new Error('Twelve Data returned an invalid candle series.');
+  }
+  const ordered = candles.sort((left, right) => left.timestamp - right.timestamp).slice(-MAX_CANDLES);
+  const latest = ordered.at(-1)?.timestamp;
+  const maxAgeSeconds = timeframe === 'H1' ? 2 * 60 * 60
+    : timeframe === 'H4' ? 8 * 60 * 60 : 48 * 60 * 60;
+  if (latest === undefined || Date.now() / 1000 - latest > maxAgeSeconds || latest > Date.now() / 1000 + 300) {
+    throw new Error(`Twelve Data returned stale ${timeframe} candles for ${pair}.`);
+  }
+  return ordered;
+}
+
 async function fetchCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promise<Candle[]> {
   const endpoint = process.env.MARKET_DATA_PROVIDER_URL?.trim();
   if (!endpoint) return [];
@@ -163,8 +211,16 @@ async function getCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1') {
   return getCachedData(`market:candles:${pair}:${timeframe}`, async () => {
     const mt5Candles = await fetchActiveMt5Candles(pair, timeframe);
     if (mt5Candles.length >= 200) return mt5Candles;
-    // Preserve the independent HTTPS provider as a fallback; signal gating still rejects stale/incomplete inputs.
-    return fetchCandles(pair, timeframe);
+    // Keep providers isolated: never splice OHLC bars from different feeds into one indicator series.
+    const configuredProvider = await fetchCandles(pair, timeframe).catch((error) => {
+      console.warn(`Configured market data provider unavailable for ${pair} ${timeframe}.`, error);
+      return [];
+    });
+    if (configuredProvider.length >= 200) return configuredProvider;
+    return fetchTwelveDataCandles(pair, timeframe).catch((error) => {
+      console.warn(`Twelve Data unavailable for ${pair} ${timeframe}; technical execution remains disabled.`, error);
+      return [];
+    });
   }, LIVE_PRICE_TTL_SECONDS);
 }
 
