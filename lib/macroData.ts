@@ -340,7 +340,7 @@ async function getFmpCatalysts(apiKey: string): Promise<EconomicCatalyst[]> {
 
 async function getCotProvider(urlValue: string, token?: string): Promise<CotPosition[]> {
   const providerUrl = new URL(urlValue);
-  if (providerUrl.protocol !== 'https:' && providerUrl.protocol !== 'http:') throw new Error('Unsupported COT provider protocol.');
+  if (providerUrl.protocol !== 'https:') throw new Error('COT provider must use HTTPS.');
   const response = await fetch(providerUrl, {
     cache: 'no-store',
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
@@ -435,11 +435,11 @@ async function getCftcCot(): Promise<CotPosition[]> {
 }
 
 async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallbackSnapshot()): Promise<MacroSnapshot | null> {
-  const fredApiKey = process.env.FRED_API_KEY?.trim();
-  const finnhubApiKey = process.env.FINNHUB_API_KEY?.trim();
-  const alphaVantageKey = process.env.ALPHA_VANTAGE_API_KEY?.trim();
-  const fmpKey = process.env.FMP_API_KEY?.trim();
-  const cotProviderUrl = process.env.COT_DATA_PROVIDER_URL?.trim();
+  const fredApiKey = process.env.FRED_COMMERCIAL_USE_APPROVED === 'true' ? process.env.FRED_API_KEY?.trim() : undefined;
+  const finnhubApiKey = process.env.FINNHUB_COMMERCIAL_USE_APPROVED === 'true' ? process.env.FINNHUB_API_KEY?.trim() : undefined;
+  const alphaVantageKey = process.env.ALPHA_VANTAGE_COMMERCIAL_USE_APPROVED === 'true' ? process.env.ALPHA_VANTAGE_API_KEY?.trim() : undefined;
+  const fmpKey = process.env.FMP_COMMERCIAL_USE_APPROVED === 'true' ? process.env.FMP_API_KEY?.trim() : undefined;
+  const cotProviderUrl = process.env.COT_DATA_PROVIDER_LICENSE_APPROVED === 'true' ? process.env.COT_DATA_PROVIDER_URL?.trim() : undefined;
   const cotProviderToken = process.env.COT_DATA_PROVIDER_TOKEN?.trim();
 
   const snapshot: MacroSnapshot = {
@@ -457,7 +457,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     fmpKey ? getFmpCatalysts(fmpKey) : Promise.resolve(null),
     cotProviderUrl ? getCotProvider(cotProviderUrl, cotProviderToken) : getCftcCot(),
     getFrankfurterRates(),
-    getFairEconomyCatalysts(),
+    process.env.FAIRECONOMY_COMMERCIAL_USE_APPROVED === 'true' ? getFairEconomyCatalysts() : Promise.resolve([]),
     getEcbMacroInputs(),
     getBankOfCanadaMacroInputs(),
     getBankOfEnglandPolicyRate(),
@@ -700,7 +700,7 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
   if (endpoint) {
     try {
       const providerUrl = new URL(endpoint);
-      if (providerUrl.protocol !== 'https:' && providerUrl.protocol !== 'http:') throw new Error('Unsupported provider protocol.');
+      if (providerUrl.protocol !== 'https:') throw new Error('Macro provider must use HTTPS.');
 
       const token = process.env.MACRO_DATA_PROVIDER_TOKEN?.trim();
       const response = await fetch(providerUrl, {
