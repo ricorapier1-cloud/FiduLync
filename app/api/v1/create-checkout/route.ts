@@ -36,6 +36,9 @@ export async function POST(req: Request) {
     }
 
     const paystackSecret = (process.env.PAYSTACK_SECRET_KEY || '').trim();
+    if (paystackSecret.startsWith('sk_live_') && process.env.PAYSTACK_LIVE_ENABLED !== 'true') {
+      return NextResponse.json({ success: false, error: 'Live payments are disabled while merchant compliance approval is pending.' }, { status: 503 });
+    }
     const reference = `ALGO_${plan}_${currency}_${mt5Account}_${crypto.randomBytes(16).toString('hex').toUpperCase()}`;
 
     if (paystackSecret.startsWith('sk_')) {
