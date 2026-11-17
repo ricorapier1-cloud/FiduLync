@@ -57,6 +57,10 @@ export async function PATCH(request:Request) {
       if(path && (path.startsWith('/')||path.includes('..')||path.includes('\\')||!path.toLowerCase().endsWith('.ex5'))) return NextResponse.json({error:'Artifact path must be a safe relative .ex5 storage path.'},{status:400});
       if((path||sha||size>0||version||approved)&&(!path||! /^[a-f0-9]{64}$/.test(sha)||!Number.isSafeInteger(size)||size<=0||!version)) return NextResponse.json({error:'Artifact registration requires a storage path, SHA-256, file size and artifact version.'},{status:400});
       const artifact={ea_slug:slug,storage_path:path,sha256:sha,size_bytes:size,artifact_version:version,release_approved:approved,approved_at:approved?new Date().toISOString():null,updated_at:new Date().toISOString()};
+      if(approved) {
+        const proof=await admin.storage.from('algolync-artifacts').createSignedUrl(path,60);
+        if(proof.error||!proof.data?.signedUrl) return NextResponse.json({error:'The compiled artifact does not exist in the private storage bucket. Upload it before approval.'},{status:409});
+      }
       const saved=await admin.from('ea_product_artifacts').upsert(artifact,{onConflict:'ea_slug'}).select().single();
       if(saved.error) return NextResponse.json({error:'Private artifact registry update failed.'},{status:503});
     }
