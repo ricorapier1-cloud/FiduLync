@@ -19,6 +19,7 @@ export default function OwnerProductPricing({accessToken}:{accessToken:string}) 
   const [busy,setBusy]=useState('');
   const [message,setMessage]=useState('');
   const [error,setError]=useState('');
+  const [artifactFiles,setArtifactFiles]=useState<Record<string,File|null>>({});
 
   const load=useCallback(async()=>{
     setBusy('loading');setError('');
@@ -54,6 +55,21 @@ export default function OwnerProductPricing({accessToken}:{accessToken:string}) 
     setError('');
     setMessage(`Pricing estimate generated for ${product.name}. Review and save to publish the price.`);
   }
+  async function uploadArtifact(product:Product){
+    const file=artifactFiles[product.slug];
+    if(!file){setError('Select a compiled .ex5 file first.');return;}
+    setBusy('upload:'+product.slug);setError('');setMessage('');
+    try{
+      const form=new FormData();form.append('slug',product.slug);form.append('version',product.artifact_version||product.version);form.append('file',file);
+      const response=await fetch('/api/owner/products/artifact',{method:'POST',headers:{Authorization:'Bearer '+accessToken},body:form});
+      const result=await response.json();
+      if(!response.ok||!result.success)throw new Error(result.error||'Artifact upload failed.');
+      setProducts(current=>current.map(item=>item.slug===product.slug?{...item,artifact_path:result.artifact.storage_path,artifact_sha256:result.artifact.sha256,artifact_size_bytes:result.artifact.size_bytes,artifact_version:result.artifact.artifact_version,release_approved:false}:item));
+      setArtifactFiles(current=>({...current,[product.slug]:null}));
+      setMessage(`Uploaded ${file.name}; SHA-256 recorded. Review and approve the artifact before enabling sales.`);
+    }catch(e){setError(e instanceof Error?e.message:'Artifact upload failed.');}
+    finally{setBusy('');}
+  }
   async function save(product:Product){
     setBusy(product.slug);setError('');setMessage('');
     try{
@@ -87,7 +103,9 @@ export default function OwnerProductPricing({accessToken}:{accessToken:string}) 
         <label className="text-[10px] text-slate-500">PRIVATE STORAGE PATH<input value={product.artifact_path||''} onChange={event=>patch(product.slug,'artifact_path',event.target.value)} placeholder="eridam-nexus-pro/v4.2.0.ex5" className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-xs text-white"/></label>
         <label className="text-[10px] text-slate-500">ARTIFACT SHA-256<input value={product.artifact_sha256||''} onChange={event=>patch(product.slug,'artifact_sha256',event.target.value)} placeholder="64-character SHA-256 digest" className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-xs text-white"/></label>
         <label className="text-[10px] text-slate-500">ARTIFACT VERSION<input value={product.artifact_version||product.version} onChange={event=>patch(product.slug,'artifact_version',event.target.value)} className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-xs text-white"/></label>
-        <label className="text-[10px] text-slate-500">FILE SIZE (BYTES)<input type="number" min="1" value={product.artifact_size_bytes||0} onChange={event=>patch(product.slug,'artifact_size_bytes',Number(event.target.value))} className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-xs text-white"/></label>
+        <label className="text-[10px] text-slate-500">FILE SIZE (BYTES)<input type="number" min="1" value={product.artifact_size_bytes||0} readOnly className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-xs text-white"/></label>
+        <label className="text-[10px] text-slate-500 sm:col-span-2">UPLOAD COMPILED EA (.EX5)<input type="file" accept=".ex5,application/octet-stream" onChange={event=>setArtifactFiles(current=>({...current,[product.slug]:event.target.files?.[0]||null}))} className="mt-1.5 block w-full text-xs text-slate-300 file:mr-3 file:rounded file:border-0 file:bg-white/10 file:px-3 file:py-2 file:text-xs file:text-white"/></label>
+        <button type="button" disabled={busy==='upload:'+product.slug||!artifactFiles[product.slug]} onClick={()=>void uploadArtifact(product)} className="rounded-lg border border-cyan-300/30 px-3 py-2 text-xs text-cyan-200 disabled:opacity-40 sm:col-span-2">{busy==='upload:'+product.slug?'Uploading privately…':'Upload .ex5 and calculate SHA-256'}</button>
         <label className="text-[10px] text-slate-500">ASSET COVERAGE COUNT<input type="number" min="1" value={assetCoverage[product.slug]||'4'} onChange={event=>setAssetCoverage(current=>({...current,[product.slug]:event.target.value}))} className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-xs text-white"/></label>
       </div>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
