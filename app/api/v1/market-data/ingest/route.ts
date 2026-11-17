@@ -83,7 +83,7 @@ export async function POST(request: Request) {
     if (quotes.length) {
       const result = await supabaseQuery('mt5_market_quotes', {
         method: 'POST', query: 'on_conflict=installation_id,symbol',
-        prefer: 'resolution=merge-duplicates,return=minimal',
+        prefer: 'resolution=merge-duplicates,return=representation',
         body: quotes.map((quote) => ({ ...quote, installation_id: installation.id })),
       });
       if (!result) throw new Error('Quote storage failed.');
@@ -98,7 +98,7 @@ export async function POST(request: Request) {
     }
     await supabaseQuery('mt5_installations', {
       method: 'PATCH', query: `id=eq.${installation.id}`,
-      prefer: 'return=minimal', body: { last_seen_at: new Date().toISOString() },
+      prefer: 'return=representation', body: { last_seen_at: new Date().toISOString() },
     });
     return NextResponse.json({
       accepted: true, installation_id: installation.id,
