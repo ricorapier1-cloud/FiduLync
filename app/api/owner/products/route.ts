@@ -62,12 +62,6 @@ export async function PATCH(request:Request) {
     }
     if(body.is_active!==undefined) {
       if(typeof body.is_active!=='boolean') return NextResponse.json({error:'is_active must be boolean.'},{status:400});
-      if(body.is_active===true) {
-        const artifact=await admin.from('ea_product_artifacts').select('storage_path,sha256,size_bytes,release_approved').eq('ea_slug',slug).maybeSingle();
-        if(artifact.error||!artifact.data?.release_approved||!artifact.data.storage_path||!artifact.data.sha256||!artifact.data.size_bytes) {
-          return NextResponse.json({error:'Register and approve a verified compiled .ex5 artifact before publishing a commercial EA.'},{status:409});
-        }
-      }
       patch.is_active=body.is_active;
     }
     const updated=await admin.from('ea_products').update(patch).eq('slug',slug).select(FIELDS).maybeSingle();
