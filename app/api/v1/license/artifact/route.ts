@@ -33,8 +33,7 @@ export async function POST(request:Request) {
       }
       const slotType=mode==='REAL'?'LIVE':'DEMO';
       const seats=await supabaseRead<Array<{mt5_login:number}>>('ea_license_seats',`license_key=eq.${encodeURIComponent(key)}&mt5_login=eq.${login}&slot_type=eq.${slotType}&select=mt5_login&limit=1`);
-      const legacy=seats?.length?[]:await supabaseRead<Array<{account_number:number;account_type:string}>>('license_bound_accounts',`license_key=eq.${encodeURIComponent(key)}&account_number=eq.${login}&select=account_number,account_type&limit=1`);
-      if(!seats?.length&&!legacy?.some(row=>row.account_type===slotType)) return NextResponse.json({error:'MT5 account is not bound to this license.'},{status:403,headers});
+      if(!seats?.length) return NextResponse.json({error:'MT5 account is not bound to a subscription seat.'},{status:403,headers});
     }
     const artifact=await getSupabaseAdmin().from('ea_product_artifacts').select('storage_path,release_approved').eq('ea_slug',slug).maybeSingle();
     if(!artifact.data?.release_approved||!artifact.data.storage_path) return NextResponse.json({error:'Approved compiled artifact is not available.'},{status:404,headers});
