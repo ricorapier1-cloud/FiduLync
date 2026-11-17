@@ -39,6 +39,9 @@ export type MacroSignalPayload = {
   safe_to_trade: boolean;
   execution_blockers: string[];
   risk_mode: 'DISABLED' | 'PILOT_TREND' | 'PILOT_MEAN_REVERSION';
+  market_data_source: 'mt5' | 'configured_provider' | 'twelve_data' | 'unavailable' | 'unknown';
+  latest_market_candle_at: string | null;
+  market_candle_counts: { h1: number; h4: number; d1: number };
   timestamp_utc: string;
 };
 
@@ -148,6 +151,9 @@ export async function getMacroSignal(symbol: string, now = Date.now()): Promise<
       safe_to_trade: safeToTrade,
       execution_blockers: [...new Set(executionBlockers)],
       risk_mode: riskBudget.mode,
+      market_data_source: technical.data_source,
+      latest_market_candle_at: technical.latest_candle_at,
+      market_candle_counts: technical.candle_counts,
       timestamp_utc: new Date(now).toISOString(),
     };
   };
