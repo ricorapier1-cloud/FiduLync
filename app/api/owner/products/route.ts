@@ -13,7 +13,7 @@ async function ownerAuthorized(request:Request) {
   return !error && data.user?.email?.toLowerCase()===OWNER_EMAIL;
 }
 function attachArtifact(product:Record<string,unknown>,artifact:Record<string,unknown>|null) {
-  return {...product,artifact_path:artifact?.storage_path??'',artifact_sha256:artifact?.sha256??'',artifact_size_bytes:artifact?.size_bytes??0,artifact_version:artifact?.artifact_version??product.version,release_approved:artifact?.release_approved===true};
+  return {...product,artifact_path:artifact?.storage_path??'',artifact_sha256:artifact?.sha256??'',artifact_size_bytes:artifact?.size_bytes??0,artifact_version:artifact?.artifact_version??'',release_approved:artifact?.release_approved===true};
 }
 
 export async function GET(request:Request) {
@@ -47,7 +47,7 @@ export async function PATCH(request:Request) {
     if(body.category!==undefined) patch.category=String(body.category).toUpperCase().slice(0,40);
     if(body.metrics_json!==undefined&&body.metrics_json&&typeof body.metrics_json==='object'&&!Array.isArray(body.metrics_json)) patch.metrics_json=body.metrics_json;
 
-    const hasArtifact=['artifact_path','artifact_sha256','artifact_size_bytes','artifact_version','release_approved'].some(key=>body[key]!==undefined);
+    const hasArtifact=Boolean(body.artifact_path||body.artifact_sha256||Number(body.artifact_size_bytes||0)>0||body.release_approved===true);
     if(hasArtifact) {
       const path=String(body.artifact_path||'').trim();
       const sha=String(body.artifact_sha256||'').trim().toLowerCase();
@@ -55,7 +55,7 @@ export async function PATCH(request:Request) {
       const version=String(body.artifact_version||'').trim();
       const approved=body.release_approved===true;
       if(path && (path.startsWith('/')||path.includes('..')||path.includes('\\')||!path.toLowerCase().endsWith('.ex5'))) return NextResponse.json({error:'Artifact path must be a safe relative .ex5 storage path.'},{status:400});
-      if(approved&&(!path||! /^[a-f0-9]{64}$/.test(sha)||!Number.isSafeInteger(size)||size<=0||!version)) return NextResponse.json({error:'Release approval requires a storage path, SHA-256, file size and artifact version.'},{status:400});
+      if((path||sha||size>0||version||approved)&&(!path||! /^[a-f0-9]{64}$/.test(sha)||!Number.isSafeInteger(size)||size<=0||!version)) return NextResponse.json({error:'Artifact registration requires a storage path, SHA-256, file size and artifact version.'},{status:400});
       const artifact={ea_slug:slug,storage_path:path,sha256:sha,size_bytes:size,artifact_version:version,release_approved:approved,approved_at:approved?new Date().toISOString():null,updated_at:new Date().toISOString()};
       const saved=await admin.from('ea_product_artifacts').upsert(artifact,{onConflict:'ea_slug'}).select().single();
       if(saved.error) return NextResponse.json({error:'Private artifact registry update failed.'},{status:503});
