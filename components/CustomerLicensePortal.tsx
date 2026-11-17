@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 type PortalData = {
   license: { mt5_account: number; tier: string; status: string; expires_at: string | null; created_at: string; ea_slug: string | null; billing_cycle: string | null; included_live_seats: number; included_demo_seats: number; extra_live_seats: number };
@@ -29,6 +29,31 @@ export default function CustomerLicensePortal() {
   const [seatNew, setSeatNew] = useState('');
   const [brokerServer, setBrokerServer] = useState('');
   const [seatMessage, setSeatMessage] = useState('');
+  const [checkoutLicenseKey, setCheckoutLicenseKey] = useState('');
+  const [checkoutMessage, setCheckoutMessage] = useState('');
+  const [firstLogin, setFirstLogin] = useState('');
+  const [firstSlotType, setFirstSlotType] = useState<'LIVE'|'DEMO'>('LIVE');
+  const [firstBroker, setFirstBroker] = useState('');
+  const [firstBindBusy, setFirstBindBusy] = useState(false);
+
+  useEffect(() => {
+    const reference = new URLSearchParams(window.location.search).get('subscription_ref');
+    if (!reference) return;
+    let active = true;
+    fetch(`/api/v1/subscriptions/verify?reference=${encodeURIComponent(reference)}`, {cache:'no-store'})
+      .then(async response => {
+        const result = await response.json();
+        if (!response.ok || !result.success || !result.license_key) throw new Error(result.error || 'Payment verification is pending.');
+        if (active) {
+          setCheckoutLicenseKey(result.license_key);
+          setLicense(result.license_key);
+          setCheckoutMessage('Payment verified. Your subscription license has been provisioned. Bind your first MT5 account to open the workspace.');
+          window.history.replaceState({}, '', '/portal');
+        }
+      })
+      .catch(error => { if (active) setCheckoutMessage(error instanceof Error ? error.message : 'Payment verification is pending.'); });
+    return () => { active = false; };
+  }, []);
 
   async function load(event: React.FormEvent) {
     event.preventDefault(); setBusy(true); setError(''); setData(null);
@@ -86,6 +111,24 @@ export default function CustomerLicensePortal() {
     finally { setHelperBusy(false); }
   }
 
+  async function bindFirstAccount(event: React.FormEvent) {
+    event.preventDefault(); setFirstBindBusy(true); setCheckoutMessage('');
+    try {
+      const response=await fetch('/api/v1/license/seats',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+        license_key:checkoutLicenseKey,slot_type:firstSlotType,slot_number:1,current_mt5_login:null,new_mt5_login:firstLogin,broker_server:firstBroker,
+      })});
+      const result=await response.json();
+      if(!response.ok || result.success===false) throw new Error(result.error || 'MT5 account binding failed.');
+      setAccount(firstLogin);
+      const portal=await fetch('/api/v1/customer-portal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mt5_account:firstLogin,license_key:checkoutLicenseKey})});
+      const portalData=await portal.json();
+      if(!portal.ok) throw new Error(portalData.error || 'Account is bound, but workspace could not be loaded yet.');
+      setData(portalData); setActiveTab('subscriptions');
+      setCheckoutMessage('MT5 account bound successfully. Your private workspace is ready.');
+    } catch(error) { setCheckoutMessage(error instanceof Error?error.message:'First account binding unavailable.'); }
+    finally { setFirstBindBusy(false); }
+  }
+
   async function bindSeat(event: React.FormEvent) {
     event.preventDefault(); setBusy(true); setSeatMessage(''); setError('');
     try {
@@ -122,6 +165,20 @@ export default function CustomerLicensePortal() {
       <button disabled={busy} className="mt-5 h-11 rounded bg-cyan-300 px-5 text-sm font-semibold text-slate-950 disabled:opacity-50">{busy?'VERIFYING…':'OPEN DASHBOARD'}</button>
     </form>
     {error && <p role="alert" className="mt-4 rounded border border-rose-400/20 bg-rose-400/5 p-3 text-sm text-rose-300">{error}</p>}
+    {checkoutMessage && <p role="status" className="mt-4 rounded-lg border border-cyan-300/20 bg-cyan-300/5 p-3 text-xs leading-5 text-cyan-100">{checkoutMessage}</p>}
+    {checkoutLicenseKey && !data && (
+      <section className="mt-5 rounded-xl border border-emerald-300/20 bg-[#0a111b] p-5">
+        <p className="font-mono text-[10px] tracking-widest text-emerald-300">SUBSCRIPTION ACTIVE</p>
+        <p className="mt-2 text-xs text-slate-400">Save your license key. It is also shown in your confirmation email when delivery is configured.</p>
+        <code className="mt-3 block select-all break-all rounded bg-black/30 p-3 text-sm text-white">{checkoutLicenseKey}</code>
+        <form onSubmit={bindFirstAccount} className="mt-5 grid gap-3 sm:grid-cols-2">
+          <label className="text-xs text-slate-400">First MT5 account type<select value={firstSlotType} onChange={event=>setFirstSlotType(event.target.value as 'LIVE'|'DEMO')} className="mt-2 h-10 w-full rounded border border-white/10 bg-black/30 px-3 text-white"><option value="LIVE">Live / Real</option><option value="DEMO">Demo</option></select></label>
+          <label className="text-xs text-slate-400">MT5 login<input required inputMode="numeric" value={firstLogin} onChange={event=>setFirstLogin(event.target.value)} className="mt-2 h-10 w-full rounded border border-white/10 bg-black/30 px-3 font-mono text-white" placeholder="MT5 login"/></label>
+          <label className="text-xs text-slate-400 sm:col-span-2">Broker server (optional)<input value={firstBroker} onChange={event=>setFirstBroker(event.target.value)} className="mt-2 h-10 w-full rounded border border-white/10 bg-black/30 px-3 text-white" placeholder="Broker server"/></label>
+          <button disabled={firstBindBusy || !firstLogin} className="h-11 rounded-lg bg-emerald-300 px-4 text-sm font-semibold text-slate-950 disabled:opacity-40 sm:col-span-2">{firstBindBusy?'Binding account…':'Bind account and open workspace'}</button>
+        </form>
+      </section>
+    )}
     {data && <>
       <nav aria-label="Private workspace tabs" className="mt-6 grid grid-cols-3 gap-2 rounded-xl border border-white/10 bg-[#0a111b] p-2">
         {([['subscriptions','Subscriptions'],['seats','MT5 account slots'],['telemetry','Private telemetry']] as const).map(([tab,label]) =>
