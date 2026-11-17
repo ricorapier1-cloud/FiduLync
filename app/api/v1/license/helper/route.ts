@@ -25,9 +25,7 @@ export async function POST(request: Request) {
     }
     const seats = await supabaseRead<Array<{ mt5_login: number }>>('ea_license_seats',
       `license_key=eq.${encodeURIComponent(key)}&mt5_login=eq.${login}&select=mt5_login&limit=1`);
-    const legacy = seats?.length ? [] : await supabaseRead<Array<{ account_number: number }>>('license_bound_accounts',
-      `license_key=eq.${encodeURIComponent(key)}&account_number=eq.${login}&select=account_number&limit=1`);
-    if (!seats?.length && !legacy?.length) return NextResponse.json({ error: 'MT5 login is not bound to this license.' }, { status: 403, headers });
+    if (!seats?.length) return NextResponse.json({ error: 'MT5 login is not bound to a subscription seat.' }, { status: 403, headers });
     const source = await readFile(join(process.cwd(), 'mql5', 'MacroLyncLicense.mqh'), 'utf8');
     return new NextResponse(source, { status: 200, headers: { ...headers, 'Content-Type': 'text/plain; charset=utf-8' } });
   } catch (error) {
