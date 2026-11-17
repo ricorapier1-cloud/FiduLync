@@ -72,7 +72,7 @@ export async function POST(request: Request) {
       `license_key=eq.${encodeURIComponent(licenseKey)}&mt5_login=eq.${mt5Login}&select=slot_type,mt5_login&limit=1`
     );
     let bound = seats?.some((seat) => Number(seat.mt5_login) === mt5Login && seat.slot_type === (accountMode === 'REAL' ? 'LIVE' : 'DEMO')) ?? false;
-    if (!bound) {
+    if (!bound && !license.ea_slug) {
       const legacy = await supabaseRead<Array<{ account_number: number; account_type: string }>>(
         'license_bound_accounts',
         `license_key=eq.${encodeURIComponent(licenseKey)}&account_number=eq.${mt5Login}&select=account_number,account_type&limit=1`
