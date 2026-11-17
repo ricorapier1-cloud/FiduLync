@@ -32,9 +32,12 @@ export async function POST(request: Request) {
     if (!product || product.is_active !== true || eaSlug === 'macro-atr-breakout' || !artifact?.data?.release_approved || !artifact.data.storage_path || !artifact.data.sha256 || !artifact.data.size_bytes) {
       return NextResponse.json({success:false,error:'This commercial EA is not approved for sale yet or its compiled .ex5 release artifact is missing or unapproved.'},{status:409});
     }
-    const base = currency === 'NGN'
-      ? Number(cycle === 'MONTHLY' ? product.monthly_price_ngn : product.annual_price_ngn)
-      : Number(cycle === 'MONTHLY' ? product.monthly_price_usd : product.annual_price_usd);
+    const monthlyBase = currency === 'NGN' ? Number(product.monthly_price_ngn) : Number(product.monthly_price_usd);
+    const annualBase = currency === 'NGN' ? Number(product.annual_price_ngn) : Number(product.annual_price_usd);
+    if (cycle === 'ANNUAL' && (annualBase <= 0 || annualBase > monthlyBase * 10)) {
+      return NextResponse.json({success:false,error:'Annual pricing must be positive and cannot exceed ten monthly payments (two months free). Update the owner catalog first.'},{status:409});
+    }
+    const base = cycle === 'MONTHLY' ? monthlyBase : annualBase;
     const seatMonthly = currency === 'NGN' ? Number(product.extra_seat_price_ngn) : Number(product.extra_seat_price_usd);
     const seatPrice = cycle === 'ANNUAL' ? seatMonthly * 10 : seatMonthly;
     const amountMinor = Math.round((base + seatPrice * extraSeats) * 100);
