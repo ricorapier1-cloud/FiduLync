@@ -14,7 +14,7 @@ const PRICES: Record<string, number> = {
 
 export async function POST(request: Request) {
   const secret = process.env.PAYSTACK_SECRET_KEY?.trim() ?? '';
-  if (!secret.startsWith('sk_') || !isSupabaseConfigured()) {
+  if (!secret.startsWith('sk_') || (secret.startsWith('sk_live_') && process.env.PAYSTACK_LIVE_ENABLED !== 'true') || !isSupabaseConfigured()) {
     return NextResponse.json({ error: 'Payment webhook is not configured.' }, { status: 503 });
   }
 
