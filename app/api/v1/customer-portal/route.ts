@@ -27,9 +27,9 @@ export async function POST(request: Request) {
     if (!await validateCustomerLicense(mt5Account, licenseKey)) {
       return NextResponse.json({ error: 'This license does not authorize that MT5 account.' }, { status: 401 });
     }
-    const rows = await supabaseRead<Array<{ license_key: string; mt5_account: number; email: string; tier: string; status: string; expires_at: string | null; created_at: string; ea_slug: string | null; billing_cycle: string | null; included_live_seats: number; included_demo_seats: number; extra_live_seats: number }>>(
+    const rows = await supabaseRead<Array<{ license_key: string; mt5_account: number; email: string; tier: string; status: string; expires_at: string | null; created_at: string; ea_slug: string | null; billing_cycle: string | null; period_ends_at: string | null; included_live_seats: number; included_demo_seats: number; extra_live_seats: number }>>(
       'licenses',
-      `license_key=eq.${encodeURIComponent(licenseKey)}&select=license_key,mt5_account,email,tier,status,expires_at,created_at,ea_slug,billing_cycle,included_live_seats,included_demo_seats,extra_live_seats&limit=1`
+      `license_key=eq.${encodeURIComponent(licenseKey)}&select=license_key,mt5_account,email,tier,status,expires_at,created_at,ea_slug,billing_cycle,period_ends_at,included_live_seats,included_demo_seats,extra_live_seats&limit=1`
     );
     if (!rows?.[0]) return NextResponse.json({ error: 'License details are temporarily unavailable.' }, { status: 503 });
     const [heartbeat, trades, seats] = await Promise.all([
