@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       const now = Math.floor(Date.now() / 1000);
       const leaseExpires = now + 24 * 60 * 60;
       const lease = signLease({ iss: 'fidulync', sub: licenseKey, ea: eaSlug, login: mt5Login, mode: 'DEMO', iat: now, exp: leaseExpires }, secret);
-      return NextResponse.json({ valid: true, license_type: 'DEMO_TRIAL', lease_token: lease, lease_expires_at: new Date(leaseExpires * 1000).toISOString() }, { headers });
+      return NextResponse.json({ valid: true, license_type: 'DEMO_TRIAL', lease_token: lease, lease_expires_unix: leaseExpires, lease_expires_at: new Date(leaseExpires * 1000).toISOString() }, { headers });
     }
 
     const records = await supabaseRead<Array<Record<string, unknown>>>(
