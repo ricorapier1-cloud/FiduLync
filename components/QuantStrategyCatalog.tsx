@@ -61,7 +61,7 @@ function InteractiveSparkline({ points, color }: { points: number[]; color: 'eme
   );
 }
 
-export function QuantStrategyCatalog({ onSelectEa, products }: { onSelectEa?: (slug: string) => void; products?: EaProduct[] }) {
+export function QuantStrategyCatalog({ products }: { products?: EaProduct[] }) {
   const catalog = products?.length ? products : EA_CATALOG;
   const [categoryFilter, setCategoryFilter] = useState<'ALL'|'FLAGSHIP'|'MOMENTUM'|'SANDBOX'>('ALL');
   const visibleCatalog = categoryFilter === 'ALL' ? catalog : catalog.filter(product => product.tierCategory === categoryFilter);
