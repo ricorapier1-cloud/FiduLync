@@ -140,7 +140,7 @@ async function fetchTwelveDataCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1
 }
 
 async function fetchCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promise<Candle[]> {
-  const endpoint = process.env.MARKET_DATA_PROVIDER_URL?.trim();
+  const endpoint = process.env.MARKET_DATA_PROVIDER_LICENSE_APPROVED === 'true' ? process.env.MARKET_DATA_PROVIDER_URL?.trim() : undefined;
   if (!endpoint) return [];
 
   const providerUrl = new URL(endpoint);
