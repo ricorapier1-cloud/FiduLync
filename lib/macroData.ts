@@ -646,7 +646,14 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     console.error('COT provider unavailable; retaining cached positioning:', cotResult.reason);
   }
   if (hasLiveData) {
-    snapshot.source = snapshot.currencies.length >= 11 ? 'provider' : 'partial';
+    const coreG10 = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'SEK', 'NOK'];
+    const completeG10MacroCoverage = coreG10.every((code) => {
+      const currency = snapshot.currencies.find((item) => item.code === code);
+      return currency?.policyRateSource === 'provider' && currency.inflationSource === 'provider';
+    });
+    // A live calendar, COT report or reference FX rate cannot make a partial
+    // macro snapshot look fully provider-verified.
+    snapshot.source = completeG10MacroCoverage ? 'provider' : 'partial';
   }
   return hasLiveData ? snapshot : null;
 }
