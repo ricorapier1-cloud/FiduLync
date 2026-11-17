@@ -30,7 +30,7 @@ export async function GET(request: Request) {
   }
 
   const secret = process.env.PAYSTACK_SECRET_KEY?.trim() ?? '';
-  if (!secret.startsWith('sk_') || !isSupabaseConfigured()) {
+  if (!secret.startsWith('sk_') || (secret.startsWith('sk_live_') && process.env.PAYSTACK_LIVE_ENABLED !== 'true') || !isSupabaseConfigured()) {
     return NextResponse.json({ success: false, error: 'Payment verification is not configured.' }, { status: 503, headers });
   }
 
