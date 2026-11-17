@@ -100,7 +100,14 @@ async function fetchCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promis
   if (!candles.every((candle): candle is Candle => candle !== null)) {
     throw new Error('Market data provider returned an invalid candle.');
   }
-  return candles.sort((left, right) => left.timestamp - right.timestamp).slice(-MAX_CANDLES);
+  const ordered = candles.sort((left, right) => left.timestamp - right.timestamp).slice(-MAX_CANDLES);
+  const latest = ordered.at(-1)?.timestamp;
+  const maxAgeSeconds = timeframe === 'H1' ? 2 * 60 * 60
+    : timeframe === 'H4' ? 8 * 60 * 60 : 48 * 60 * 60;
+  if (latest === undefined || Date.now() / 1000 - latest > maxAgeSeconds || latest > Date.now() / 1000 + 300) {
+    throw new Error(`Market data provider returned stale ${timeframe} candles for ${pair}.`);
+  }
+  return ordered;
 }
 
 type StoredCandle = {
