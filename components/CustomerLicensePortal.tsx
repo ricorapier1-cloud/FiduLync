@@ -23,6 +23,12 @@ export default function CustomerLicensePortal() {
   const [activeTab, setActiveTab] = useState<'subscriptions'|'seats'|'telemetry'>('subscriptions');
   const [helperBusy, setHelperBusy] = useState(false);
   const [helperMessage, setHelperMessage] = useState('');
+  const [slotType, setSlotType] = useState<'LIVE'|'DEMO'>('LIVE');
+  const [slotNumber, setSlotNumber] = useState('1');
+  const [seatCurrent, setSeatCurrent] = useState('');
+  const [seatNew, setSeatNew] = useState('');
+  const [brokerServer, setBrokerServer] = useState('');
+  const [seatMessage, setSeatMessage] = useState('');
 
   async function load(event: React.FormEvent) {
     event.preventDefault(); setBusy(true); setError(''); setData(null);
@@ -78,6 +84,24 @@ export default function CustomerLicensePortal() {
       URL.revokeObjectURL(url); setHelperMessage('Private license helper downloaded.');
     } catch (error) { setHelperMessage(error instanceof Error ? error.message : 'Private download unavailable.'); }
     finally { setHelperBusy(false); }
+  }
+
+  async function bindSeat(event: React.FormEvent) {
+    event.preventDefault(); setBusy(true); setSeatMessage(''); setError('');
+    try {
+      const response = await fetch('/api/v1/license/seats', {
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({license_key:license,slot_type:slotType,slot_number:Number(slotNumber),current_mt5_login:seatCurrent || null,new_mt5_login:seatNew,broker_server:brokerServer}),
+      });
+      const result = await response.json();
+      if(!response.ok || result.success === false) throw new Error(result.error || 'Seat binding rejected.');
+      const refreshed = await fetch('/api/v1/customer-portal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mt5_account:account,license_key:license})});
+      const portal = await refreshed.json();
+      if(refreshed.ok) setData(portal);
+      setSeatMessage(result.rebind_available_at ? 'Account slot updated. Rebinding is locked for 72 hours.' : 'Account slot updated.');
+      setSeatCurrent(''); setSeatNew('');
+    } catch(error) { setSeatMessage(error instanceof Error ? error.message : 'Seat update unavailable.'); }
+    finally { setBusy(false); }
   }
 
   const money = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -151,7 +175,16 @@ export default function CustomerLicensePortal() {
         <h2 className="font-semibold">MT5 account slots</h2>
         <p className="mt-1 text-xs text-slate-400">Entitlements: {data.license.included_live_seats ?? 1} live + {data.license.included_demo_seats ?? 2} demo + {data.license.extra_live_seats ?? 0} extra live seats.</p>
         <div className="mt-4 grid gap-2 sm:grid-cols-2">{data.seats.map(seat=><div key={seat.id} className="rounded-lg border border-white/10 bg-black/20 p-3"><p className="font-mono text-[10px] text-slate-500">{seat.slot_type} SLOT {seat.slot_number}</p><p className="mt-1 text-sm text-white">{seat.mt5_login ?? 'Unbound'}</p><p className="mt-1 text-[10px] text-slate-500">{seat.rebind_available_at ? 'Rebind after '+new Date(seat.rebind_available_at).toLocaleString() : 'Available for binding'}</p></div>)}</div>
-        {data.seats.length===0 && <p className="mt-3 text-xs text-slate-500">Seat records are being provisioned for this legacy license. Your current account remains verified.</p>}
+        {data.seats.length===0 && <p className="mt-3 text-xs text-slate-500">Seat records are created automatically on first binding for eligible mapped subscriptions.</p>}
+        <form onSubmit={bindSeat} className="mt-5 grid gap-3 border-t border-white/10 pt-4 sm:grid-cols-2">
+          <label className="text-xs text-slate-400">Slot type<select value={slotType} onChange={event=>setSlotType(event.target.value as 'LIVE'|'DEMO')} className="mt-2 h-10 w-full rounded border border-white/10 bg-black/30 px-3 text-white"><option value="LIVE">Live account</option><option value="DEMO">Demo account</option></select></label>
+          <label className="text-xs text-slate-400">Slot number<input required min="1" type="number" value={slotNumber} onChange={event=>setSlotNumber(event.target.value)} className="mt-2 h-10 w-full rounded border border-white/10 bg-black/30 px-3 text-white"/></label>
+          <label className="text-xs text-slate-400">Current MT5 login (blank for first bind)<input inputMode="numeric" value={seatCurrent} onChange={event=>setSeatCurrent(event.target.value)} className="mt-2 h-10 w-full rounded border border-white/10 bg-black/30 px-3 font-mono text-white" placeholder="Current slot login"/></label>
+          <label className="text-xs text-slate-400">New MT5 login<input required inputMode="numeric" value={seatNew} onChange={event=>setSeatNew(event.target.value)} className="mt-2 h-10 w-full rounded border border-white/10 bg-black/30 px-3 font-mono text-white" placeholder="New login"/></label>
+          <label className="text-xs text-slate-400 sm:col-span-2">Broker server (optional)<input value={brokerServer} onChange={event=>setBrokerServer(event.target.value)} className="mt-2 h-10 w-full rounded border border-white/10 bg-black/30 px-3 text-white" placeholder="Broker server name"/></label>
+          <button disabled={busy || !seatNew} className="h-10 rounded-lg bg-cyan-300 px-4 text-xs font-semibold text-slate-950 disabled:opacity-40 sm:col-span-2">{busy?'Updating slot…':'Bind / Rebind account slot'}</button>
+          {seatMessage && <p role="status" className="text-xs text-slate-400 sm:col-span-2">{seatMessage}</p>}
+        </form>
       </section>
       <section className={`${activeTab==='seats'?'mt-5':'hidden'} rounded-xl border border-amber-300/20 bg-[#11100c] p-5`}>
         <h2 className="font-semibold">Move license to another MT5 account</h2>
