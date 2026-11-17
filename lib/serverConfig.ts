@@ -24,7 +24,7 @@ export function getAppBaseUrl(fallback = DEFAULT_APP_URL): URL {
   return parseHttpUrl(fallback) ?? new URL(DEFAULT_APP_URL);
 }
 
-export function getSupabaseUrl(value = process.env.NEXT_PUBLIC_SUPABASE_URL): string | null {
+export function getSupabaseUrl(value = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL): string | null {
   const url = parseHttpUrl(value);
   return url?.toString().replace(/\/$/, '') ?? null;
 }
