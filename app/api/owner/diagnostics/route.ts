@@ -86,6 +86,26 @@ export async function GET(request: Request) {
     }
   }));
 
+  if (process.env.TWELVE_DATA_API_KEY?.trim()) tasks.push(probe('twelve_data', async () => {
+    const url = new URL('https://api.twelvedata.com/time_series');
+    url.searchParams.set('symbol', 'EUR/USD');
+    url.searchParams.set('interval', '1h');
+    url.searchParams.set('outputsize', '2');
+    url.searchParams.set('timezone', 'UTC');
+    url.searchParams.set('apikey', required('TWELVE_DATA_API_KEY'));
+    const response = await requestOk(url);
+    const data = await response.json() as { status?: string; code?: number; message?: string; values?: Array<{ datetime?: string; open?: string; high?: string; low?: string; close?: string }> };
+    if (data.status === 'error' || !Array.isArray(data.values) || data.values.length < 1) {
+      // Do not return provider error text: some gateways echo request metadata.
+      throw new Error(data.code ? `Twelve Data rejected the request (provider code ${data.code}).` : 'Twelve Data returned no valid candles.');
+    }
+    const candle = data.values[0];
+    const prices = [candle.open, candle.high, candle.low, candle.close].map(Number);
+    if (!candle.datetime || !prices.every((value) => Number.isFinite(value) && value > 0)) {
+      throw new Error('Twelve Data response did not contain a valid OHLC candle.');
+    }
+  }));
+
   if (process.env.FINNHUB_API_KEY?.trim()) tasks.push(probe('finnhub', async () => {
     const url = new URL('https://finnhub.io/api/v1/quote');
     url.searchParams.set('symbol', 'OANDA:EUR_USD');
@@ -134,7 +154,7 @@ export async function GET(request: Request) {
   for (const [name, check] of results) checks[name] = check;
 
   for (const [name, variable] of [
-    ['fred', 'FRED_API_KEY'], ['bea', 'BEA_API_KEY'], ['bls', 'BLS_API_KEY'],
+    ['fred', 'FRED_API_KEY'], ['bea', 'BEA_API_KEY'], ['bls', 'BLS_API_KEY'], ['twelve_data', 'TWELVE_DATA_API_KEY'],
     ['finnhub', 'FINNHUB_API_KEY'], ['gemini', 'GEMINI_API_KEY'],
     ['paystack', 'PAYSTACK_SECRET_KEY'],
   ] as const) {
