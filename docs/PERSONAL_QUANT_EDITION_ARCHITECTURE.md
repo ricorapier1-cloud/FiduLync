@@ -224,3 +224,15 @@ The platform can be engineered to high institutional standards for a single oper
 5. Implement the versioned EA proposal/decision contract and central Risk Governor.
 6. Build tests and diagnostics before enabling any trade authorization.
 7. Keep all live execution gates disabled until Windows MT5, broker data, model validation and demo forward tests are complete.
+
+
+## 8. Implementation log — 2026-11-18
+
+The first code milestone is committed on `feat/personal-quant-edition`:
+
+- Added `lib/quantGovernance.ts`, a deterministic pre-trade proposal evaluator with explicit APPROVE / REJECT / ABSTAIN / DEGRADED outcomes.
+- Added broker-metadata-based volume calculation using tick size, tick value, volume minimum/maximum and volume step. It floors volume and rejects a minimum lot that breaches the risk budget.
+- Added checks for live data freshness, macro-data health, model and execution validation, news lockout, loss streaks, daily/weekly/high-water drawdown, stop direction and distance, reward/risk, free margin, total margin usage and portfolio open risk.
+- Added six focused unit cases and a pull-request CI step to run them.
+
+This is a pure governance foundation only. It is not yet wired into the dashboard, MT5 bridge, persistent proposal audit, or broker execution path. No API credentials, Supabase schema, production deployment, or live execution setting has been changed. CI must pass before the module is treated as validated; broker-specific tick-value conversion and integration contract tests remain required.
