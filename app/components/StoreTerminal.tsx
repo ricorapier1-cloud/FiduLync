@@ -29,36 +29,6 @@ export default function StoreTerminal({ initialSnapshot, initialTradeExpectancy,
     return () => window.clearInterval(timer);
   }, [router]);
 
-  async function testSignal() {
-    setTesting(true);
-    setSignal(null);
-    setSignalError('');
-    try {
-      const response = await fetch(`/api/v1/macro-signal?symbol=${encodeURIComponent(symbol)}`, {
-        cache: 'no-store',
-      });
-      const payload: unknown = await response.json();
-      if (!response.ok) {
-        const message = typeof payload === 'object' && payload !== null && 'error' in payload
-          && typeof payload.error === 'string'
-          ? payload.error
-          : `Signal request failed (${response.status}).`;
-        setSignalError(message);
-        return;
-      }
-      if (!isSignalResult(payload)) {
-        setSignalError('The signal endpoint returned an invalid response.');
-        return;
-      }
-      setSignal(payload);
-    } catch (error) {
-      console.error('Live signal tester request failed:', error);
-      setSignalError('The signal endpoint could not be reached.');
-    } finally {
-      setTesting(false);
-    }
-  }
-
 
 
   return (
@@ -240,10 +210,6 @@ function StrategyCard({
 
 function Spec({ label, value }: { label: string; value: string }) {
   return <div><dt className="font-mono text-[8px] tracking-wide text-slate-600">{label}</dt><dd className="mt-1 text-[10px] leading-4 text-slate-300">{value}</dd></div>;
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return <div><div className="font-mono text-[8px] text-slate-600">{label}</div><div className="mt-1 text-slate-200">{value}</div></div>;
 }
 
 function ExpectancyMetric({ label, value }: { label: string; value: string }) {
