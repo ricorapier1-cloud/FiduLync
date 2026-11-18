@@ -3,6 +3,7 @@ import { requireOwner } from '@/lib/ownerAuth';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
 import { getPersonalRiskPolicy } from '@/lib/riskPolicy';
 import { getCurrencyStrengthIndex } from '@/lib/currencyStrength';
+import { getMacroSnapshot } from '@/lib/macroEngine';
 import type { MacroSnapshot } from '@/types/macro';
 
 export const dynamic = 'force-dynamic';
@@ -117,8 +118,7 @@ export async function GET(request: Request) {
         ? supabase.from('mt5_market_quotes').select('symbol,bid,ask,quote_time,spread_points,point,broker,server')
             .in('installation_id', installationIds).order('quote_time', { ascending: false }).limit(1000)
         : Promise.resolve({ data: [], error: null }),
-      supabase.from('macro_snapshot_payloads').select('payload,refreshed_at')
-        .eq('snapshot_key', 'global').maybeSingle(),
+      getMacroSnapshot(),
       ...PAIRS.flatMap((pair) => FRAMES.map((timeframe) => installationIds.length
         ? supabase.from('mt5_market_candles').select('symbol,timeframe,bar_time,open,high,low,close,is_closed,broker,server')
             .in('installation_id', installationIds).ilike('symbol', pair + '%').eq('timeframe', timeframe).eq('is_closed', true)
@@ -169,7 +169,7 @@ export async function GET(request: Request) {
       };
     });
 
-    const rawMacro = macroResult.data?.payload as MacroSnapshot | undefined;
+    const rawMacro = macroResult as MacroSnapshot;
     const verifiedMacro = rawMacro ? {
       ...rawMacro,
       currencies: rawMacro.currencies.filter((currency) => currency.policyRateSource === 'provider' && currency.inflationSource === 'provider'),
@@ -182,7 +182,7 @@ export async function GET(request: Request) {
     const macroStrength = verifiedMacro ? getCurrencyStrengthIndex(verifiedMacro) : [];
     const macroRates = verifiedMacro?.currencies.map((currency) => currency.policyRate).filter(Number.isFinite) ?? [];
     const policySpread = macroRates.length ? Math.max(...macroRates) - Math.min(...macroRates) : null;
-    const macroRecordedAt = macroResult.data?.refreshed_at ?? rawMacro?.asOf ?? null;
+    const macroRecordedAt = rawMacro?.asOf ?? null;
     const macroAgeHours = macroRecordedAt ? (Date.now() - Date.parse(macroRecordedAt)) / 3_600_000 : null;
     const macro = rawMacro && macroRecordedAt ? {
       regime_label: rawMacro.source.toUpperCase() + (rawMacro.source === 'partial' ? ' · PARTIAL' : ''),
