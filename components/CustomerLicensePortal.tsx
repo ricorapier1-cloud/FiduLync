@@ -26,6 +26,7 @@ export default function CustomerLicensePortal() {
   const [account, setAccount] = useState('');
   const [data, setData] = useState<PortalData | null>(null);
   const [seats, setSeats] = useState<Seat[]>([]);
+  const [demoLocked, setDemoLocked] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [tab, setTab] = useState<(typeof tabs)[number]['id']>('subscriptions');
   const [busy, setBusy] = useState(false);
@@ -50,6 +51,7 @@ export default function CustomerLicensePortal() {
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'Could not load account slots.');
     setSeats(result.slots || []);
+    setDemoLocked(result.demo_locked === true);
   }
 
   async function load(event?: FormEvent) {
@@ -161,6 +163,7 @@ export default function CustomerLicensePortal() {
       {tab === 'seats' && <section className="mt-5 rounded-xl border border-white/10 bg-[#0a111b] p-5">
         <div><h2 className="font-semibold">MT5 account slots</h2><p className="mt-1 text-xs text-slate-400">Each slot is managed independently. Re-binding a populated slot starts a 72-hour cooldown.</p></div>
         <div className="mt-5 grid gap-3 md:grid-cols-2">
+          {demoLocked && <p className="mb-3 rounded-lg border border-cyan-300/20 bg-cyan-300/[0.04] p-3 text-xs text-cyan-100 md:col-span-2">This demo trial is permanently locked to the original MT5 demo login. Live subscriptions support self-service slot re-binding.</p>}
           {seats.map((seat) => {
             const cooldown = seat.mt5_login !== null && seat.rebind_available_at && Date.parse(seat.rebind_available_at) > now;
             return <div key={seat.slot_type + seat.slot_number} className="rounded-lg border border-white/10 bg-black/20 p-4">
@@ -168,7 +171,7 @@ export default function CustomerLicensePortal() {
               <p className="mt-3 font-mono text-lg">{seat.mt5_login || '—'}</p>
               <p className="mt-1 text-[10px] text-slate-500">{seat.broker_server || 'Broker not specified'}</p>
               {seat.rebind_available_at && seat.mt5_login && <p className={`mt-2 text-[10px] ${cooldown ? 'text-amber-300' : 'text-emerald-300'}`}>{cooldown ? 'Rebind cooldown: ' + remaining(seat.rebind_available_at) : 'Rebinding available'}</p>}
-              <button type="button" disabled={Boolean(cooldown) || busy} onClick={() => { setSelectedSeat(seat); setNewLogin(''); setBrokerServer(seat.broker_server || ''); }} className="mt-4 rounded border border-cyan-300/30 px-3 py-2 text-[10px] font-semibold text-cyan-100 disabled:opacity-40">{seat.mt5_login ? 'Rebind this slot' : 'Bind MT5 login'}</button>
+              {!demoLocked && <button type="button" disabled={Boolean(cooldown) || busy} onClick={() => { setSelectedSeat(seat); setNewLogin(''); setBrokerServer(seat.broker_server || ''); }} className="mt-4 rounded border border-cyan-300/30 px-3 py-2 text-[10px] font-semibold text-cyan-100 disabled:opacity-40">{seat.mt5_login ? 'Rebind this slot' : 'Bind MT5 login'}</button>
             </div>;
           })}
           {seats.length === 0 && <p className="text-xs text-slate-500">No account slots are configured for this license.</p>}
