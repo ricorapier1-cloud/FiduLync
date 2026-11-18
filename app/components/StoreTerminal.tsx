@@ -80,7 +80,7 @@ export default function StoreTerminal({ initialSnapshot, session }: StoreTermina
           <aside className="absolute inset-y-0 right-0 w-full max-w-2xl overflow-y-auto border-l border-white/10 bg-[#080c12] p-4 shadow-2xl sm:p-7">
             <div className="mb-5 flex items-center justify-between border-b border-white/10 pb-4">
               <div><div className="font-mono text-[9px] tracking-widest text-emerald-300">ALGOLYNC / SECURE CHECKOUT</div><h2 className="mt-1 text-lg font-semibold">Subscription checkout</h2></div>
-              <button type="button" onClick={() => setCheckoutOpen(false)} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-slate-300">Close</button>
+              <button type="button" onClick={() => { setManualCheckoutOpen(false); if (hasPaymentReference) { window.history.replaceState({}, '', '/store'); window.dispatchEvent(new PopStateEvent('popstate')); } }} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-slate-300">Close</button>
             </div>
             <PaystackCheckout selectedEaSlug={selectedEaSlug} selectedBillingCycle={selectedBillingCycle} selectedCurrency={selectedCurrency} />
           </aside>
