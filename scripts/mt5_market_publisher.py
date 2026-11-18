@@ -54,7 +54,8 @@ TIMEFRAMES = {
     "D1": mt5.TIMEFRAME_D1,
 }
 HISTORY_BARS = max(200, min(500, int(os.getenv("MT5_HISTORY_BARS", "200"))))
-INTERVAL_SECONDS = max(15, int(os.getenv("MT5_PUBLISH_INTERVAL_SECONDS", "15")))
+INTERVAL_SECONDS = max(1, min(5, int(os.getenv("MT5_PUBLISH_INTERVAL_SECONDS", "1"))))
+CANDLE_REFRESH_SECONDS = max(10, int(os.getenv("MT5_CANDLE_REFRESH_SECONDS", "15")))
 LOSS_STREAK_REFRESH_SECONDS = max(15, min(25, int(os.getenv("MT5_LOSS_STREAK_REFRESH_SECONDS", "20"))))
 _loss_streak_cache: tuple[int, str] | None = None
 _loss_streak_last_attempt = 0.0
@@ -382,14 +383,16 @@ def main() -> int:
 
     initialize_terminal()
     last_sent: dict[tuple[str, str], int] = {}
+    last_candle_refresh = 0.0
     try:
         while True:
+            loop_started = time.monotonic()
             account = mt5.account_info()
             terminal = mt5.terminal_info()
             if account is None or terminal is None or not terminal.connected:
                 print("MT5 disconnected. Reinitializing terminal...")
                 mt5.shutdown()
-                time.sleep(5)
+                time.sleep(2)
                 initialize_terminal()
                 account = mt5.account_info()
             infos = ensure_symbols()
@@ -398,25 +401,36 @@ def main() -> int:
                 time.sleep(INTERVAL_SECONDS)
                 continue
 
+            # Keep the quote/account/position channel light and frequent.
             quotes = build_quotes(infos, account)
             positions_result = mt5.positions_get()
             account_snapshot = build_account_snapshot(account, infos, positions_result)
             position_snapshot = build_position_snapshot(account, positions_result)
-            for index, (timeframe_name, timeframe_value) in enumerate(TIMEFRAMES.items()):
-                candles, pending = build_candles(timeframe_name, timeframe_value, infos, last_sent)
-                batch_quotes = quotes if index == 0 else []
-                try:
-                    post_batch(batch_quotes, candles, account_snapshot if index == 0 else None, position_snapshot if index == 0 else None)
-                    last_sent.update(pending)
-                except Exception as exc:
-                    print(f"Publish failed for {timeframe_name}: {exc}")
-            time.sleep(INTERVAL_SECONDS)
+            try:
+                post_batch(quotes, [], account_snapshot, position_snapshot)
+            except Exception as exc:
+                print(f"Quote/account publish failed: {exc}")
+
+            # Historical candles are heavier; refresh them on a separate cadence.
+            now_monotonic = time.monotonic()
+            if now_monotonic - last_candle_refresh >= CANDLE_REFRESH_SECONDS:
+                for timeframe_name, timeframe_value in TIMEFRAMES.items():
+                    candles, pending = build_candles(timeframe_name, timeframe_value, infos, last_sent)
+                    try:
+                        if candles:
+                            post_batch([], candles)
+                            last_sent.update(pending)
+                    except Exception as exc:
+                        print(f"Candle publish failed for {timeframe_name}: {exc}")
+                last_candle_refresh = now_monotonic
+
+            elapsed = time.monotonic() - loop_started
+            time.sleep(max(0.1, INTERVAL_SECONDS - elapsed))
     except KeyboardInterrupt:
         print("Publisher stopped by user.")
     finally:
         mt5.shutdown()
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())
