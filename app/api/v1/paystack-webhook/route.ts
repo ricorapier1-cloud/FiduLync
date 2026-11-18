@@ -47,9 +47,9 @@ async function applyPaymentFailed(data: Record<string, unknown>, paystackSecret:
     ? data.subscription as Record<string, unknown> : {};
   const code = text(subscription.subscription_code) || text(data.subscription_code);
   if (!code) return;
-  const rows = await supabaseRead<Array<{ license_key: string; grace_until: string | null }>>(
+  const rows = await supabaseRead<Array<{ license_key: string; grace_until: string | null; renewal_reminder_due: boolean }>>(
     'ea_subscriptions',
-    `subscription_code=eq.${encodeURIComponent(code)}&select=license_key,grace_until&limit=1`
+    `subscription_code=eq.${encodeURIComponent(code)}&select=license_key,grace_until,renewal_reminder_due&limit=1`
   );
   const row = rows?.[0];
   if (!row) return;
@@ -62,7 +62,7 @@ async function applyPaymentFailed(data: Record<string, unknown>, paystackSecret:
     method: 'PATCH', query: `license_key=eq.${encodeURIComponent(row.license_key)}`,
     body: { status: 'PAST_DUE', grace_until: graceUntil, renewal_reminder_due: true, updated_at: new Date().toISOString() },
   });
-  try {
+  if (row.renewal_reminder_due !== true) try {
     const reminder = await fetch(`https://api.paystack.co/subscription/${encodeURIComponent(code)}/manage/email`, {
       method: 'POST', headers: { Authorization: `Bearer ${paystackSecret}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({}), cache: 'no-store', signal: AbortSignal.timeout(10_000),
