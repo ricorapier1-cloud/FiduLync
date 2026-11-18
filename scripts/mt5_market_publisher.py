@@ -128,6 +128,9 @@ def build_quotes(infos: dict[str, Any], account: Any) -> list[dict[str, Any]]:
             "spread_points": round(max(0.0, spread_points), 2),
             "digits": int(info.digits),
             "point": point,
+            "tick_size": float(info.trade_tick_size),
+            "tick_value": float(info.trade_tick_value),
+            "contract_size": float(info.trade_contract_size),
             "broker": str(account.company or "")[:100],
             "server": str(account.server or "")[:120],
         })
@@ -179,10 +182,49 @@ def build_candles(
     return candles, pending
 
 
-def post_batch(quotes: list[dict[str, Any]], candles: list[dict[str, Any]]) -> None:
+def build_account_snapshot(account: Any, infos: dict[str, Any]) -> dict[str, Any]:
+    equity = float(account.equity)
+    open_risk_cash = 0.0
+    risk_verified = True
+    positions = mt5.positions_get()
+    if positions is None:
+        positions = ()
+        risk_verified = False
+    for position in positions:
+        info = mt5.symbol_info(position.symbol)
+        tick_size = float(getattr(info, "trade_tick_size", 0) or 0) if info else 0.0
+        tick_value = float(getattr(info, "trade_tick_value", 0) or 0) if info else 0.0
+        stop_loss = float(getattr(position, "sl", 0) or 0)
+        open_price = float(getattr(position, "price_open", 0) or 0)
+        volume = float(getattr(position, "volume", 0) or 0)
+        if tick_size <= 0 or tick_value <= 0 or stop_loss <= 0 or open_price <= 0 or volume <= 0:
+            risk_verified = False
+            open_risk_cash = max(open_risk_cash, equity)
+            continue
+        distance_ticks = abs(open_price - stop_loss) / tick_size
+        open_risk_cash += distance_ticks * tick_value * volume
+
+    return {
+        "account_login": int(account.login),
+        "currency": str(account.currency or "USD").upper(),
+        "balance": float(account.balance),
+        "equity": equity,
+        "margin": float(account.margin),
+        "free_margin": float(account.margin_free),
+        "margin_level": float(account.margin_level or 0),
+        "open_positions": len(positions),
+        "open_risk_cash": min(max(0.0, open_risk_cash), max(equity, open_risk_cash)),
+        "open_risk_verified": risk_verified,
+        "broker": str(account.company or "")[:100],
+        "server": str(account.server or "")[:120],
+        "captured_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+    }
+
+
+def post_batch(quotes: list[dict[str, Any]], candles: list[dict[str, Any]], account_snapshot: dict[str, Any] | None = None) -> None:
     if not quotes and not candles:
         return
-    body = json.dumps({"quotes": quotes, "candles": candles}, separators=(",", ":")).encode("utf-8")
+    body = json.dumps({"quotes": quotes, "candles": candles, "account_snapshot": account_snapshot}, separators=(",", ":")).encode("utf-8")
     now = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     request = Request(
         INGEST_URL,
@@ -244,7 +286,7 @@ def main() -> int:
                 candles, pending = build_candles(timeframe_name, timeframe_value, infos, last_sent)
                 batch_quotes = quotes if index == 0 else []
                 try:
-                    post_batch(batch_quotes, candles)
+                    post_batch(batch_quotes, candles, build_account_snapshot(account, infos) if index == 0 else None)
                     last_sent.update(pending)
                 except Exception as exc:
                     print(f"Publish failed for {timeframe_name}: {exc}")
