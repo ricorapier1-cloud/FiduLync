@@ -1,4 +1,3 @@
-import { QuantStrategyCatalog } from "@/components/QuantStrategyCatalog";
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Metadata } from 'next';
@@ -11,11 +10,11 @@ import { getTradeExpectancy } from '@/lib/tradeLedger';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'AlgoLync Store & Live EA Monitor',
-  description: 'AlgoLync strategy vault, live expert-advisor fleet telemetry, instant Paystack license provisioning, and the MacroLync MT5 signal bridge.',
+  title: 'Personal EA Lab & MT5 Monitor',
+  description: 'Personal EA research library, MT5 fleet telemetry, live signal diagnostics and the MacroLync bridge.'
 };
 
-export default async function AlgoLyncStorePage() {
+export default async function PersonalEaLabPage() {
   let fleet = { configured: false, heartbeats: [] as Awaited<ReturnType<typeof getHeartbeatFleet>>['heartbeats'] };
   let telemetryError = '';
   try {
