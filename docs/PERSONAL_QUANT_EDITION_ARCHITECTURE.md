@@ -62,11 +62,15 @@ The Vercel project contains names for Supabase, Upstash, FRED, Finnhub, Twelve D
 
 ### Implementation checkpoint — 2026-11-18
 - `feat/personal-quant-edition` is the active implementation branch; production `main` remains unchanged.
-- The personal branch has a Vercel preview deployment in `READY` state at commit `4e54e320e0aae1ef068ad3e94502e9d885209ccf`. This is a preview, not the production site.
-- The Vercel build status for that commit is successful. The GitHub Pull Request Quality Gate is still running; its final TypeScript, quant tests, lint, production build and Python syntax-check result must be confirmed before treating the branch as validated.
-- The branch currently includes a deterministic risk-governance primitive, broker-step volume flooring, server-owned disabled-by-default risk policy, a manual sizing planner, test coverage, and sample EA source downloads labelled as research/demo fixtures.
-- The risk-governance primitive is not yet wired to a complete authenticated EA proposal/decision lifecycle backed by independently verified account state and durable audit records. No EA should treat the dashboard research signal or the current preview build as an execution authorization.
-- MetaEditor compilation, Strategy Tester runs, live broker quote validation, and end-to-end EA supervision remain blocked until a Windows MT5 terminal and broker demo account are available.
+- Additive Supabase migrations have been applied for account snapshots, daily/weekly/high-water risk anchors, durable EA risk decisions, broker volume/margin metadata, and protection against stale account-snapshot time rewind. Existing financial records were not deleted.
+- The MT5 publisher now sends seven major USD FX pairs plus XAUUSD by default, broker tick/volume/stop metadata, account equity/margin, open positions and estimated open-position risk. Historical candles are chunked to respect the ingestion API's 1,000-candle request limit.
+- The authenticated supervisor decision endpoint validates a registered installation token, timestamp and replay nonce; it loads account/quote/risk-anchor context from Supabase rather than trusting EA-supplied account state; and it writes durable decision records including abstentions.
+- Added an MQL5 supervisor include and a no-trade connectivity probe EA. Neither contains broker order execution.
+- Safety remains fail-closed: missing open-position risk, stale account/quote data, unverified broker sizing/margin, unavailable loss-streak state, or unavailable macro/news context results in ABSTAIN. Server policy also keeps execution permission, model validation and execution-quality verification disabled.
+- The risk proposal endpoint is not yet fully validated end-to-end. The account snapshot table is currently empty because no MT5 terminal has connected.
+- A Vercel deployment attempt was blocked by the account's API deployment daily quota (more than 100 deployments in 24 hours). The last existing preview is older than the latest commits; no production deployment was attempted.
+- GitHub Actions checks have not run for the latest commits because the PR quality workflow is introduced on the feature branch and is not yet present on the base branch. Do not merge merely to trigger it. A local/remote full test run and MT5 MetaEditor compile remain outstanding.
+- The implementation still needs reliable consecutive-loss telemetry, live macro/news state, a reviewed persistent policy-control workflow, security review, full Next.js build/lint/test verification, MetaEditor compilation, Strategy Tester and demo forward validation before any execution permission can be considered.
 
 ## 3. Target architecture
 
