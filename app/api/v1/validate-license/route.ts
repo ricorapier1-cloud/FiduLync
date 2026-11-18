@@ -80,7 +80,7 @@ export async function POST(req: Request) {
 
     // 3. Check bound accounts in license_bound_accounts
     if (accountNumber > 0) {
-      const bound = await supabaseRead<any[]>(
+      const bound = await supabaseRead<BoundAccountRecord[]>(
         'license_bound_accounts',
         `license_key=eq.${encodeURIComponent(licenseKey)}&select=account_number,account_type`
       );
@@ -121,7 +121,7 @@ export async function POST(req: Request) {
       account: accountNumber,
       message: 'License verified. Active cloud telemetry enabled.',
     });
-  } catch (err: any) {
-    return NextResponse.json({ valid: false, message: err.message || 'Validation error' }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ valid: false, message: err instanceof Error ? err.message : 'Validation error' }, { status: 500 });
   }
 }
