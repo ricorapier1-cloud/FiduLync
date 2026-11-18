@@ -14,6 +14,7 @@ type AccountSnapshot = {
   account_login: number; currency: string; balance: number; equity: number;
   margin: number; free_margin: number; open_positions: number; open_risk_cash: number;
   open_risk_verified: boolean; captured_at: string;
+  consecutive_losses: number | null; loss_streak_verified: boolean; history_synced_at: string | null;
 };
 type Quote = {
   symbol: string; bid: number; ask: number; quote_time: string; spread_points: number;
@@ -92,7 +93,7 @@ export async function POST(request: Request) {
     const [accounts, quotes, states, macroSignal] = await Promise.all([
       supabaseRead<AccountSnapshot[]>(
         'mt5_account_snapshots',
-        `select=account_login,currency,balance,equity,margin,free_margin,open_positions,open_risk_cash,open_risk_verified,captured_at&installation_id=eq.${installation.id}&account_login=eq.${accountLogin}&limit=1`,
+        `select=account_login,currency,balance,equity,margin,free_margin,open_positions,open_risk_cash,open_risk_verified,captured_at,consecutive_losses,loss_streak_verified,history_synced_at&installation_id=eq.${installation.id}&account_login=eq.${accountLogin}&limit=1`,
       ),
       supabaseRead<Quote[]>(
         'mt5_market_quotes',
@@ -168,6 +169,10 @@ export async function POST(request: Request) {
       specification: symbolSpec,
     });
     const estimatedMargin = sizing.valid && marginPerLot > 0 ? sizing.volume * marginPerLot : Number.NaN;
+    const historySyncedAt = account.history_synced_at ? Date.parse(account.history_synced_at) : Number.NaN;
+    const lossStreakFresh = account.loss_streak_verified && Number.isSafeInteger(account.consecutive_losses)
+      && account.consecutive_losses !== null && Number.isFinite(historySyncedAt)
+      && Date.now() - historySyncedAt >= 0 && Date.now() - historySyncedAt <= 30_000;
     const context: RiskContext = {
       bid: quote.bid,
       ask: quote.ask,
@@ -181,7 +186,7 @@ export async function POST(request: Request) {
       dailyStartEquity: state.daily_start_equity,
       weeklyStartEquity: state.weekly_start_equity,
       highWaterMarkEquity: state.high_water_mark_equity,
-      consecutiveLosses: Number.NaN,
+      consecutiveLosses: lossStreakFresh ? Number(account.consecutive_losses) : Number.NaN,
       regime: macroSignal?.regime ?? 'UNAVAILABLE',
       marketDataHealth: snapshotAgeMs >= 0 && snapshotAgeMs <= 30_000 && quoteAgeMs >= 0 && quoteAgeMs <= 30_000 && Boolean(macroSignal && macroSignal.market_data_source === 'mt5' && !macroSignal.execution_blockers.includes('MARKET_DATA_NOT_VERIFIED')) ? 'LIVE' : 'STALE',
       macroDataHealth: macroSignal && !macroSignal.execution_blockers.includes('MACRO_DATA_NOT_VERIFIED') ? 'LIVE' : 'UNAVAILABLE',
@@ -227,7 +232,8 @@ export async function POST(request: Request) {
           currency: account.currency, balance: account.balance, equity: account.equity,
           margin: account.margin, free_margin: account.free_margin, open_positions: account.open_positions,
           open_risk_cash: account.open_risk_cash, open_risk_verified: account.open_risk_verified,
-          captured_at: account.captured_at,
+          captured_at: account.captured_at, consecutive_losses: account.consecutive_losses,
+          loss_streak_verified: account.loss_streak_verified, history_synced_at: account.history_synced_at,
         },
         quote: {
           bid: quote.bid, ask: quote.ask, spread_points: quote.spread_points,
