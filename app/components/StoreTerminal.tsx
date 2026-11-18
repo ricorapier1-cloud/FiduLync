@@ -4,6 +4,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import BrandGlyph from '@/components/BrandGlyph';
 import { PaystackCheckout } from '@/components/PaystackCheckout';
+import FreeEaResources from '@/components/FreeEaResources';
 import { QuantStrategyCatalog } from '@/components/QuantStrategyCatalog';
 import { getCurrencyStrengthIndex, type getLiquiditySession } from '@/lib/currencyStrength';
 import type { MacroSnapshot } from '@/types/macro';
@@ -73,6 +74,7 @@ export default function StoreTerminal({ initialSnapshot, session }: StoreTermina
 
         <section className="mt-11" aria-labelledby="strategies-heading">
           <QuantStrategyCatalog onSelectEa={(slug, cycle, currency) => { setSelectedEaSlug(slug); setSelectedBillingCycle(cycle); setSelectedCurrency(currency); setManualCheckoutOpen(true); }} />
+          <FreeEaResources />
         </section>
 
         {checkoutOpen && <div className="fixed inset-0 z-[90] bg-black/75 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="AlgoLync subscription checkout">
