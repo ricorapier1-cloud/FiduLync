@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { requireOwner } from '@/lib/ownerAuth';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
 import { getPersonalRiskPolicy } from '@/lib/riskPolicy';
+import { getCurrencyStrengthIndex } from '@/lib/currencyStrength';
+import type { MacroSnapshot } from '@/types/macro';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -115,8 +117,8 @@ export async function GET(request: Request) {
         ? supabase.from('mt5_market_quotes').select('symbol,bid,ask,quote_time,spread_points,point,broker,server')
             .in('installation_id', installationIds).order('quote_time', { ascending: false }).limit(1000)
         : Promise.resolve({ data: [], error: null }),
-      supabase.from('macro_snapshots').select('regime_label,top_long,top_short,policy_spread,provenance,csi_scores,recorded_at')
-        .order('recorded_at', { ascending: false }).limit(1),
+      supabase.from('macro_snapshot_payloads').select('payload,refreshed_at')
+        .eq('snapshot_key', 'global').maybeSingle(),
       ...PAIRS.flatMap((pair) => FRAMES.map((timeframe) => installationIds.length
         ? supabase.from('mt5_market_candles').select('symbol,timeframe,bar_time,open,high,low,close,is_closed,broker,server')
             .in('installation_id', installationIds).ilike('symbol', pair + '%').eq('timeframe', timeframe).eq('is_closed', true)
@@ -167,15 +169,30 @@ export async function GET(request: Request) {
       };
     });
 
-    const macro = macroResult.data?.[0] ?? null;
-    const macroAgeHours = macro ? (Date.now() - Date.parse(macro.recorded_at)) / 3_600_000 : null;
+    const rawMacro = macroResult.data?.payload as MacroSnapshot | undefined;
+    const macroStrength = rawMacro ? getCurrencyStrengthIndex(rawMacro) : [];
+    const macroRates = rawMacro?.currencies.map((currency) => currency.policyRate).filter(Number.isFinite) ?? [];
+    const policySpread = macroRates.length ? Math.max(...macroRates) - Math.min(...macroRates) : null;
+    const macroRecordedAt = macroResult.data?.refreshed_at ?? rawMacro?.asOf ?? null;
+    const macroAgeHours = macroRecordedAt ? (Date.now() - Date.parse(macroRecordedAt)) / 3_600_000 : null;
+    const macro = rawMacro && macroRecordedAt ? {
+      regime_label: rawMacro.source.toUpperCase() + (rawMacro.source === 'partial' ? ' · PARTIAL' : ''),
+      top_long: macroStrength[0]?.currency ?? '',
+      top_short: macroStrength.at(-1)?.currency ?? '',
+      policy_spread: policySpread,
+      provenance: [rawMacro.source, 'COT '+(rawMacro.cotSource ?? 'unavailable'), 'Calendar '+(rawMacro.calendarSource ?? 'reference')].join(' · '),
+      csi_scores: Object.fromEntries(macroStrength.map((item) => [item.currency, item.score])),
+      recorded_at: macroRecordedAt,
+      age_hours: macroAgeHours === null ? 0 : Math.max(0, Math.round(macroAgeHours)),
+      fresh: macroAgeHours !== null && macroAgeHours >= -0.01 && macroAgeHours <= 24,
+    } : null;
     return NextResponse.json({
       generated_at: new Date().toISOString(),
       universe: PAIRS,
       frames: FRAMES,
       active_installations: installationIds.length,
       pairs,
-      macro: macro ? { ...macro, age_hours: Math.max(0, Math.round(macroAgeHours ?? 0)), fresh: macroAgeHours !== null && macroAgeHours >= 0 && macroAgeHours <= 24 } : null,
+      macro,
       guardrails: { max_spread_points: policy.maxSpreadPoints, max_spread_atr_ratio: policy.maxSpreadAtrRatio, quote_max_age_seconds: 120 },
       execution_enabled: false,
       disclaimer: 'Research context only. No entry signal, trade instruction or broker execution is produced by this endpoint.',
