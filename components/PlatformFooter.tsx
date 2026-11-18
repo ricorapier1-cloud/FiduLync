@@ -110,7 +110,7 @@ export default function PlatformFooter() {
             Trading foreign exchange (Forex) and Contracts for Difference (CFDs) on margin carries a high level of risk and may not be suitable for all investors. High leverage can work against you as well as for you. Before deciding to trade foreign exchange or utilize automated Expert Advisors, you should carefully consider your investment objectives, level of experience, and risk appetite. There is a possibility that you could sustain a loss of some or all of your initial capital. Past performance, backtests, or hypothetical results are not indicative of future market outcomes.
           </p>
           <p className="mt-2 text-slate-500">
-            FiduLync Personal Quant provides market research, risk planning and EA supervision tools for the owner's own trading. It is not a broker or investment adviser, does not place orders, and does not guarantee trading results.
+            FiduLync Personal Quant provides market research, risk planning and EA supervision tools for the owner&apos;s own trading. It is not a broker or investment adviser, does not place orders, and does not guarantee trading results.
           </p>
         </div>
 
