@@ -62,7 +62,7 @@ The Vercel project contains names for Supabase, Upstash, FRED, Finnhub, Twelve D
 
 ### Implementation checkpoint — 2026-11-18
 - `feat/personal-quant-edition` is the active implementation branch; production `main` remains unchanged.
-- Additive Supabase migrations have been applied for account snapshots, daily/weekly/high-water risk anchors, durable EA risk decisions, broker volume/margin metadata, and protection against stale account-snapshot time rewind. Existing financial records were not deleted.
+- Additive Supabase migrations have been applied for account snapshots, daily/weekly/high-water risk anchors, durable EA risk decisions with sanitized proposal/context evidence and policy version, broker volume/margin metadata, and protection against stale account-snapshot time rewind. Existing financial records were not deleted.
 - The MT5 publisher now sends seven major USD FX pairs plus XAUUSD by default, broker tick/volume/stop metadata, account equity/margin, open positions and estimated open-position risk. Historical candles are chunked to respect the ingestion API's 1,000-candle request limit.
 - The authenticated supervisor decision endpoint validates a registered installation token, timestamp and replay nonce; it loads account/quote/risk-anchor context from Supabase rather than trusting EA-supplied account state; binds MacroLync technical/regime/news context to the same authenticated installation (no cross-terminal or provider fallback); and writes durable decision records including abstentions.
 - Added an MQL5 supervisor include and a no-trade connectivity probe EA. Neither contains broker order execution.
