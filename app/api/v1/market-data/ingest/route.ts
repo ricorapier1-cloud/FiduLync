@@ -61,13 +61,17 @@ export async function POST(request: Request) {
     });
     if (!nonceRows) throw new Error('Replay protection could not be stored.');
 
-    const accountSnapshot = body.account_snapshot;
-    if (accountSnapshot !== undefined && accountSnapshot !== null) {
-      if (!isRecord(accountSnapshot)
-        || !Number.isSafeInteger(accountSnapshot.account_login) || Number(accountSnapshot.account_login) <= 0
+    const rawAccountSnapshot = body.account_snapshot;
+    let accountSnapshot: Record<string, unknown> | null = null;
+    if (rawAccountSnapshot !== undefined && rawAccountSnapshot !== null) {
+      if (!isRecord(rawAccountSnapshot)) {
+        return NextResponse.json({ error: 'Account snapshot failed validation.' }, { status: 400 });
+      }
+      accountSnapshot = rawAccountSnapshot;
+      if (!Number.isSafeInteger(accountSnapshot.account_login) || Number(accountSnapshot.account_login) <= 0
         || typeof accountSnapshot.currency !== 'string' || !/^[A-Z]{3,8}$/.test(accountSnapshot.currency)
         || !['balance','equity','margin','free_margin','open_risk_cash'].every((key) =>
-          typeof accountSnapshot[key] === 'number' && Number.isFinite(accountSnapshot[key]) && (accountSnapshot[key] as number) >= 0)
+          typeof accountSnapshot?.[key] === 'number' && Number.isFinite(accountSnapshot[key]) && (accountSnapshot[key] as number) >= 0)
         || (accountSnapshot.equity as number) <= 0
         || !Number.isSafeInteger(accountSnapshot.open_positions) || (accountSnapshot.open_positions as number) < 0
         || typeof accountSnapshot.open_risk_verified !== 'boolean'
