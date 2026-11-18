@@ -19,15 +19,9 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
   const [accountToBind, setAccountToBind] = useState('');
   const [accountTypeToBind, setAccountTypeToBind] = useState<'LIVE' | 'DEMO'>('LIVE');
   const [brokerServerInput, setBrokerServerInput] = useState('');
-  const [boundAccountsList, setBoundAccountsList] = useState<any[]>([]);
+  const [boundAccountsList, setBoundAccountsList] = useState<Array<{ account_number: string | number; account_type: 'LIVE' | 'DEMO' }>>([]);
   const [availableSlots, setAvailableSlots] = useState<{ live: number; demo: number }>({ live: 1, demo: 2 });
   const [loadingBinding, setLoadingBinding] = useState(false);
-
-  useEffect(() => {
-    if (selectedEaSlug) {
-      setSelectedSlug(selectedEaSlug);
-    }
-  }, [selectedEaSlug]);
 
   const currentEa: EaProduct = getEaBySlug(selectedSlug) || EA_CATALOG[0];
 
@@ -44,7 +38,6 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
     const reference = new URLSearchParams(window.location.search).get('ref');
     if (!reference) return;
 
-    setLoading(true);
     fetch(`/api/v1/verify-payment?reference=${encodeURIComponent(reference)}`, { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
