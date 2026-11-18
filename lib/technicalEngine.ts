@@ -306,8 +306,11 @@ function trueRanges(candles: Candle[]) {
 }
 
 function averageTrueRange(candles: Candle[], period = 14) {
-  const window = trueRanges(candles).slice(-period);
-  return window.length < period ? null : window.reduce((sum, value) => sum + value, 0) / period;
+  const ranges = trueRanges(candles);
+  if (ranges.length < period) return null;
+  let value = ranges.slice(0, period).reduce((sum, item) => sum + item, 0) / period;
+  for (const range of ranges.slice(period)) value = (value * (period - 1) + range) / period;
+  return value;
 }
 
 function averageDirectionalIndex(candles: Candle[], period = 14) {
