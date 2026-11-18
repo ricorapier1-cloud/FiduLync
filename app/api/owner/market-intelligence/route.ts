@@ -68,13 +68,14 @@ function frameAnalysis(rows: Candle[], timeframe: string) {
   const closes = bars.map((bar) => Number(bar.close));
   const fast = ema(closes, 20);
   const slow = ema(closes, 50);
+  const long = ema(closes, 200);
   const last = closes.at(-1) ?? null;
   const volatility = atr(bars);
   const momentum = rsi(closes);
   let bias = 'INSUFFICIENT_DATA';
-  if (fast !== null && slow !== null && last !== null) {
-    if (fast > slow && last > fast) bias = 'BULLISH';
-    else if (fast < slow && last < fast) bias = 'BEARISH';
+  if (fast !== null && slow !== null && long !== null && last !== null) {
+    if (fast > slow && slow > long && last > fast) bias = 'BULLISH';
+    else if (fast < slow && slow < long && last < fast) bias = 'BEARISH';
     else bias = 'NEUTRAL';
   }
   const ageMinutes = bars.length ? Math.max(0, (Date.now() - Date.parse(bars.at(-1)!.bar_time)) / 60000) : null;
@@ -86,6 +87,7 @@ function frameAnalysis(rows: Candle[], timeframe: string) {
     last_close: last,
     ema20: fast,
     ema50: slow,
+    ema200: long,
     atr14: volatility,
     rsi14: momentum,
     bias,
@@ -118,7 +120,7 @@ export async function GET(request: Request) {
       ...PAIRS.flatMap((pair) => FRAMES.map((timeframe) => installationIds.length
         ? supabase.from('mt5_market_candles').select('symbol,timeframe,bar_time,open,high,low,close,is_closed,broker,server')
             .in('installation_id', installationIds).ilike('symbol', pair + '%').eq('timeframe', timeframe).eq('is_closed', true)
-            .order('bar_time', { ascending: false }).limit(120)
+            .order('bar_time', { ascending: false }).limit(250)
         : Promise.resolve({ data: [], error: null }))),
     ]);
     if (quoteResult.error) throw quoteResult.error;
@@ -147,7 +149,7 @@ export async function GET(request: Request) {
       const aligned = biases.every((bias) => bias === 'BULLISH') ? 'BULLISH'
         : biases.every((bias) => bias === 'BEARISH') ? 'BEARISH'
         : biases.every((bias) => bias === 'INSUFFICIENT_DATA') ? 'INSUFFICIENT_DATA' : 'MIXED';
-      const dataComplete = FRAMES.every((timeframe) => frames[timeframe].bars >= 50);
+      const dataComplete = FRAMES.every((timeframe) => frames[timeframe].bars >= 200);
       const fresh = quoteFresh && FRAMES.every((timeframe) => frames[timeframe].fresh);
       const spreadWithinGuard = spreadAtrRatio !== null && spreadAtrRatio <= policy.maxSpreadAtrRatio
         && quote !== undefined && quote.spread_points <= policy.maxSpreadPoints;
