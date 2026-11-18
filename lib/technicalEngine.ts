@@ -181,7 +181,7 @@ type StoredCandle = {
   close: number;
 };
 
-async function fetchActiveMt5Candles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promise<Candle[]> {
+async function fetchActiveMt5Candles(pair: string, timeframe: 'H1' | 'H4' | 'D1', installationId?: string): Promise<Candle[]> {
   const query = new URLSearchParams({
     select: 'installation_id,bar_time,open,high,low,close,installation:mt5_installations!inner(status)',
     symbol: `eq.${pair}`,
@@ -191,6 +191,7 @@ async function fetchActiveMt5Candles(pair: string, timeframe: 'H1' | 'H4' | 'D1'
     order: 'bar_time.desc',
     limit: String(MAX_CANDLES * 3),
   });
+  if (installationId) query.set('installation_id', `eq.${installationId}`);
   const rows = await supabaseRead<Array<StoredCandle>>('mt5_market_candles', query.toString());
   if (!rows?.length) return [];
 
@@ -224,10 +225,12 @@ async function fetchActiveMt5Candles(pair: string, timeframe: 'H1' | 'H4' | 'D1'
 type CandleSource = 'mt5' | 'configured_provider' | 'twelve_data' | 'unavailable';
 type CandleSeries = { candles: Candle[]; source: CandleSource };
 
-async function getCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promise<CandleSeries> {
-  return getCachedData(`market:candles:${pair}:${timeframe}`, async () => {
-    const mt5Candles = await fetchActiveMt5Candles(pair, timeframe);
+async function getCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1', installationId?: string): Promise<CandleSeries> {
+  return getCachedData(`market:candles:${installationId ?? 'active'}:${pair}:${timeframe}`, async () => {
+    const mt5Candles = await fetchActiveMt5Candles(pair, timeframe, installationId);
     if (mt5Candles.length >= 200) return { candles: mt5Candles, source: 'mt5' as const };
+    // An authenticated supervisor must never fall back to another terminal or provider feed.
+    if (installationId) return { candles: [], source: 'unavailable' as const };
     // Keep providers isolated: never splice OHLC bars from different feeds into one indicator series.
     const configuredProvider = await fetchCandles(pair, timeframe).catch((error) => {
       console.warn(`Configured market data provider unavailable for ${pair} ${timeframe}.`, error);
@@ -416,13 +419,13 @@ export function calculateTechnicalSignal(pair: string, h1: Candle[], h4: Candle[
   };
 }
 
-export async function getTechnicalSignal(pair: string): Promise<TechnicalSignal> {
+export async function getTechnicalSignal(pair: string, installationId?: string): Promise<TechnicalSignal> {
   try {
-    return await getCachedData(`technical:signal:${pair}`, async () => {
+    return await getCachedData(`technical:signal:${installationId ?? 'active'}:${pair}`, async () => {
       const [h1Series, h4Series, d1Series] = await Promise.all([
-        getCandles(pair, 'H1'),
-        getCandles(pair, 'H4'),
-        getCandles(pair, 'D1'),
+        getCandles(pair, 'H1', installationId),
+        getCandles(pair, 'H4', installationId),
+        getCandles(pair, 'D1', installationId),
       ]);
       const candleCounts = {
         h1: h1Series.candles.length,
