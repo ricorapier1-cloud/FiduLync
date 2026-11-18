@@ -39,7 +39,8 @@ export async function POST(request: Request) {
       'ea_license_seats',
       `license_key=eq.${encodeURIComponent(licenseKey)}&select=mt5_login,slot_type&order=slot_type.asc`
     );
-    const fallbackAccount = row.mt5_account ?? seats?.find((seat) => seat.mt5_login)?.mt5_login ?? null;\n    const account = requestedAccount ?? (fallbackAccount === null ? null : Number(fallbackAccount));
+    const fallbackAccount = row.mt5_account ?? seats?.find((seat) => seat.mt5_login)?.mt5_login ?? null;
+    const account = requestedAccount ?? (fallbackAccount === null ? null : Number(fallbackAccount));
     if (account !== null && !await validateCustomerLicense(account, licenseKey)) {
       return NextResponse.json({ error: 'This license does not authorize that MT5 account.' }, { status: 401 });
     }
