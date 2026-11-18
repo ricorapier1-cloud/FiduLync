@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     const licenseKey = typeof body.license_key === 'string' ? body.license_key.trim().toUpperCase() : '';
     const eaSlug = typeof body.ea_slug === 'string' ? body.ea_slug.trim().toLowerCase() : '';
     const loginText = String(body.mt5_login ?? '').trim();
-    const mt5Login = /^\\d{1,20}$/.test(loginText) ? Number(loginText) : Number.NaN;
+    const mt5Login = /^\d{1,20}$/.test(loginText) ? Number(loginText) : Number.NaN;
     const accountMode = body.account_mode === 'DEMO' ? 'DEMO' : body.account_mode === 'REAL' ? 'REAL' : '';
 
     if (!/^ALGOLYNX-[A-Z0-9-]{8,100}$/.test(licenseKey) || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(eaSlug)
