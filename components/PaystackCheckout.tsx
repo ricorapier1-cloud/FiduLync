@@ -3,11 +3,13 @@
 import React, { useEffect, useState } from 'react';
 import { EA_CATALOG, EaProduct, getEaBySlug } from '@/lib/eaCatalog';
 
-export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { selectedEaSlug?: string }) {
+export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro', selectedBillingCycle = 'MONTHLY', selectedCurrency = 'NGN' }: { selectedEaSlug?: string; selectedBillingCycle?: 'MONTHLY' | 'ANNUAL'; selectedCurrency?: 'NGN' | 'USD' }) {
   const [tab, setTab] = useState<'BUY' | 'BIND' | 'DOWNLOADS'>('BUY');
   const [selectedSlug, setSelectedSlug] = useState<string>(selectedEaSlug);
-  const [plan, setPlan] = useState<'MONTHLY' | 'LIFETIME'>('MONTHLY');
-  const [currency, setCurrency] = useState<'NGN' | 'USD'>('NGN');
+  const [plan, setPlan] = useState<'MONTHLY' | 'ANNUAL'>(selectedBillingCycle);
+  const [currency, setCurrency] = useState<'NGN' | 'USD'>(selectedCurrency);
+  const [extraLiveSeats, setExtraLiveSeats] = useState<0 | 1 | 3 | 5>(0);
+  const [dbProducts, setDbProducts] = useState<Array<{ slug: string; monthly_price_ngn: number; monthly_price_usd: number; annual_price_ngn: number; annual_price_usd: number; extra_seat_price_ngn: number; extra_seat_price_usd: number }>>([]);
   const [email, setEmail] = useState('');
   const [mt5Account, setMt5Account] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,19 +26,34 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
   const [loadingBinding, setLoadingBinding] = useState(false);
 
   useEffect(() => {
-    if (selectedEaSlug) {
-      setSelectedSlug(selectedEaSlug);
-    }
-  }, [selectedEaSlug]);
+    if (selectedEaSlug) setSelectedSlug(selectedEaSlug);
+    setPlan(selectedBillingCycle);
+    setCurrency(selectedCurrency);
+  }, [selectedEaSlug, selectedBillingCycle, selectedCurrency]);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/v1/products', { cache: 'no-store' }).then((response) => response.json()).then((data) => {
+      if (active && Array.isArray(data.products)) setDbProducts(data.products);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
 
   const currentEa: EaProduct = getEaBySlug(selectedSlug) || EA_CATALOG[0];
 
-  const priceNgn = plan === 'MONTHLY' ? currentEa.monthlyPriceNgn : currentEa.lifetimePriceNgn;
-  const priceUsd = plan === 'MONTHLY' ? currentEa.monthlyPriceUsd : currentEa.lifetimePriceUsd;
+  const dbProduct = dbProducts.find((item) => item.slug === selectedSlug);
+  const monthlyNgn = dbProduct?.monthly_price_ngn ?? currentEa.monthlyPriceNgn;
+  const monthlyUsd = dbProduct?.monthly_price_usd ?? currentEa.monthlyPriceUsd;
+  const annualNgn = dbProduct?.annual_price_ngn ?? monthlyNgn * 10;
+  const annualUsd = dbProduct?.annual_price_usd ?? monthlyUsd * 10;
+  const extraNgn = dbProduct?.extra_seat_price_ngn ?? 0;
+  const extraUsd = dbProduct?.extra_seat_price_usd ?? 0;
+  const priceNgn = (plan === 'MONTHLY' ? monthlyNgn : annualNgn) + extraNgn * extraLiveSeats * (plan === 'ANNUAL' ? 10 : 1);
+  const priceUsd = (plan === 'MONTHLY' ? monthlyUsd : annualUsd) + extraUsd * extraLiveSeats * (plan === 'ANNUAL' ? 10 : 1);
 
   const priceDisplay =
     currency === 'NGN'
-      ? `₦${priceNgn.toLocaleString()} ${plan === 'MONTHLY' ? '/ month' : 'One-Time'}`
+      ? `₦${priceNgn.toLocaleString()} ${plan === 'MONTHLY' ? '/ month' : '/ year'}`
       : `$${priceUsd} ${plan === 'MONTHLY' ? '/ month' : 'One-Time'}`;
 
   // Check URL callback ref
@@ -76,7 +93,8 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
           email: email.trim(),
           ea_slug: selectedSlug,
           currency,
-          plan,
+          billing_cycle: plan,
+          extra_live_seats: extraLiveSeats,
           mt5_account: mt5Account ? Number(mt5Account) : undefined,
         }),
       });
@@ -256,12 +274,12 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPlan('LIFETIME')}
+                  onClick={() => setPlan('ANNUAL')}
                   className={`rounded py-1.5 text-center transition-all ${
-                    plan === 'LIFETIME' ? 'bg-emerald-500 font-bold text-black' : 'text-slate-400'
+                    plan === 'ANNUAL' ? 'bg-emerald-500 font-bold text-black' : 'text-slate-400'
                   }`}
                 >
-                  LIFETIME
+                  ANNUAL · 2 MONTHS FREE
                 </button>
               </div>
             </div>
@@ -291,6 +309,11 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
                 </button>
               </div>
             </div>
+          </div>
+
+          <div>
+            <label className="block font-mono text-xs text-slate-400 uppercase tracking-wider mb-2">Extra live account seats</label>
+            <div className="grid grid-cols-4 gap-2">{([0, 1, 3, 5] as const).map((count) => <button key={count} type="button" onClick={() => setExtraLiveSeats(count)} className={extraLiveSeats === count ? 'rounded-lg border border-emerald-400/50 bg-emerald-400/10 px-2 py-2 text-xs text-emerald-200' : 'rounded-lg border border-white/10 px-2 py-2 text-xs text-slate-400'}>{count === 0 ? 'Included' : '+' + count}</button>)}</div>
           </div>
 
           {/* Input Fields */}
