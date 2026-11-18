@@ -93,9 +93,6 @@ public:
       ArrayResize(data,copied-1);
       char response[];
       string response_headers;
-      string headers="Content-Type: application/json\r\n";
-      headers+="Authorization: Bearer "+m_publisher_token+"\r\n";
-      headers+="x-mt5-timestamp: "+TimeToString(TimeGMT(),TIME_DATE|TIME_SECONDS)+"\r\n";
       // ISO-8601 UTC timestamp required by the API.
       MqlDateTime utc;
       TimeToStruct(TimeGMT(),utc);
@@ -114,7 +111,6 @@ public:
       string payload=CharArrayToString(response,0,-1,CP_UTF8);
       decision=JsonString(payload,"decision");
       approved_volume=JsonNumber(payload,"approvedVolume");
-      reason=JsonString(payload,"blockers");
       if(decision!="APPROVE" || approved_volume<=0.0)
       {
          approved_volume=0.0;
