@@ -60,7 +60,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
 
           <div className="topbar-actions">
             <a
-              href="https://wa.me/2348037212445?text=Hello%20Desk%2C%20I%20have%20an%20enquiry%20regarding%20AlgoLync%20EAs"
+              href="https://wa.me/2348037212445?text=Hello%2C%20I%20need%20help%20with%20my%20FiduLync%20Personal%20Quant%20workspace"
               target="_blank"
               rel="noopener noreferrer"
               className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-400/10 h-11 w-11 justify-center p-0 font-mono text-[10px] text-emerald-300 transition hover:bg-emerald-400/20"
@@ -113,7 +113,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
             ))}
             <div className="mt-4 border-t border-white/[0.08] pt-4">
               <a
-                href="https://wa.me/2348037212445?text=Hello%20Desk%2C%20I%20have%20an%20enquiry%20regarding%20AlgoLync%20EAs"
+                href="https://wa.me/2348037212445?text=Hello%2C%20I%20need%20help%20with%20my%20FiduLync%20Personal%20Quant%20workspace"
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setDrawerOpen(false)}
