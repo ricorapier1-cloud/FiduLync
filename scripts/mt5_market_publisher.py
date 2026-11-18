@@ -52,10 +52,9 @@ TIMEFRAMES = {
 }
 HISTORY_BARS = max(200, min(500, int(os.getenv("MT5_HISTORY_BARS", "200"))))
 INTERVAL_SECONDS = max(15, int(os.getenv("MT5_PUBLISH_INTERVAL_SECONDS", "60")))
-INGEST_URL = os.getenv(
-    "FIDULYNC_INGEST_URL",
-    "https://fidulync.vercel.app/api/v1/market-data/ingest",
-).strip()
+# Deliberately require an explicit verified deployment URL. The production
+# deployment may not yet contain the personal-quant account-snapshot endpoint.
+INGEST_URL = os.getenv("FIDULYNC_INGEST_URL", "").strip()
 PUBLISHER_TOKEN = os.getenv("FIDULYNC_PUBLISHER_TOKEN", "").strip()
 TERMINAL_PATH = os.getenv("MT5_TERMINAL_PATH", "").strip()
 SYMBOL_MAP_TEXT = os.getenv("MT5_SYMBOL_MAP", "").strip()
