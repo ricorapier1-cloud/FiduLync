@@ -6,8 +6,8 @@ type License = { id:string; license_key:string; email:string; mt5_account:number
 type Provider = { id:string; configured:boolean; approved:boolean; state:string };
 type Snapshot = { generated_at:string; metrics:{customers:number;licenses:number;active_licenses:number;paid_entitlements:number;unbound_licenses:number;expired_or_inactive:number}; licenses:License[]; providers:Provider[]; capabilities:Record<string,string> };
 type Props = { accessToken:string };
-type Diagnostics = { checked_at:string; overall:string; summary:{checks:number;errors:number;blockers:number}; checks:Record<string,{status:string;detail:string}> };
-const sections = ['Overview','Customers & licenses','Payments','Data providers','Release governance','Security & audit'] as const;
+type Diagnostics = { checked_at:string; overall:string; summary:{checks:number;errors:number;blockers:number}; checks:Record<string,{status:string;detail:string}> };\ntype PricingProduct = { slug:string; name:string; version:string; category:string; monthly_price_ngn:number; monthly_price_usd:number; annual_price_ngn:number; annual_price_usd:number; extra_seat_price_ngn:number; extra_seat_price_usd:number; metrics_json:Record<string,unknown> };\ntype PricingDraft = Pick<PricingProduct,'monthly_price_ngn'|'monthly_price_usd'|'annual_price_ngn'|'annual_price_usd'|'extra_seat_price_ngn'|'extra_seat_price_usd'>;
+const sections = ['Overview','Customers & licenses','Payments','Product pricing','Data providers','Release governance','Security & audit'] as const;
 type Section = typeof sections[number];
 
 function State({value}:{value:string}) {
@@ -26,7 +26,7 @@ export default function OwnerControlPlane({accessToken}:Props) {
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState('');
  const [query,setQuery]=useState('');
- const [copied,setCopied]=useState('');
+ const [copied,setCopied]=useState('');\n const [pricingProducts,setPricingProducts]=useState<PricingProduct[]>([]);\n const [pricingSlug,setPricingSlug]=useState('');\n const [pricingDraft,setPricingDraft]=useState<PricingDraft>({monthly_price_ngn:0,monthly_price_usd:0,annual_price_ngn:0,annual_price_usd:0,extra_seat_price_ngn:0,extra_seat_price_usd:0});\n const [pricingSaving,setPricingSaving]=useState(false);\n const [pricingNotice,setPricingNotice]=useState('');
  const refresh=useCallback(async()=>{
   setLoading(true); setError('');
   try {
@@ -38,8 +38,37 @@ export default function OwnerControlPlane({accessToken}:Props) {
    if(probe.ok) setDiagnostics(await probe.json() as Diagnostics);
   } catch(e) { setError(e instanceof Error?e.message:'Unable to load owner data.'); }
   finally { setLoading(false); }
- },[accessToken]);
+ },[accessToken,pricingSlug]);
  useEffect(()=>{ const task=Promise.resolve().then(()=>refresh()); return ()=>{ void task; }; },[refresh]);
+ const pricingProduct=pricingProducts.find(p=>p.slug===pricingSlug)??null;
+ useEffect(()=>{if(pricingProduct)setPricingDraft({monthly_price_ngn:Number(pricingProduct.monthly_price_ngn),monthly_price_usd:Number(pricingProduct.monthly_price_usd),annual_price_ngn:Number(pricingProduct.annual_price_ngn),annual_price_usd:Number(pricingProduct.annual_price_usd),extra_seat_price_ngn:Number(pricingProduct.extra_seat_price_ngn),extra_seat_price_usd:Number(pricingProduct.extra_seat_price_usd)});},[pricingProduct]);
+ const estimate=useMemo(()=>{
+  if(!pricingProduct)return null;
+  const metrics=pricingProduct.metrics_json??{};
+  const sharpe=Number(metrics.sharpe??metrics.sharpe_ratio??1);
+  const rawCoverage=metrics.asset_coverage??metrics.asset_classes;
+  const coverage=Array.isArray(rawCoverage)?rawCoverage.length:Math.max(1,Number(rawCoverage)||1);
+  const tier=pricingProduct.category.toUpperCase();
+  const tierMultiplier=tier.includes('FLAGSHIP')?1.5:tier.includes('PREMIUM')?1.3:tier.includes('MOMENTUM')?1.1:tier.includes('SANDBOX')?0:1;
+  const sharpeMultiplier=Math.min(2,Math.max(0.75,0.75+Math.max(0,sharpe)*0.35));
+  const coverageMultiplier=Math.min(1.5,1+Math.min(20,coverage)*0.025);
+  const factor=tierMultiplier*sharpeMultiplier*coverageMultiplier;
+  const ngn=Math.round((30000*factor)/1000)*1000;
+  const usd=Math.round(25*factor);
+  return {monthly_price_ngn:ngn,monthly_price_usd:usd,annual_price_ngn:ngn*10,annual_price_usd:usd*10,extra_seat_price_ngn:Math.round(ngn*0.18/500)*500,extra_seat_price_usd:Math.max(1,Math.round(usd*0.18))};
+ },[pricingProduct]);
+ async function savePricing(){
+  if(!pricingProduct)return;
+  setPricingSaving(true);setPricingNotice('');setError('');
+  try{
+   const response=await fetch('/api/owner/products',{method:'PATCH',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body:JSON.stringify({slug:pricingSlug,...pricingDraft})});
+   const body=await response.json() as {success?:boolean;error?:string;product?:PricingProduct};
+   if(!response.ok||!body.success)throw new Error(body.error||'Pricing update failed.');
+   setPricingProducts(current=>current.map(p=>p.slug===pricingSlug?{...p,...pricingDraft}:p));
+   setPricingNotice('Pricing saved to the live EA catalogue.');
+  }catch(e){setError(e instanceof Error?e.message:'Unable to save pricing.');}
+  finally{setPricingSaving(false);}
+ }
  const filtered=useMemo(()=>{
   const q=query.trim().toLowerCase();
   return (snapshot?.licenses??[]).filter(x=>!q||[x.email,x.license_key,x.payment_reference??'',String(x.mt5_account??'')].some(v=>v.toLowerCase().includes(q)));
@@ -76,6 +105,19 @@ export default function OwnerControlPlane({accessToken}:Props) {
    <Metric label="Provisioned paid licenses" value={snapshot.metrics.paid_entitlements} detail="Each row has a payment reference stored on the license record"/>
    <div className="rounded-xl border border-amber-300/20 bg-amber-300/[0.04] p-4 text-xs leading-5 text-amber-100">Paystack verification and webhook provisioning are implemented on the release branch. This panel does not claim to be a full Paystack transaction ledger: refunds, disputes, reversals, chargebacks and reconciliation history still need dedicated records and workflows.</div>
    {snapshot.licenses.filter(x=>x.payment_reference).slice(0,20).map(x=><div key={x.id} className="flex flex-col gap-1 rounded-lg border border-white/[0.07] p-3 sm:flex-row sm:justify-between"><span className="text-slate-300">{x.email} · {x.tier}</span><span className="font-mono text-[10px] text-slate-500">{x.payment_reference}</span></div>)}
+  </div>}
+  {snapshot&&section==='Product pricing'&&<div className="mt-5 space-y-4">
+   <Panel title="EA subscription pricing" subtitle="The estimator is a transparent heuristic using the product's declared Sharpe metric, asset coverage and strategy tier. It is a starting suggestion, not a performance valuation.">
+    <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+     <label className="text-xs text-slate-400">EA product<select value={pricingSlug} onChange={e=>setPricingSlug(e.target.value)} className="mt-2 h-10 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-white">{pricingProducts.map(p=><option key={p.slug} value={p.slug}>{p.name} · {p.category}</option>)}</select></label>
+     <div className="flex items-end"><button disabled={!estimate} onClick={()=>estimate&&setPricingDraft(estimate)} className="h-10 rounded-lg border border-cyan-300/30 px-4 text-xs text-cyan-100 disabled:opacity-40">Apply estimator</button></div>
+    </div>
+    {estimate&&<div className="grid gap-3 rounded-xl border border-cyan-300/20 bg-cyan-300/[0.04] p-4 sm:grid-cols-2"><div><div className="text-[9px] text-slate-500">SUGGESTED MONTHLY NGN</div><div className="mt-1 text-xl font-semibold text-cyan-100">₦{estimate.monthly_price_ngn.toLocaleString()}</div></div><div><div className="text-[9px] text-slate-500">SUGGESTED MONTHLY USD</div><div className="mt-1 text-xl font-semibold text-cyan-100">$ {estimate.monthly_price_usd}</div></div><p className="text-[10px] leading-5 text-slate-500 sm:col-span-2">Annual suggestion equals ten monthly payments (two months free). Sharpe and coverage inputs are taken from the product metrics JSON; if those inputs are illustrative or unverified, the estimate is illustrative too.</p></div>}
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+     {(['monthly_price_ngn','monthly_price_usd','annual_price_ngn','annual_price_usd','extra_seat_price_ngn','extra_seat_price_usd'] as const).map(field=><label key={field} className="text-[10px] text-slate-400">{field.replaceAll('_',' ').toUpperCase()}<input type="number" min="0" step={field.endsWith('_ngn')?'1':'0.01'} value={pricingDraft[field]} onChange={e=>setPricingDraft(current=>({...current,[field]:Number(e.target.value)}))} className="mt-2 h-10 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-white"/></label>)}
+    </div>
+    <div className="flex flex-wrap items-center gap-3"><button onClick={()=>void savePricing()} disabled={pricingSaving||!pricingProduct} className="rounded-lg bg-emerald-300 px-4 py-2.5 text-xs font-semibold text-slate-950 disabled:opacity-50">{pricingSaving?'Saving…':'Save manual pricing'}</button>{pricingNotice&&<span className="text-xs text-emerald-200">{pricingNotice}</span>}</div>
+   </Panel>
   </div>}
   {snapshot&&section==='Data providers'&&<div className="mt-5 space-y-2">
    <div className="mb-3 rounded-lg border border-white/[0.08] bg-white/[0.02] p-3 text-[11px] text-slate-300">Live diagnostics: {diagnostics?diagnostics.overall+' · '+diagnostics.summary.errors+' errors · '+diagnostics.summary.blockers+' blockers':'Not yet probed'}</div>
