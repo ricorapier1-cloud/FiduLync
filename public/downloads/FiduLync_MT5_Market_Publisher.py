@@ -358,14 +358,20 @@ def post_batch(
             },
         )
         try:
-            with urlopen(request, timeout=25) as response:
+            request_started = time.perf_counter()
+            timeout_seconds = 5 if quotes or account_snapshot is not None or position_snapshot is not None else 15
+            with urlopen(request, timeout=timeout_seconds) as response:
                 payload = response.read().decode("utf-8", errors="replace")
+                elapsed_ms = (time.perf_counter() - request_started) * 1000
                 if response.status != 202:
                     raise RuntimeError(f"Ingestion returned HTTP {response.status}: {payload[:300]}")
                 result = json.loads(payload)
                 print(
                     f"Accepted: {result.get('quotes_received', 0)} quotes, "
-                    f"{result.get('candles_received', 0)} candles at {result.get('received_at_utc', now)}"
+                    f"{result.get('candles_received', 0)} candles, "
+                    f"{result.get('positions_received', 0)} positions; "
+                    f"snapshot complete={result.get('position_snapshot_complete', False)}; "
+                    f"ingest RTT={elapsed_ms:.0f} ms at {result.get('received_at_utc', now)}"
                 )
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
