@@ -280,7 +280,7 @@ export default function StoreTerminal({ bridgeSource, initialSnapshot, session }
             <li className="rounded-lg border border-white/[0.06] bg-black/20 p-3"><strong className="text-white">3. Register the terminal</strong><br />Use the private owner console to register the terminal and its installation credential. Never share broker passwords.</li>
             <li className="rounded-lg border border-white/[0.06] bg-black/20 p-3"><strong className="text-white">4. Start in shadow/demo mode</strong><br />Verify quotes, closed candles, broker symbol specifications and EA telemetry before considering any live use.</li>
           </ol>
-          <p className="mt-4 text-[11px] leading-5 text-amber-200/80">No personal EA execution approval is enabled by this page. Keep broker-side stop-loss protection and the EA's local risk controls active.</p>
+          <p className="mt-4 text-[11px] leading-5 text-amber-200/80">No personal EA execution approval is enabled by this page. Keep broker-side stop-loss protection and the EA&apos;s local risk controls active.</p>
         </section>
 
                 <div className="mt-8 flex items-center gap-2 border-t border-white/[0.07] pt-5 text-[10px] leading-5 text-slate-600">
