@@ -5,7 +5,7 @@ import { isSupabaseConfigured, supabaseQuery, supabaseRead } from '@/lib/supabas
 
 export const dynamic = 'force-dynamic';
 
-const EMAIL = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: Request) {
   const ip = getClientIp(request);
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
     const eaSlug = typeof body.ea_slug === 'string' ? body.ea_slug.trim().toLowerCase() : '';
     const loginText = String(body.mt5_login ?? body.mt5_account ?? '').trim();
-    const mt5Login = /^\\d{1,20}$/.test(loginText) ? Number(loginText) : Number.NaN;
+    const mt5Login = /^\d{1,20}$/.test(loginText) ? Number(loginText) : Number.NaN;
 
     if (!EMAIL.test(email) || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(eaSlug)
       || !Number.isSafeInteger(mt5Login) || mt5Login <= 0) {
