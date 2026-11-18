@@ -50,6 +50,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ valid: false, error: 'License not found for this EA.' }, { status: 404, headers });
     }
 
+    const activeProducts = await supabaseRead<Array<{ slug: string }>>('ea_products', `slug=eq.${encodeURIComponent(eaSlug)}&is_active=eq.true&select=slug&limit=1`);
+    if (!activeProducts?.length) return NextResponse.json({ valid: false, error: 'This EA product is not currently active.' }, { status: 403, headers });
+
     const now = Date.now();
     const status = String(license.status || '').toUpperCase();
     const expiry = license.expires_at ? Date.parse(license.expires_at) : Number.POSITIVE_INFINITY;
