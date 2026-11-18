@@ -61,7 +61,9 @@ export async function POST(request: Request) {
     takeProfit: typeof p.takeProfit === 'number' ? p.takeProfit : Number.NaN,
     requestedRiskPct: typeof p.requestedRiskPct === 'number' ? p.requestedRiskPct : Number.NaN,
   };
-  if (!/^[A-Z0-9._-]{3,20}$/.test(proposal.symbol)
+  if ((p.side !== 'BUY' && p.side !== 'SELL')
+    || !proposal.installationId
+    || !/^[A-Z0-9._-]{3,20}$/.test(proposal.symbol)
     || !/^[A-Za-z0-9_-]{8,100}$/.test(proposal.requestId)
     || !Number.isFinite(proposal.entryPrice) || !Number.isFinite(proposal.stopLoss)
     || !Number.isFinite(proposal.takeProfit) || !Number.isFinite(proposal.requestedRiskPct)) {
