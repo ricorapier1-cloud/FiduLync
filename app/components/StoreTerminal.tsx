@@ -94,6 +94,7 @@ export default function StoreTerminal({ initialSnapshot, session }: StoreTermina
             <span>Research and software only. Trading is risky; every EA must retain its own account-level equity and drawdown protections.</span>
           </div>
           <nav aria-label="Legal information" className="flex flex-wrap gap-4">
+            <a href="/about" className="text-slate-400 underline underline-offset-4 hover:text-emerald-300">About FiduLync</a>
             <a href="/terms" className="text-slate-400 underline underline-offset-4 hover:text-emerald-300">Terms &amp; Risk Disclosure</a>
             <a href="/refund-policy" className="text-slate-400 underline underline-offset-4 hover:text-emerald-300">Refund &amp; Cancellation</a>
             <a href="mailto:fidulync@gmail.com" className="text-slate-400 underline underline-offset-4 hover:text-emerald-300">Customer Support</a>
