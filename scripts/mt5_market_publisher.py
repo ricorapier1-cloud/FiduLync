@@ -56,6 +56,7 @@ TIMEFRAMES = {
 HISTORY_BARS = max(200, min(500, int(os.getenv("MT5_HISTORY_BARS", "200"))))
 INTERVAL_SECONDS = max(1, min(5, int(os.getenv("MT5_PUBLISH_INTERVAL_SECONDS", "1"))))
 CANDLE_REFRESH_SECONDS = max(10, int(os.getenv("MT5_CANDLE_REFRESH_SECONDS", "15")))
+POSITION_REFRESH_SECONDS = max(3, int(os.getenv("MT5_POSITION_REFRESH_SECONDS", "5")))
 LOSS_STREAK_REFRESH_SECONDS = max(15, min(25, int(os.getenv("MT5_LOSS_STREAK_REFRESH_SECONDS", "20"))))
 _loss_streak_cache: tuple[int, str] | None = None
 _loss_streak_last_attempt = 0.0
@@ -331,7 +332,7 @@ def post_batch(
     account_snapshot: dict[str, Any] | None = None,
     position_snapshot: dict[str, Any] | None = None,
 ) -> None:
-    if not quotes and not candles and position_snapshot is None:
+    if not quotes and not candles and account_snapshot is None and position_snapshot is None:
         return
     # The API caps each request at 1,000 candles. Split broad FX universes safely,
     # sending the account snapshot and quotes only with the first chunk.
@@ -384,6 +385,7 @@ def main() -> int:
     initialize_terminal()
     last_sent: dict[tuple[str, str], int] = {}
     last_candle_refresh = 0.0
+    last_position_refresh = 0.0
     try:
         while True:
             loop_started = time.monotonic()
@@ -402,12 +404,18 @@ def main() -> int:
                 continue
 
             # Keep the quote/account/position channel light and frequent.
+            account_snapshot = None
+            position_snapshot = None
+            now_monotonic = time.monotonic()
+            if now_monotonic - last_position_refresh >= POSITION_REFRESH_SECONDS:
+                positions_result = mt5.positions_get()
+                account_snapshot = build_account_snapshot(account, infos, positions_result)
+                position_snapshot = build_position_snapshot(account, positions_result)
             quotes = build_quotes(infos, account)
-            positions_result = mt5.positions_get()
-            account_snapshot = build_account_snapshot(account, infos, positions_result)
-            position_snapshot = build_position_snapshot(account, positions_result)
             try:
                 post_batch(quotes, [], account_snapshot, position_snapshot)
+                if account_snapshot is not None:
+                    last_position_refresh = time.monotonic()
             except Exception as exc:
                 print(f"Quote/account publish failed: {exc}")
 
