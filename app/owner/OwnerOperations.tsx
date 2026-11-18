@@ -156,7 +156,7 @@ export default function OwnerOperations({ accessToken, email, role, onSignOut }:
           <Panel title="Operational exceptions" subtitle="Only observed system facts are shown. Missing integrations are not treated as healthy.">
             <ReadinessRow label="MT5 terminal heartbeat" value={heartbeatFresh ? 'Recent' : 'Not verified'} note={'Most recent owner connector heartbeat: ' + formatTime(market?.latest_heartbeat)} tone={heartbeatFresh ? 'good' : 'warn'} />
             <ReadinessRow label="Live broker quote" value={quoteFresh ? 'Fresh quote observed' : 'No fresh quote'} note={market?.latest_quote ? market.latest_quote.symbol + ' quote timestamp: ' + formatTime(market.latest_quote.quote_time) : 'Connect an MT5 terminal to provide broker bid/ask observations.'} tone={quoteFresh ? 'good' : 'warn'} />
-            <ReadinessRow label="Model validation registry" value="Not connected" note="No signed model approval, walk-forward evidence or release registry is currently exposed in this console." />
+            <ReadinessRow label="Model validation registry" value="Schema ready · pending evidence" note="The model registry schema exists, but no model has an independently reviewed dataset fingerprint, code fingerprint and validation evidence." />
             <ReadinessRow label="Portfolio risk telemetry" value={accountRisk?.snapshot_fresh ? (accountRisk.open_risk_verified && accountRisk.risk_anchors_available ? 'Fresh account snapshot' : 'Partial telemetry') : 'Not verified'} note={accountRisk?.latest_snapshot ? 'Account ' + accountRisk.latest_snapshot.account_login + ' · ' + accountRisk.latest_snapshot.currency + ' equity ' + accountRisk.latest_snapshot.equity.toFixed(2) + ' · ' + accountRisk.latest_snapshot.open_positions + ' open positions · received ' + formatTime(accountRisk.latest_snapshot.captured_at) : 'No MT5 account snapshot has reached the risk control plane yet.'} tone={accountRiskTone} />
             <ReadinessRow label="Tamper-evident audit trail" value="Not configured" note="Administrative actions are not yet written to a dedicated immutable audit ledger." />
           </Panel>
@@ -190,9 +190,9 @@ export default function OwnerOperations({ accessToken, email, role, onSignOut }:
         {active === 'research' && <Panel title="Quant research oversight" subtitle="Research outputs must be traceable, reproducible and independently validated before release.">
           <ReadinessRow label="Technical research engine" value="Code integrated" note="MacroLync technical indicators and regime features are implemented in the application; code presence alone is not evidence of predictive performance." tone="good" />
           <ReadinessRow label="Live market data provenance" value={market?.latest_candle ? 'Broker observation received' : 'Not connected'} note={'Latest candle: ' + (market?.latest_candle ? formatTime(market.latest_candle.bar_time) + ' · ' + market.latest_candle.broker + '/' + market.latest_candle.server : 'No MT5 observations are available.')} tone={market?.latest_candle ? 'good' : 'warn'} />
-          <ReadinessRow label="Model version registry" value="Not connected" note="Versioned model manifests, parameter hashes and approval signatures are not yet surfaced here." />
-          <ReadinessRow label="Walk-forward / out-of-sample evidence" value="Not verified" note="No signed validation reports are attached to this console. Do not market model accuracy until evidence exists." />
-          <ReadinessRow label="Independent data checks" value="Required" note="Broker-specific FX prices are not a consolidated market feed; compare independent sources and preserve source provenance." />
+          <ReadinessRow label="Model version registry" value="Schema provisioned · awaiting artifacts" note="The database registry is ready; model manifests, reproducible datasets, parameter hashes and reviewer-approved evidence have not yet been supplied." />
+          <ReadinessRow label="Walk-forward / out-of-sample evidence" value="Not approved" note="No walk-forward, out-of-sample, Monte Carlo, cost-stress or regime-robustness report has been independently reviewed. No model is approved." />
+          <ReadinessRow label="Independent data checks" value="Required" note="Broker-specific prices are not a consolidated market feed. Cross-source validation, economic-calendar events, COT positioning and macro surprise history remain separate release gates." />
         </Panel>}
 
         {active === 'risk' && <div className="space-y-5">
@@ -227,7 +227,7 @@ export default function OwnerOperations({ accessToken, email, role, onSignOut }:
           <ReadinessRow label="Owner identity check" value="Verified per API request" note={'Authenticated owner: ' + email} tone="good" />
           <ReadinessRow label="Connector secret storage" value="SHA-256 hash only" note="MT5 installation credentials are returned once and stored as hashes; individual installations can be revoked." tone="good" />
           <ReadinessRow label="Broker credentials" value="Not exposed" note="No MT5 account passwords or broker trading credentials are requested by the data-only connector." tone="good" />
-          <ReadinessRow label="Dedicated audit ledger" value="Not configured" note="A tamper-evident record of sign-ins, connector creation/revocation, policy changes and privileged reads is still required." />
+          <ReadinessRow label="Dedicated audit ledger" value="Partial · decision evidence only" note="Risk-decision evidence is append-only. A complete owner-action audit trail for sign-ins, connector lifecycle, policy changes and privileged reads is still required." />
           <ReadinessRow label="MFA / step-up verification" value="Email OTP only" note="The current owner sign-in uses passwordless email OTP. Passkeys or stronger step-up authentication are not yet configured." tone="warn" />
           <ReadinessRow label="Dual approval" value="Not configured" note="For future high-impact actions, require independent approval rather than a single administrator self-approving." />
         </Panel>}
