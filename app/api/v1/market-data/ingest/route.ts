@@ -9,6 +9,7 @@ export const runtime = 'nodejs';
 type Installation = { id: string; status: string };
 type Quote = { symbol: string; bid: number; ask: number; quote_time: string; spread_points: number; digits?: number; point?: number; tick_size?: number; tick_value?: number; tick_value_loss?: number; tick_value_profit?: number; contract_size?: number; volume_min?: number; volume_max?: number; volume_step?: number; stop_level_points?: number; margin_per_lot_buy?: number; margin_per_lot_sell?: number; broker?: string; server?: string };
 type Candle = { symbol: string; timeframe: 'H1' | 'H4' | 'D1'; bar_time: string; open: number; high: number; low: number; close: number; tick_volume?: number; spread_points?: number; real_volume?: number; is_closed?: boolean; broker?: string; server?: string; digits?: number; point?: number; tick_size?: number; tick_value?: number; contract_size?: number };
+type PositionSnapshot = { snapshot_id: string; captured_at: string; account_login: number; expected_positions: number; positions: Record<string, unknown>[] };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -43,7 +44,7 @@ export async function POST(request: Request) {
   }
   if (!isRecord(body) || !Array.isArray(body.quotes) || !Array.isArray(body.candles)
     || body.quotes.length > 50 || body.candles.length > 1_000
-    || body.quotes.length + body.candles.length === 0) {
+    || body.quotes.length + body.candles.length === 0 && body.position_snapshot == null) {
     return NextResponse.json({ error: 'Payload must contain up to 50 quotes and 1,000 candles.' }, { status: 400 });
   }
 
@@ -83,6 +84,42 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Account snapshot failed validation.' }, { status: 400 });
       }
       accountSnapshot = snapshot;
+    }
+
+    const rawPositionSnapshot = body.position_snapshot;
+    let positionSnapshot: PositionSnapshot | null = null;
+    if (rawPositionSnapshot !== undefined && rawPositionSnapshot !== null) {
+      if (!isRecord(rawPositionSnapshot) || typeof rawPositionSnapshot.snapshot_id !== 'string'
+        || !/^[0-9a-f-]{36}$/i.test(rawPositionSnapshot.snapshot_id)
+        || typeof rawPositionSnapshot.captured_at !== 'string' || !validTime(rawPositionSnapshot.captured_at, false)
+        || !Number.isSafeInteger(rawPositionSnapshot.account_login) || Number(rawPositionSnapshot.account_login) <= 0
+        || !Number.isSafeInteger(rawPositionSnapshot.expected_positions) || Number(rawPositionSnapshot.expected_positions) < 0
+        || Number(rawPositionSnapshot.expected_positions) > 500
+        || !Array.isArray(rawPositionSnapshot.positions)
+        || rawPositionSnapshot.positions.length !== rawPositionSnapshot.expected_positions
+        || (accountSnapshot && Number(accountSnapshot.account_login) !== Number(rawPositionSnapshot.account_login))) {
+        return NextResponse.json({ error: 'Position snapshot manifest failed validation.' }, { status: 400 });
+      }
+      const rows: Record<string, unknown>[] = [];
+      for (const raw of rawPositionSnapshot.positions) {
+        if (!isRecord(raw) || !Number.isSafeInteger(raw.position_ticket) || Number(raw.position_ticket) <= 0
+          || (raw.position_identifier !== undefined && raw.position_identifier !== null && (!Number.isSafeInteger(raw.position_identifier) || Number(raw.position_identifier) <= 0))
+          || !validSymbol(raw.symbol) || !['BUY', 'SELL'].includes(String(raw.side))
+          || typeof raw.volume !== 'number' || !Number.isFinite(raw.volume) || raw.volume <= 0
+          || typeof raw.price_open !== 'number' || !Number.isFinite(raw.price_open) || raw.price_open <= 0
+          || (raw.stop_loss !== undefined && raw.stop_loss !== null && (typeof raw.stop_loss !== 'number' || !Number.isFinite(raw.stop_loss) || raw.stop_loss <= 0))
+          || (raw.take_profit !== undefined && raw.take_profit !== null && (typeof raw.take_profit !== 'number' || !Number.isFinite(raw.take_profit) || raw.take_profit <= 0))
+          || (raw.profit_account_currency !== undefined && raw.profit_account_currency !== null && (typeof raw.profit_account_currency !== 'number' || !Number.isFinite(raw.profit_account_currency)))
+          || (raw.contract_size !== undefined && raw.contract_size !== null && (typeof raw.contract_size !== 'number' || !Number.isFinite(raw.contract_size) || raw.contract_size <= 0))
+          || (raw.tick_size !== undefined && raw.tick_size !== null && (typeof raw.tick_size !== 'number' || !Number.isFinite(raw.tick_size) || raw.tick_size <= 0))
+          || (raw.tick_value_loss !== undefined && raw.tick_value_loss !== null && (typeof raw.tick_value_loss !== 'number' || !Number.isFinite(raw.tick_value_loss) || raw.tick_value_loss <= 0))
+          || (raw.quote_currency !== undefined && raw.quote_currency !== null && (typeof raw.quote_currency !== 'string' || !/^[A-Z]{3,8}$/.test(raw.quote_currency)))
+          || (raw.base_currency !== undefined && raw.base_currency !== null && (typeof raw.base_currency !== 'string' || !/^[A-Z]{3,8}$/.test(raw.base_currency)))) {
+          return NextResponse.json({ error: 'One or more open positions failed validation.' }, { status: 400 });
+        }
+        rows.push(raw);
+      }
+      positionSnapshot = { ...rawPositionSnapshot, positions: rows } as PositionSnapshot;
     }
 
     const quotes: Quote[] = [];
@@ -166,6 +203,51 @@ export async function POST(request: Request) {
       });
       if (!snapshotResult) throw new Error('Account snapshot storage failed.');
     }
+    let positionsReceived = 0;
+    if (positionSnapshot) {
+      const positionRows = positionSnapshot.positions.map((position) => ({
+        installation_id: installation.id,
+        account_login: positionSnapshot.account_login,
+        snapshot_id: positionSnapshot.snapshot_id,
+        captured_at: positionSnapshot.captured_at,
+        position_ticket: position.position_ticket,
+        position_identifier: position.position_identifier ?? null,
+        symbol: String(position.symbol).toUpperCase(),
+        side: position.side,
+        volume: position.volume,
+        price_open: position.price_open,
+        stop_loss: position.stop_loss ?? null,
+        take_profit: position.take_profit ?? null,
+        profit_account_currency: position.profit_account_currency ?? null,
+        contract_size: position.contract_size ?? null,
+        tick_size: position.tick_size ?? null,
+        tick_value_loss: position.tick_value_loss ?? null,
+        quote_currency: position.quote_currency ?? null,
+        base_currency: position.base_currency ?? null,
+        snapshot_complete: true,
+      }));
+      if (positionRows.length) {
+        const insertedPositions = await supabaseQuery('mt5_open_position_snapshots', {
+          method: 'POST', query: 'on_conflict=installation_id,account_login,snapshot_id,position_ticket',
+          prefer: 'resolution=ignore-duplicates,return=minimal', body: positionRows,
+        });
+        if (!insertedPositions) throw new Error('Position snapshot rows could not be stored.');
+      }
+      const manifest = await supabaseQuery('mt5_position_snapshot_manifests', {
+        method: 'POST', query: 'on_conflict=installation_id,account_login,snapshot_id',
+        prefer: 'return=minimal',
+        body: [{
+          installation_id: installation.id,
+          account_login: positionSnapshot.account_login,
+          snapshot_id: positionSnapshot.snapshot_id,
+          captured_at: positionSnapshot.captured_at,
+          expected_positions: positionSnapshot.expected_positions,
+          complete: true,
+        }],
+      });
+      if (!manifest) throw new Error('Position snapshot completion manifest could not be stored.');
+      positionsReceived = positionRows.length;
+    }
     await supabaseQuery('mt5_installations', {
       method: 'PATCH', query: `id=eq.${installation.id}`,
       prefer: 'return=representation', body: { last_seen_at: new Date().toISOString() },
@@ -173,6 +255,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       accepted: true, installation_id: installation.id,
       quotes_received: quotes.length, candles_received: candles.length, account_snapshot_received: Boolean(accountSnapshot),
+      positions_received: positionsReceived, position_snapshot_complete: Boolean(positionSnapshot),
       received_at_utc: new Date().toISOString(),
     }, { status: 202, headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
