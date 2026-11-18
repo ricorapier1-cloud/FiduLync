@@ -6,7 +6,9 @@ type License = { id:string; license_key:string; email:string; mt5_account:number
 type Provider = { id:string; configured:boolean; approved:boolean; state:string };
 type Snapshot = { generated_at:string; metrics:{customers:number;licenses:number;active_licenses:number;paid_entitlements:number;unbound_licenses:number;expired_or_inactive:number}; licenses:License[]; providers:Provider[]; capabilities:Record<string,string> };
 type Props = { accessToken:string };
-type Diagnostics = { checked_at:string; overall:string; summary:{checks:number;errors:number;blockers:number}; checks:Record<string,{status:string;detail:string}> };\ntype PricingProduct = { slug:string; name:string; version:string; category:string; monthly_price_ngn:number; monthly_price_usd:number; annual_price_ngn:number; annual_price_usd:number; extra_seat_price_ngn:number; extra_seat_price_usd:number; metrics_json:Record<string,unknown> };\ntype PricingDraft = Pick<PricingProduct,'monthly_price_ngn'|'monthly_price_usd'|'annual_price_ngn'|'annual_price_usd'|'extra_seat_price_ngn'|'extra_seat_price_usd'>;
+type Diagnostics = { checked_at:string; overall:string; summary:{checks:number;errors:number;blockers:number}; checks:Record<string,{status:string;detail:string}> };
+type PricingProduct = { slug:string; name:string; version:string; category:string; monthly_price_ngn:number; monthly_price_usd:number; annual_price_ngn:number; annual_price_usd:number; extra_seat_price_ngn:number; extra_seat_price_usd:number; metrics_json:Record<string,unknown> };
+type PricingDraft = Pick<PricingProduct,'monthly_price_ngn'|'monthly_price_usd'|'annual_price_ngn'|'annual_price_usd'|'extra_seat_price_ngn'|'extra_seat_price_usd'>;
 const sections = ['Overview','Customers & licenses','Payments','Product pricing','Data providers','Release governance','Security & audit'] as const;
 type Section = typeof sections[number];
 
@@ -26,7 +28,12 @@ export default function OwnerControlPlane({accessToken}:Props) {
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState('');
  const [query,setQuery]=useState('');
- const [copied,setCopied]=useState('');\n const [pricingProducts,setPricingProducts]=useState<PricingProduct[]>([]);\n const [pricingSlug,setPricingSlug]=useState('');\n const [pricingDraft,setPricingDraft]=useState<PricingDraft>({monthly_price_ngn:0,monthly_price_usd:0,annual_price_ngn:0,annual_price_usd:0,extra_seat_price_ngn:0,extra_seat_price_usd:0});\n const [pricingSaving,setPricingSaving]=useState(false);\n const [pricingNotice,setPricingNotice]=useState('');
+ const [copied,setCopied]=useState('');
+ const [pricingProducts,setPricingProducts]=useState<PricingProduct[]>([]);
+ const [pricingSlug,setPricingSlug]=useState('');
+ const [pricingDraft,setPricingDraft]=useState<PricingDraft>({monthly_price_ngn:0,monthly_price_usd:0,annual_price_ngn:0,annual_price_usd:0,extra_seat_price_ngn:0,extra_seat_price_usd:0});
+ const [pricingSaving,setPricingSaving]=useState(false);
+ const [pricingNotice,setPricingNotice]=useState('');
  const refresh=useCallback(async()=>{
   setLoading(true); setError('');
   try {
