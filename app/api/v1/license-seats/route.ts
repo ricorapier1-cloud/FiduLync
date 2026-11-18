@@ -5,7 +5,7 @@ import { isSupabaseConfigured, supabaseQuery, supabaseRead } from '@/lib/supabas
 export const dynamic = 'force-dynamic';
 
 type License = {
-  license_key: string; ea_slug: string | null; status: string | null; expires_at: string | null;
+  license_key: string; ea_slug: string | null; status: string | null; expires_at: string | null; grace_until: string | null;
   included_live_seats: number; extra_live_seats: number; included_demo_seats: number; tier: string; mt5_account: number | null;
 };
 
@@ -29,6 +29,10 @@ export async function POST(request: Request) {
     );
     const license = licenses?.[0];
     if (!license || !license.ea_slug) return NextResponse.json({ success: false, error: 'Subscription not found.' }, { status: 404 });
+    const status = String(license.status || '').toUpperCase();
+    const active = status === 'ACTIVE' && (!license.expires_at || Date.parse(license.expires_at) > Date.now());
+    const grace = status === 'PAST_DUE' && Boolean(license.grace_until && Date.parse(license.grace_until) > Date.now());
+    if (!active && !grace) return NextResponse.json({ success: false, error: 'This license is not currently entitled to account-slot changes.' }, { status: 403 });
 
     if (action === 'bind') {
       if (String(license.tier).toUpperCase() === 'DEMO_TRIAL') {
