@@ -38,8 +38,32 @@ const macroLinks = [
 export default function PlatformShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [ownerAuthorized, setOwnerAuthorized] = useState(false);
   const isHome = pathname === '/';
-  const navigation = isHome ? macroLinks : links;
+  const visibleLinks = links.filter((item) => item.href !== '/owner' || ownerAuthorized);
+  const navigation = (isHome ? macroLinks : links).filter((item) => item.href !== '/owner' || ownerAuthorized);
+
+  useEffect(() => {
+    if (!ownerSupabase) return;
+    let active = true;
+    const verifyOwner = async (accessToken: string | null) => {
+      if (!accessToken) { if (active) setOwnerAuthorized(false); return; }
+      try {
+        const response = await fetch('/api/owner/verify', {
+          headers: { Authorization: 'Bearer ' + accessToken }, cache: 'no-store',
+        });
+        const result = await response.json() as { authenticated?: boolean };
+        if (active) setOwnerAuthorized(response.ok && result.authenticated === true);
+      } catch {
+        if (active) setOwnerAuthorized(false);
+      }
+    };
+    ownerSupabase.auth.getSession().then(({ data }) => void verifyOwner(data.session?.access_token ?? null));
+    const { data: listener } = ownerSupabase.auth.onAuthStateChange((_event, session) => {
+      void verifyOwner(session?.access_token ?? null);
+    });
+    return () => { active = false; listener.subscription.unsubscribe(); };
+  }, []);
 
   return (
     <>
