@@ -128,8 +128,9 @@ export async function GET(request: Request) {
         frames[timeframe] = frameAnalysis(rows, timeframe);
       });
       const h1Source = frames.H1;
-      const quote = quoteRows.find((row) => row.symbol === h1Source.symbol && row.broker === h1Source.broker && row.server === h1Source.server)
-        ?? quoteRows.find((row) => row.symbol.toUpperCase().startsWith(pair));
+      const quote = h1Source.symbol
+        ? quoteRows.find((row) => row.symbol === h1Source.symbol && row.broker === h1Source.broker && row.server === h1Source.server)
+        : quoteRows.find((row) => row.symbol.toUpperCase().startsWith(pair));
       const quoteAgeSeconds = quote ? (Date.now() - Date.parse(quote.quote_time)) / 1000 : null;
       const quoteFresh = quoteAgeSeconds !== null && quoteAgeSeconds >= 0 && quoteAgeSeconds <= 120;
       const h1Atr = frames.H1.atr14;
