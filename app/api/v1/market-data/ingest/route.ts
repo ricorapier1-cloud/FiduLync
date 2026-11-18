@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     if (!nonceRows) throw new Error('Replay protection could not be stored.');
 
     const accountSnapshot = body.account_snapshot;
-    if (accountSnapshot !== undefined) {
+    if (accountSnapshot !== undefined && accountSnapshot !== null) {
       if (!isRecord(accountSnapshot)
         || !Number.isSafeInteger(accountSnapshot.account_login) || Number(accountSnapshot.account_login) <= 0
         || typeof accountSnapshot.currency !== 'string' || !/^[A-Z]{3,8}$/.test(accountSnapshot.currency)
