@@ -172,7 +172,7 @@ export async function POST(request: Request) {
       highWaterMarkEquity: state.high_water_mark_equity,
       consecutiveLosses: Number.NaN,
       regime: macroSignal?.regime ?? 'UNAVAILABLE',
-      marketDataHealth: snapshotAgeMs >= 0 && snapshotAgeMs <= 30_000 && quoteAgeMs >= 0 && quoteAgeMs <= 30_000 && macroSignal?.market_data_source !== 'unavailable' ? 'LIVE' : 'STALE',
+      marketDataHealth: snapshotAgeMs >= 0 && snapshotAgeMs <= 30_000 && quoteAgeMs >= 0 && quoteAgeMs <= 30_000 && macroSignal?.market_data_source === 'mt5' && !macroSignal.execution_blockers.includes('MARKET_DATA_NOT_VERIFIED') ? 'LIVE' : 'STALE',
       macroDataHealth: macroSignal && !macroSignal.execution_blockers.includes('MACRO_DATA_NOT_VERIFIED') ? 'LIVE' : 'UNAVAILABLE',
       newsLockout: macroSignal ? macroSignal.news_lockout : true,
       symbolSpec,
