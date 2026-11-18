@@ -52,6 +52,10 @@ export async function GET(request: Request) {
     const completePositionSnapshot = Boolean(latestManifest?.complete)
       && expectedPositions >= 0 && latestSnapshotRows.length === expectedPositions
       && latestSnapshotRows.every((row) => row.snapshot_complete);
+    const positionAgeSeconds = latestManifest?.captured_at
+      ? Math.round((Date.now() - Date.parse(latestManifest.captured_at)) / 1000) : null;
+    const positionFresh = completePositionSnapshot && positionAgeSeconds !== null
+      && positionAgeSeconds >= 0 && positionAgeSeconds <= 15;
     const exposureMap = new Map<string, { currency: string; net_units: number; gross_units: number; positions: number }>();
     const unresolvedExposure: string[] = [];
     if (completePositionSnapshot) {
@@ -105,6 +109,8 @@ export async function GET(request: Request) {
         captured_at: completePositionSnapshot ? latestManifest.captured_at : null,
         expected_positions: latestManifest ? expectedPositions : null,
         complete: completePositionSnapshot,
+        fresh: positionFresh,
+        age_seconds: positionAgeSeconds,
         positions: completePositionSnapshot ? latestSnapshotRows.map((row) => ({
           ticket: row.position_ticket, symbol: row.symbol, side: row.side, volume: row.volume,
           entry: row.price_open, stop_loss: row.stop_loss, take_profit: row.take_profit,
@@ -115,7 +121,8 @@ export async function GET(request: Request) {
         currency_exposure_units: completePositionSnapshot ? currencyExposure : null,
         exposure_unresolved_symbols: completePositionSnapshot ? unresolvedExposure : null,
         exposure_basis: 'Native currency units derived from broker contract size and entry price; not converted into account-currency risk.',
-        status: completePositionSnapshot ? 'SNAPSHOT_CAPTURED' : 'AWAITING_COMPLETE_MT5_POSITION_SNAPSHOT',
+        status: !completePositionSnapshot ? 'AWAITING_COMPLETE_MT5_POSITION_SNAPSHOT'
+          : positionFresh ? 'SNAPSHOT_CAPTURED' : 'STALE_POSITION_SNAPSHOT',
       },
       execution_enabled: false,
       note: 'Evidence capture does not equal independent validation. This endpoint cannot approve a model or enable broker execution.',
