@@ -120,9 +120,12 @@ export async function POST(request: Request) {
       case 'invoice.payment_failed':
         await applyPaymentFailed(data);
         return NextResponse.json({ status: 'grace_period_applied' });
-      case 'subscription.disable':
+      case 'subscription.not_renew':
         await applySubscriptionDisable(data);
         return NextResponse.json({ status: 'cancellation_scheduled' });
+      case 'subscription.disable':
+        await applySubscriptionDisable(data);
+        return NextResponse.json({ status: 'cancellation_processed' });
       default:
         return NextResponse.json({ status: 'ignored' });
     }
