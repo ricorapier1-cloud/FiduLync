@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { supabaseInsert, supabaseRead } from '@/lib/supabaseAdmin';
 import { getPersonalRiskPolicy } from '@/lib/riskPolicy';
-import { evaluateRiskProposal, type RiskContext, type RiskProposal } from '@/lib/quantGovernance';
+import { calculateBrokerAwareVolume, evaluateRiskProposal, type RiskContext, type RiskProposal } from '@/lib/quantGovernance';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -16,7 +16,7 @@ type AccountSnapshot = {
 };
 type Quote = {
   symbol: string; bid: number; ask: number; quote_time: string; spread_points: number;
-  point: number | null; tick_size: number | null; tick_value: number | null; contract_size: number | null;
+  point: number | null; tick_size: number | null; tick_value: number | null; contract_size: number | null;\n  volume_min: number | null; volume_max: number | null; volume_step: number | null; stop_level_points: number | null;\n  margin_per_lot_buy: number | null; margin_per_lot_sell: number | null;
 };
 type RiskState = {
   daily_start_equity: number; weekly_start_equity: number; high_water_mark_equity: number;
@@ -91,7 +91,7 @@ export async function POST(request: Request) {
       ),
       supabaseRead<Quote[]>(
         'mt5_market_quotes',
-        `select=symbol,bid,ask,quote_time,spread_points,point,tick_size,tick_value,contract_size&installation_id=eq.${installation.id}&symbol=eq.${encodeURIComponent(proposal.symbol)}&limit=1`,
+        `select=symbol,bid,ask,quote_time,spread_points,point,tick_size,tick_value,contract_size,volume_min,volume_max,volume_step,stop_level_points,margin_per_lot_buy,margin_per_lot_sell&installation_id=eq.${installation.id}&symbol=eq.${encodeURIComponent(proposal.symbol)}&limit=1`,
       ),
       supabaseRead<RiskState[]>(
         'mt5_risk_state',
@@ -127,16 +127,27 @@ export async function POST(request: Request) {
       symbol: quote.symbol,
       tickSize: Number(quote.tick_size ?? 0),
       tickValuePerLot: Number(quote.tick_value ?? 0),
-      volumeMin: 0.01,
-      volumeMax: 100,
-      volumeStep: 0.01,
+      volumeMin: Number(quote.volume_min ?? 0),
+      volumeMax: Number(quote.volume_max ?? 0),
+      volumeStep: Number(quote.volume_step ?? 0),
       contractSize: Number(quote.contract_size ?? 0),
-      stopLevelPoints: 0,
+      stopLevelPoints: Number(quote.stop_level_points ?? 0),
       point: Number(quote.point ?? 0),
       verified: Number(quote.tick_size) > 0 && Number(quote.tick_value) > 0
-        && Number(quote.contract_size) > 0 && Number(quote.point) > 0,
+        && Number(quote.contract_size) > 0 && Number(quote.point) > 0
+        && Number(quote.volume_min) > 0 && Number(quote.volume_max) >= Number(quote.volume_min)
+        && Number(quote.volume_step) > 0 && Number(quote.stop_level_points) >= 0,
     };
     const policy = getPersonalRiskPolicy();
+    const marginPerLot = proposal.side === 'BUY' ? Number(quote.margin_per_lot_buy ?? 0) : Number(quote.margin_per_lot_sell ?? 0);
+    const sizing = calculateBrokerAwareVolume({
+      equity: account.equity,
+      riskPct: Math.min(proposal.requestedRiskPct, policy.maxPerTradeRiskPct),
+      entryPrice: proposal.entryPrice,
+      stopLoss: proposal.stopLoss,
+      specification: symbolSpec,
+    });
+    const estimatedMargin = sizing.valid && marginPerLot > 0 ? sizing.volume * marginPerLot : Number.NaN;
     const context: RiskContext = {
       bid: quote.bid,
       ask: quote.ask,
@@ -145,12 +156,12 @@ export async function POST(request: Request) {
       equity: account.equity,
       freeMargin: account.free_margin,
       usedMargin: account.margin,
-      estimatedMargin: 0,
+      estimatedMargin,
       currentOpenRiskCash: account.open_risk_cash,
       dailyStartEquity: state.daily_start_equity,
       weeklyStartEquity: state.weekly_start_equity,
       highWaterMarkEquity: state.high_water_mark_equity,
-      consecutiveLosses: 0,
+      consecutiveLosses: Number.NaN,
       regime: 'UNAVAILABLE',
       marketDataHealth: snapshotAgeMs >= 0 && snapshotAgeMs <= 30_000 && quoteAgeMs >= 0 && quoteAgeMs <= 30_000 ? 'LIVE' : 'STALE',
       macroDataHealth: 'UNAVAILABLE',
