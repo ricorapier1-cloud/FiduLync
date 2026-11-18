@@ -69,7 +69,7 @@ export default function TermsPage() {
               Commercial AlgoLync Expert Advisors are provided under recurring monthly or annual software subscriptions. The specific EA, price, billing interval, included MT5 account seats and renewal date are shown at checkout before payment.
             </p>
             <ul className="mt-2 list-disc pl-5 space-y-1.5 text-slate-300">
-              <li>Monthly subscriptions renew monthly; annual subscriptions renew annually. Annual pricing is set at ten monthly payments, representing two months free. Renewal is processed by Paystack using the customer's authorization.</li>
+              <li>Monthly subscriptions renew monthly; annual subscriptions renew annually. Annual pricing is set at ten monthly payments, representing two months free. Renewal is processed by Paystack using the customer&apos;s authorization.</li>
               <li>Each active EA subscription includes one live MT5 account seat and two demo MT5 account seats. Additional live seats are charged at the displayed rate. Account re-binding is self-service and subject to a 72-hour cooldown per slot.</li>
               <li>Free demo trials are time-limited, EA-specific and restricted to MT5 demo accounts. Demo access does not grant permission to trade a live account.</li>
               <li>Customers may cancel renewal using the available subscription-management controls. Cancellation prevents future renewal; access remains governed by the paid period and any disclosed grace period.</li>
