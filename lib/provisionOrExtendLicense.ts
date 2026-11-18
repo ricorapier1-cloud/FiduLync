@@ -45,9 +45,18 @@ export async function provisionOrExtendLicense(referenceInput: string, suppliedS
   const email = typeof customer.email === 'string' ? customer.email.trim().toLowerCase() : '';
   const nestedSubscription = payment?.subscription && typeof payment.subscription === 'object'
     ? payment.subscription as Record<string, unknown> : {};
-  const subscriptionCode = suppliedSubscriptionCode
+  const plan = payment?.plan && typeof payment.plan === 'object' ? payment.plan as Record<string, unknown> : {};
+  let subscriptionCode = suppliedSubscriptionCode
     || (typeof payment?.subscription_code === 'string' ? payment.subscription_code : '')
     || (typeof nestedSubscription.subscription_code === 'string' ? nestedSubscription.subscription_code : '');
+  const planCode = typeof plan.plan_code === 'string' ? plan.plan_code : typeof payment?.plan_code === 'string' ? payment.plan_code : '';
+  if (!subscriptionCode && planCode) {
+    const matchingSubscriptions = await supabaseRead<Array<{ subscription_code: string }>>(
+      'ea_subscriptions',
+      `paystack_plan_code=eq.${encodeURIComponent(planCode)}&email=eq.${encodeURIComponent(email)}&select=subscription_code&limit=1`
+    );
+    subscriptionCode = matchingSubscriptions?.[0]?.subscription_code || '';
+  }
 
   if (envelope.status !== true || !payment || payment.status !== 'success'
     || payment.reference !== reference || !email) {
