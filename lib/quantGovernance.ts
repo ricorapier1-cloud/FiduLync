@@ -80,6 +80,25 @@ export type RiskPolicy = {
   rewardRiskMinimum: number;
 };
 
+/** Reject stale, future-dated or account-snapshot-misaligned risk anchors. */
+export function isRiskAnchorFresh(
+  updatedAt: string,
+  lastSnapshotAt: string,
+  accountSnapshotAt: string,
+  now = Date.now(),
+  maxAgeMs = 30_000,
+  alignmentToleranceMs = 5_000,
+): boolean {
+  const updated = Date.parse(updatedAt);
+  const anchorSnapshot = Date.parse(lastSnapshotAt);
+  const accountSnapshot = Date.parse(accountSnapshotAt);
+  if (![updated, anchorSnapshot, accountSnapshot, now, maxAgeMs, alignmentToleranceMs].every(Number.isFinite)
+    || maxAgeMs <= 0 || alignmentToleranceMs < 0) return false;
+  return now - updated >= 0 && now - updated <= maxAgeMs
+    && now - anchorSnapshot >= 0 && now - anchorSnapshot <= maxAgeMs
+    && Math.abs(anchorSnapshot - accountSnapshot) <= alignmentToleranceMs;
+}
+
 export type ClosedBar = { high: number; low: number; close: number };
 
 /** ATR over closed bars only. Input must be chronological and contain period + 1 bars. */
