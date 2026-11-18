@@ -247,3 +247,10 @@ This is a pure governance foundation only. It is not yet wired into the dashboar
 - Replaced illustrative analytics metrics with an explicit verified-data empty state.
 - Added a mobile-friendly manual risk planner. It requires the operator to enter and confirm broker tick/volume specifications rather than guessing them.
 - Changed signal presentation so research readiness is not labelled as trade permission; the page states that no broker order is placed.
+
+
+### Server-owned policy hardening
+
+- Risk thresholds, owner execution enablement, model-validation evidence and execution-quality evidence are held in a server-only policy module, not accepted from an EA or browser proposal.
+- The initial policy inherits the owner's established guardrails (1.0% maximum per-trade risk, 2.0% portfolio open-risk ceiling, 4% daily drawdown, 8% weekly drawdown, 15% high-water drawdown and 10% margin usage ceiling).
+- Execution enablement and model/execution evidence are false by default. The initial policy therefore cannot issue an APPROVE decision; the evaluator is tested with a separate enabled fixture to verify sizing and gates, not to enable production trading.
