@@ -59,7 +59,13 @@ export async function POST(request: Request) {
   }
 
   let body: unknown;
-  try { body = await request.json(); } catch {
+  try {
+    const rawBody = await request.text();
+    if (new TextEncoder().encode(rawBody).byteLength > 16_384) {
+      return NextResponse.json({ error: 'Proposal payload is too large.' }, { status: 413 });
+    }
+    body = JSON.parse(rawBody);
+  } catch {
     return NextResponse.json({ error: 'A valid JSON proposal is required.' }, { status: 400 });
   }
   if (!record(body) || !Number.isSafeInteger(body.account_login) || Number(body.account_login) <= 0
@@ -94,6 +100,9 @@ export async function POST(request: Request) {
     );
     const installation = installations?.[0];
     if (!installation) return NextResponse.json({ error: 'Publisher token is invalid or revoked.' }, { status: 401 });
+    if (!checkRateLimit(`ea-supervisor:${installation.id}`, 30, 60_000)) {
+      return NextResponse.json({ error: 'Installation rate limit exceeded.' }, { status: 429 });
+    }
     if (proposal.installationId !== installation.id) {
       return NextResponse.json({ error: 'Proposal installation does not match its authenticated publisher.' }, { status: 403 });
     }
