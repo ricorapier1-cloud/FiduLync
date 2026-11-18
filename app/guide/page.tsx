@@ -1,33 +1,88 @@
 'use client';
+
 import Link from 'next/link';
-export default function CustomerGuidePage() {
+
+export default function PersonalQuantGuidePage() {
   return (
-    <main className="min-h-screen bg-[#030A08] text-emerald-50 px-4 py-10 pb-36">
-      <div className="max-w-3xl mx-auto space-y-8">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-500/20 pb-4">
-          <Link href="/store" className="text-xs font-mono text-emerald-400 hover:underline">← BACK TO ALGOLYNX VAULT</Link>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => window.print()} className="text-xs font-mono px-3 py-1.5 rounded bg-emerald-500 text-black font-bold hover:bg-emerald-400">PRINT / SAVE PDF</button>
-            <Link href="/" className="text-xs font-mono px-3 py-1.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">MACRO TERMINAL</Link>
+    <main className="min-h-screen bg-[#080a0f] px-4 py-10 pb-36 text-slate-100">
+      <div className="mx-auto max-w-3xl space-y-8">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-5">
+          <Link href="/store" className="text-xs font-mono text-emerald-300 hover:underline">← PERSONAL EA LAB</Link>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => window.print()} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-slate-200 hover:bg-white/5">Print / Save PDF</button>
+            <Link href="/risk" className="rounded-lg bg-emerald-300 px-3 py-2 text-xs font-semibold text-[#07120d]">Manual Risk Planner</Link>
           </div>
-        </div>
+        </header>
+
         <div>
-          <p className="text-xs font-mono text-emerald-400 tracking-widest mb-2">SUBSCRIBER ONBOARDING & MT5 SETUP MANUAL</p>
-          <h1 className="text-3xl font-bold tracking-tight mb-2">AlgoLync Expert Advisor Setup Guide</h1>
-          <p className="text-sm text-emerald-200/75">Follow these four steps to bind your MetaTrader 5 account and activate automated execution.</p>
+          <p className="font-mono text-[10px] tracking-[0.2em] text-emerald-300">FIDULYNC / PERSONAL QUANT EDITION</p>
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight">Personal setup and MT5 connection guide</h1>
+          <p className="mt-3 text-sm leading-6 text-slate-400">Use FiduLync as a private quantitative research, discretionary risk-planning and EA-supervision workspace. It does not place, modify or close broker orders.</p>
         </div>
-        <section className="bg-[#06120E] border border-emerald-500/25 rounded-xl p-6 space-y-3">
-          <h2 className="text-lg font-bold text-white">Step 1: Provision Your Account-Bound License</h2>
-          <p className="text-sm text-emerald-100/80">Visit the <Link href="/store" className="text-emerald-400 underline">AlgoLync Vault (/store)</Link>, select your plan, and enter your exact MT5 account number.</p>
+
+        <section className="rounded-xl border border-white/10 bg-[#0c1016] p-5 sm:p-6">
+          <h2 className="text-base font-semibold">Before you start</h2>
+          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-slate-300">
+            <li>You can open the dashboards and download source files from your phone.</li>
+            <li>Live broker quotes, account snapshots and MetaEditor compilation require a Windows PC or Windows VPS running a logged-in MT5 terminal.</li>
+            <li>Use a demo account first. Do not share broker passwords, investor passwords, owner tokens or publisher tokens.</li>
+            <li>The server policy intentionally keeps trade approvals disabled until model, data and execution validation are complete.</li>
+          </ul>
         </section>
-        <section className="bg-[#06120E] border border-emerald-500/25 rounded-xl p-6 space-y-3">
-          <h2 className="text-lg font-bold text-white">Step 2: Install the .EX5 Binary</h2>
-          <p className="text-sm text-emerald-100/80">Place <code className="text-emerald-300 font-mono">AlgoLync_EA.ex5</code> into your MT5 Data Folder under <code className="text-emerald-300 font-mono">MQL5/Experts/</code>.</p>
+
+        <section className="rounded-xl border border-white/10 bg-[#0c1016] p-5 sm:p-6">
+          <h2 className="text-base font-semibold">1. Register your private MT5 connector</h2>
+          <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-300">
+            <li>Open the <Link href="/owner" className="text-emerald-300 underline">Owner Control Centre</Link> and sign in with the configured owner email.</li>
+            <li>Open Market Data Operations and create a terminal installation.</li>
+            <li>Copy the installation ID and one-time publisher token into a secure password manager. The token is shown once; revoke and recreate the installation if lost or exposed.</li>
+          </ol>
         </section>
-        <section className="bg-[#06120E] border border-emerald-500/25 rounded-xl p-6 space-y-3">
-          <h2 className="text-lg font-bold text-white">Step 3: Whitelist WebRequest URL</h2>
-          <p className="text-sm text-emerald-100/80">In MT5 Tools → Options → Expert Advisors, check <strong>Allow WebRequest</strong> and add:</p>
-          <div className="bg-black/70 border border-emerald-500/40 rounded p-3 font-mono text-sm text-emerald-400 select-all">https://fidulync.vercel.app</div>
+
+        <section className="rounded-xl border border-white/10 bg-[#0c1016] p-5 sm:p-6">
+          <h2 className="text-base font-semibold">2. Start the read-only MT5 market publisher</h2>
+          <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-300">
+            <li>On the Windows PC/VPS with MT5 already logged in, install Python 3.11+ and run <code className="rounded bg-black/40 px-1.5 py-0.5 text-emerald-200">py -m pip install MetaTrader5</code>.</li>
+            <li>From the Personal EA Lab, download both <a href="/downloads/FiduLync_MT5_Market_Publisher.py" className="text-emerald-300 underline">FiduLync_MT5_Market_Publisher.py</a> and <a href="/downloads/mt5_risk_state.py" className="text-emerald-300 underline">mt5_risk_state.py</a>. Save them in the same folder.</li>
+            <li>Set the private token and the exact verified deployment URL in that Windows session. Do not point the publisher at production until the updated ingestion route has been deployed and verified.</li>
+            <li>Set broker symbol suffix mappings if necessary. The default universe includes major FX pairs and XAUUSD.</li>
+            <li>Run the publisher. It sends broker quotes, closed H1/H4/D1 candles, account/margin snapshots and a loss-streak estimate derived from the terminal's available closed-deal history. It never sends orders.</li>
+          </ol>
+          <pre className="mt-4 overflow-x-auto rounded-lg border border-white/10 bg-black/40 p-4 text-xs leading-6 text-slate-300"><code>{`set FIDULYNC_PUBLISHER_TOKEN=YOUR_ONE_TIME_TOKEN
+set FIDULYNC_INGEST_URL=https://YOUR_VERIFIED_DEPLOYMENT/api/v1/market-data/ingest
+set MT5_SYMBOL_MAP=EURUSD=EURUSD,GBPUSD=GBPUSD,USDJPY=USDJPY,USDCHF=USDCHF,USDCAD=USDCAD,AUDUSD=AUDUSD,NZDUSD=NZDUSD,EURJPY=EURJPY,XAUUSD=XAUUSD
+py FiduLync_MT5_Market_Publisher.py`}</code></pre>
+        </section>
+
+        <section className="rounded-xl border border-white/10 bg-[#0c1016] p-5 sm:p-6">
+          <h2 className="text-base font-semibold">3. Test the EA supervisor — no-trade probe only</h2>
+          <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-300">
+            <li>Download <a href="/downloads/QuantSupervisor.mqh" className="text-emerald-300 underline">QuantSupervisor.mqh</a> and save it as <code className="text-emerald-200">MQL5/Include/FiduLync/QuantSupervisor.mqh</code>.</li>
+            <li>Download <a href="/downloads/FiduLync_Supervisor_Probe.mq5" className="text-emerald-300 underline">FiduLync_Supervisor_Probe.mq5</a> into <code className="text-emerald-200">MQL5/Experts/</code>.</li>
+            <li>In MetaEditor, compile the probe. In MT5 Tools → Options → Expert Advisors, allow WebRequest only to the exact verified deployment hostname.</li>
+            <li>Attach the probe to a demo chart and enter the deployment URL, installation ID and publisher token. Review the Experts log and the latest supervisor decision in the Owner Control Centre.</li>
+          </ol>
+          <p className="mt-4 rounded-lg border border-amber-300/20 bg-amber-300/[0.05] p-3 text-xs leading-5 text-amber-100">The probe contains no OrderSend call. APPROVE is not currently enabled by the server policy; stale, incomplete or unverified data must result in ABSTAIN or DEGRADED.</p>
+        </section>
+
+        <section className="rounded-xl border border-white/10 bg-[#0c1016] p-5 sm:p-6">
+          <h2 className="text-base font-semibold">4. Use the research and manual risk tools</h2>
+          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-slate-300">
+            <li><Link href="/" className="text-emerald-300 underline">MacroLync Dashboard</Link> — macro, currency-strength and market research context.</li>
+            <li><Link href="/risk" className="text-emerald-300 underline">Manual Risk Planner</Link> — calculate risk and broker-aware position sizing before a discretionary trade.</li>
+            <li><Link href="/analytics" className="text-emerald-300 underline">Analytics</Link> — inspect available trade and research records.</li>
+            <li><Link href="/store" className="text-emerald-300 underline">Personal EA Lab</Link> — download free sample EAs and the MT5 bridge/probe source.</li>
+          </ul>
+        </section>
+
+        <section className="rounded-xl border border-white/10 bg-[#0c1016] p-5 sm:p-6">
+          <h2 className="text-base font-semibold">Important limitations</h2>
+          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-slate-300">
+            <li>The initial daily, weekly and high-water equity anchors begin with the first trusted snapshot received after their migration; they do not reconstruct earlier account drawdown.</li>
+            <li>Loss-streak verification depends on the broker history available to the connected MT5 terminal. Missing or stale history blocks supervision.</li>
+            <li>Broker tick values, volume steps, stop levels and margin calculations must be checked on the actual account and symbol.</li>
+            <li>MetaEditor compilation, Strategy Tester and demo forward testing cannot be replaced by a web build. No model or signal guarantees profit.</li>
+          </ul>
         </section>
       </div>
     </main>
