@@ -6,6 +6,7 @@ const { evaluateRiskProposal, calculateBrokerAwareVolume } = quant;
 function policy(overrides = {}) {
   return {
     policyVersion: 'personal-v1',
+    executionEnabled: true,
     maxPerTradeRiskPct: 0.5,
     maxPortfolioRiskPct: 2,
     maxDailyDrawdownPct: 4,
@@ -49,7 +50,6 @@ function proposal(overrides = {}) {
     modelValidated: true,
     executionQualityVerified: true,
     newsLockout: false,
-    explicitExecutionEnablement: true,
     symbolSpec: {
       symbol: 'EURUSD',
       tickSize: 0.00001,
@@ -82,11 +82,11 @@ test('server-owned policy caps requested risk even if the proposal asks for more
   assert.equal(result.approvedVolume, 0.25);
 });
 
-test('fails closed when explicit execution enablement is absent', () => {
-  const result = evaluateRiskProposal(proposal({ explicitExecutionEnablement: false }), policy());
+test('fails closed while owner execution permission is disabled', () => {
+  const result = evaluateRiskProposal(proposal(), policy({ executionEnabled: false }));
   assert.equal(result.decision, 'REJECT');
   assert.equal(result.approvedVolume, 0);
-  assert.ok(result.blockers.includes('EXECUTION_NOT_EXPLICITLY_ENABLED'));
+  assert.ok(result.blockers.includes('EXECUTION_NOT_ENABLED_BY_OWNER'));
 });
 
 test('blocks reference or stale market data', () => {
