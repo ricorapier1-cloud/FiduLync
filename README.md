@@ -1,6 +1,6 @@
 # MacroLync Institutional Terminal
 
-MacroLync is a single-operator quantitative FX and macro terminal. AlgoLync is its proprietary strategy vault and MT5 VPS telemetry monitor. The browser has no account or subscription flow; MT5/EA API requests use a private `x-algo-key` header.
+MacroLync is a quantitative macro-research and market-intelligence terminal. AlgoLync is its EA subscription marketplace, customer licence portal and MT5 VPS telemetry service. Customers can browse EA products, purchase monthly or annual subscriptions, request eligible demo trials and manage their MT5 account seats in the authenticated `/portal` workspace. MT5/EA private API credentials remain server-side and in trusted terminal configurations only.
 
 ## Local development
 
@@ -36,8 +36,25 @@ Set server-side values in `.env.local` or the deployment secret manager:
 | `MARKET_DATA_PROVIDER_LICENSE_APPROVED` | Must be `true` only after display, derived-data and redistribution rights are documented |
 | `NEXT_PUBLIC_APP_URL` | Canonical HTTP(S) origin for metadata and signal bridge display |
 | `CRON_SECRET` | Bearer secret for the scheduled macro snapshot refresh |
+| `PAYSTACK_SECRET_KEY` | Server-side Paystack test secret for checkout verification, recurring plans and signed webhooks; never expose it to the browser |
+| `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | Paystack public key used only where the browser SDK requires it |
+| `PAYSTACK_LIVE_ENABLED` | Must remain `false` until Paystack approves the business and the owner explicitly authorizes live processing |
+| `RESEND_API_KEY` | Server-side Resend API key for licence, transfer and customer transactional emails |
+| `LICENSE_FROM_EMAIL` | Sender identity on a domain verified in Resend, e.g. `FiduLync Licences <licenses@your-verified-domain>` |
 
 Use a long, unique random value for `ALGOLYNC_PRIVATE_KEY` (or the accepted legacy `ALGO_PRIVATE_API_KEY`) and rotate it in the server secret manager and all EA configurations together. Never commit environment files or embed service-role/provider credentials in an EA.
+
+
+## AlgoLync subscriptions, licensing and release workflow
+
+- The public catalogue is read from Supabase `ea_products`; monthly/annual prices, extra live seats and demo eligibility are not hard-coded in the storefront.
+- Annual pricing is ten monthly payments (two months free). An active subscription includes one live MT5 seat and two demo MT5 seats; extra live seats are priced separately.
+- Checkout is initialized by `POST /api/v1/create-checkout`. The browser callback and signed `/api/v1/paystack-webhook` both verify the Paystack transaction and call the same idempotent subscription provisioning service.
+- Configure Paystack's webhook URL as `https://<your-domain>/api/v1/paystack-webhook`. The server validates `x-paystack-signature` using HMAC-SHA512 over the raw request body. Use Paystack test keys for integration tests. Keep `PAYSTACK_LIVE_ENABLED=false` until written compliance approval and owner authorization.
+- Resend requires both `RESEND_API_KEY` and `LICENSE_FROM_EMAIL`. Verify the sending domain in Resend and publish its DNS records before using a sender such as `licenses@your-domain`. The Resend API key alone does not establish a sender identity.
+- Demo keys are time-limited, email/EA/MT5-login anti-abuse protected and locked to MT5 demo accounts. A demo download is enabled only when a release-approved EX5 artifact with a SHA-256 registry record exists.
+- Commercial EA binaries are not considered releasable until compiled with MetaEditor, hashed, uploaded to private Supabase Storage and approved in the artifact registry. The free MacroLync G10 ATR Breakout is an open-source `.mq5` sandbox; it is source code, not a compiled EX5 binary.
+- Customers manage licences, account seats and private telemetry in `/portal`. Owner-only catalogue pricing controls are available in `/owner`.
 
 ## Signal engine and API
 
