@@ -134,7 +134,7 @@ export default function OwnerOperations({ accessToken, email, role, onSignOut }:
     <div className="grid gap-5 lg:grid-cols-[230px_minmax(0,1fr)]">
       <nav aria-label="Owner operations modules" className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible">
         {modules.map((item) => <button key={item.id} onClick={() => setActive(item.id)} aria-current={active === item.id ? 'page' : undefined} className={'min-w-max rounded-xl border px-3 py-3 text-left transition-colors lg:min-w-0 ' + (active === item.id ? 'border-emerald-300/25 bg-emerald-300/[0.08] text-emerald-100' : 'border-white/[0.07] bg-[#0b1118] text-slate-400 hover:border-white/20 hover:text-slate-200')}><span className="block text-xs font-semibold">{item.short}</span><span className="mt-1 hidden text-[10px] leading-4 text-slate-500 lg:block">{item.description}</span></button>)}
-        <div className="hidden rounded-xl border border-white/[0.07] bg-[#0b1118] p-3 text-[10px] leading-5 text-slate-500 lg:block">Customer product access is separate from this private owner control plane. Administrative access does not override trading or risk eligibility checks.</div>
+        <div className="hidden rounded-xl border border-white/[0.07] bg-[#0b1118] p-3 text-[10px] leading-5 text-slate-500 lg:block">This control plane is restricted to the configured owner. Administrative access does not override trading or risk eligibility checks.</div>
       </nav>
       <div className="min-w-0 space-y-5">
         <div><div className="text-[9px] font-medium uppercase tracking-[0.18em] text-emerald-300">{activeModule.label}</div><p className="mt-1 text-xs text-slate-500">{activeModule.description}</p></div>
@@ -154,10 +154,10 @@ export default function OwnerOperations({ accessToken, email, role, onSignOut }:
 
         {active === 'governance' && <Panel title="Platform governance" subtitle="Least-privilege administration. Privileged roles are not fabricated before their authorization controls exist.">
           <ReadinessRow label="Primary owner" value="Verified" note={email + ' is the sole configured owner identity.'} tone="good" />
-          <ReadinessRow label="Customer support identity" value="Separate" note="fidulync@gmail.com remains the customer-facing support address." tone="good" />
+          <ReadinessRow label="Support contact" value="Separate" note="fidulync@gmail.com remains the separate technical support address." tone="good" />
           <ReadinessRow label="Role-based access control" value="Owner-only" note="Quant researcher, risk officer, operations and auditor roles are future roles; no extra accounts are implicitly trusted." />
           <ReadinessRow label="Public owner registration" value="Not exposed" note="Owner verification is performed server-side against the configured owner email." tone="good" />
-          <ReadinessRow label="Customer / control-plane separation" value="Required boundary" note="This console must not expose customer credentials or bypass customer-level entitlements." tone="good" />
+          <ReadinessRow label="Public / owner access boundary" value="Required boundary" note="This console must not expose customer credentials or bypass customer-level entitlements." tone="good" />
         </Panel>}
 
         {active === 'market' && <div className="space-y-5">
@@ -210,7 +210,7 @@ export default function OwnerOperations({ accessToken, email, role, onSignOut }:
         {active === 'security' && <Panel title="Security and audit" subtitle="Privileged access must be authenticated server-side, attributable and reviewable.">
           <ReadinessRow label="Owner identity check" value="Verified per API request" note={'Authenticated owner: ' + email} tone="good" />
           <ReadinessRow label="Connector secret storage" value="SHA-256 hash only" note="MT5 installation credentials are returned once and stored as hashes; individual installations can be revoked." tone="good" />
-          <ReadinessRow label="Customer credentials" value="Not exposed" note="No MT5 account passwords or broker trading credentials are requested by the data-only connector." tone="good" />
+          <ReadinessRow label="Broker credentials" value="Not exposed" note="No MT5 account passwords or broker trading credentials are requested by the data-only connector." tone="good" />
           <ReadinessRow label="Dedicated audit ledger" value="Not configured" note="A tamper-evident record of sign-ins, connector creation/revocation, policy changes and privileged reads is still required." />
           <ReadinessRow label="MFA / step-up verification" value="Email OTP only" note="The current owner sign-in uses passwordless email OTP. Passkeys or stronger step-up authentication are not yet configured." tone="warn" />
           <ReadinessRow label="Dual approval" value="Not configured" note="For future high-impact actions, require independent approval rather than a single administrator self-approving." />
