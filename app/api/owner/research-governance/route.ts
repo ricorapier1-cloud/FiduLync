@@ -36,7 +36,7 @@ export async function GET(request: Request) {
     if (manifests.error) throw manifests.error;
 
     const executionRows = executions.data ?? [];
-    const fills = executionRows.filter((row) => row.event_type === 'fill' && typeof row.slippage_points === 'number');
+    const fills = executionRows.filter((row) => row.event_type === 'FILL' && typeof row.slippage_points === 'number');
     const slippage = fills.map((row) => Math.abs(Number(row.slippage_points))).sort((a, b) => a - b);
     const latency = executionRows.map((row) => row.latency_ms).filter((value): value is number => typeof value === 'number').sort((a, b) => a - b);
     const latestManifest = manifests.data?.[0] ?? null;
