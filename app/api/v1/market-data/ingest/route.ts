@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { supabaseInsert, supabaseQuery, supabaseRead } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,9 @@ function validTime(value: unknown, allowHistory: boolean) {
 }
 
 export async function POST(request: Request) {
+  if (!checkRateLimit(getClientIp(request), 120, 60_000)) {
+    return NextResponse.json({ error: 'MT5 ingestion rate limit exceeded.' }, { status: 429 });
+  }
   const token = (request.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '').trim();
   const timestampHeader = request.headers.get('x-mt5-timestamp') ?? '';
   const nonce = request.headers.get('x-mt5-nonce') ?? '';
