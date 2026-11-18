@@ -217,11 +217,12 @@ export async function GET(request: Request) {
       const fresh = quoteFresh && FRAMES.every((timeframe) => frames[timeframe].fresh);
       const spreadWithinGuard = spreadAtrRatio !== null && spreadAtrRatio <= policy.maxSpreadAtrRatio
         && quote !== undefined && quote.spread_points <= policy.maxSpreadPoints;
+      const fundamental = pairFundamental(pair);
       return {
         pair,
         quote: quote ? { ...quote, age_seconds: Math.max(0, Math.round(quoteAgeSeconds ?? 0)), fresh: quoteFresh } : null,
         frames,
-        fundamental: pairFundamental(pair),
+        fundamental,
         multi_timeframe_bias: aligned,
         data_complete: dataComplete,
         data_fresh: fresh,
@@ -229,7 +230,7 @@ export async function GET(request: Request) {
         spread_within_guard: spreadWithinGuard,
         readiness: !installationIds.length ? 'AWAITING_MT5' : !dataComplete ? 'INSUFFICIENT_HISTORY'
           : !fresh ? 'STALE_OR_MISSING_FEED' : !spreadWithinGuard ? 'SPREAD_GUARD'
-            : pairFundamental(pair).verified ? 'RESEARCH_INPUTS_READY' : 'FUNDAMENTALS_BLOCKED',
+            : fundamental.verified ? 'RESEARCH_INPUTS_READY' : 'FUNDAMENTALS_BLOCKED',
       };
     });
 
