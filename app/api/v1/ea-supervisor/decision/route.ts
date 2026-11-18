@@ -24,6 +24,7 @@ type Quote = {
 };
 type RiskState = {
   daily_start_equity: number; weekly_start_equity: number; high_water_mark_equity: number;
+  updated_at: string; last_snapshot_at: string;
 };
 
 type PriorDecision = {
@@ -150,7 +151,7 @@ export async function POST(request: Request) {
       ),
       supabaseRead<RiskState[]>(
         'mt5_risk_state',
-        `select=daily_start_equity,weekly_start_equity,high_water_mark_equity&installation_id=eq.${installation.id}&account_login=eq.${accountLogin}&limit=1`,
+        `select=daily_start_equity,weekly_start_equity,high_water_mark_equity,updated_at,last_snapshot_at&installation_id=eq.${installation.id}&account_login=eq.${accountLogin}&limit=1`,
       ),
       getMacroSignal(proposal.symbol, Date.now(), installation.id).catch((error) => {
         console.warn('EA supervisor macro context unavailable:', error);
@@ -219,6 +220,12 @@ export async function POST(request: Request) {
     });
     const estimatedMargin = sizing.valid && marginPerLot > 0 ? sizing.volume * marginPerLot : Number.NaN;
     const historySyncedAt = account.history_synced_at ? Date.parse(account.history_synced_at) : Number.NaN;
+    const riskStateUpdatedAt = Date.parse(state.updated_at);
+    const riskStateSnapshotAt = Date.parse(state.last_snapshot_at);
+    const riskStateFresh = Number.isFinite(riskStateUpdatedAt) && Number.isFinite(riskStateSnapshotAt)
+      && Date.now() - riskStateUpdatedAt >= 0 && Date.now() - riskStateUpdatedAt <= 30_000
+      && Date.now() - riskStateSnapshotAt >= 0 && Date.now() - riskStateSnapshotAt <= 30_000
+      && Math.abs(riskStateSnapshotAt - capturedAt) <= 5_000;
     const lossStreakFresh = account.loss_streak_verified && account.consecutive_losses !== null
       && Number.isSafeInteger(account.consecutive_losses) && Number.isFinite(historySyncedAt)
       && Date.now() - historySyncedAt >= 0 && Date.now() - historySyncedAt <= 30_000;
@@ -254,6 +261,7 @@ export async function POST(request: Request) {
 
     const forcedBlockers = [
       ...(!account.open_risk_verified ? ['OPEN_POSITION_RISK_UNVERIFIED'] : []),
+      ...(!riskStateFresh ? ['RISK_ANCHORS_STALE_OR_NOT_SYNCHRONIZED'] : []),
       ...unavailableBlockers,
     ];
     const result = forcedBlockers.length
@@ -290,7 +298,8 @@ export async function POST(request: Request) {
         },
         risk_anchors: {
           daily_start_equity: state.daily_start_equity, weekly_start_equity: state.weekly_start_equity,
-          high_water_mark_equity: state.high_water_mark_equity,
+          high_water_mark_equity: state.high_water_mark_equity, updated_at: state.updated_at,
+          last_snapshot_at: state.last_snapshot_at, fresh: riskStateFresh,
         },
         calculated_margin: estimatedMargin,
         macro: macroSignal ? {
