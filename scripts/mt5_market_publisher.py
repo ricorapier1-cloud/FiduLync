@@ -55,6 +55,9 @@ TIMEFRAMES = {
 }
 HISTORY_BARS = max(200, min(500, int(os.getenv("MT5_HISTORY_BARS", "200"))))
 INTERVAL_SECONDS = max(15, int(os.getenv("MT5_PUBLISH_INTERVAL_SECONDS", "15")))
+LOSS_STREAK_REFRESH_SECONDS = max(15, min(25, int(os.getenv("MT5_LOSS_STREAK_REFRESH_SECONDS", "20"))))
+_loss_streak_cache: tuple[int, str] | None = None
+_loss_streak_last_attempt = 0.0
 # Deliberately require an explicit verified deployment URL. The production
 # deployment may not yet contain the personal-quant account-snapshot endpoint.
 INGEST_URL = os.getenv("FIDULYNC_INGEST_URL", "").strip()
@@ -194,19 +197,32 @@ def build_candles(
     return candles, pending
 
 
-def build_verified_loss_streak(positions: Any) -> tuple[int | None, bool, str]:
-    """Calculate the current losing streak from the terminal's available deal history."""
-    synced_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+def build_verified_loss_streak(positions: Any) -> tuple[int | None, bool, str | None]:
+    """Return a recently reconciled loss streak; never mark stale or failed history verified."""
+    global _loss_streak_cache, _loss_streak_last_attempt
+
     if positions is None:
-        return None, False, synced_at
+        return None, False, None
+
+    now_monotonic = time.monotonic()
+    now_utc = datetime.now(timezone.utc)
+    cached = _loss_streak_cache
+    if cached is not None and now_monotonic - _loss_streak_last_attempt < LOSS_STREAK_REFRESH_SECONDS:
+        synced_epoch, streak = cached
+        age_seconds = now_utc.timestamp() - synced_epoch
+        if 0 <= age_seconds <= LOSS_STREAK_REFRESH_SECONDS:
+            synced_at = datetime.fromtimestamp(synced_epoch, tz=timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+            return streak, True, synced_at
+
+    _loss_streak_last_attempt = now_monotonic
     try:
-        deals = mt5.history_deals_get(datetime(2000, 1, 1, tzinfo=timezone.utc), datetime.now(timezone.utc))
+        deals = mt5.history_deals_get(datetime(2000, 1, 1, tzinfo=timezone.utc), now_utc)
     except Exception as exc:
         print(f"WARNING: MT5 closed-trade history unavailable: {exc}")
-        return None, False, synced_at
+        return None, False, None
     if deals is None:
         print(f"WARNING: MT5 history_deals_get failed: {mt5.last_error()}")
-        return None, False, synced_at
+        return None, False, None
 
     open_position_ids = {
         int(getattr(position, "identifier", getattr(position, "ticket", 0)) or 0)
@@ -218,6 +234,9 @@ def build_verified_loss_streak(positions: Any) -> tuple[int | None, bool, str]:
         int(getattr(mt5, "DEAL_ENTRY_INOUT", 2)),
     }
     consecutive_losses = consecutive_closed_loss_streak(deals, open_position_ids, exit_entries)
+    synced_epoch = now_utc.timestamp()
+    _loss_streak_cache = (synced_epoch, consecutive_losses)
+    synced_at = now_utc.isoformat(timespec="seconds").replace("+00:00", "Z")
     return consecutive_losses, True, synced_at
 
 
