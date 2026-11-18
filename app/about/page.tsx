@@ -27,12 +27,12 @@ export default function AboutPage() {
           <section className="rounded-xl border border-white/10 bg-[#0c1016] p-5">
             <h2 className="font-semibold text-white">What customers pay for</h2>
             <ul className="mt-2 list-disc space-y-1 pl-5">
-              <li>Monthly or annual access to the MacroLync research and intelligence service.</li>
+              <li>MacroLync research-terminal access and any premium features only where a paid plan is explicitly published and shown at checkout.</li>
               <li>Monthly or annual subscriptions for individual AlgoLync EA products, including the account-seat entitlements displayed at checkout.</li>
               <li>Optional additional live MT5 account seats at the prices shown before checkout.</li>
               <li>Free, time-limited demo or open-source sandbox access where offered.</li>
             </ul>
-            <p className="mt-2">The current product catalogue and prices are displayed on the <Link href="/store" className="text-emerald-300 underline underline-offset-4">AlgoLync Store</Link>. Customers see the product, currency, billing interval, total price and seat selection before authorising payment.</p>
+            <p className="mt-2">The current recurring checkout catalogue and prices for AlgoLync EA subscriptions are displayed on the <Link href="/store" className="text-emerald-300 underline underline-offset-4">AlgoLync Store</Link>. Customers see the product, currency, billing interval, total price and seat selection before authorising payment. No unlisted or off-platform charge is collected.</p>
           </section>
           <section className="rounded-xl border border-white/10 bg-[#0c1016] p-5">
             <h2 className="font-semibold text-white">Customer payment and trading-fund flow</h2>
