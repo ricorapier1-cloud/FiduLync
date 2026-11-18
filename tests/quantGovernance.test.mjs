@@ -152,57 +152,63 @@ test('uses existing margin plus proposed margin for the margin ceiling', () => {
 });
 
 
+
 test('returns DEGRADED for a stale broker quote', () => {
-  const result = evaluateRiskProposal(proposal({ quoteAgeMs: 5000 }), policy());
+  const result = evaluateRiskProposal(proposal(), context({ quoteAgeMs: 5000 }), policy());
   assert.equal(result.decision, 'DEGRADED');
   assert.equal(result.approvedVolume, 0);
   assert.ok(result.blockers.includes('QUOTE_STALE'));
 });
 
 test('rejects a proposal during a high-impact news lockout', () => {
-  const result = evaluateRiskProposal(proposal({ newsLockout: true }), policy());
+  const result = evaluateRiskProposal(proposal(), context({ newsLockout: true }), policy());
   assert.equal(result.decision, 'REJECT');
   assert.equal(result.approvedVolume, 0);
   assert.ok(result.blockers.includes('HIGH_IMPACT_NEWS_LOCKOUT'));
 });
 
 test('rejects an excessive spread before granting any volume', () => {
-  const result = evaluateRiskProposal(proposal({ spreadPoints: 31 }), policy());
+  const result = evaluateRiskProposal(proposal(), context({ spreadPoints: 31 }), policy());
   assert.equal(result.decision, 'REJECT');
   assert.equal(result.approvedVolume, 0);
   assert.ok(result.blockers.includes('SPREAD_LIMIT_EXCEEDED'));
 });
 
 test('abstains when broker metadata belongs to a different symbol', () => {
-  const result = evaluateRiskProposal(proposal({
-    symbolSpec: { ...proposal().symbolSpec, symbol: 'XAUUSD' },
-  }), policy());
+  const result = evaluateRiskProposal(
+    proposal(),
+    context({ symbolSpec: { ...context().symbolSpec, symbol: 'XAUUSD' } }),
+    policy(),
+  );
   assert.equal(result.decision, 'ABSTAIN');
   assert.equal(result.approvedVolume, 0);
   assert.ok(result.blockers.includes('BROKER_SYMBOL_MISMATCH'));
 });
 
 test('rejects protective stops on the wrong side of a buy entry', () => {
-  const result = evaluateRiskProposal(proposal({ stopLoss: 1.1010 }), policy());
+  const result = evaluateRiskProposal(proposal({ stopLoss: 1.1010 }), context(), policy());
   assert.equal(result.decision, 'REJECT');
   assert.equal(result.approvedVolume, 0);
   assert.ok(result.blockers.includes('ENTRY_OR_PROTECTIVE_STOPS_INVALID'));
 });
 
 test('rejects when projected open risk breaches the portfolio ceiling', () => {
-  const result = evaluateRiskProposal(proposal({ currentOpenRiskCash: 175 }), policy({
-    maxPortfolioRiskPct: 2,
-  }));
+  const result = evaluateRiskProposal(
+    proposal(),
+    context({ currentOpenRiskCash: 175 }),
+    policy({ maxPortfolioRiskPct: 2 }),
+  );
   assert.equal(result.decision, 'REJECT');
   assert.equal(result.approvedVolume, 0);
   assert.ok(result.blockers.includes('PORTFOLIO_RISK_LIMIT_EXCEEDED'));
 });
 
 test('rejects when the proposed margin exceeds available free margin', () => {
-  const result = evaluateRiskProposal(proposal({
-    freeMargin: 100,
-    estimatedMargin: 500,
-  }), policy());
+  const result = evaluateRiskProposal(
+    proposal(),
+    context({ freeMargin: 100, estimatedMargin: 500 }),
+    policy(),
+  );
   assert.equal(result.decision, 'REJECT');
   assert.equal(result.approvedVolume, 0);
   assert.ok(result.blockers.includes('INSUFFICIENT_FREE_MARGIN'));
