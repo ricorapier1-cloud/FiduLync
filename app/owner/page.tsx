@@ -126,7 +126,7 @@ export default function OwnerAccessPage() {
 
   async function verifyCode(event: React.FormEvent) {
     event.preventDefault();
-    if (!supabase || !/^\\d{6}$/.test(code.trim())) {
+    if (!supabase || !/^\d{6}$/.test(code.trim())) {
       setMessage('Enter the six-digit code from the latest owner sign-in email.');
       return;
     }
@@ -183,7 +183,7 @@ export default function OwnerAccessPage() {
             <label className="block text-xs text-slate-400" htmlFor="owner-code">Six-digit email code</label>
             <span className="text-[10px] text-slate-500">Latest request: {lastSentAt ? new Date(lastSentAt).toLocaleTimeString() : 'just now'}</span>
           </div>
-          <input id="owner-code" inputMode="numeric" autoComplete="one-time-code" autoFocus maxLength={6} value={code} onChange={(event) => setCode(event.target.value.replace(/\\D/g, '').slice(0, 6))} placeholder="000000" aria-label="Six-digit owner sign-in code" className="h-12 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-center font-mono text-xl tracking-[0.45em] text-white outline-none focus:border-emerald-300/40" />
+          <input id="owner-code" inputMode="numeric" autoComplete="one-time-code" autoFocus maxLength={6} value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" aria-label="Six-digit owner sign-in code" className="h-12 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-center font-mono text-xl tracking-[0.45em] text-white outline-none focus:border-emerald-300/40" />
           <button type="submit" disabled={busy || code.length !== 6} className="h-11 w-full rounded-lg border border-emerald-300/30 px-4 text-sm font-semibold text-emerald-200 disabled:opacity-50">
             {busy ? 'Verifying…' : 'Verify code and open console'}
           </button>
