@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   const input = body as Record<string, unknown>;
   const licenseKey = typeof input.license_key === 'string' ? input.license_key.trim().toUpperCase() : '';
   const accountText = String(input.mt5_account ?? '').trim();
-  const requestedAccount = accountText === '' ? null : /^\\d{1,20}$/.test(accountText) ? Number(accountText) : Number.NaN;
+  const requestedAccount = accountText === '' ? null : /^\d{1,20}$/.test(accountText) ? Number(accountText) : Number.NaN;
   if (!/^ALGOLYNX-[A-Z0-9-]{8,100}$/.test(licenseKey)
     || (requestedAccount !== null && (!Number.isSafeInteger(requestedAccount) || requestedAccount <= 0))) {
     return NextResponse.json({ error: 'Enter a valid license key and, optionally, an MT5 account login.' }, { status: 400 });
