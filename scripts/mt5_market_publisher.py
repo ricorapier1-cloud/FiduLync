@@ -39,6 +39,10 @@ DEFAULT_SYMBOL_MAP = {
     "EURUSD": "EURUSD",
     "GBPUSD": "GBPUSD",
     "USDJPY": "USDJPY",
+    "USDCHF": "USDCHF",
+    "USDCAD": "USDCAD",
+    "AUDUSD": "AUDUSD",
+    "NZDUSD": "NZDUSD",
     "XAUUSD": "XAUUSD",
 }
 TIMEFRAMES = {
@@ -230,35 +234,44 @@ def build_account_snapshot(account: Any, infos: dict[str, Any]) -> dict[str, Any
 def post_batch(quotes: list[dict[str, Any]], candles: list[dict[str, Any]], account_snapshot: dict[str, Any] | None = None) -> None:
     if not quotes and not candles:
         return
-    body = json.dumps({"quotes": quotes, "candles": candles, "account_snapshot": account_snapshot}, separators=(",", ":")).encode("utf-8")
-    now = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
-    request = Request(
-        INGEST_URL,
-        data=body,
-        method="POST",
-        headers={
-            "Authorization": f"Bearer {PUBLISHER_TOKEN}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "x-mt5-timestamp": now,
-            "x-mt5-nonce": str(uuid.uuid4()),
-        },
-    )
-    try:
-        with urlopen(request, timeout=25) as response:
-            payload = response.read().decode("utf-8", errors="replace")
-            if response.status != 202:
-                raise RuntimeError(f"Ingestion returned HTTP {response.status}: {payload[:300]}")
-            result = json.loads(payload)
-            print(
-                f"Accepted: {result.get('quotes_received', 0)} quotes, "
-                f"{result.get('candles_received', 0)} candles at {result.get('received_at_utc', now)}"
-            )
-    except HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"Ingestion HTTP {exc.code}: {detail[:300]}") from exc
-    except URLError as exc:
-        raise RuntimeError(f"Cannot reach FiduLync ingestion endpoint: {exc.reason}") from exc
+    # The API caps each request at 1,000 candles. Split broad FX universes safely,
+    # sending the account snapshot and quotes only with the first chunk.
+    chunks = [candles[index:index + 1_000] for index in range(0, len(candles), 1_000)] or [[]]
+    for index, chunk in enumerate(chunks):
+        batch_quotes = quotes if index == 0 else []
+        batch_snapshot = account_snapshot if index == 0 else None
+        body = json.dumps(
+            {"quotes": batch_quotes, "candles": chunk, "account_snapshot": batch_snapshot},
+            separators=(",", ":"),
+        ).encode("utf-8")
+        now = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+        request = Request(
+            INGEST_URL,
+            data=body,
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {PUBLISHER_TOKEN}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "x-mt5-timestamp": now,
+                "x-mt5-nonce": str(uuid.uuid4()),
+            },
+        )
+        try:
+            with urlopen(request, timeout=25) as response:
+                payload = response.read().decode("utf-8", errors="replace")
+                if response.status != 202:
+                    raise RuntimeError(f"Ingestion returned HTTP {response.status}: {payload[:300]}")
+                result = json.loads(payload)
+                print(
+                    f"Accepted: {result.get('quotes_received', 0)} quotes, "
+                    f"{result.get('candles_received', 0)} candles at {result.get('received_at_utc', now)}"
+                )
+        except HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"Ingestion HTTP {exc.code}: {detail[:300]}") from exc
+        except URLError as exc:
+            raise RuntimeError(f"Cannot reach FiduLync ingestion endpoint: {exc.reason}") from exc
 
 
 def main() -> int:
