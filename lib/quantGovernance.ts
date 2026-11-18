@@ -31,6 +31,15 @@ export type RiskProposal = {
   entryPrice: number;
   stopLoss: number;
   takeProfit: number;
+  requestedRiskPct: number;
+};
+
+/**
+ * Trusted account/market context assembled by the server from the authenticated
+ * installation, persisted MT5 telemetry and server-side data-quality checks.
+ * Never accept this object from an EA or browser request body.
+ */
+export type RiskContext = {
   bid: number;
   ask: number;
   quoteAgeMs: number;
@@ -44,7 +53,6 @@ export type RiskProposal = {
   weeklyStartEquity: number;
   highWaterMarkEquity: number;
   consecutiveLosses: number;
-  requestedRiskPct: number;
   regime: GovernanceRegime;
   marketDataHealth: DataHealth;
   macroDataHealth: DataHealth;
@@ -127,30 +135,30 @@ export function calculateBrokerAwareVolume(args: {
   return { volume: stepped, riskCash: actualRisk, valid: true, reason: null };
 }
 
-function validateProposalShape(p: RiskProposal, policy: RiskPolicy): string[] {
+function validateProposalShape(p: RiskProposal, ctx: RiskContext, policy: RiskPolicy): string[] {
   const issues: string[] = [];
   if (!p.requestId?.trim() || !p.installationId?.trim() || !p.symbol?.trim()) issues.push('IDENTITY_FIELDS_MISSING');
   if (!['BUY', 'SELL'].includes(p.side)) issues.push('INVALID_ORDER_SIDE');
-  if (!['TRENDING_EXPANSION', 'MEAN_REVERTING', 'HIGH_VOL_CHOP', 'UNAVAILABLE'].includes(p.regime)) issues.push('INVALID_MARKET_REGIME');
-  if (!['LIVE', 'DELAYED', 'REFERENCE', 'STALE', 'UNAVAILABLE'].includes(p.marketDataHealth)
-    || !['LIVE', 'DELAYED', 'REFERENCE', 'STALE', 'UNAVAILABLE'].includes(p.macroDataHealth)) issues.push('INVALID_DATA_HEALTH_STATE');
-  const required = [p.entryPrice, p.stopLoss, p.takeProfit, p.bid, p.ask, p.quoteAgeMs,
-    p.spreadPoints, p.equity, p.freeMargin, p.usedMargin, p.estimatedMargin, p.currentOpenRiskCash,
-    p.dailyStartEquity, p.weeklyStartEquity, p.highWaterMarkEquity, p.consecutiveLosses,
+  if (!['TRENDING_EXPANSION', 'MEAN_REVERTING', 'HIGH_VOL_CHOP', 'UNAVAILABLE'].includes(ctx.regime)) issues.push('INVALID_MARKET_REGIME');
+  if (!['LIVE', 'DELAYED', 'REFERENCE', 'STALE', 'UNAVAILABLE'].includes(ctx.marketDataHealth)
+    || !['LIVE', 'DELAYED', 'REFERENCE', 'STALE', 'UNAVAILABLE'].includes(ctx.macroDataHealth)) issues.push('INVALID_DATA_HEALTH_STATE');
+  const required = [p.entryPrice, p.stopLoss, p.takeProfit, ctx.bid, ctx.ask, ctx.quoteAgeMs,
+    ctx.spreadPoints, ctx.equity, ctx.freeMargin, ctx.usedMargin, ctx.estimatedMargin, ctx.currentOpenRiskCash,
+    ctx.dailyStartEquity, ctx.weeklyStartEquity, ctx.highWaterMarkEquity, ctx.consecutiveLosses,
     p.requestedRiskPct, policy.maxPerTradeRiskPct, policy.maxPortfolioRiskPct,
     policy.maxDailyDrawdownPct, policy.maxWeeklyDrawdownPct,
     policy.maxHighWaterDrawdownPct, policy.maxMarginUsagePct, policy.maxSpreadPoints,
     policy.maxQuoteAgeMs, policy.maxConsecutiveLosses, policy.rewardRiskMinimum];
   if (!required.every(Number.isFinite)) issues.push('NON_FINITE_OR_MISSING_NUMERIC_INPUT');
-  if (!finitePositive(p.equity) || !finitePositive(p.dailyStartEquity)
-    || !finitePositive(p.weeklyStartEquity) || !finitePositive(p.highWaterMarkEquity)) {
+  if (!finitePositive(ctx.equity) || !finitePositive(ctx.dailyStartEquity)
+    || !finitePositive(ctx.weeklyStartEquity) || !finitePositive(ctx.highWaterMarkEquity)) {
     issues.push('ACCOUNT_EQUITY_STATE_INVALID');
   }
-  if (p.bid <= 0 || p.ask <= 0 || p.ask < p.bid) issues.push('INVALID_BID_ASK');
-  if (p.symbol !== p.symbolSpec.symbol) issues.push('BROKER_SYMBOL_MISMATCH');
-  if (!Number.isFinite(p.symbolSpec.stopLevelPoints) || p.symbolSpec.stopLevelPoints < 0
-    || !finitePositive(p.symbolSpec.point)) issues.push('BROKER_STOP_METADATA_INVALID');
-  if (p.freeMargin < 0 || p.usedMargin < 0 || p.estimatedMargin < 0 || p.currentOpenRiskCash < 0) issues.push('INVALID_ACCOUNT_EXPOSURE');
+  if (ctx.bid <= 0 || ctx.ask <= 0 || ctx.ask < ctx.bid) issues.push('INVALID_BID_ASK');
+  if (p.symbol !== ctx.symbolSpec.symbol) issues.push('BROKER_SYMBOL_MISMATCH');
+  if (!Number.isFinite(ctx.symbolSpec.stopLevelPoints) || ctx.symbolSpec.stopLevelPoints < 0
+    || !finitePositive(ctx.symbolSpec.point)) issues.push('BROKER_STOP_METADATA_INVALID');
+  if (ctx.freeMargin < 0 || ctx.usedMargin < 0 || ctx.estimatedMargin < 0 || ctx.currentOpenRiskCash < 0) issues.push('INVALID_ACCOUNT_EXPOSURE');
   if (p.requestedRiskPct <= 0 || policy.maxPerTradeRiskPct <= 0
     || policy.maxPortfolioRiskPct <= 0) issues.push('RISK_LIMITS_INVALID');
   if (policy.maxMarginUsagePct <= 0 || policy.maxMarginUsagePct > 100
@@ -167,8 +175,8 @@ function validateProposalShape(p: RiskProposal, policy: RiskPolicy): string[] {
  * supervisory permission only; the EA must recheck quote, stops and local
  * protections before dispatch and attach broker-side SL/TP.
  */
-export function evaluateRiskProposal(p: RiskProposal, policy: RiskPolicy, now = Date.now()): RiskGovernanceResult {
-  const blockers = validateProposalShape(p, policy);
+export function evaluateRiskProposal(p: RiskProposal, ctx: RiskContext, policy: RiskPolicy, now = Date.now()): RiskGovernanceResult {
+  const blockers = validateProposalShape(p, ctx, policy);
   const result = (decision: GovernanceDecision, volume = 0, riskCash = 0, rr: number | null = null): RiskGovernanceResult => ({
     schemaVersion: '1.0',
     requestId: typeof p.requestId === 'string' ? p.requestId : '',
@@ -185,54 +193,54 @@ export function evaluateRiskProposal(p: RiskProposal, policy: RiskPolicy, now = 
   if (!policy.executionEnabled) blockers.push('EXECUTION_NOT_ENABLED_BY_OWNER');
   if (!policy.modelValidated) blockers.push('MODEL_NOT_OUT_OF_SAMPLE_VALIDATED');
   if (!policy.executionQualityVerified) blockers.push('EXECUTION_QUALITY_NOT_VERIFIED');
-  if (!p.symbolSpec.verified) blockers.push('BROKER_SYMBOL_SPEC_NOT_VERIFIED');
-  if (p.marketDataHealth !== 'LIVE') blockers.push('MARKET_DATA_NOT_LIVE');
-  if (p.macroDataHealth !== 'LIVE') blockers.push('MACRO_DATA_NOT_LIVE');
-  if (p.quoteAgeMs > policy.maxQuoteAgeMs) blockers.push('QUOTE_STALE');
-  if (p.spreadPoints > policy.maxSpreadPoints) blockers.push('SPREAD_LIMIT_EXCEEDED');
-  if (p.newsLockout) blockers.push('HIGH_IMPACT_NEWS_LOCKOUT');
-  if (p.regime === 'HIGH_VOL_CHOP') blockers.push('HIGH_VOLATILITY_CHOP');
-  if (p.regime === 'UNAVAILABLE') blockers.push('MARKET_REGIME_UNAVAILABLE');
-  if (p.consecutiveLosses >= policy.maxConsecutiveLosses) blockers.push('LOSS_STREAK_LIMIT_REACHED');
+  if (!ctx.symbolSpec.verified) blockers.push('BROKER_SYMBOL_SPEC_NOT_VERIFIED');
+  if (ctx.marketDataHealth !== 'LIVE') blockers.push('MARKET_DATA_NOT_LIVE');
+  if (ctx.macroDataHealth !== 'LIVE') blockers.push('MACRO_DATA_NOT_LIVE');
+  if (ctx.quoteAgeMs > policy.maxQuoteAgeMs) blockers.push('QUOTE_STALE');
+  if (ctx.spreadPoints > policy.maxSpreadPoints) blockers.push('SPREAD_LIMIT_EXCEEDED');
+  if (ctx.newsLockout) blockers.push('HIGH_IMPACT_NEWS_LOCKOUT');
+  if (ctx.regime === 'HIGH_VOL_CHOP') blockers.push('HIGH_VOLATILITY_CHOP');
+  if (ctx.regime === 'UNAVAILABLE') blockers.push('MARKET_REGIME_UNAVAILABLE');
+  if (ctx.consecutiveLosses >= policy.maxConsecutiveLosses) blockers.push('LOSS_STREAK_LIMIT_REACHED');
 
   const dataDegraded = blockers.some((item) => ['MARKET_DATA_NOT_LIVE', 'MACRO_DATA_NOT_LIVE', 'QUOTE_STALE'].includes(item));
   if (dataDegraded) return result('DEGRADED');
 
-  const dailyDrawdownPct = Math.max(0, (p.dailyStartEquity - p.equity) / p.dailyStartEquity * 100);
-  const weeklyDrawdownPct = Math.max(0, (p.weeklyStartEquity - p.equity) / p.weeklyStartEquity * 100);
-  const highWaterDrawdownPct = Math.max(0, (p.highWaterMarkEquity - p.equity) / p.highWaterMarkEquity * 100);
+  const dailyDrawdownPct = Math.max(0, (ctx.dailyStartEquity - ctx.equity) / ctx.dailyStartEquity * 100);
+  const weeklyDrawdownPct = Math.max(0, (ctx.weeklyStartEquity - ctx.equity) / ctx.weeklyStartEquity * 100);
+  const highWaterDrawdownPct = Math.max(0, (ctx.highWaterMarkEquity - ctx.equity) / ctx.highWaterMarkEquity * 100);
   if (dailyDrawdownPct >= policy.maxDailyDrawdownPct) blockers.push('DAILY_DRAWDOWN_LIMIT_REACHED');
   if (weeklyDrawdownPct >= policy.maxWeeklyDrawdownPct) blockers.push('WEEKLY_DRAWDOWN_LIMIT_REACHED');
   if (highWaterDrawdownPct >= policy.maxHighWaterDrawdownPct) blockers.push('HIGH_WATER_DRAWDOWN_LIMIT_REACHED');
 
   const stopDistance = Math.abs(p.entryPrice - p.stopLoss);
   const correctSide = p.side === 'BUY'
-    ? p.stopLoss < p.entryPrice && p.takeProfit > p.entryPrice && p.entryPrice >= p.ask
-    : p.stopLoss > p.entryPrice && p.takeProfit < p.entryPrice && p.entryPrice <= p.bid;
+    ? p.stopLoss < p.entryPrice && p.takeProfit > p.entryPrice && p.entryPrice >= ctx.ask
+    : p.stopLoss > p.entryPrice && p.takeProfit < p.entryPrice && p.entryPrice <= ctx.bid;
   if (!finitePositive(stopDistance) || !correctSide) blockers.push('ENTRY_OR_PROTECTIVE_STOPS_INVALID');
   const rewardRisk = stopDistance > 0 ? Math.abs(p.takeProfit - p.entryPrice) / stopDistance : null;
   if (rewardRisk === null || !Number.isFinite(rewardRisk) || rewardRisk < policy.rewardRiskMinimum) {
     blockers.push('REWARD_RISK_BELOW_MINIMUM');
   }
-  const stopPoints = stopDistance / p.symbolSpec.point;
-  if (stopPoints < p.symbolSpec.stopLevelPoints) blockers.push('BROKER_STOP_LEVEL_NOT_MET');
+  const stopPoints = stopDistance / ctx.symbolSpec.point;
+  if (stopPoints < ctx.symbolSpec.stopLevelPoints) blockers.push('BROKER_STOP_LEVEL_NOT_MET');
 
   const volumeResult = calculateBrokerAwareVolume({
-    equity: p.equity,
+    equity: ctx.equity,
     riskPct: Math.min(p.requestedRiskPct, policy.maxPerTradeRiskPct),
     entryPrice: p.entryPrice,
     stopLoss: p.stopLoss,
-    specification: p.symbolSpec,
+    specification: ctx.symbolSpec,
   });
   if (!volumeResult.valid) blockers.push(volumeResult.reason ?? 'POSITION_SIZE_INVALID');
 
-  const nextMarginUsagePct = p.equity > 0
-    ? ((p.usedMargin + p.estimatedMargin) / p.equity) * 100
+  const nextMarginUsagePct = ctx.equity > 0
+    ? ((ctx.usedMargin + ctx.estimatedMargin) / ctx.equity) * 100
     : Number.POSITIVE_INFINITY;
-  if (p.estimatedMargin > p.freeMargin) blockers.push('INSUFFICIENT_FREE_MARGIN');
+  if (ctx.estimatedMargin > ctx.freeMargin) blockers.push('INSUFFICIENT_FREE_MARGIN');
   if (nextMarginUsagePct > policy.maxMarginUsagePct) blockers.push('MARGIN_USAGE_LIMIT_EXCEEDED');
 
-  const projectedPortfolioRiskPct = ((p.currentOpenRiskCash + volumeResult.riskCash) / p.equity) * 100;
+  const projectedPortfolioRiskPct = ((ctx.currentOpenRiskCash + volumeResult.riskCash) / ctx.equity) * 100;
   if (projectedPortfolioRiskPct > policy.maxPortfolioRiskPct) blockers.push('PORTFOLIO_RISK_LIMIT_EXCEEDED');
 
   if (blockers.length) return result('REJECT');
