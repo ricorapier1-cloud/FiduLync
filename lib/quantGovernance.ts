@@ -128,6 +128,9 @@ function validateProposalShape(p: RiskProposal): string[] {
   const issues: string[] = [];
   if (!p.requestId?.trim() || !p.installationId?.trim() || !p.symbol?.trim()) issues.push('IDENTITY_FIELDS_MISSING');
   if (!['BUY', 'SELL'].includes(p.side)) issues.push('INVALID_ORDER_SIDE');
+  if (!['TRENDING_EXPANSION', 'MEAN_REVERTING', 'HIGH_VOL_CHOP', 'UNAVAILABLE'].includes(p.regime)) issues.push('INVALID_MARKET_REGIME');
+  if (!['LIVE', 'DELAYED', 'REFERENCE', 'STALE', 'UNAVAILABLE'].includes(p.marketDataHealth)
+    || !['LIVE', 'DELAYED', 'REFERENCE', 'STALE', 'UNAVAILABLE'].includes(p.macroDataHealth)) issues.push('INVALID_DATA_HEALTH_STATE');
   const required = [p.entryPrice, p.stopLoss, p.takeProfit, p.bid, p.ask, p.quoteAgeMs,
     p.spreadPoints, p.equity, p.freeMargin, p.usedMargin, p.estimatedMargin, p.currentOpenRiskCash,
     p.dailyStartEquity, p.weeklyStartEquity, p.highWaterMarkEquity, p.consecutiveLosses,
@@ -141,6 +144,9 @@ function validateProposalShape(p: RiskProposal): string[] {
     issues.push('ACCOUNT_EQUITY_STATE_INVALID');
   }
   if (p.bid <= 0 || p.ask <= 0 || p.ask < p.bid) issues.push('INVALID_BID_ASK');
+  if (p.symbol !== p.symbolSpec.symbol) issues.push('BROKER_SYMBOL_MISMATCH');
+  if (!Number.isFinite(p.symbolSpec.stopLevelPoints) || p.symbolSpec.stopLevelPoints < 0
+    || !finitePositive(p.symbolSpec.point)) issues.push('BROKER_STOP_METADATA_INVALID');
   if (p.freeMargin < 0 || p.usedMargin < 0 || p.estimatedMargin < 0 || p.currentOpenRiskCash < 0) issues.push('INVALID_ACCOUNT_EXPOSURE');
   if (p.requestedRiskPct <= 0 || p.limits.maxPerTradeRiskPct <= 0
     || p.limits.maxPortfolioRiskPct <= 0) issues.push('RISK_LIMITS_INVALID');
@@ -185,6 +191,9 @@ export function evaluateRiskProposal(p: RiskProposal, now = Date.now()): RiskGov
   if (p.regime === 'HIGH_VOL_CHOP') blockers.push('HIGH_VOLATILITY_CHOP');
   if (p.regime === 'UNAVAILABLE') blockers.push('MARKET_REGIME_UNAVAILABLE');
   if (p.consecutiveLosses >= p.limits.maxConsecutiveLosses) blockers.push('LOSS_STREAK_LIMIT_REACHED');
+
+  const dataDegraded = blockers.some((item) => ['MARKET_DATA_NOT_LIVE', 'MACRO_DATA_NOT_LIVE', 'QUOTE_STALE'].includes(item));
+  if (dataDegraded) return result('DEGRADED');
 
   const dailyDrawdownPct = Math.max(0, (p.dailyStartEquity - p.equity) / p.dailyStartEquity * 100);
   const weeklyDrawdownPct = Math.max(0, (p.weeklyStartEquity - p.equity) / p.weeklyStartEquity * 100);
