@@ -51,13 +51,13 @@ export type RiskProposal = {
   modelValidated: boolean;
   executionQualityVerified: boolean;
   newsLockout: boolean;
-  explicitExecutionEnablement: boolean;
   symbolSpec: BrokerSymbolSpecification;
 };
 
 export type RiskPolicy = {
   /** Server-owned policy identifier; never accept this object from an EA/client. */
   policyVersion: string;
+  executionEnabled: boolean;
   maxPerTradeRiskPct: number;
   maxPortfolioRiskPct: number;
   maxDailyDrawdownPct: number;
@@ -182,7 +182,7 @@ export function evaluateRiskProposal(p: RiskProposal, policy: RiskPolicy, now = 
   });
   if (blockers.length) return result('ABSTAIN');
 
-  if (!p.explicitExecutionEnablement) blockers.push('EXECUTION_NOT_EXPLICITLY_ENABLED');
+  if (!policy.executionEnabled) blockers.push('EXECUTION_NOT_ENABLED_BY_OWNER');
   if (!p.modelValidated) blockers.push('MODEL_NOT_OUT_OF_SAMPLE_VALIDATED');
   if (!p.executionQualityVerified) blockers.push('EXECUTION_QUALITY_NOT_VERIFIED');
   if (!p.symbolSpec.verified) blockers.push('BROKER_SYMBOL_SPEC_NOT_VERIFIED');
