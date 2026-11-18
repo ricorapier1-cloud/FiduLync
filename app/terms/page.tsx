@@ -56,7 +56,7 @@ export default function TermsPage() {
       </header>
       <div className="space-y-4">
         {sections.map((section) => (
-          <section key={section.title} className="rounded-xl border border-white/10 bg-[#0c1118] p-5">
+          <section id={section.title.startsWith("7.") ? "privacy" : undefined} key={section.title} className="rounded-xl border border-white/10 bg-[#0c1118] p-5">
             <h2 className="text-sm font-semibold text-white">{section.title}</h2>
             <p className="mt-3 text-xs leading-6 text-slate-400">{section.body}</p>
           </section>
