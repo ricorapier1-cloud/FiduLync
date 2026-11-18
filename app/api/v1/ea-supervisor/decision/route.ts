@@ -170,8 +170,8 @@ export async function POST(request: Request) {
     });
     const estimatedMargin = sizing.valid && marginPerLot > 0 ? sizing.volume * marginPerLot : Number.NaN;
     const historySyncedAt = account.history_synced_at ? Date.parse(account.history_synced_at) : Number.NaN;
-    const lossStreakFresh = account.loss_streak_verified && Number.isSafeInteger(account.consecutive_losses)
-      && account.consecutive_losses !== null && Number.isFinite(historySyncedAt)
+    const lossStreakFresh = account.loss_streak_verified && account.consecutive_losses !== null
+      && Number.isSafeInteger(account.consecutive_losses) && Number.isFinite(historySyncedAt)
       && Date.now() - historySyncedAt >= 0 && Date.now() - historySyncedAt <= 30_000;
     const context: RiskContext = {
       bid: quote.bid,
