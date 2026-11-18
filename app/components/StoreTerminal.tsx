@@ -149,11 +149,11 @@ export default function StoreTerminal({ bridgeSource, initialSnapshot, session }
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
             <a
-              href="/mql5/MacroLyncLicense.mqh"
+              href="/mql5/MacroLyncBridge.mqh"
               download
               className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-emerald-300/30 bg-emerald-300/[0.1] px-3.5 text-xs font-medium text-emerald-100 transition hover:bg-emerald-300/[0.16]"
             >
-              <BrandGlyph name="arrow-down" size={15} /> License Helper (.mqh)
+              <BrandGlyph name="arrow-down" size={15} /> Research Bridge (.mqh)
             </a>
             <a
               href="/mql5/MacroLyncBridge.mqh"
