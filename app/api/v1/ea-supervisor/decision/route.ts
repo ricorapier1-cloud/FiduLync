@@ -16,7 +16,9 @@ type AccountSnapshot = {
 };
 type Quote = {
   symbol: string; bid: number; ask: number; quote_time: string; spread_points: number;
-  point: number | null; tick_size: number | null; tick_value: number | null; contract_size: number | null;\n  volume_min: number | null; volume_max: number | null; volume_step: number | null; stop_level_points: number | null;\n  margin_per_lot_buy: number | null; margin_per_lot_sell: number | null;
+  point: number | null; tick_size: number | null; tick_value: number | null; contract_size: number | null;
+  volume_min: number | null; volume_max: number | null; volume_step: number | null; stop_level_points: number | null;
+  margin_per_lot_buy: number | null; margin_per_lot_sell: number | null;
 };
 type RiskState = {
   daily_start_equity: number; weekly_start_equity: number; high_water_mark_equity: number;
