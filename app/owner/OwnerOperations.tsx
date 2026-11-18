@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import OwnerControlPlane from './OwnerControlPlane';
 import OwnerTradingDesk from './OwnerTradingDesk';
+import OwnerResearchGovernance from './OwnerResearchGovernance';
 
 type Props = { accessToken: string; email: string; role: string; onSignOut: () => void };
 type Installation = { id: string; label: string; status: 'active' | 'revoked'; created_at: string; last_seen_at: string | null; broker: string | null; server: string | null };
@@ -187,13 +188,7 @@ export default function OwnerOperations({ accessToken, email, role, onSignOut }:
           </Panel>
         </div>}
 
-        {active === 'research' && <Panel title="Quant research oversight" subtitle="Research outputs must be traceable, reproducible and independently validated before release.">
-          <ReadinessRow label="Technical research engine" value="Code integrated" note="MacroLync technical indicators and regime features are implemented in the application; code presence alone is not evidence of predictive performance." tone="good" />
-          <ReadinessRow label="Live market data provenance" value={market?.latest_candle ? 'Broker observation received' : 'Not connected'} note={'Latest candle: ' + (market?.latest_candle ? formatTime(market.latest_candle.bar_time) + ' · ' + market.latest_candle.broker + '/' + market.latest_candle.server : 'No MT5 observations are available.')} tone={market?.latest_candle ? 'good' : 'warn'} />
-          <ReadinessRow label="Model version registry" value="Schema provisioned · awaiting artifacts" note="The database registry is ready; model manifests, reproducible datasets, parameter hashes and reviewer-approved evidence have not yet been supplied." />
-          <ReadinessRow label="Walk-forward / out-of-sample evidence" value="Not approved" note="No walk-forward, out-of-sample, Monte Carlo, cost-stress or regime-robustness report has been independently reviewed. No model is approved." />
-          <ReadinessRow label="Independent data checks" value="Required" note="Broker-specific prices are not a consolidated market feed. Cross-source validation, economic-calendar events, COT positioning and macro surprise history remain separate release gates." />
-        </Panel>}
+        {active === 'research' && <OwnerResearchGovernance accessToken={accessToken} />}
 
         {active === 'risk' && <div className="space-y-5">
           <Panel title="Server-owned risk policy" subtitle="Read-only policy snapshot. The browser and EA cannot edit thresholds or enable execution.">
