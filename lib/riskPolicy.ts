@@ -21,6 +21,7 @@ export const DEFAULT_PERSONAL_RISK_POLICY: Readonly<RiskPolicy> = Object.freeze(
   maxHighWaterDrawdownPct: 15.0,
   maxMarginUsagePct: 10.0,
   maxSpreadPoints: 30,
+  maxSpreadAtrRatio: 0.12,
   maxQuoteAgeMs: 2_000,
   maxConsecutiveLosses: 3,
   rewardRiskMinimum: 1.5,
