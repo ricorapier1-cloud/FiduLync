@@ -98,11 +98,21 @@ export async function getMacroSignal(symbol: string, now = Date.now(), installat
     const macroSnapshotAt = Date.parse(snapshot.asOf);
     const macroAgeMs = now - macroSnapshotAt;
     const macroFresh = Number.isFinite(macroSnapshotAt) && macroAgeMs >= -5 * 60_000 && macroAgeMs <= 24 * 60 * 60_000;
+    const cotMarkets = normalizedSymbol === 'XAUUSD'
+      ? ['GOLD']
+      : [normalizedSymbol.slice(0, 3), normalizedSymbol.slice(3)].filter((code) => code !== 'USD');
+    const cotFresh = cotMarkets.length > 0 && cotMarkets.every((market) => {
+      const position = snapshot.cot.find((item) => item.market === market);
+      const observedAt = position?.asOf ? Date.parse(position.asOf) : Number.NaN;
+      const age = now - observedAt;
+      return Number.isFinite(observedAt) && age >= -5 * 60_000 && age <= 14 * 24 * 60 * 60_000;
+    });
     const macroDataVerified = macroFresh && snapshot.source === 'provider'
       && snapshot.cotSource === 'provider'
       && snapshot.calendarSource === 'provider'
       && verifiedPolicyInputs
-      && verifiedYieldInputs;
+      && verifiedYieldInputs
+      && cotFresh;
     const score = fundamental && macroDataVerified
       ? Math.max(-100, Math.min(100, Math.round(fundamental.score * 0.6 + technical.score * 0.4)))
       : 0;
