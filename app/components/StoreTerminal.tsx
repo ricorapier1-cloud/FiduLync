@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import BrandGlyph from '@/components/BrandGlyph';
 import { PaystackCheckout } from '@/components/PaystackCheckout';
@@ -17,7 +17,10 @@ export default function StoreTerminal({ initialSnapshot, session }: StoreTermina
   const [selectedEaSlug, setSelectedEaSlug] = useState('eridam-nexus-pro');
   const [selectedBillingCycle, setSelectedBillingCycle] = useState<'MONTHLY' | 'ANNUAL'>('MONTHLY');
   const [selectedCurrency, setSelectedCurrency] = useState<'NGN' | 'USD'>('NGN');
-  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [manualCheckoutOpen, setManualCheckoutOpen] = useState(false);
+  const locationSearch = useSyncExternalStore(subscribeToLocation, getLocationSearch, getServerLocationSearch);
+  const hasPaymentReference = new URLSearchParams(locationSearch).has('ref');
+  const checkoutOpen = manualCheckoutOpen || hasPaymentReference;
   const router = useRouter();
 
 
@@ -25,7 +28,6 @@ export default function StoreTerminal({ initialSnapshot, session }: StoreTermina
 
   useEffect(() => {
     const timer = window.setInterval(() => router.refresh(), 30_000);
-    if (new URLSearchParams(window.location.search).has('ref')) setCheckoutOpen(true);
     return () => window.clearInterval(timer);
   }, [router]);
 
@@ -70,11 +72,11 @@ export default function StoreTerminal({ initialSnapshot, session }: StoreTermina
         </section>
 
         <section className="mt-11" aria-labelledby="strategies-heading">
-          <QuantStrategyCatalog onSelectEa={(slug, cycle, currency) => { setSelectedEaSlug(slug); setSelectedBillingCycle(cycle); setSelectedCurrency(currency); setCheckoutOpen(true); }} />
+          <QuantStrategyCatalog onSelectEa={(slug, cycle, currency) => { setSelectedEaSlug(slug); setSelectedBillingCycle(cycle); setSelectedCurrency(currency); setManualCheckoutOpen(true); }} />
         </section>
 
         {checkoutOpen && <div className="fixed inset-0 z-[90] bg-black/75 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="AlgoLync subscription checkout">
-          <button type="button" aria-label="Close checkout" onClick={() => setCheckoutOpen(false)} className="absolute inset-0 h-full w-full cursor-default" />
+          <button type="button" aria-label="Close checkout" onClick={() => { setManualCheckoutOpen(false); if (hasPaymentReference) { window.history.replaceState({}, '', '/store'); window.dispatchEvent(new PopStateEvent('popstate')); } }} className="absolute inset-0 h-full w-full cursor-default" />
           <aside className="absolute inset-y-0 right-0 w-full max-w-2xl overflow-y-auto border-l border-white/10 bg-[#080c12] p-4 shadow-2xl sm:p-7">
             <div className="mb-5 flex items-center justify-between border-b border-white/10 pb-4">
               <div><div className="font-mono text-[9px] tracking-widest text-emerald-300">ALGOLYNC / SECURE CHECKOUT</div><h2 className="mt-1 text-lg font-semibold">Subscription checkout</h2></div>
@@ -136,4 +138,11 @@ function StrategyCard({
 function Spec({ label, value }: { label: string; value: string }) {
   return <div><dt className="font-mono text-[8px] tracking-wide text-slate-600">{label}</dt><dd className="mt-1 text-[10px] leading-4 text-slate-300">{value}</dd></div>;
 }
+function subscribeToLocation(callback: () => void) {
+  window.addEventListener('popstate', callback);
+  return () => window.removeEventListener('popstate', callback);
+}
+function getLocationSearch() { return window.location.search; }
+function getServerLocationSearch() { return ''; }
+
 
