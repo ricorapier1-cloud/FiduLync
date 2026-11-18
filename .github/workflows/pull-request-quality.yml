@@ -1,5 +1,5 @@
 name: Pull Request Quality Gate
-# Revalidate the complete Personal Quant and preserved legacy licensing workflows after the November 18 risk hardening.
+# Revalidate the complete Personal Quant and preserved legacy licensing workflows after the November 18 risk-anchor freshness helper tests.
 
 on:
   pull_request:
