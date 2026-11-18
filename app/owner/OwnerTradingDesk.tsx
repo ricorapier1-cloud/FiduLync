@@ -63,7 +63,7 @@ export default function OwnerTradingDesk({ accessToken }: Props) {
     }
   }, [accessToken]);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => { const task = Promise.resolve().then(() => refresh()); return () => { void task; }; }, [refresh]);
 
   return <div className="space-y-5">
     <Panel title="Institutional trading desk">
