@@ -5,6 +5,7 @@ import { getPersonalRiskPolicy } from '@/lib/riskPolicy';
 import { getCurrencyStrengthIndex } from '@/lib/currencyStrength';
 import { getMacroSnapshot } from '@/lib/macroEngine';
 import type { MacroSnapshot } from '@/types/macro';
+import { calculateTechnicalSignal } from '@/lib/technicalEngine';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -205,7 +206,7 @@ export async function GET(request: Request) {
         ? quoteRows.find((row) => row.installation_id === h1Source.installation_id && row.symbol === h1Source.symbol && row.broker === h1Source.broker && row.server === h1Source.server)
         : undefined;
       const quoteAgeSeconds = quote ? (Date.now() - Date.parse(quote.quote_time)) / 1000 : null;
-      const quoteFresh = quoteAgeSeconds !== null && quoteAgeSeconds >= 0 && quoteAgeSeconds <= 120;
+      const quoteFresh = quoteAgeSeconds !== null && quoteAgeSeconds >= 0 && quoteAgeSeconds <= policy.maxQuoteAgeMs / 1000;
       const h1Atr = frames.H1.atr14;
       const spreadPrice = quote && Number.isFinite(quote.point) ? quote.spread_points * quote.point : null;
       const spreadAtrRatio = spreadPrice !== null && h1Atr && h1Atr > 0 ? spreadPrice / h1Atr : null;
@@ -218,10 +219,23 @@ export async function GET(request: Request) {
       const spreadWithinGuard = spreadAtrRatio !== null && spreadAtrRatio <= policy.maxSpreadAtrRatio
         && quote !== undefined && quote.spread_points <= policy.maxSpreadPoints;
       const fundamental = pairFundamental(pair);
+      const quantitative = calculateTechnicalSignal(pair,
+        (selectedSource?.orderedByFrame.H1 ?? []).map((bar) => ({ timestamp: Date.parse(bar.bar_time) / 1000, open: bar.open, high: bar.high, low: bar.low, close: bar.close })),
+        (selectedSource?.orderedByFrame.H4 ?? []).map((bar) => ({ timestamp: Date.parse(bar.bar_time) / 1000, open: bar.open, high: bar.high, low: bar.low, close: bar.close })),
+        (selectedSource?.orderedByFrame.D1 ?? []).map((bar) => ({ timestamp: Date.parse(bar.bar_time) / 1000, open: bar.open, high: bar.high, low: bar.low, close: bar.close })),
+      );
       return {
         pair,
         quote: quote ? { ...quote, age_seconds: Math.max(0, Math.round(quoteAgeSeconds ?? 0)), fresh: quoteFresh } : null,
         frames,
+        quantitative: {
+          available: quantitative.available, regime: quantitative.regime,
+          rsi14: quantitative.rsi14, alma20: quantitative.alma20, kama10: quantitative.kama10,
+          hurst_exponent: quantitative.hurst_exponent, trend_r_squared: quantitative.trend_r_squared,
+          adr20_pips: quantitative.adr20_pips, current_daily_range_adr: quantitative.current_daily_range_adr,
+          gaussian_z_score: quantitative.gaussian_z_score,
+          kaufman_efficiency_ratio: quantitative.kaufman_efficiency_ratio, adx: quantitative.adx,
+        },
         fundamental,
         multi_timeframe_bias: aligned,
         data_complete: dataComplete,
@@ -291,7 +305,7 @@ export async function GET(request: Request) {
       active_installations: installationIds.length,
       pairs,
       macro,
-      guardrails: { max_spread_points: policy.maxSpreadPoints, max_spread_atr_ratio: policy.maxSpreadAtrRatio, quote_max_age_seconds: 120 },
+      guardrails: { max_spread_points: policy.maxSpreadPoints, max_spread_atr_ratio: policy.maxSpreadAtrRatio, quote_max_age_seconds: policy.maxQuoteAgeMs / 1000 },
       execution_enabled: false,
       disclaimer: 'Research context only. No entry signal, trade instruction or broker execution is produced by this endpoint.',
     }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
