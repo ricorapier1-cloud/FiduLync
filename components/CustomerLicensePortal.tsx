@@ -35,7 +35,7 @@ export default function CustomerLicensePortal() {
   const [selectedSeat, setSelectedSeat] = useState<Seat | null>(null);
   const [newLogin, setNewLogin] = useState('');
   const [brokerServer, setBrokerServer] = useState('');
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(0);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
@@ -57,6 +57,7 @@ export default function CustomerLicensePortal() {
   async function load(event?: FormEvent) {
     event?.preventDefault();
     if (!license.trim()) { setError('Enter your AlgoLync license key.'); return; }
+    setNow(Date.now());
     setBusy(true); setError(''); setMessage(''); setData(null); setSeats([]);
     try {
       const response = await fetch('/api/v1/customer-portal', {
