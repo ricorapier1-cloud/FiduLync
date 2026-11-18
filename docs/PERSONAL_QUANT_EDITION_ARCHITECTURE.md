@@ -277,3 +277,12 @@ This is a pure governance foundation only. It is not yet wired into the dashboar
 - The sensitive MT5, owner-audit, licensing and legacy escrow tables have RLS enabled. A direct grant check returned no `anon` or `authenticated` table privileges for the selected sensitive tables. Their no-policy RLS advisor findings are consistent with service-role-only access; do not add broad browser policies to silence the informational linter.
 - Supabase Security Advisor also reports leaked-password protection disabled. This remains a separate owner-auth hardening task; it was not changed during this implementation.
 - No schema migration, row deletion or credential rotation was performed.
+
+
+## Implementation hardening checkpoint — 2026-11-18 (continued)
+- Fixed the legacy Paystack checkout lint errors without removing the preserved licensing/customer workflow; removed unused legacy store declarations/imports.
+- The EA supervisor now validates that risk-anchor timestamps are fresh and synchronized with the latest account snapshot. Stale or mismatched anchors force ABSTAIN.
+- Owner diagnostics now report risk-anchor freshness and age.
+- Added broker loss-side and profit-side tick-value fields to the MT5 quote schema. The publisher transmits the broker's loss-side tick value, ingestion validates it, and supervisor sizing now uses the loss-side value rather than the generic tick value. Existing rows remain nullable and therefore fail closed until refreshed by the updated publisher.
+- Added closed-bar H1 ATR calculation and a volatility-relative spread gate (12% of ATR by default), in addition to the absolute broker spread ceiling. The supervisor requires 15 closed H1 candles for the ATR calculation; unavailable history forces ABSTAIN.
+- Added unit coverage for ATR history validation and abnormal spread relative to ATR. These changes have not yet passed the complete CI workflow or a live MT5 broker test.
