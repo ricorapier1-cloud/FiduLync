@@ -225,9 +225,9 @@ def build_account_snapshot(account: Any, infos: dict[str, Any]) -> dict[str, Any
     equity = float(account.equity)
     open_risk_cash = 0.0
     risk_verified = True
-    positions = mt5.positions_get()
-    if positions is None:
-        positions = ()
+    positions_result = mt5.positions_get()
+    positions = positions_result if positions_result is not None else ()
+    if positions_result is None:
         risk_verified = False
     for position in positions:
         info = mt5.symbol_info(position.symbol)
@@ -243,7 +243,7 @@ def build_account_snapshot(account: Any, infos: dict[str, Any]) -> dict[str, Any
         distance_ticks = abs(open_price - stop_loss) / tick_size
         open_risk_cash += distance_ticks * tick_value * volume
 
-    consecutive_losses, loss_streak_verified, history_synced_at = build_verified_loss_streak(positions)
+    consecutive_losses, loss_streak_verified, history_synced_at = build_verified_loss_streak(positions_result)
     return {
         "account_login": int(account.login),
         "currency": str(account.currency or "USD").upper(),
@@ -262,6 +262,7 @@ def build_account_snapshot(account: Any, infos: dict[str, Any]) -> dict[str, Any
         "server": str(account.server or "")[:120],
         "captured_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
     }
+
 
 def post_batch(quotes: list[dict[str, Any]], candles: list[dict[str, Any]], account_snapshot: dict[str, Any] | None = None) -> None:
     if not quotes and not candles:
