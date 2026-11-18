@@ -195,7 +195,7 @@ export default function OwnerAccessPage() {
         </form>}
         {message && <p role="status" aria-live="polite" className="mt-5 rounded-lg border border-white/10 bg-black/20 p-3 text-xs leading-5 text-slate-300">{message}</p>}
         {!supabase && <p className="mt-4 text-xs text-rose-200">This deployment is missing its public Supabase authentication configuration.</p>}
-        <div className="mt-6 border-t border-white/[0.08] pt-4 text-[10px] leading-5 text-slate-500">If the email contains a secure sign-in link, open it on this device; it returns to this owner page. For numeric codes, the Supabase email template must render {{ .Token }}. Never share one-time codes or MT5 connector tokens.</div>
+        <div className="mt-6 border-t border-white/[0.08] pt-4 text-[10px] leading-5 text-slate-500">If the email contains a secure sign-in link, open it on this device; it returns to this owner page. For numeric codes, the Supabase email template must render {'{{ .Token }}'}. Never share one-time codes or MT5 connector tokens.</div>
       </div>
     </main>
   );
