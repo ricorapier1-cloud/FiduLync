@@ -38,85 +38,33 @@ async function supabaseWrite(table: string, query: string, body: Record<string, 
 
 export async function validateCustomerLicense(mt5Account: number, licenseKey: string): Promise<boolean> {
   if (!Number.isSafeInteger(mt5Account) || mt5Account <= 0 || !licenseKey.trim()) return false;
-  const query = new URLSearchParams({
-    select: 'license_key,mt5_account,status,expires_at',
-    mt5_account: `eq.${mt5Account}`,
-    license_key: `eq.${licenseKey.trim()}`,
-    status: 'eq.active',
-    limit: '1',
-  });
-  const rows = await supabaseRows<{ license_key: string; mt5_account: number | string; status: string; expires_at: string | null }>('licenses', query.toString());
-  if (rows.length !== 1) return false;
-  const row = rows[0];
-  return Number(row.mt5_account) === mt5Account && row.license_key === licenseKey.trim()
-    && row.status === 'active'
-    && (!row.expires_at || Date.parse(row.expires_at) > Date.now());
-}
+  const key = licenseKey.trim().toUpperCase();
+  const licenses = await supabaseRows<{
+    license_key: string; mt5_account: number | string | null; status: string | null;
+    expires_at: string | null; grace_until: string | null; tier: string | null; ea_slug: string | null;
+  }>('licenses', new URLSearchParams({
+    select: 'license_key,mt5_account,status,expires_at,grace_until,tier,ea_slug',
+    license_key: `eq.${key}`, limit: '1',
+  }).toString());
+  const license = licenses[0];
+  if (!license || license.license_key !== key) return false;
+  const status = String(license.status || '').toUpperCase();
+  const active = status === 'ACTIVE' && (!license.expires_at || Date.parse(license.expires_at) > Date.now());
+  const grace = status === 'PAST_DUE' && Boolean(license.grace_until && Date.parse(license.grace_until) > Date.now());
+  if (!active && !grace) return false;
 
-export type CustomerHeartbeat = {
-  mt5_account: number;
-  license_key: string;
-  ea_name: string;
-  balance: number;
-  equity: number;
-  floating_pnl: number;
-  drawdown_pct: number;
-  open_positions: number;
-  status: string;
-  updated_at?: string;
-};
+  if (String(license.tier || '').toUpperCase() === 'DEMO_TRIAL' || key.startsWith('ALGOLYNX-DEMO-')) {
+    const trials = await supabaseRows<{ mt5_login: number | string; expires_at: string }>('ea_demo_trials', new URLSearchParams({
+      select: 'mt5_login,expires_at', license_key: `eq.${key}`, mt5_login: `eq.${mt5Account}`, limit: '1',
+    }).toString());
+    return trials.length === 1 && Date.parse(trials[0].expires_at) > Date.now();
+  }
 
-export async function saveCustomerHeartbeat(input: CustomerHeartbeat) {
-  await supabaseWrite('ea_heartbeats',
-    'on_conflict=mt5_account',
-    { ...input, updated_at: new Date().toISOString() },
-    'resolution=merge-duplicates,return=minimal'
-  );
-}
-
-export async function getCustomerHeartbeat(mt5Account: number, licenseKey: string) {
-  const query = new URLSearchParams({
-    select: 'mt5_account,ea_name,balance,equity,floating_pnl,drawdown_pct,open_positions,status,updated_at',
-    mt5_account: `eq.${mt5Account}`,
-    license_key: `eq.${licenseKey}`,
-    limit: '1',
-  });
-  const rows = await supabaseRows<Omit<CustomerHeartbeat, 'license_key'> & { updated_at: string }>('ea_heartbeats', query.toString());
-  if (!rows.length) return null;
-  const row = rows[0];
-  const heartbeatAge = Date.now() - Date.parse(row.updated_at);
-  const online = (row.status === 'RUNNING' || row.status === 'ONLINE')
-    && Number.isFinite(heartbeatAge) && heartbeatAge >= 0 && heartbeatAge <= 15 * 60_000;
-  return { ...row, connection_status: online ? 'ONLINE' as const : 'OFFLINE' as const };
-}
-
-export type CustomerTrade = {
-  mt5_account: number;
-  license_key: string;
-  ticket: string;
-  symbol: string;
-  direction: 'LONG' | 'SHORT';
-  entry_price: number;
-  exit_price: number;
-  profit_usd: number;
-  r_multiple: number;
-  confluence_score: number;
-  regime: string;
-  closed_at_utc: string;
-};
-
-export async function saveCustomerTrade(trade: CustomerTrade) {
-  await supabaseWrite('trade_ledger', 'on_conflict=mt5_account,ticket,symbol',
-    trade as unknown as Record<string, unknown>, 'resolution=ignore-duplicates,return=minimal');
-}
-
-export async function getCustomerTrades(mt5Account: number, licenseKey: string) {
-  const query = new URLSearchParams({
-    select: 'ticket,symbol,direction,entry_price,exit_price,profit_usd,r_multiple,confluence_score,regime,closed_at_utc',
-    mt5_account: `eq.${mt5Account}`,
-    license_key: `eq.${licenseKey}`,
-    order: 'closed_at_utc.desc',
-    limit: '20',
-  });
-  return supabaseRows<Omit<CustomerTrade, 'mt5_account' | 'license_key'>>( 'trade_ledger', query.toString());
+  if (Number(license.mt5_account) === mt5Account) return true;
+  if (!license.ea_slug) return false;
+  const seats = await supabaseRows<{ mt5_login: number | string }>('ea_license_seats', new URLSearchParams({
+    select: 'mt5_login', license_key: `eq.${key}`, ea_slug: `eq.${license.ea_slug}`,
+    mt5_login: `eq.${mt5Account}`, limit: '1',
+  }).toString());
+  return seats.length === 1 && Number(seats[0].mt5_login) === mt5Account;
 }
