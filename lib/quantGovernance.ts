@@ -37,6 +37,7 @@ export type RiskProposal = {
   spreadPoints: number;
   equity: number;
   freeMargin: number;
+  usedMargin: number;
   estimatedMargin: number;
   currentOpenRiskCash: number;
   dailyStartEquity: number;
@@ -128,7 +129,7 @@ function validateProposalShape(p: RiskProposal): string[] {
   if (!p.requestId?.trim() || !p.installationId?.trim() || !p.symbol?.trim()) issues.push('IDENTITY_FIELDS_MISSING');
   if (!['BUY', 'SELL'].includes(p.side)) issues.push('INVALID_ORDER_SIDE');
   const required = [p.entryPrice, p.stopLoss, p.takeProfit, p.bid, p.ask, p.quoteAgeMs,
-    p.spreadPoints, p.equity, p.freeMargin, p.estimatedMargin, p.currentOpenRiskCash,
+    p.spreadPoints, p.equity, p.freeMargin, p.usedMargin, p.estimatedMargin, p.currentOpenRiskCash,
     p.dailyStartEquity, p.weeklyStartEquity, p.highWaterMarkEquity, p.consecutiveLosses,
     p.requestedRiskPct, p.limits.maxPerTradeRiskPct, p.limits.maxPortfolioRiskPct,
     p.limits.maxDailyDrawdownPct, p.limits.maxWeeklyDrawdownPct,
@@ -140,7 +141,7 @@ function validateProposalShape(p: RiskProposal): string[] {
     issues.push('ACCOUNT_EQUITY_STATE_INVALID');
   }
   if (p.bid <= 0 || p.ask <= 0 || p.ask < p.bid) issues.push('INVALID_BID_ASK');
-  if (p.freeMargin < 0 || p.estimatedMargin < 0 || p.currentOpenRiskCash < 0) issues.push('INVALID_ACCOUNT_EXPOSURE');
+  if (p.freeMargin < 0 || p.usedMargin < 0 || p.estimatedMargin < 0 || p.currentOpenRiskCash < 0) issues.push('INVALID_ACCOUNT_EXPOSURE');
   if (p.requestedRiskPct <= 0 || p.limits.maxPerTradeRiskPct <= 0
     || p.limits.maxPortfolioRiskPct <= 0) issues.push('RISK_LIMITS_INVALID');
   if (p.limits.maxMarginUsagePct <= 0 || p.limits.maxMarginUsagePct > 100
@@ -163,7 +164,7 @@ export function evaluateRiskProposal(p: RiskProposal, now = Date.now()): RiskGov
     schemaVersion: '1.0',
     requestId: typeof p.requestId === 'string' ? p.requestId : '',
     decision,
-    approvedRiskPct: decision === 'APPROVE' ? p.requestedRiskPct : 0,
+    approvedRiskPct: decision === 'APPROVE' ? Math.min(p.requestedRiskPct, p.limits.maxPerTradeRiskPct) : 0,
     approvedVolume: decision === 'APPROVE' ? volume : 0,
     estimatedRiskCash: decision === 'APPROVE' ? riskCash : 0,
     estimatedRewardRisk: rr,
@@ -214,7 +215,7 @@ export function evaluateRiskProposal(p: RiskProposal, now = Date.now()): RiskGov
   if (!volumeResult.valid) blockers.push(volumeResult.reason ?? 'POSITION_SIZE_INVALID');
 
   const nextMarginUsagePct = p.equity > 0
-    ? (p.estimatedMargin / p.equity) * 100
+    ? ((p.usedMargin + p.estimatedMargin) / p.equity) * 100
     : Number.POSITIVE_INFINITY;
   if (p.estimatedMargin > p.freeMargin) blockers.push('INSUFFICIENT_FREE_MARGIN');
   if (nextMarginUsagePct > p.limits.maxMarginUsagePct) blockers.push('MARGIN_USAGE_LIMIT_EXCEEDED');
