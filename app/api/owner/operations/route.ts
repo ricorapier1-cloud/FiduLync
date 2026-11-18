@@ -120,11 +120,13 @@ export async function GET(request: Request) {
       },
       database: { reachable: true, installation_records: installations?.length ?? 0 },
       governance: {
-        audit_log: 'not_configured',
+        audit_log: 'decision_evidence_append_only',
         multi_role_access: 'owner_only',
         step_up_authentication: 'not_configured',
-        model_validation_registry: 'not_connected',
-        portfolio_risk_telemetry: accountRisk && accountSnapshotFresh && accountRisk.open_risk_verified && riskAnchorsAvailable && lossStreakFresh ? 'connected' : accountRisk ? 'partial' : 'not_connected',
+        model_validation_registry: 'configured_pending_independent_review',
+        execution_quality_evidence: 'schema_ready_waiting_for_mt5_fills',
+        position_snapshot_evidence: 'schema_ready_waiting_for_mt5_position_feed',
+        portfolio_risk_telemetry: accountRisk && accountSnapshotFresh && accountRisk.open_risk_verified && riskAnchorsAvailable && lossStreakFresh ? 'account_open_stop_risk_connected_currency_exposure_pending' : accountRisk ? 'partial' : 'not_connected',
       },
     }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
   } catch (error) {
