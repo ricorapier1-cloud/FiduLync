@@ -26,6 +26,7 @@ export async function sendTransactionalEmail(input: EmailInput): Promise<boolean
     body: JSON.stringify({
       from,
       to: [input.to],
+      reply_to: 'fidulync@gmail.com',
       subject: input.subject,
       html: input.html,
     }),

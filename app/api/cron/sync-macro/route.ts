@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getMacroSnapshot } from '@/lib/macroEngine';
+import { reconcileEaSubscriptions } from '@/lib/reconcileEaSubscriptions';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,7 @@ export async function GET(req: Request) {
   const timestamp = new Date().toISOString();
 
   try {
+    const subscriptionReconciliation = await reconcileEaSubscriptions();
     const snapshot = await getMacroSnapshot(true);
     const isFallbackOnly = snapshot.source === 'fallback';
     const provenance = snapshot.source === 'provider' && snapshot.calendarSource === 'provider'
@@ -31,6 +33,7 @@ export async function GET(req: Request) {
         cotSource: snapshot.cotSource,
         currenciesCount: snapshot.currencies.length,
         provenance,
+        subscriptionReconciliation,
         timestamp,
       }, { status: 503 });
     }
@@ -43,6 +46,7 @@ export async function GET(req: Request) {
       cotSource: snapshot.cotSource,
       currenciesCount: snapshot.currencies.length,
       provenance,
+      subscriptionReconciliation,
       timestamp,
     }, { status: 200 });
   } catch (error) {

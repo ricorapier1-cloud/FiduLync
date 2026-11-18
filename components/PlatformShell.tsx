@@ -1,16 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import BrandGlyph, { type BrandGlyphName } from '@/components/BrandGlyph';
 import WhatsAppSupportButton from '@/components/WhatsAppSupportButton';
 import PlatformFooter from '@/components/PlatformFooter';
 
+const ownerSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const ownerSupabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const ownerSupabase = ownerSupabaseUrl && ownerSupabaseKey
+  ? createClient(ownerSupabaseUrl, ownerSupabaseKey, { auth: { persistSession: true, autoRefreshToken: true } })
+  : null;
+
 const links = [
   { href: '/', label: 'MacroLync', icon: 'shield' },
   { href: '/store', label: 'AlgoLync Vault', icon: 'chart' },
-  { href: '/account', label: 'My License', icon: 'shield' },
+  { href: '/portal', label: 'My License', icon: 'shield' },
   { href: '/faq', label: 'FAQ', icon: 'activity' },
   { href: '/terms', label: 'Terms & Risk', icon: 'shield-alert' },
   { href: '/owner', label: 'Owner Console', icon: 'shield' },
@@ -22,7 +29,7 @@ const macroLinks = [
   { href: '#catalysts', label: 'Catalysts', icon: 'calendar' },
   { href: '#positioning', label: 'Positioning', icon: 'radio' },
   { href: '/store', label: 'AlgoLync Vault', icon: 'chart' },
-  { href: '/account', label: 'My License', icon: 'shield' },
+  { href: '/portal', label: 'My License', icon: 'shield' },
   { href: '/faq', label: 'FAQ', icon: 'activity' },
   { href: '/terms', label: 'Terms & Risk', icon: 'shield-alert' },
   { href: '/owner', label: 'Owner Console', icon: 'shield' },
@@ -31,8 +38,32 @@ const macroLinks = [
 export default function PlatformShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [ownerAuthorized, setOwnerAuthorized] = useState(false);
   const isHome = pathname === '/';
-  const navigation = isHome ? macroLinks : links;
+  const visibleLinks = links.filter((item) => item.href !== '/owner' || ownerAuthorized);
+  const navigation = (isHome ? macroLinks : links).filter((item) => item.href !== '/owner' || ownerAuthorized);
+
+  useEffect(() => {
+    if (!ownerSupabase) return;
+    let active = true;
+    const verifyOwner = async (accessToken: string | null) => {
+      if (!accessToken) { if (active) setOwnerAuthorized(false); return; }
+      try {
+        const response = await fetch('/api/owner/verify', {
+          headers: { Authorization: 'Bearer ' + accessToken }, cache: 'no-store',
+        });
+        const result = await response.json() as { authenticated?: boolean };
+        if (active) setOwnerAuthorized(response.ok && result.authenticated === true);
+      } catch {
+        if (active) setOwnerAuthorized(false);
+      }
+    };
+    ownerSupabase.auth.getSession().then(({ data }) => void verifyOwner(data.session?.access_token ?? null));
+    const { data: listener } = ownerSupabase.auth.onAuthStateChange((_event, session) => {
+      void verifyOwner(session?.access_token ?? null);
+    });
+    return () => { active = false; listener.subscription.unsubscribe(); };
+  }, []);
 
   return (
     <>
@@ -134,7 +165,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
 
       {!isHome && (
         <nav className="mobile-tabbar" aria-label="Bottom navigation">
-          {links.map(({ href, label, icon }) => (
+          {visibleLinks.map(({ href, label, icon }) => (
             <Link
               key={href}
               href={href}
