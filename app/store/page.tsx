@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Personal EA Lab & MT5 Monitor',
-  description: 'Personal EA research library, MT5 fleet telemetry, live signal diagnostics and the MacroLync bridge.'
+  description: 'Personal EA research library, live signal diagnostics and the MacroLync MT5 bridge.'
 };
 
 export default async function PersonalEaLabPage() {
@@ -18,11 +18,9 @@ export default async function PersonalEaLabPage() {
 
   return (
     <StoreTerminal
-      initialFleet={fleet}
-      telemetryError={telemetryError}
       bridgeSource={bridgeSource}
       initialSnapshot={initialSnapshot}
-        session={getLiquiditySession()}
+      session={getLiquiditySession()}
     />
   );
 }
