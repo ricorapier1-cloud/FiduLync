@@ -82,6 +82,13 @@ test('server-owned policy caps requested risk even if the proposal asks for more
   assert.equal(result.approvedVolume, 0.25);
 });
 
+test('fails closed until model validation evidence is server-approved', () => {
+  const result = evaluateRiskProposal(proposal(), policy({ modelValidated: false }));
+  assert.equal(result.decision, 'REJECT');
+  assert.equal(result.approvedVolume, 0);
+  assert.ok(result.blockers.includes('MODEL_NOT_OUT_OF_SAMPLE_VALIDATED'));
+});
+
 test('fails closed while owner execution permission is disabled', () => {
   const result = evaluateRiskProposal(proposal(), policy({ executionEnabled: false }));
   assert.equal(result.decision, 'REJECT');
