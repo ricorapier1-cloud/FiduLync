@@ -12,6 +12,7 @@ type Pair = {
   pair: string;
   quote: { symbol: string; bid: number; ask: number; quote_time: string; spread_points: number; point: number; broker: string; server: string; age_seconds: number; fresh: boolean } | null;
   frames: Record<string, Frame>;
+  quantitative: { available: boolean; regime: string; rsi14: number | null; alma20: number | null; kama10: number | null; hurst_exponent: number | null; trend_r_squared: number | null; adr20_pips: number | null; current_daily_range_adr: number | null; gaussian_z_score: number | null; kaufman_efficiency_ratio: number | null; adx: number | null };
   fundamental: { verified: boolean; status: string; blockers: string[]; policy_rate_diff_bps: number | null; real_yield_diff_bps: number | null; cot_position_diff: number | null; upcoming_events: number; high_impact_news_lockout: boolean };
   multi_timeframe_bias: string;
   data_complete: boolean;
@@ -122,6 +123,19 @@ export default function OwnerTradingDesk({ accessToken }: Props) {
             {pair.fundamental.high_impact_news_lockout && <p className="mt-2 text-[9px] font-semibold text-rose-200">High-impact event lockout window active</p>}
             {pair.fundamental.blockers.length>0 && <details className="mt-2"><summary className="cursor-pointer text-[9px] text-amber-100">Why fundamental verification is blocked ({pair.fundamental.blockers.length})</summary><ul className="mt-2 list-disc space-y-1 pl-4 text-[9px] text-slate-500">{pair.fundamental.blockers.map((blocker) => <li key={blocker}>{label(blocker)}</li>)}</ul></details>}
           </div>
+          <details className="mt-3 rounded-lg border border-white/[0.07] p-3"><summary className="cursor-pointer text-[10px] font-semibold text-slate-300">Advanced quantitative instruments · {pair.quantitative.available ? label(pair.quantitative.regime) : 'unavailable'}</summary>
+            <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[9px] text-slate-500 sm:grid-cols-3">
+              <span>ALMA(20) <b className="float-right font-mono text-slate-300">{number(pair.quantitative.alma20, pair.pair==='USDJPY'?3:5)}</b></span>
+              <span>KAMA(10) <b className="float-right font-mono text-slate-300">{number(pair.quantitative.kama10, pair.pair==='USDJPY'?3:5)}</b></span>
+              <span>Hurst exponent <b className="float-right font-mono text-slate-300">{number(pair.quantitative.hurst_exponent,3)}</b></span>
+              <span>Trend R² <b className="float-right font-mono text-slate-300">{number(pair.quantitative.trend_r_squared,3)}</b></span>
+              <span>Gaussian Z <b className="float-right font-mono text-slate-300">{number(pair.quantitative.gaussian_z_score,3)}</b></span>
+              <span>Kaufman ER <b className="float-right font-mono text-slate-300">{number(pair.quantitative.kaufman_efficiency_ratio,3)}</b></span>
+              <span>ADX(14) <b className="float-right font-mono text-slate-300">{number(pair.quantitative.adx,2)}</b></span>
+              <span>ADR(20) <b className="float-right font-mono text-slate-300">{number(pair.quantitative.adr20_pips,1)} pips</b></span>
+              <span>Daily range / ADR <b className="float-right font-mono text-slate-300">{pair.quantitative.current_daily_range_adr===null?'—':(pair.quantitative.current_daily_range_adr*100).toFixed(1)+'%'}</b></span>
+            </div>
+          </details>
         </article>)}
       </div>
       {!data?.pairs?.length && !loading && <p className="text-xs text-slate-500">No pair observations are available yet.</p>}
