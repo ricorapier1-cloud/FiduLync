@@ -86,8 +86,9 @@ export async function getMacroSignal(symbol: string, now = Date.now(), installat
       && quoteCurrency.inflationSource === 'provider'
       && (normalizedSymbol === 'XAUUSD'
         || (baseCurrency?.policyRateSource === 'provider' && baseCurrency.inflationSource === 'provider')));
-    const verifiedYieldInputs = Boolean(quoteCurrency?.twoYearYieldSource === 'provider'
-      && (normalizedSymbol === 'XAUUSD' || baseCurrency?.twoYearYieldSource === 'provider'));
+    const hasComparableTwoYearYields = baseCurrency?.twoYearYield !== undefined && quoteCurrency?.twoYearYield !== undefined;
+    const verifiedYieldInputs = !hasComparableTwoYearYields
+      || (baseCurrency?.twoYearYieldSource === 'provider' && quoteCurrency?.twoYearYieldSource === 'provider');
     // Reference and partial macro snapshots may be useful for display, but they
     // must never create a directional signal for an EA.
     const macroDataVerified = snapshot.source === 'provider'
