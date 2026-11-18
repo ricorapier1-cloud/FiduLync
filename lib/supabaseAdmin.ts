@@ -42,7 +42,11 @@ export async function supabaseQuery<T = unknown>(
     throw new Error(`Supabase ${table} error (${response.status}): ${text}`);
   }
 
-  return (await response.json()) as T;
+  const responseText = await response.text();
+  if (!responseText) return {} as T;
+  try { return JSON.parse(responseText) as T; } catch {
+    throw new Error(`Supabase ${table} returned an invalid JSON response.`);
+  }
 }
 
 export async function supabaseInsert<T = unknown>(
