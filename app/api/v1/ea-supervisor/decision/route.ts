@@ -117,12 +117,12 @@ export async function POST(request: Request) {
     // same ID for different inputs is a conflict, never a fresh evaluation.
     const priorDecisions = await supabaseRead<PriorDecision[]>(
       'mt5_risk_decisions',
-      `select=account_login,decision,approved_risk_pct,approved_volume,estimated_risk_cash,estimated_reward_risk,blockers,evaluated_at,proposal&installation_id=eq.${installation.id}&account_login=eq.${accountLogin}&request_id=eq.${encodeURIComponent(proposal.requestId)}&limit=1`,
+      `select=account_login,decision,approved_risk_pct,approved_volume,estimated_risk_cash,estimated_reward_risk,blockers,evaluated_at,proposal&installation_id=eq.${installation.id}&request_id=eq.${encodeURIComponent(proposal.requestId)}&limit=1`,
     );
     if (priorDecisions === null) throw new Error('Prior decision idempotency lookup failed.');
     const prior = priorDecisions[0];
     if (prior) {
-      const sameProposal = Object.keys(proposalEvidence).every((key) => prior.proposal?.[key] === proposalEvidence[key as keyof typeof proposalEvidence]);
+      const sameProposal = prior.account_login === accountLogin && Object.keys(proposalEvidence).every((key) => prior.proposal?.[key] === proposalEvidence[key as keyof typeof proposalEvidence]);
       if (!sameProposal) {
         return NextResponse.json({ error: 'Request ID was already used for a different proposal.' }, { status: 409 });
       }
