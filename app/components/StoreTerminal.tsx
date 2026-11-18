@@ -140,11 +140,11 @@ export default function StoreTerminal({ bridgeSource, initialSnapshot, session }
           <div>
             <div className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-emerald-300">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399]" />
-              ALGOLYNC / PRIVATE STRATEGY VAULT
+              FIDULYNC / PERSONAL QUANT WORKSPACE
             </div>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Algorithm command center</h1>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Personal Quant command center</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-              Proprietary strategy architecture, VPS fleet telemetry, and the MacroLync execution bridge.
+              Private quantitative research, discretionary risk planning, and authenticated EA supervision. FiduLync does not place broker orders.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
@@ -162,7 +162,7 @@ export default function StoreTerminal({ bridgeSource, initialSnapshot, session }
         <section className="mt-7 rounded-xl border border-white/[0.08] bg-[#0c1016] p-4 sm:p-5" aria-label="Market state">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <div className="font-mono text-[9px] tracking-[0.17em] text-slate-500">LIVE MACRO STRENGTH INDEX</div>
+              <div className="font-mono text-[9px] tracking-[0.17em] text-slate-500">MACRO CURRENCY STRENGTH MODEL</div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {currencyStrength.map(({ currency, score: strength }) => (
                   <span key={currency} className="inline-flex items-center gap-2 rounded-md border border-white/[0.08] px-2.5 py-2 font-mono text-[10px]">
@@ -200,7 +200,7 @@ export default function StoreTerminal({ bridgeSource, initialSnapshot, session }
           <div className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-5 sm:p-6">
             <div className="font-mono text-[9px] tracking-[0.17em] text-slate-500">03 / MACROLYNC API</div>
             <h2 className="mt-1 text-lg font-semibold">Live signal tester</h2>
-            <p className="mt-1 text-xs leading-5 text-slate-400">Previews a same-origin live signal without placing the private EA key in the browser.</p>
+            <p className="mt-1 text-xs leading-5 text-slate-400">Previews the server-side MacroLync research model. A research signal is not a broker order approval.</p>
             <label className="mt-5 block text-[9px] tracking-wide text-slate-500" htmlFor="signal-symbol">SYMBOL</label>
             <select id="signal-symbol" value={symbol} onChange={(event) => setSymbol(event.target.value)} className="mt-2 h-10 w-full rounded-md border border-white/[0.1] bg-[#080a0f] px-3 font-mono text-xs text-slate-200 outline-none focus:border-emerald-300/40">
               {symbols.map((item) => <option key={item}>{item}</option>)}
