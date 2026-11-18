@@ -34,7 +34,7 @@ export type MacroSignalPayload = {
   csi_spread: number;
   max_risk_pct: number;
   risk_multiplier: number;
-  correlation_group: 'USD_BLOC' | 'JPY_CROSS' | 'EUR_BLOC' | 'COMMODITY_FX';
+  correlation_group: 'USD_BLOC' | 'JPY_CROSS' | 'EUR_BLOC' | 'COMMODITY_FX' | 'GOLD_METALS';
   news_lockout: boolean;
   safe_to_trade: boolean;
   execution_blockers: string[];
@@ -92,12 +92,18 @@ export async function getMacroSignal(symbol: string, now = Date.now(), installat
     const strengths = getCurrencyStrengthIndex(snapshot);
     const baseStrength = strengths.find((item) => item.currency === normalizedSymbol.slice(0, 3))?.score;
     const quoteStrength = strengths.find((item) => item.currency === normalizedSymbol.slice(3))?.score;
-    const csiSpread = baseStrength !== undefined && quoteStrength !== undefined ? baseStrength - quoteStrength : 0;
+    // Gold is not a G10 currency. Model XAUUSD against the inverse USD strength
+    // factor rather than treating the missing XAU currency score as zero.
+    const csiSpread = normalizedSymbol === 'XAUUSD'
+      ? -(quoteStrength ?? 0)
+      : baseStrength !== undefined && quoteStrength !== undefined ? baseStrength - quoteStrength : 0;
     const newsLockout = isNewsLockout(snapshot, now, normalizedSymbol);
     const edgeQualified = Math.abs(csiSpread) >= 60 && Math.abs(score) >= 45;
     const bias = edgeQualified ? (score > 0 ? 'LONG' : 'SHORT') : 'NEUTRAL';
     const [base, quote] = [normalizedSymbol.slice(0, 3), normalizedSymbol.slice(3)];
-    const correlationGroup = base === 'JPY' || quote === 'JPY'
+    const correlationGroup = normalizedSymbol === 'XAUUSD'
+      ? 'GOLD_METALS'
+      : base === 'JPY' || quote === 'JPY'
       ? 'JPY_CROSS'
       : base === 'EUR' || quote === 'EUR'
         ? 'EUR_BLOC'
