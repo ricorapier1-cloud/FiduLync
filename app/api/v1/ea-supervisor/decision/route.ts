@@ -43,6 +43,7 @@ function record(value: unknown): value is Record<string, unknown> {
 }
 
 export async function POST(request: Request) {
+  let idempotencyContext: { installationId: string; accountLogin: number; proposalEvidence: Record<string, unknown> } | null = null;
   if (!checkRateLimit(getClientIp(request), 60, 60_000)) {
     return NextResponse.json({ error: 'Rate limit exceeded.' }, { status: 429 });
   }
@@ -113,6 +114,7 @@ export async function POST(request: Request) {
       side: proposal.side, entry_price: proposal.entryPrice, stop_loss: proposal.stopLoss,
       take_profit: proposal.takeProfit, requested_risk_pct: proposal.requestedRiskPct,
     };
+    idempotencyContext = { installationId: installation.id, accountLogin, proposalEvidence };
     // A retried request ID returns its original immutable decision. Reusing the
     // same ID for different inputs is a conflict, never a fresh evaluation.
     const priorDecisions = await supabaseRead<PriorDecision[]>(
@@ -304,6 +306,36 @@ export async function POST(request: Request) {
     return NextResponse.json(result, { status: 200, headers: { 'Cache-Control': 'no-store, max-age=0' } });
   } catch (error) {
     if (error instanceof Error && /duplicate key|unique constraint/i.test(error.message)) {
+      // A concurrent retry can race the initial idempotency lookup. Once the
+      // winning transaction commits, recover its immutable decision and replay
+      // it only when installation, account and every proposal field match.
+      if (idempotencyContext) {
+        try {
+          const { installationId, accountLogin, proposalEvidence } = idempotencyContext;
+          const racedDecisions = await supabaseRead<PriorDecision[]>(
+            'mt5_risk_decisions',
+            `select=account_login,decision,approved_risk_pct,approved_volume,estimated_risk_cash,estimated_reward_risk,blockers,evaluated_at,proposal&installation_id=eq.${installationId}&request_id=eq.${encodeURIComponent(String(proposalEvidence.request_id))}&limit=1`,
+          );
+          if (racedDecisions === null) throw new Error('Concurrent idempotency recovery lookup failed.');
+          const raced = racedDecisions[0];
+          if (raced) {
+            const sameProposal = raced.account_login === accountLogin
+              && Object.keys(proposalEvidence).every((key) => raced.proposal?.[key] === proposalEvidence[key]);
+            if (sameProposal) {
+              return NextResponse.json({
+                schemaVersion: '1.0', requestId: proposalEvidence.request_id, decision: raced.decision,
+                approvedRiskPct: raced.approved_risk_pct, approvedVolume: raced.approved_volume,
+                estimatedRiskCash: raced.estimated_risk_cash, estimatedRewardRisk: raced.estimated_reward_risk,
+                blockers: raced.blockers, evaluatedAt: raced.evaluated_at,
+              }, { status: 200, headers: { 'Cache-Control': 'no-store, max-age=0', 'Idempotency-Replayed': 'true' } });
+            }
+            return NextResponse.json({ error: 'Request ID was already used for a different proposal.' }, { status: 409 });
+          }
+        } catch (recoveryError) {
+          console.error('EA supervisor concurrent idempotency recovery failed:', recoveryError);
+          return NextResponse.json({ error: 'Risk supervision is temporarily unavailable. EA must abstain.' }, { status: 503 });
+        }
+      }
       return NextResponse.json({ error: 'Duplicate request or replay detected.' }, { status: 409 });
     }
     console.error('EA supervisor decision failed:', error);
