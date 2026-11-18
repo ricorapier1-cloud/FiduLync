@@ -31,6 +31,8 @@ export async function GET(request: Request) {
     let quoteData: { symbol: string; quote_time: string; broker: string; server: string } | null = null;
     let accountRisk: { account_login: number; currency: string; equity: number; margin: number; free_margin: number; open_positions: number; open_risk_cash: number; open_risk_verified: boolean; captured_at: string; consecutive_losses: number | null; loss_streak_verified: boolean; history_synced_at: string | null } | null = null;
     let riskAnchorsAvailable = false;
+    let riskAnchorAgeMs: number | null = null;
+    let riskAnchorSnapshotAgeMs: number | null = null;
     let latestDecision: { decision: string; symbol: string; evaluated_at: string; blockers: string[] } | null = null;
     if (installationIds.length) {
       const [candles, quotes, snapshots, anchors, decisions] = await Promise.all([
@@ -40,7 +42,7 @@ export async function GET(request: Request) {
           .in('installation_id', installationIds).order('quote_time', { ascending: false }).limit(1),
         supabase.from('mt5_account_snapshots').select('account_login,currency,equity,margin,free_margin,open_positions,open_risk_cash,open_risk_verified,captured_at,consecutive_losses,loss_streak_verified,history_synced_at')
           .in('installation_id', installationIds).order('captured_at', { ascending: false }).limit(1),
-        supabase.from('mt5_risk_state').select('installation_id,account_login,updated_at')
+        supabase.from('mt5_risk_state').select('installation_id,account_login,updated_at,last_snapshot_at')
           .in('installation_id', installationIds).order('updated_at', { ascending: false }).limit(1),
         supabase.from('mt5_risk_decisions').select('decision,symbol,evaluated_at,blockers')
           .in('installation_id', installationIds).order('evaluated_at', { ascending: false }).limit(1),
@@ -53,7 +55,10 @@ export async function GET(request: Request) {
       candleData = candles.data?.[0] ?? null;
       quoteData = quotes.data?.[0] ?? null;
       accountRisk = snapshots.data?.[0] ?? null;
-      riskAnchorsAvailable = Boolean(anchors.data?.length);
+      const latestAnchor = anchors.data?.[0];
+      riskAnchorsAvailable = Boolean(latestAnchor);
+      riskAnchorAgeMs = latestAnchor ? Date.now() - Date.parse(latestAnchor.updated_at) : null;
+      riskAnchorSnapshotAgeMs = latestAnchor ? Date.now() - Date.parse(latestAnchor.last_snapshot_at) : null;
       latestDecision = decisions.data?.[0] ?? null;
     }
 
@@ -89,6 +94,10 @@ export async function GET(request: Request) {
         snapshot_fresh: accountSnapshotFresh,
         open_risk_verified: Boolean(accountRisk?.open_risk_verified),
         risk_anchors_available: riskAnchorsAvailable,
+        risk_anchors_fresh: riskAnchorAgeMs !== null && riskAnchorSnapshotAgeMs !== null
+          && riskAnchorAgeMs >= 0 && riskAnchorAgeMs <= 30_000
+          && riskAnchorSnapshotAgeMs >= 0 && riskAnchorSnapshotAgeMs <= 30_000,
+        risk_anchor_age_seconds: riskAnchorAgeMs === null ? null : Math.max(0, Math.round(riskAnchorAgeMs / 1000)),
         loss_streak_verified: lossStreakFresh,
         latest_decision: latestDecision,
       },
