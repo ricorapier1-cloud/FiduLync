@@ -11,7 +11,7 @@ export const runtime = 'nodejs';
 
 const PAIRS = ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'USDCAD', 'AUDUSD', 'NZDUSD', 'XAUUSD'] as const;
 const FRAMES = ['D1', 'H4', 'H1'] as const;
-type Candle = { symbol: string; timeframe: string; bar_time: string; open: number; high: number; low: number; close: number; is_closed: boolean; broker: string; server: string };
+type Candle = { installation_id: string; symbol: string; timeframe: string; bar_time: string; open: number; high: number; low: number; close: number; is_closed: boolean; broker: string; server: string };
 type Quote = { symbol: string; bid: number; ask: number; quote_time: string; spread_points: number; point: number; broker: string; server: string };
 
 function ema(values: number[], period: number): number | null {
@@ -45,25 +45,9 @@ function rsi(values: number[], period = 14): number | null {
   if (averageLoss === 0) return averageGain === 0 ? 50 : 100;
   return 100 - 100 / (1 + averageGain / averageLoss);
 }
-function selectSingleSeries(rows: Candle[], timeframe: string): Candle[] {
-  const groups = new Map<string, Candle[]>();
-  for (const row of rows) {
-    const key = [row.symbol, row.broker, row.server].join('|');
-    const group = groups.get(key) ?? [];
-    group.push(row);
-    groups.set(key, group);
-  }
-  const candidates = [...groups.values()].map((group) => {
-    const ordered = [...group].sort((a, b) => Date.parse(a.bar_time) - Date.parse(b.bar_time));
-    const latest = ordered.at(-1);
-    const ageMinutes = latest ? (Date.now() - Date.parse(latest.bar_time)) / 60000 : Number.POSITIVE_INFINITY;
-    const freshnessLimit = timeframe === 'H1' ? 180 : timeframe === 'H4' ? 720 : 2880;
-    return { ordered, fresh: ageMinutes >= 0 && ageMinutes <= freshnessLimit, latestTime: latest ? Date.parse(latest.bar_time) : 0 };
-  });
-  candidates.sort((a, b) => Number(b.fresh) - Number(a.fresh) || b.ordered.length - a.ordered.length || b.latestTime - a.latestTime);
-  return candidates[0]?.ordered ?? [];
+function sourceKey(row: Candle) {
+  return [row.installation_id, row.symbol, row.broker, row.server].join('|');
 }
-
 function frameAnalysis(rows: Candle[], timeframe: string) {
   const bars = rows.filter((bar) => [bar.open, bar.high, bar.low, bar.close].every((value) => Number.isFinite(value) && value > 0)
     && bar.high >= bar.low && bar.high >= Math.max(bar.open, bar.close) && bar.low <= Math.min(bar.open, bar.close))
@@ -120,7 +104,7 @@ export async function GET(request: Request) {
         : Promise.resolve({ data: [], error: null }),
       getMacroSnapshot(),
       ...PAIRS.flatMap((pair) => FRAMES.map((timeframe) => installationIds.length
-        ? supabase.from('mt5_market_candles').select('symbol,timeframe,bar_time,open,high,low,close,is_closed,broker,server')
+        ? supabase.from('mt5_market_candles').select('installation_id,symbol,timeframe,bar_time,open,high,low,close,is_closed,broker,server')
             .in('installation_id', installationIds).ilike('symbol', pair + '%').eq('timeframe', timeframe).eq('is_closed', true)
             .order('bar_time', { ascending: false }).limit(250)
         : Promise.resolve({ data: [], error: null }))),
@@ -131,16 +115,38 @@ export async function GET(request: Request) {
     const quoteRows = (quoteResult.data ?? []) as Quote[];
     const policy = getPersonalRiskPolicy();
     const pairs = PAIRS.map((pair, pairIndex) => {
-      const frames = {} as Record<string, ReturnType<typeof frameAnalysis>>;
+      const sourceGroups = new Map<string, Record<string, Candle[]>>();
       FRAMES.forEach((timeframe, frameIndex) => {
         const result = candleResults[pairIndex * FRAMES.length + frameIndex];
-        const rows = selectSingleSeries((result.data ?? []) as Candle[], timeframe);
-        frames[timeframe] = frameAnalysis(rows, timeframe);
+        for (const row of (result.data ?? []) as Candle[]) {
+          const key = sourceKey(row);
+          const group = sourceGroups.get(key) ?? {};
+          group[timeframe] = group[timeframe] ?? [];
+          group[timeframe].push(row);
+          sourceGroups.set(key, group);
+        }
+      });
+      const candidates = [...sourceGroups.entries()].map(([key, grouped]) => {
+        const orderedByFrame = Object.fromEntries(FRAMES.map((timeframe) => [timeframe,
+          [...(grouped[timeframe] ?? [])].sort((a, b) => Date.parse(a.bar_time) - Date.parse(b.bar_time)),
+        ])) as Record<string, Candle[]>;
+        const completeFrames = FRAMES.filter((timeframe) => (orderedByFrame[timeframe]?.length ?? 0) >= 200).length;
+        const availableFrames = FRAMES.filter((timeframe) => (orderedByFrame[timeframe]?.length ?? 0) > 0).length;
+        const totalBars = FRAMES.reduce((sum, timeframe) => sum + (orderedByFrame[timeframe]?.length ?? 0), 0);
+        const latestTime = Math.max(0, ...FRAMES.map((timeframe) => Date.parse(orderedByFrame[timeframe]?.at(-1)?.bar_time ?? '') || 0));
+        return { key, orderedByFrame, completeFrames, availableFrames, totalBars, latestTime };
+      });
+      candidates.sort((a, b) => b.completeFrames - a.completeFrames || b.availableFrames - a.availableFrames
+        || b.totalBars - a.totalBars || b.latestTime - a.latestTime);
+      const selectedSource = candidates[0];
+      const frames = {} as Record<string, ReturnType<typeof frameAnalysis>>;
+      FRAMES.forEach((timeframe) => {
+        frames[timeframe] = frameAnalysis(selectedSource?.orderedByFrame[timeframe] ?? [], timeframe);
       });
       const h1Source = frames.H1;
       const quote = h1Source.symbol
         ? quoteRows.find((row) => row.symbol === h1Source.symbol && row.broker === h1Source.broker && row.server === h1Source.server)
-        : quoteRows.find((row) => row.symbol.toUpperCase().startsWith(pair));
+        : undefined;
       const quoteAgeSeconds = quote ? (Date.now() - Date.parse(quote.quote_time)) / 1000 : null;
       const quoteFresh = quoteAgeSeconds !== null && quoteAgeSeconds >= 0 && quoteAgeSeconds <= 120;
       const h1Atr = frames.H1.atr14;
