@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { supabaseInsert, supabaseRead } from '@/lib/supabaseAdmin';
 import { getPersonalRiskPolicy } from '@/lib/riskPolicy';
+import { getMacroSignal } from '@/lib/signalEngine';
 import { calculateBrokerAwareVolume, evaluateRiskProposal, type RiskContext, type RiskProposal } from '@/lib/quantGovernance';
 
 export const dynamic = 'force-dynamic';
@@ -88,7 +89,7 @@ export async function POST(request: Request) {
     if (!nonceRows) return NextResponse.json({ error: 'Replay protection could not be stored.' }, { status: 503 });
 
     const accountLogin = Number(body.account_login);
-    const [accounts, quotes, states] = await Promise.all([
+    const [accounts, quotes, states, macroSignal] = await Promise.all([
       supabaseRead<AccountSnapshot[]>(
         'mt5_account_snapshots',
         `select=account_login,currency,balance,equity,margin,free_margin,open_positions,open_risk_cash,open_risk_verified,captured_at&installation_id=eq.${installation.id}&account_login=eq.${accountLogin}&limit=1`,
@@ -101,6 +102,10 @@ export async function POST(request: Request) {
         'mt5_risk_state',
         `select=daily_start_equity,weekly_start_equity,high_water_mark_equity&installation_id=eq.${installation.id}&account_login=eq.${accountLogin}&limit=1`,
       ),
+      getMacroSignal(proposal.symbol).catch((error) => {
+        console.warn('EA supervisor macro context unavailable:', error);
+        return null;
+      }),
     ]);
 
     const account = accounts?.[0];
@@ -166,10 +171,10 @@ export async function POST(request: Request) {
       weeklyStartEquity: state.weekly_start_equity,
       highWaterMarkEquity: state.high_water_mark_equity,
       consecutiveLosses: Number.NaN,
-      regime: 'UNAVAILABLE',
-      marketDataHealth: snapshotAgeMs >= 0 && snapshotAgeMs <= 30_000 && quoteAgeMs >= 0 && quoteAgeMs <= 30_000 ? 'LIVE' : 'STALE',
-      macroDataHealth: 'UNAVAILABLE',
-      newsLockout: false,
+      regime: macroSignal?.regime ?? 'UNAVAILABLE',
+      marketDataHealth: snapshotAgeMs >= 0 && snapshotAgeMs <= 30_000 && quoteAgeMs >= 0 && quoteAgeMs <= 30_000 && macroSignal?.market_data_source !== 'unavailable' ? 'LIVE' : 'STALE',
+      macroDataHealth: macroSignal && !macroSignal.execution_blockers.includes('MACRO_DATA_NOT_VERIFIED') ? 'LIVE' : 'UNAVAILABLE',
+      newsLockout: macroSignal ? macroSignal.news_lockout : true,
       symbolSpec,
     };
     const unavailableBlockers: string[] = [];
@@ -178,6 +183,7 @@ export async function POST(request: Request) {
     }
     if (!Number.isFinite(context.consecutiveLosses)) unavailableBlockers.push('LOSS_STREAK_CONTEXT_UNAVAILABLE');
     if (context.macroDataHealth !== 'LIVE') unavailableBlockers.push('MACRO_NEWS_CONTEXT_UNAVAILABLE');
+    if (!macroSignal || macroSignal.market_data_source === 'unavailable') unavailableBlockers.push('TECHNICAL_MARKET_CONTEXT_UNAVAILABLE');
     if (snapshotAgeMs < 0 || snapshotAgeMs > 30_000) unavailableBlockers.push('ACCOUNT_SNAPSHOT_STALE');
     if (quoteAgeMs < 0 || quoteAgeMs > 30_000) unavailableBlockers.push('BROKER_QUOTE_STALE');
 
