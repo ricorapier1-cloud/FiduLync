@@ -84,9 +84,18 @@ export async function getMacroSignal(symbol: string, now = Date.now(), installat
     const verifiedPolicyInputs = Boolean(quoteCurrency
       && quoteCurrency.policyRateSource === 'provider'
       && quoteCurrency.inflationSource === 'provider'
-      && (normalizedSymbol.startsWith('XAU')
+      && (normalizedSymbol === 'XAUUSD'
         || (baseCurrency?.policyRateSource === 'provider' && baseCurrency.inflationSource === 'provider')));
-    const score = fundamental
+    const verifiedYieldInputs = Boolean(quoteCurrency?.twoYearYieldSource === 'provider'
+      && (normalizedSymbol === 'XAUUSD' || baseCurrency?.twoYearYieldSource === 'provider'));
+    // Reference and partial macro snapshots may be useful for display, but they
+    // must never create a directional signal for an EA.
+    const macroDataVerified = snapshot.source === 'provider'
+      && snapshot.cotSource === 'provider'
+      && snapshot.calendarSource === 'provider'
+      && verifiedPolicyInputs
+      && verifiedYieldInputs;
+    const score = fundamental && macroDataVerified
       ? Math.max(-100, Math.min(100, Math.round(fundamental.score * 0.6 + technical.score * 0.4)))
       : 0;
     const strengths = getCurrencyStrengthIndex(snapshot);
@@ -94,11 +103,12 @@ export async function getMacroSignal(symbol: string, now = Date.now(), installat
     const quoteStrength = strengths.find((item) => item.currency === normalizedSymbol.slice(3))?.score;
     // Gold is not a G10 currency. Model XAUUSD against the inverse USD strength
     // factor rather than treating the missing XAU currency score as zero.
-    const csiSpread = normalizedSymbol === 'XAUUSD'
+    const csiSpread = !macroDataVerified ? 0 : normalizedSymbol === 'XAUUSD'
       ? -(quoteStrength ?? 0)
       : baseStrength !== undefined && quoteStrength !== undefined ? baseStrength - quoteStrength : 0;
     const newsLockout = isNewsLockout(snapshot, now, normalizedSymbol);
-    const edgeQualified = Math.abs(csiSpread) >= 60 && Math.abs(score) >= 45;
+    const edgeQualified = technical.available && macroDataVerified
+      && Math.abs(csiSpread) >= 60 && Math.abs(score) >= 45;
     const bias = edgeQualified ? (score > 0 ? 'LONG' : 'SHORT') : 'NEUTRAL';
     const [base, quote] = [normalizedSymbol.slice(0, 3), normalizedSymbol.slice(3)];
     const correlationGroup = normalizedSymbol === 'XAUUSD'
@@ -119,10 +129,7 @@ export async function getMacroSignal(symbol: string, now = Date.now(), installat
         : false;
     const validStops = technical.atr_stop_pips !== null && technical.atr_stop_pips > 0
       && technical.atr_take_profit_pips !== null && technical.atr_take_profit_pips > 0;
-    const macroDataVerified = Boolean(fundamental)
-      && verifiedPolicyInputs
-      && snapshot.calendarSource === 'provider';
-    const riskBudget = deriveRiskBudget({
+        const riskBudget = deriveRiskBudget({
       regime: technical.regime,
       marketDataVerified: technical.available,
       macroDataVerified,
