@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     if (installError) throw installError;
     const ids = (installs ?? []).map((item) => item.id as string);
 
-    const [models, executions, positions] = await Promise.all([
+    const [models, executions, manifests] = await Promise.all([
       supabase.from('quant_model_registry')
         .select('id,model_key,model_version,market_scope,timeframe_scope,status,evidence,validation_metrics,reviewer_id,reviewed_at,created_at,updated_at')
         .order('created_at', { ascending: false }).limit(50),
@@ -25,25 +25,60 @@ export async function GET(request: Request) {
         .in('installation_id', ids).gte('event_time', new Date(Date.now() - 30 * 86400000).toISOString())
         .order('event_time', { ascending: false }).limit(500)
         : Promise.resolve({ data: [], error: null }),
-      ids.length ? supabase.from('mt5_open_position_snapshots')
-        .select('snapshot_id,captured_at,position_ticket,symbol,side,volume,profit_account_currency,snapshot_complete')
-        .in('installation_id', ids)
-        .order('captured_at', { ascending: false }).limit(500)
+      ids.length ? supabase.from('mt5_position_snapshot_manifests')
+        .select('installation_id,account_login,snapshot_id,captured_at,expected_positions,complete')
+        .in('installation_id', ids).eq('complete', true)
+        .order('captured_at', { ascending: false }).limit(1)
         : Promise.resolve({ data: [], error: null }),
     ]);
     if (models.error) throw models.error;
     if (executions.error) throw executions.error;
-    if (positions.error) throw positions.error;
+    if (manifests.error) throw manifests.error;
 
     const executionRows = executions.data ?? [];
     const fills = executionRows.filter((row) => row.event_type === 'fill' && typeof row.slippage_points === 'number');
     const slippage = fills.map((row) => Math.abs(Number(row.slippage_points))).sort((a, b) => a - b);
     const latency = executionRows.map((row) => row.latency_ms).filter((value): value is number => typeof value === 'number').sort((a, b) => a - b);
-    const latestPosition = positions.data?.[0];
-    const latestSnapshotRows = latestPosition
-      ? (positions.data ?? []).filter((row) => row.snapshot_id === latestPosition.snapshot_id)
-      : [];
-    const completePositionSnapshot = latestSnapshotRows.length > 0 && latestSnapshotRows.every((row) => row.snapshot_complete);
+    const latestManifest = manifests.data?.[0] ?? null;
+    const positionResult = latestManifest ? await supabase.from('mt5_open_position_snapshots')
+      .select('snapshot_id,captured_at,position_ticket,symbol,side,volume,price_open,stop_loss,take_profit,profit_account_currency,contract_size,base_currency,quote_currency,snapshot_complete')
+      .eq('installation_id', latestManifest.installation_id)
+      .eq('account_login', latestManifest.account_login)
+      .eq('snapshot_id', latestManifest.snapshot_id)
+      .order('position_ticket', { ascending: true }) : { data: [], error: null };
+    if (positionResult.error) throw positionResult.error;
+    const latestSnapshotRows = positionResult.data ?? [];
+    const expectedPositions = Number(latestManifest?.expected_positions ?? -1);
+    const completePositionSnapshot = Boolean(latestManifest?.complete)
+      && expectedPositions >= 0 && latestSnapshotRows.length === expectedPositions
+      && latestSnapshotRows.every((row) => row.snapshot_complete);
+    const exposureMap = new Map<string, { currency: string; net_units: number; gross_units: number; positions: number }>();
+    const unresolvedExposure: string[] = [];
+    if (completePositionSnapshot) {
+      for (const position of latestSnapshotRows) {
+        const base = typeof position.base_currency === 'string' ? position.base_currency : '';
+        const quote = typeof position.quote_currency === 'string' ? position.quote_currency : '';
+        const contract = Number(position.contract_size);
+        const volume = Number(position.volume);
+        const price = Number(position.price_open);
+        if (!base || !quote || !Number.isFinite(contract) || contract <= 0 || !Number.isFinite(volume)
+          || volume <= 0 || !Number.isFinite(price) || price <= 0) {
+          unresolvedExposure.push(String(position.symbol));
+          continue;
+        }
+        const direction = position.side === 'BUY' ? 1 : -1;
+        const baseUnits = direction * volume * contract;
+        const quoteUnits = -direction * volume * contract * price;
+        for (const [currency, signedUnits] of [[base, baseUnits], [quote, quoteUnits]] as const) {
+          const current = exposureMap.get(currency) ?? { currency, net_units: 0, gross_units: 0, positions: 0 };
+          current.net_units += signedUnits;
+          current.gross_units += Math.abs(signedUnits);
+          current.positions += 1;
+          exposureMap.set(currency, current);
+        }
+      }
+    }
+    const currencyExposure = [...exposureMap.values()].sort((a, b) => b.gross_units - a.gross_units);
     const modelRows = models.data ?? [];
 
     return NextResponse.json({
@@ -66,11 +101,20 @@ export async function GET(request: Request) {
         status: executionRows.length ? 'EVIDENCE_CAPTURED_PENDING_REVIEW' : 'AWAITING_MT5_FILLS',
       },
       positions: {
-        snapshot_id: completePositionSnapshot ? latestPosition.snapshot_id : null,
-        captured_at: completePositionSnapshot ? latestPosition.captured_at : null,
+        snapshot_id: completePositionSnapshot ? latestManifest.snapshot_id : null,
+        captured_at: completePositionSnapshot ? latestManifest.captured_at : null,
+        expected_positions: latestManifest ? expectedPositions : null,
         complete: completePositionSnapshot,
-        positions: completePositionSnapshot ? latestSnapshotRows.length : null,
+        positions: completePositionSnapshot ? latestSnapshotRows.map((row) => ({
+          ticket: row.position_ticket, symbol: row.symbol, side: row.side, volume: row.volume,
+          entry: row.price_open, stop_loss: row.stop_loss, take_profit: row.take_profit,
+          floating_profit: row.profit_account_currency,
+        })) : null,
+        position_count: completePositionSnapshot ? latestSnapshotRows.length : null,
         floating_profit: completePositionSnapshot ? latestSnapshotRows.reduce((sum, row) => sum + Number(row.profit_account_currency ?? 0), 0) : null,
+        currency_exposure_units: completePositionSnapshot ? currencyExposure : null,
+        exposure_unresolved_symbols: completePositionSnapshot ? unresolvedExposure : null,
+        exposure_basis: 'Native currency units derived from broker contract size and entry price; not converted into account-currency risk.',
         status: completePositionSnapshot ? 'SNAPSHOT_CAPTURED' : 'AWAITING_COMPLETE_MT5_POSITION_SNAPSHOT',
       },
       execution_enabled: false,
