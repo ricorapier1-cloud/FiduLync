@@ -9,6 +9,22 @@ type Overview = {
   generated_at: string;
   market_data: { active_installations: number; total_installations: number; latest_heartbeat: string | null; latest_heartbeat_age_seconds: number | null; latest_candle: { symbol: string; timeframe: string; bar_time: string; broker: string; server: string } | null; latest_candle_age_minutes: number | null; latest_quote: { symbol: string; quote_time: string; broker: string; server: string } | null; latest_quote_age_seconds: number | null };
   installations: Installation[];
+  risk_policy: {
+    policy_version: string;
+    execution_enabled: boolean;
+    model_validated: boolean;
+    execution_quality_verified: boolean;
+    max_per_trade_risk_pct: number;
+    max_portfolio_risk_pct: number;
+    max_daily_drawdown_pct: number;
+    max_weekly_drawdown_pct: number;
+    max_high_water_drawdown_pct: number;
+    max_margin_usage_pct: number;
+    max_spread_points: number;
+    max_quote_age_ms: number;
+    max_consecutive_losses: number;
+    reward_risk_minimum: number;
+  };
   database: { reachable: boolean; installation_records: number };
   governance: { audit_log: string; multi_role_access: string; step_up_authentication: string; model_validation_registry: string; portfolio_risk_telemetry: string };
 };
@@ -165,13 +181,31 @@ export default function OwnerOperations({ accessToken, email, role, onSignOut }:
           <ReadinessRow label="Independent data checks" value="Required" note="Broker-specific FX prices are not a consolidated market feed; compare independent sources and preserve source provenance." />
         </Panel>}
 
-        {active === 'risk' && <Panel title="Risk control centre" subtitle="The control plane can restrict system eligibility; it must never force a trade or bypass a risk gate.">
-          <ReadinessRow label="Execution eligibility" value="Fail-closed principle" note="Missing or stale market data must result in unavailable execution eligibility, not a fabricated green status." tone="good" />
-          <ReadinessRow label="Portfolio exposure / margin" value="Not connected" note="No live account equity, open positions, leverage, margin level or cross-account exposure telemetry is currently connected." />
-          <ReadinessRow label="Drawdown and loss limits" value="Not centrally verified" note="A central risk register and runtime telemetry are not yet exposed to this owner console." />
-          <ReadinessRow label="Emergency execution disable" value="Not implemented here" note="No dashboard switch is presented until a server-enforced, audited kill control is implemented end-to-end." />
-          <ReadinessRow label="Administrative override" value="Prohibited" note="Owner access must not override SL/TP, margin checks, exposure caps, signal quality gates or account risk constraints." tone="good" />
-        </Panel>}
+        {active === 'risk' && <div className="space-y-5">
+          <Panel title="Server-owned risk policy" subtitle="Read-only policy snapshot. The browser and EA cannot edit thresholds or enable execution.">
+            <ReadinessRow label="Policy version" value={overview?.risk_policy.policy_version ?? 'Unavailable'} note="Loaded from server-only policy configuration." tone="good" />
+            <ReadinessRow label="Order approval" value={overview?.risk_policy.execution_enabled ? 'Enabled by owner policy' : 'Disabled — fail closed'} note="Execution remains disabled until the model, execution path, account telemetry and demo validation are independently approved." tone={overview?.risk_policy.execution_enabled ? 'bad' : 'good'} />
+            <ReadinessRow label="Model validation evidence" value={overview?.risk_policy.model_validated ? 'Approved' : 'Not approved'} note="No out-of-sample and walk-forward validation registry is connected." tone={overview?.risk_policy.model_validated ? 'good' : 'warn'} />
+            <ReadinessRow label="Execution-quality evidence" value={overview?.risk_policy.execution_quality_verified ? 'Approved' : 'Not verified'} note="Broker-specific slippage, reject rate, latency and cost evidence is not yet connected." tone={overview?.risk_policy.execution_quality_verified ? 'good' : 'warn'} />
+          </Panel>
+          <Panel title="Configured risk ceilings" subtitle="Initial server defaults based on the existing Quant_Core guardrails; these are ceilings, not recommended risk targets.">
+            <ReadinessRow label="Maximum risk per trade" value={overview ? overview.risk_policy.max_per_trade_risk_pct + '%' : '—'} note="Position size is rounded down to broker volume steps; minimum-lot risk above budget is rejected." />
+            <ReadinessRow label="Maximum open portfolio risk" value={overview ? overview.risk_policy.max_portfolio_risk_pct + '%' : '—'} note="Requires verified open-position risk telemetry before any approval can be considered." />
+            <ReadinessRow label="Daily drawdown stop" value={overview ? overview.risk_policy.max_daily_drawdown_pct + '%' : '—'} note="Measured against the server-maintained daily starting equity." />
+            <ReadinessRow label="Weekly drawdown stop" value={overview ? overview.risk_policy.max_weekly_drawdown_pct + '%' : '—'} note="Measured against the server-maintained weekly starting equity." />
+            <ReadinessRow label="High-water drawdown stop" value={overview ? overview.risk_policy.max_high_water_drawdown_pct + '%' : '—'} note="Hard equity shield threshold; no automatic reactivation after a breach." />
+            <ReadinessRow label="Maximum margin usage" value={overview ? overview.risk_policy.max_margin_usage_pct + '%' : '—'} note="Includes existing used margin plus the proposed trade margin." />
+            <ReadinessRow label="Maximum spread" value={overview ? overview.risk_policy.max_spread_points + ' points' : '—'} note="Broker symbol point size must be verified per instrument." />
+            <ReadinessRow label="Maximum quote age" value={overview ? overview.risk_policy.max_quote_age_ms + ' ms' : '—'} note="Stale quote state results in DEGRADED, never approval." />
+            <ReadinessRow label="Loss-streak breaker" value={overview ? overview.risk_policy.max_consecutive_losses + ' consecutive losses' : '—'} note="Requires complete, account-isolated closed-trade history." />
+            <ReadinessRow label="Minimum reward / risk" value={overview ? overview.risk_policy.reward_risk_minimum.toFixed(2) + 'R' : '—'} note="A threshold, not a guarantee of positive expectancy." />
+          </Panel>
+          <Panel title="Account telemetry and overrides" subtitle="The current live account and control surface is intentionally incomplete.">
+            <ReadinessRow label="Portfolio exposure / margin" value="Not connected" note="No live account equity, open positions, leverage, margin level or cross-account exposure telemetry is currently connected." />
+            <ReadinessRow label="Emergency execution disable" value="Server policy disabled" note="No browser toggle exists. Any future change requires a server-enforced, audited owner action." tone="good" />
+            <ReadinessRow label="Administrative override" value="Prohibited" note="Owner access must not override SL/TP, margin checks, exposure caps, signal quality gates or account risk constraints." tone="good" />
+          </Panel>
+        </div>}
 
         {active === 'security' && <Panel title="Security and audit" subtitle="Privileged access must be authenticated server-side, attributable and reviewable.">
           <ReadinessRow label="Owner identity check" value="Verified per API request" note={'Authenticated owner: ' + email} tone="good" />
