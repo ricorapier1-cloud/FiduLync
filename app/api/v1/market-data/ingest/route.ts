@@ -10,6 +10,7 @@ type Installation = { id: string; status: string };
 type Quote = { symbol: string; bid: number; ask: number; quote_time: string; spread_points: number; digits?: number; point?: number; tick_size?: number; tick_value?: number; tick_value_loss?: number; tick_value_profit?: number; contract_size?: number; volume_min?: number; volume_max?: number; volume_step?: number; stop_level_points?: number; margin_per_lot_buy?: number; margin_per_lot_sell?: number; broker?: string; server?: string };
 type Candle = { symbol: string; timeframe: 'H1' | 'H4' | 'D1'; bar_time: string; open: number; high: number; low: number; close: number; tick_volume?: number; spread_points?: number; real_volume?: number; is_closed?: boolean; broker?: string; server?: string; digits?: number; point?: number; tick_size?: number; tick_value?: number; contract_size?: number };
 type PositionSnapshot = { snapshot_id: string; captured_at: string; account_login: number; expected_positions: number; positions: Record<string, unknown>[] };
+type ExecutionEvent = { event_id: string; event_type: 'FILL' | 'DEAL_CLOSE'; symbol: string; side: 'BUY' | 'SELL'; fill_price: number; volume: number; event_time: string; broker_code?: string | null };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -44,7 +45,8 @@ export async function POST(request: Request) {
   }
   if (!isRecord(body) || !Array.isArray(body.quotes) || !Array.isArray(body.candles)
     || body.quotes.length > 50 || body.candles.length > 1_000
-    || body.quotes.length + body.candles.length === 0 && body.account_snapshot == null && body.position_snapshot == null) {
+    || !Array.isArray(body.execution_events ?? []) || (body.execution_events as unknown[]).length > 500
+    || body.quotes.length + body.candles.length === 0 && body.account_snapshot == null && body.position_snapshot == null && !(Array.isArray(body.execution_events) && body.execution_events.length)) {
     return NextResponse.json({ error: 'Payload must contain up to 50 quotes and 1,000 candles.' }, { status: 400 });
   }
 
@@ -120,6 +122,20 @@ export async function POST(request: Request) {
         rows.push(raw);
       }
       positionSnapshot = { ...rawPositionSnapshot, positions: rows } as PositionSnapshot;
+    }
+
+    const executionEvents: ExecutionEvent[] = [];
+    for (const raw of (body.execution_events ?? []) as unknown[]) {
+      if (!isRecord(raw) || typeof raw.event_id !== 'string' || !/^[A-Za-z0-9._:-]{1,80}$/.test(raw.event_id)
+        || !['FILL', 'DEAL_CLOSE'].includes(String(raw.event_type))
+        || !validSymbol(raw.symbol) || !['BUY', 'SELL'].includes(String(raw.side))
+        || typeof raw.fill_price !== 'number' || !Number.isFinite(raw.fill_price) || raw.fill_price <= 0
+        || typeof raw.volume !== 'number' || !Number.isFinite(raw.volume) || raw.volume <= 0
+        || typeof raw.event_time !== 'string' || !validTime(raw.event_time, true)
+        || (raw.broker_code !== undefined && raw.broker_code !== null && (typeof raw.broker_code !== 'string' || raw.broker_code.length > 80))) {
+        return NextResponse.json({ error: 'One or more execution events failed validation.' }, { status: 400 });
+      }
+      executionEvents.push(raw as ExecutionEvent);
     }
 
     const quotes: Quote[] = [];
@@ -203,6 +219,49 @@ export async function POST(request: Request) {
       });
       if (!snapshotResult) throw new Error('Account snapshot storage failed.');
     }
+    let executionEventsReceived = 0;
+    if (executionEvents.length) {
+      const eventRows = executionEvents.map((event) => {
+        const evidence = {
+          installation_id: installation.id,
+          account_login: Number(accountSnapshot?.account_login ?? (positionSnapshot?.account_login ?? 0)),
+          event_id: event.event_id,
+          event_type: event.event_type,
+          symbol: event.symbol.toUpperCase(),
+          side: event.side,
+          fill_price: event.fill_price,
+          volume: event.volume,
+          event_time: event.event_time,
+        };
+        return {
+          installation_id: installation.id,
+          account_login: evidence.account_login,
+          event_id: event.event_id,
+          event_type: event.event_type,
+          symbol: event.symbol.toUpperCase(),
+          side: event.side,
+          requested_price: null,
+          fill_price: event.fill_price,
+          volume: event.volume,
+          spread_points: null,
+          slippage_points: null,
+          latency_ms: null,
+          broker_code: event.broker_code ?? null,
+          event_time: event.event_time,
+          evidence_hash: createHash('sha256').update(JSON.stringify(evidence)).digest('hex'),
+        };
+      });
+      if (eventRows.some((row) => !Number.isSafeInteger(row.account_login) || row.account_login <= 0)) {
+        return NextResponse.json({ error: 'Execution events require a verified account snapshot.' }, { status: 400 });
+      }
+      const insertedEvents = await supabaseQuery('mt5_execution_quality_events', {
+        method: 'POST', query: 'on_conflict=installation_id,event_id',
+        prefer: 'resolution=ignore-duplicates,return=minimal', body: eventRows,
+      });
+      if (!insertedEvents) throw new Error('Execution evidence could not be stored.');
+      executionEventsReceived = eventRows.length;
+    }
+
     let positionsReceived = 0;
     if (positionSnapshot) {
       const positionRows = positionSnapshot.positions.map((position) => ({
@@ -256,6 +315,7 @@ export async function POST(request: Request) {
       accepted: true, installation_id: installation.id,
       quotes_received: quotes.length, candles_received: candles.length, account_snapshot_received: Boolean(accountSnapshot),
       positions_received: positionsReceived, position_snapshot_complete: Boolean(positionSnapshot),
+      execution_events_received: executionEventsReceived,
       received_at_utc: new Date().toISOString(),
     }, { status: 202, headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
