@@ -218,9 +218,11 @@ def build_verified_loss_streak(positions: Any) -> tuple[int | None, bool, str | 
     try:
         deals = mt5.history_deals_get(datetime(2000, 1, 1, tzinfo=timezone.utc), now_utc)
     except Exception as exc:
+        _loss_streak_cache = None
         print(f"WARNING: MT5 closed-trade history unavailable: {exc}")
         return None, False, None
     if deals is None:
+        _loss_streak_cache = None
         print(f"WARNING: MT5 history_deals_get failed: {mt5.last_error()}")
         return None, False, None
 
