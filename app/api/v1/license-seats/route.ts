@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 type License = {
   license_key: string; ea_slug: string | null; status: string | null; expires_at: string | null;
-  included_live_seats: number; extra_live_seats: number; included_demo_seats: number;
+  included_live_seats: number; extra_live_seats: number; included_demo_seats: number; tier: string; mt5_account: number | null;
 };
 
 export async function POST(request: Request) {
@@ -31,6 +31,9 @@ export async function POST(request: Request) {
     if (!license || !license.ea_slug) return NextResponse.json({ success: false, error: 'Subscription not found.' }, { status: 404 });
 
     if (action === 'bind') {
+      if (String(license.tier).toUpperCase() === 'DEMO_TRIAL') {
+        return NextResponse.json({ success: false, error: 'Demo trial accounts are permanently locked to the MT5 demo login used at registration.' }, { status: 403 });
+      }
       const slotType = body.slot_type === 'DEMO' ? 'DEMO' : body.slot_type === 'LIVE' ? 'LIVE' : '';
       const slotNumber = Number(body.slot_number);
       const newLoginText = String(body.new_mt5_login ?? '').trim();
@@ -51,6 +54,10 @@ export async function POST(request: Request) {
         },
       });
       return NextResponse.json({ success: true, result }, { headers: { 'Cache-Control': 'no-store' } });
+    }
+
+    if (String(license.tier).toUpperCase() === 'DEMO_TRIAL') {
+      return NextResponse.json({ success: true, ea_slug: license.ea_slug, status: license.status, expires_at: license.expires_at, demo_locked: true, slots: [{ slot_type: 'DEMO', slot_number: 1, mt5_login: license.mt5_account, broker_server: null, rebind_available_at: null }] }, { headers: { 'Cache-Control': 'no-store' } });
     }
 
     const rows = await supabaseRead<Array<{
