@@ -6,6 +6,7 @@
 
 input string InpFiduLyncBaseUrl="https://fidulync.vercel.app";
 input string InpInstallationId="";
+input string InpCanonicalSymbol=""; // Canonical publisher symbol when broker symbols have suffixes.
 input string InpPublisherToken="";
 input double InpRequestedRiskPct=0.25;
 input int    InpStopDistancePoints=300;
@@ -45,7 +46,8 @@ void OnTick()
    double target=entry+(InpStopDistancePoints*point*InpRewardRisk);
    string decision,reason;
    double approvedVolume=0.0;
-   bool approved=Supervisor.RequestDecision(_Symbol,"BUY",entry,stop,target,
+   string canonicalSymbol=(InpCanonicalSymbol=="" ? _Symbol : InpCanonicalSymbol);
+   bool approved=Supervisor.RequestDecision(canonicalSymbol,"BUY",entry,stop,target,
                                             InpRequestedRiskPct,AccountInfoInteger(ACCOUNT_LOGIN),
                                             decision,approvedVolume,reason);
    PrintFormat("FiduLync supervisor response: decision=%s approved=%s volume=%.2f reason=%s",
