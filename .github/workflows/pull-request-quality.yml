@@ -20,6 +20,10 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Report dependency vulnerability summary
+        run: |
+          npm audit --json > /tmp/fidulync-npm-audit.json || true
+          node -e "const r=require('/tmp/fidulync-npm-audit.json'); const v=r.vulnerabilities||{}; console.log('Dependency audit totals:', JSON.stringify(r.metadata?.vulnerabilities||{})); for (const [name,item] of Object.entries(v)) console.log(name, 'severity='+item.severity, 'direct='+item.isDirect, 'fixAvailable='+JSON.stringify(item.fixAvailable));"
       - name: TypeScript
         run: npx tsc --noEmit
       - name: Quant governance unit tests
