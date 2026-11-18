@@ -9,23 +9,23 @@ const jetBrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jet
 
 export const metadata: Metadata = {
   metadataBase: getAppBaseUrl(),
-  applicationName: 'MacroLync & AlgoLync Terminal',
+  applicationName: 'FiduLync Personal Quant Edition',
   title: {
-    default: 'MacroLync & AlgoLync | Institutional Trading Terminal',
-    template: '%s | MacroLync & AlgoLync',
+    default: 'FiduLync Personal Quant | Private Trading Intelligence',
+    template: '%s | FiduLync Personal Quant',
   },
-  description: 'MacroLync quantitative FX and macro research with the AlgoLync strategy vault and MT5 telemetry bridge.',
+  description: 'Private quantitative market research, disciplined risk planning and MT5 EA supervision for personal trading.',
   openGraph: {
     type: 'website',
-    siteName: 'MacroLync & AlgoLync',
-    title: 'MacroLync & AlgoLync | Institutional Trading Terminal',
-    description: 'MacroLync quantitative FX and macro research with the AlgoLync strategy vault and MT5 telemetry bridge.',
+    siteName: 'FiduLync Personal Quant',
+    title: 'FiduLync Personal Quant | Private Trading Intelligence',
+    description: 'Private quantitative market research, disciplined risk planning and MT5 EA supervision for personal trading.',
     images: ['/opengraph-image.png'],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'MacroLync & AlgoLync | Institutional Trading Terminal',
-    description: 'MacroLync FX research, AlgoLync strategies, event risk, and MT5 fleet telemetry.',
+    title: 'FiduLync Personal Quant | Private Trading Intelligence',
+    description: 'Private quantitative market research, disciplined risk planning and MT5 EA supervision for personal trading.',
     images: ['/opengraph-image.png'],
   },
 };
