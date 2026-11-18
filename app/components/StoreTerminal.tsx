@@ -88,9 +88,16 @@ export default function StoreTerminal({ initialSnapshot, session }: StoreTermina
           </aside>
         </div>}
 
-        <div className="mt-8 flex items-center gap-2 border-t border-white/[0.07] pt-5 text-[10px] leading-5 text-slate-600">
-          <BrandGlyph name="shield" size={13} className="shrink-0" />
-          <span>Internal research tooling. Trading is risky; every EA must retain its own account-level equity and drawdown protections.</span>
+        <div className="mt-8 flex flex-col gap-3 border-t border-white/[0.07] pt-5 text-[10px] leading-5 text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <BrandGlyph name="shield" size={13} className="shrink-0" />
+            <span>Research and software only. Trading is risky; every EA must retain its own account-level equity and drawdown protections.</span>
+          </div>
+          <nav aria-label="Legal information" className="flex flex-wrap gap-4">
+            <a href="/terms" className="text-slate-400 underline underline-offset-4 hover:text-emerald-300">Terms &amp; Risk Disclosure</a>
+            <a href="/refund-policy" className="text-slate-400 underline underline-offset-4 hover:text-emerald-300">Refund &amp; Cancellation</a>
+            <a href="mailto:fidulync@gmail.com" className="text-slate-400 underline underline-offset-4 hover:text-emerald-300">Customer Support</a>
+          </nav>
         </div>
       </div>
     </div>
