@@ -29,17 +29,32 @@ export async function GET(request: Request) {
     const installationIds = activeInstallations.map((item) => item.id);
     let candleData: { id: string; bar_time: string; symbol: string; timeframe: string; broker: string; server: string } | null = null;
     let quoteData: { symbol: string; quote_time: string; broker: string; server: string } | null = null;
+    let accountRisk: { account_login: number; currency: string; equity: number; margin: number; free_margin: number; open_positions: number; open_risk_cash: number; open_risk_verified: boolean; captured_at: string; consecutive_losses: number | null; loss_streak_verified: boolean; history_synced_at: string | null } | null = null;
+    let riskAnchorsAvailable = false;
+    let latestDecision: { decision: string; symbol: string; evaluated_at: string; blockers: string[] } | null = null;
     if (installationIds.length) {
-      const [candles, quotes] = await Promise.all([
+      const [candles, quotes, snapshots, anchors, decisions] = await Promise.all([
         supabase.from('mt5_market_candles').select('id,bar_time,symbol,timeframe,broker,server')
           .in('installation_id', installationIds).order('bar_time', { ascending: false }).limit(1),
         supabase.from('mt5_market_quotes').select('symbol,quote_time,broker,server')
           .in('installation_id', installationIds).order('quote_time', { ascending: false }).limit(1),
+        supabase.from('mt5_account_snapshots').select('account_login,currency,equity,margin,free_margin,open_positions,open_risk_cash,open_risk_verified,captured_at,consecutive_losses,loss_streak_verified,history_synced_at')
+          .in('installation_id', installationIds).order('captured_at', { ascending: false }).limit(1),
+        supabase.from('mt5_risk_state').select('installation_id,account_login,updated_at')
+          .in('installation_id', installationIds).order('updated_at', { ascending: false }).limit(1),
+        supabase.from('mt5_risk_decisions').select('decision,symbol,evaluated_at,blockers')
+          .in('installation_id', installationIds).order('evaluated_at', { ascending: false }).limit(1),
       ]);
       if (candles.error) throw candles.error;
       if (quotes.error) throw quotes.error;
+      if (snapshots.error) throw snapshots.error;
+      if (anchors.error) throw anchors.error;
+      if (decisions.error) throw decisions.error;
       candleData = candles.data?.[0] ?? null;
       quoteData = quotes.data?.[0] ?? null;
+      accountRisk = snapshots.data?.[0] ?? null;
+      riskAnchorsAvailable = Boolean(anchors.data?.length);
+      latestDecision = decisions.data?.[0] ?? null;
     }
 
     const now = Date.now();
@@ -48,6 +63,11 @@ export async function GET(request: Request) {
     const latestHeartbeat = activeInstallations
       .map((item) => item.last_seen_at ? Date.parse(item.last_seen_at) : 0)
       .reduce((latest, value) => Math.max(latest, value), 0);
+    const accountSnapshotAgeMs = accountRisk ? now - Date.parse(accountRisk.captured_at) : null;
+    const accountSnapshotFresh = accountSnapshotAgeMs !== null && accountSnapshotAgeMs >= 0 && accountSnapshotAgeMs <= 30_000;
+    const historyAgeMs = accountRisk?.history_synced_at ? now - Date.parse(accountRisk.history_synced_at) : null;
+    const lossStreakFresh = Boolean(accountRisk?.loss_streak_verified && accountRisk.consecutive_losses !== null
+      && historyAgeMs !== null && historyAgeMs >= 0 && historyAgeMs <= 30_000);
 
     return NextResponse.json({
       generated_at: new Date().toISOString(),
@@ -63,6 +83,15 @@ export async function GET(request: Request) {
         latest_quote_age_seconds: quoteAgeMs === null ? null : Math.max(0, Math.round(quoteAgeMs / 1000)),
       },
       installations: installations ?? [],
+      account_risk: {
+        latest_snapshot: accountRisk,
+        snapshot_age_seconds: accountSnapshotAgeMs === null ? null : Math.max(0, Math.round(accountSnapshotAgeMs / 1000)),
+        snapshot_fresh: accountSnapshotFresh,
+        open_risk_verified: Boolean(accountRisk?.open_risk_verified),
+        risk_anchors_available: riskAnchorsAvailable,
+        loss_streak_verified: lossStreakFresh,
+        latest_decision: latestDecision,
+      },
       risk_policy: {
         policy_version: riskPolicy.policyVersion,
         execution_enabled: riskPolicy.executionEnabled,
@@ -85,7 +114,7 @@ export async function GET(request: Request) {
         multi_role_access: 'owner_only',
         step_up_authentication: 'not_configured',
         model_validation_registry: 'not_connected',
-        portfolio_risk_telemetry: 'not_connected',
+        portfolio_risk_telemetry: accountRisk && accountSnapshotFresh && accountRisk.open_risk_verified && riskAnchorsAvailable ? 'connected' : accountRisk ? 'partial' : 'not_connected',
       },
     }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
   } catch (error) {
