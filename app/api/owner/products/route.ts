@@ -44,11 +44,11 @@ export async function PATCH(request: Request) {
       }
       update[field] = Math.round(value * 100) / 100;
     }
-    if (update.monthly_price_ngn > 0 && update.annual_price_ngn > update.monthly_price_ngn * 12) {
-      return NextResponse.json({ error: 'Annual NGN price cannot exceed twelve monthly payments.' }, { status: 400 });
+    if (update.annual_price_ngn !== update.monthly_price_ngn * 10) {
+      return NextResponse.json({ error: 'Annual NGN pricing must equal ten monthly payments (two months free).' }, { status: 400 });
     }
-    if (update.monthly_price_usd > 0 && update.annual_price_usd > update.monthly_price_usd * 12) {
-      return NextResponse.json({ error: 'Annual USD price cannot exceed twelve monthly payments.' }, { status: 400 });
+    if (Math.abs(update.annual_price_usd - update.monthly_price_usd * 10) > 0.01) {
+      return NextResponse.json({ error: 'Annual USD pricing must equal ten monthly payments (two months free).' }, { status: 400 });
     }
     const updated = await supabaseQuery<Product[]>('ea_products', {
       method: 'PATCH', query: `slug=eq.${encodeURIComponent(slug)}&select=slug,name,monthly_price_ngn,monthly_price_usd,annual_price_ngn,annual_price_usd,extra_seat_price_ngn,extra_seat_price_usd`,
