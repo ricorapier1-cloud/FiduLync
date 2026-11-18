@@ -1,4 +1,3 @@
-import { QuantStrategyCatalog } from "@/components/QuantStrategyCatalog";
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Metadata } from 'next';
