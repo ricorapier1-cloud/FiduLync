@@ -17,11 +17,11 @@ The EA supervisor is not a broker execution service. It returns APPROVE / REDUCE
 
 ## Technical data contract
 
-The desk uses closed candles only and requires at least 200 valid closed bars on each of D1, H4 and H1 before full multi-timeframe alignment is available. It computes EMA(20/50/200), Wilder ATR(14) and Wilder RSI(14). Candle streams are selected from one installation, broker, server and symbol across all three timeframes; data from different sources must never be spliced into one indicator series.
+The desk uses closed candles only and requires at least 200 valid closed bars on each of D1, H4 and H1 before full multi-timeframe alignment is available. It computes EMA(20/50/200), Wilder ATR(14), Wilder RSI(14), ALMA(20), KAMA(10), Gaussian Z-score, Kaufman Efficiency Ratio, ADX(14), a lag-variance Hurst exponent, 100-bar log-price trend R-squared, and 20-day ADR with current daily-range/ADR ratio. The trend-regime classifier uses ADX, KER, Hurst and R-squared together; these are diagnostics and filters, not proof of edge. Candle streams are selected from one installation, broker, server and symbol across all three timeframes; data from different sources must never be spliced into one indicator series.
 
-A quote must belong to that same selected installation/broker/symbol stream and be no older than 120 seconds. The research spread guard uses the server-owned maximum spread and spread/ATR ceiling. A technical-data-ready state is not a model approval or a trade instruction.
+A quote must belong to that same selected installation/broker/symbol stream and be no older than the server-owned two-second quote freshness limit. The read-only MT5 publisher now separates one-second quote updates from five-second account/position snapshots and a 15-second closed-candle synchronization cadence. Publisher output reports ingestion round-trip time; this is a target cadence, not a measured guarantee of end-to-end EA latency. The research spread guard uses the server-owned maximum spread and spread/ATR ceiling. A technical-data-ready state is not a model approval or a trade instruction.
 
-## Fundamental data contract
+## Position and exposure evidence\n\nThe MT5 publisher now sends a complete position set with a UUID snapshot ID, account login, capture time and expected position count. The ingestion API validates each position, inserts the position rows, then writes a completion manifest last. Owner governance only reads snapshots with a complete manifest and matching row count. An explicit zero-position manifest is a valid flat snapshot; missing or incomplete data is not. Native base/quote currency exposure is estimated from broker contract size and entry price. These currency units are not converted into account-currency risk and must not be confused with the broker-aware stop-risk calculation.\n\n## Fundamental data contract
 
 A pair's fundamental state is verified only when:
 - The current macro snapshot is no older than 24 hours and is not fallback reference data.
@@ -49,6 +49,6 @@ Production Auth setup still requires:
 
 The owner desk is deliberately honest about missing evidence. At the last database check, MT5 installations, market quotes, candles, account snapshots, position snapshots, execution-quality events, model records and macro snapshots were all empty. The desk must remain in awaiting-data / blocked states until authenticated data arrives.
 
-Remaining terminal-dependent gates: install and run the MT5 publisher, compile MQL5 in MetaEditor with zero errors/warnings, validate broker contract specifications and margin/stops, run Strategy Tester, demo forward-test, and independently reconcile execution and position evidence.
+Remaining terminal-dependent gates: install and run the updated MT5 publisher, verify its one-second quote cadence and observed RTT on the actual VPS/broker path, compile MQL5 in MetaEditor with zero errors/warnings, validate broker contract specifications and margin/stops, run Strategy Tester, demo forward-test, and independently reconcile execution and position evidence.
 
 No profitability guarantee is made. Research-input readiness does not mean a strategy has positive expectancy or is safe for live capital.
