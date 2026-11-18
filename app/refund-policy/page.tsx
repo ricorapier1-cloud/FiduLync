@@ -23,7 +23,7 @@ export default function RefundPolicyPage() {
           </section>
           <section className="rounded-xl border border-white/10 bg-[#0c1016] p-5">
             <h2 className="font-semibold text-white">2. Recurring subscriptions and cancellation</h2>
-            <p className="mt-2">Monthly subscriptions renew monthly and annual subscriptions renew annually through Paystack using the customer's payment authorization. The checkout page displays the price, billing interval and included seats before payment. Annual pricing is ten monthly payments, equivalent to two months free.</p>
+            <p className="mt-2">Monthly subscriptions renew monthly and annual subscriptions renew annually through Paystack using the customer&apos;s payment authorization. The checkout page displays the price, billing interval and included seats before payment. Annual pricing is ten monthly payments, equivalent to two months free.</p>
             <p className="mt-2">Customers may request cancellation through the subscription-management link or by contacting support. Cancellation stops future renewals. Access normally continues until the end of the paid billing period, subject to the applicable licence terms, payment status and any disclosed grace period. Cancelling a subscription does not automatically refund a billing period already started.</p>
           </section>
           <section className="rounded-xl border border-white/10 bg-[#0c1016] p-5">
@@ -34,13 +34,13 @@ export default function RefundPolicyPage() {
               <li>an amount charged incorrectly compared with the checkout confirmation;</li>
               <li>a confirmed payment for which the purchased digital entitlement was not delivered and cannot reasonably be restored;</li>
               <li>a material service-access failure attributable to FiduLync that remains unresolved after we have had a reasonable opportunity to correct it; or</li>
-              <li>any other circumstance where a refund is required by applicable law or Paystack's applicable rules.</li>
+              <li>any other circumstance where a refund is required by applicable law or Paystack&apos;s applicable rules.</li>
             </ul>
             <p className="mt-2">Refund requests are reviewed individually against payment records, entitlement logs and delivery status. Where a refund is approved, it is returned through the original payment channel where supported by the payment provider.</p>
           </section>
           <section className="rounded-xl border border-white/10 bg-[#0c1016] p-5">
             <h2 className="font-semibold text-white">4. Digital licences, downloads and demo trials</h2>
-            <p className="mt-2">Because digital software access and licence keys may be delivered immediately, a change of mind, trading loss, strategy performance, broker execution result, VPS failure or incompatibility caused by a customer's environment does not by itself qualify for a refund. This does not limit rights that cannot legally be excluded.</p>
+            <p className="mt-2">Because digital software access and licence keys may be delivered immediately, a change of mind, trading loss, strategy performance, broker execution result, VPS failure or incompatibility caused by a customer&apos;s environment does not by itself qualify for a refund. This does not limit rights that cannot legally be excluded.</p>
             <p className="mt-2">Free demo trials are time-limited, are restricted to eligible MT5 demo accounts and do not automatically convert into paid subscriptions. Demo access does not promise trading results or guarantee compatibility with every broker or terminal configuration.</p>
           </section>
           <section className="rounded-xl border border-white/10 bg-[#0c1016] p-5">
@@ -48,7 +48,7 @@ export default function RefundPolicyPage() {
             <p className="mt-2">Email <a className="text-emerald-300 underline underline-offset-4" href="mailto:fidulync@gmail.com">fidulync@gmail.com</a> from the email address used at checkout. Include the Paystack transaction reference, product name, charge date and a short explanation. Never send your card PIN, password, OTP or full card details.</p>
             <p className="mt-2">We aim to acknowledge billing enquiries within two business days and provide an outcome as soon as the payment provider and relevant records allow.</p>
           </section>
-          <p className="text-xs leading-5 text-slate-500">This policy describes FiduLync's customer billing process and does not constitute financial or legal advice. Nothing here removes any consumer rights that apply under relevant law.</p>
+          <p className="text-xs leading-5 text-slate-500">This policy describes FiduLync&apos;s customer billing process and does not constitute financial or legal advice. Nothing here removes any consumer rights that apply under relevant law.</p>
         </div>
       </div>
     </main>
