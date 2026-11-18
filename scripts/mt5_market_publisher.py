@@ -131,6 +131,12 @@ def build_quotes(infos: dict[str, Any], account: Any) -> list[dict[str, Any]]:
             "tick_size": float(info.trade_tick_size),
             "tick_value": float(info.trade_tick_value),
             "contract_size": float(info.trade_contract_size),
+            "volume_min": float(info.volume_min),
+            "volume_max": float(info.volume_max),
+            "volume_step": float(info.volume_step),
+            "stop_level_points": float(info.trade_stops_level),
+            "margin_per_lot_buy": float(mt5.order_calc_margin(mt5.ORDER_TYPE_BUY, broker_symbol, 1.0, float(tick.ask)) or 0.0),
+            "margin_per_lot_sell": float(mt5.order_calc_margin(mt5.ORDER_TYPE_SELL, broker_symbol, 1.0, float(tick.bid)) or 0.0),
             "broker": str(account.company or "")[:100],
             "server": str(account.server or "")[:120],
         })
