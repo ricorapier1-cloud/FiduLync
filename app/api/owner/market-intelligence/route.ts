@@ -190,6 +190,31 @@ export async function GET(request: Request) {
       policy_spread: policySpread,
       provenance: [rawMacro.source, 'COT '+(rawMacro.cotSource ?? 'unavailable'), 'Calendar '+(rawMacro.calendarSource ?? 'reference')].join(' · '),
       csi_scores: Object.fromEntries(macroStrength.map((item) => [item.currency, item.score])),
+      source: rawMacro.source,
+      cot_source: rawMacro.cotSource ?? 'unavailable',
+      calendar_source: rawMacro.calendarSource ?? 'reference',
+      currencies: rawMacro.currencies.map((currency) => ({
+        code: currency.code,
+        policy_rate: currency.policyRate,
+        inflation: currency.inflation,
+        real_rate_proxy: currency.policyRate - currency.inflation,
+        two_year_yield: currency.twoYearYield ?? null,
+        policy_rate_source: currency.policyRateSource ?? 'reference',
+        inflation_source: currency.inflationSource ?? 'reference',
+        two_year_yield_source: currency.twoYearYieldSource ?? 'reference',
+      })),
+      cot: rawMacro.cot.map((position) => ({
+        market: position.market, net_contracts: position.netContracts,
+        percentile: position.percentile, weekly_change: position.weeklyChange,
+        as_of: position.asOf ?? null,
+      })),
+      catalysts: rawMacro.calendarSource === 'provider'
+        ? rawMacro.catalysts.filter((event) => Date.parse(event.scheduledAt) >= Date.now() - 60 * 60_000
+          && Date.parse(event.scheduledAt) <= Date.now() + 7 * 24 * 60 * 60_000)
+          .sort((a, b) => Date.parse(a.scheduledAt) - Date.parse(b.scheduledAt)).slice(0, 20)
+          .map((event) => ({ id: event.id, region: event.region, title: event.title, scheduled_at: event.scheduledAt,
+            impact: event.impact, consensus: event.consensus, actual: event.actual }))
+        : [],
       recorded_at: macroRecordedAt,
       age_hours: macroAgeHours === null ? 0 : Math.max(0, Math.round(macroAgeHours)),
       fresh: rawMacro.source !== 'fallback' && macroAgeHours !== null && macroAgeHours >= -0.01 && macroAgeHours <= 24,
