@@ -57,7 +57,7 @@ export async function GET(req: Request) {
     const maxDemo = license.max_demo_slots ?? 2;
 
     // 2. Fetch bound accounts
-    const bound = await supabaseRead<any[]>(
+    const bound = await supabaseRead<BoundAccountRecord[]>(
       'license_bound_accounts',
       `license_key=eq.${encodeURIComponent(licenseKey)}&select=account_number,account_type,broker_server,rebind_cooldown_until,created_at`
     );
@@ -74,8 +74,8 @@ export async function GET(req: Request) {
       available_demo_slots: Math.max(0, maxDemo - demoCount),
       bound_accounts: accounts,
     });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Error fetching account bindings' }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Error fetching account bindings' }, { status: 500 });
   }
 }
 
@@ -120,7 +120,7 @@ export async function POST(req: Request) {
     const maxDemo = license.max_demo_slots ?? 2;
 
     // 2. Fetch current bound accounts
-    const bound = await supabaseRead<any[]>(
+    const bound = await supabaseRead<BoundAccountRecord[]>(
       'license_bound_accounts',
       `license_key=eq.${encodeURIComponent(licenseKey)}&select=id,account_number,account_type,rebind_cooldown_until`
     );
@@ -172,7 +172,7 @@ export async function POST(req: Request) {
       account_type: accountType,
       rebind_cooldown_until: cooldownDate,
     });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Binding operation failed' }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Binding operation failed' }, { status: 500 });
   }
 }
