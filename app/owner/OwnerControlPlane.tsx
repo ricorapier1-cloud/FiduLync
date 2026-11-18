@@ -31,7 +31,7 @@ export default function OwnerControlPlane({accessToken}:Props) {
  const [copied,setCopied]=useState('');
  const [pricingProducts,setPricingProducts]=useState<PricingProduct[]>([]);
  const [pricingSlug,setPricingSlug]=useState('');
- const [pricingDraft,setPricingDraft]=useState<PricingDraft>({monthly_price_ngn:0,monthly_price_usd:0,annual_price_ngn:0,annual_price_usd:0,extra_seat_price_ngn:0,extra_seat_price_usd:0});
+ const [pricingDraftState,setPricingDraftState]=useState<{slug:string;values:PricingDraft}|null>(null);
  const [pricingSaving,setPricingSaving]=useState(false);
  const [pricingNotice,setPricingNotice]=useState('');
  const refresh=useCallback(async()=>{
@@ -50,7 +50,12 @@ export default function OwnerControlPlane({accessToken}:Props) {
  },[accessToken,pricingSlug]);
  useEffect(()=>{ const task=Promise.resolve().then(()=>refresh()); return ()=>{ void task; }; },[refresh]);
  const pricingProduct=pricingProducts.find(p=>p.slug===pricingSlug)??null;
- useEffect(()=>{if(pricingProduct)setPricingDraft({monthly_price_ngn:Number(pricingProduct.monthly_price_ngn),monthly_price_usd:Number(pricingProduct.monthly_price_usd),annual_price_ngn:Number(pricingProduct.annual_price_ngn),annual_price_usd:Number(pricingProduct.annual_price_usd),extra_seat_price_ngn:Number(pricingProduct.extra_seat_price_ngn),extra_seat_price_usd:Number(pricingProduct.extra_seat_price_usd)});},[pricingProduct]);
+ const pricingDefaults:PricingDraft=pricingProduct?{
+  monthly_price_ngn:Number(pricingProduct.monthly_price_ngn),monthly_price_usd:Number(pricingProduct.monthly_price_usd),
+  annual_price_ngn:Number(pricingProduct.annual_price_ngn),annual_price_usd:Number(pricingProduct.annual_price_usd),
+  extra_seat_price_ngn:Number(pricingProduct.extra_seat_price_ngn),extra_seat_price_usd:Number(pricingProduct.extra_seat_price_usd)
+ }:{monthly_price_ngn:0,monthly_price_usd:0,annual_price_ngn:0,annual_price_usd:0,extra_seat_price_ngn:0,extra_seat_price_usd:0};
+ const pricingDraft=pricingDraftState?.slug===pricingSlug?pricingDraftState.values:pricingDefaults;
  const estimate=useMemo(()=>{
   if(!pricingProduct)return null;
   const metrics=pricingProduct.metrics_json??{};
@@ -119,11 +124,11 @@ export default function OwnerControlPlane({accessToken}:Props) {
    <section className="space-y-4 rounded-xl border border-white/[0.08] bg-[#0a1017] p-5"><header><h3 className="text-sm font-semibold text-slate-100">EA subscription pricing</h3><p className="mt-1 text-xs text-slate-500">The estimator uses declared Sharpe, asset coverage and strategy tier as a transparent heuristic, not a performance valuation.</p></header>
     <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
      <label className="text-xs text-slate-400">EA product<select value={pricingSlug} onChange={e=>setPricingSlug(e.target.value)} className="mt-2 h-10 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-white">{pricingProducts.map(p=><option key={p.slug} value={p.slug}>{p.name} · {p.category}</option>)}</select></label>
-     <div className="flex items-end"><button disabled={!estimate} onClick={()=>estimate&&setPricingDraft(estimate)} className="h-10 rounded-lg border border-cyan-300/30 px-4 text-xs text-cyan-100 disabled:opacity-40">Apply estimator</button></div>
+     <div className="flex items-end"><button disabled={!estimate} onClick={()=>estimate&&setPricingDraftState({slug:pricingSlug,values:estimate})} className="h-10 rounded-lg border border-cyan-300/30 px-4 text-xs text-cyan-100 disabled:opacity-40">Apply estimator</button></div>
     </div>
     {estimate&&<div className="grid gap-3 rounded-xl border border-cyan-300/20 bg-cyan-300/[0.04] p-4 sm:grid-cols-2"><div><div className="text-[9px] text-slate-500">SUGGESTED MONTHLY NGN</div><div className="mt-1 text-xl font-semibold text-cyan-100">₦{estimate.monthly_price_ngn.toLocaleString()}</div></div><div><div className="text-[9px] text-slate-500">SUGGESTED MONTHLY USD</div><div className="mt-1 text-xl font-semibold text-cyan-100">$ {estimate.monthly_price_usd}</div></div><p className="text-[10px] leading-5 text-slate-500 sm:col-span-2">Annual suggestion equals ten monthly payments (two months free). Sharpe and coverage inputs are taken from the product metrics JSON; if those inputs are illustrative or unverified, the estimate is illustrative too.</p></div>}
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-     {(['monthly_price_ngn','monthly_price_usd','annual_price_ngn','annual_price_usd','extra_seat_price_ngn','extra_seat_price_usd'] as const).map(field=><label key={field} className="text-[10px] text-slate-400">{field.replaceAll('_',' ').toUpperCase()}<input type="number" min="0" step={field.endsWith('_ngn')?'1':'0.01'} value={pricingDraft[field]} onChange={e=>setPricingDraft(current=>({...current,[field]:Number(e.target.value)}))} className="mt-2 h-10 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-white"/></label>)}
+     {(['monthly_price_ngn','monthly_price_usd','annual_price_ngn','annual_price_usd','extra_seat_price_ngn','extra_seat_price_usd'] as const).map(field=><label key={field} className="text-[10px] text-slate-400">{field.replaceAll('_',' ').toUpperCase()}<input type="number" min="0" step={field.endsWith('_ngn')?'1':'0.01'} value={pricingDraft[field]} onChange={e=>setPricingDraftState({slug:pricingSlug,values:{...pricingDraft,[field]:Number(e.target.value)}})} className="mt-2 h-10 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-white"/></label>)}
     </div>
     <div className="flex flex-wrap items-center gap-3"><button onClick={()=>void savePricing()} disabled={pricingSaving||!pricingProduct} className="rounded-lg bg-emerald-300 px-4 py-2.5 text-xs font-semibold text-slate-950 disabled:opacity-50">{pricingSaving?'Saving…':'Save manual pricing'}</button>{pricingNotice&&<span className="text-xs text-emerald-200">{pricingNotice}</span>}</div>
    </section>
