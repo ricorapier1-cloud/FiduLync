@@ -1,6 +1,6 @@
 # FiduLync Personal Quant Edition — Architecture Audit & Implementation Plan
 
-**Status:** Approved product direction; implementation plan  
+**Status:** Approved product direction; implementation in progress on `feat/personal-quant-edition`  
 **Date:** 2026-11-18  
 **Target:** Single-operator personal trading intelligence and EA-supervision platform  
 **Markets:** G10 FX and XAUUSD. XAGUSD is optional and deferred until explicitly approved with broker-specific contract specifications.  
@@ -42,7 +42,7 @@ The latest overall Vercel deployment inspected was READY but had target `null` (
 - MacroLync MQL5 bridge include using authenticated HTTPS WebRequest calls.
 - Twelve Data historical candle fallback and configurable market-data provider adapter.
 - Supabase migrations for MT5 market data, replay protection, telemetry, trade-history hardening, escrow retirement and later commercial marketplace/licensing functionality.
-- A separate branch, `feat/institutional-quant-foundation`, contains a quantitative risk primitive, fail-closed execution contract and quantitative readiness documentation. It is 12 commits ahead and 3 commits behind `main`; it has diverged and must be reviewed and selectively ported rather than blindly merged.
+- The personal-edition branch now contains `lib/quantGovernance.ts`, `lib/riskPolicy.ts`, deterministic broker-aware sizing, a manual risk planner, and Node-based unit tests. These are foundational primitives, not yet a complete account-verified EA approval gateway. The older `feat/institutional-quant-foundation` branch remains divergent; do not merge it wholesale.
 - Open PRs #15 and #16 focus on commercial subscriptions, marketplace and licensing. They are outside the personal product scope and must not be merged as a route to this edition.
 - Open PR #11 contains relevant security/data-provider hardening. Review its exact diff and migration state before selectively adopting any remaining changes.
 
@@ -58,6 +58,15 @@ The Vercel project contains names for Supabase, Upstash, FRED, Finnhub, Twelve D
 6. Existing commercial portal, checkout, subscription, demo entitlement and licence routes remain in repository history/current branches. They must be mapped and disabled from the personal product without deleting useful account telemetry, owner control or historical records.
 7. A macro signal or confluence score must never be labelled as a calibrated win probability. Probabilities require out-of-sample calibration and reliability reporting.
 8. Data source, timestamp, freshness, broker/installation identity, timeframe, licensing/use permissions and degraded status must remain visible throughout the analysis pipeline.
+
+
+### Implementation checkpoint — 2026-11-18
+- `feat/personal-quant-edition` is the active implementation branch; production `main` remains unchanged.
+- The personal branch has a Vercel preview deployment in `READY` state at commit `4e54e320e0aae1ef068ad3e94502e9d885209ccf`. This is a preview, not the production site.
+- The Vercel build status for that commit is successful. The GitHub Pull Request Quality Gate is still running; its final TypeScript, quant tests, lint, production build and Python syntax-check result must be confirmed before treating the branch as validated.
+- The branch currently includes a deterministic risk-governance primitive, broker-step volume flooring, server-owned disabled-by-default risk policy, a manual sizing planner, test coverage, and sample EA source downloads labelled as research/demo fixtures.
+- The risk-governance primitive is not yet wired to a complete authenticated EA proposal/decision lifecycle backed by independently verified account state and durable audit records. No EA should treat the dashboard research signal or the current preview build as an execution authorization.
+- MetaEditor compilation, Strategy Tester runs, live broker quote validation, and end-to-end EA supervision remain blocked until a Windows MT5 terminal and broker demo account are available.
 
 ## 3. Target architecture
 
