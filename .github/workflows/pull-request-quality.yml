@@ -37,4 +37,6 @@ jobs:
         with:
           python-version: '3.11'
       - name: Validate MT5 publisher syntax
-        run: python -m py_compile scripts/mt5_market_publisher.py
+        run: python -m py_compile scripts/mt5_market_publisher.py scripts/mt5_risk_state.py
+      - name: MT5 risk telemetry unit tests
+        run: python -m unittest discover -s tests -p 'test_*.py'
