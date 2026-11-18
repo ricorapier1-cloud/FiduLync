@@ -117,7 +117,7 @@ export function calculateBrokerAwareVolume(args: {
   if (stepped < spec.volumeMin) {
     return { volume: 0, riskCash, valid: false, reason: 'MINIMUM_VOLUME_EXCEEDS_RISK_BUDGET' };
   }
-  const actualRisk = stepped * riskPerLot;
+  const actualRisk = Number((stepped * riskPerLot).toFixed(8));
   if (!Number.isFinite(actualRisk) || actualRisk > riskCash * (1 + 1e-10)) {
     return { volume: 0, riskCash, valid: false, reason: 'ROUNDED_VOLUME_EXCEEDS_RISK_BUDGET' };
   }
