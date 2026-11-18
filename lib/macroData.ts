@@ -753,12 +753,18 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
         ],
         cot: parsed.cot.length > 0 ? parsed.cot : baseline.cot,
         catalysts: parsed.catalysts.length > 0 ? parsed.catalysts : baseline.catalysts,
-        source: 'provider',
+        source: 'partial',
         cotSource: parsed.cot.length > 0 ? 'provider' : (baseline.cotSource ?? 'unavailable'),
         calendarSource: parsed.catalysts.length > 0 ? 'provider' : 'reference',
         asOf: new Date().toISOString(),
         ...(ecbRates ? { ecbRates } : {}),
       });
+      const coreG10 = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'SEK', 'NOK'];
+      const completeG10MacroCoverage = coreG10.every((code) => {
+        const currency = providerSnapshot.currencies.find((item) => item.code === code);
+        return currency?.policyRateSource === 'provider' && currency.inflationSource === 'provider';
+      });
+      providerSnapshot.source = completeG10MacroCoverage ? 'provider' : 'partial';
       await persistMacroSnapshot(providerSnapshot);
       return providerSnapshot;
     } catch (error) {
