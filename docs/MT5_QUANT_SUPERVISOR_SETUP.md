@@ -18,7 +18,7 @@ Do not change these flags to true just to force an approval. They require indepe
 2. On the Windows VPS/PC where the broker's MT5 terminal is already logged in, install Python 3.11+ and the MetaTrader5 package: `py -m pip install MetaTrader5`.
 3. Set environment variables in that Windows session:
    - `FIDULYNC_PUBLISHER_TOKEN` to the one-time token.
-   - `FIDULYNC_INGEST_URL` to `https://fidulync.vercel.app/api/v1/market-data/ingest`.
+   - `FIDULYNC_INGEST_URL` to `https://YOUR-VERIFIED-DEPLOYMENT-URL/api/v1/market-data/ingest`. Do not point it at the old production deployment until the new account-snapshot ingestion code has been deployed and verified.
    - `MT5_SYMBOL_MAP` to canonical-to-broker symbols. The default map covers seven major USD FX pairs (EURUSD, GBPUSD, USDJPY, USDCHF, USDCAD, AUDUSD, NZDUSD) plus XAUUSD. Add broker suffixes where needed. Historical candle batches are chunked to respect the API request limit.
 4. Run `py scripts/mt5_market_publisher.py`. Confirm accepted quote/candle batches and account snapshots in the owner diagnostics. The publisher reads the connected terminal; it does not request or store the broker password.
 5. Copy `MQL5/Include/FiduLync/QuantSupervisor.mqh` into the terminal's `MQL5/Include/FiduLync/` directory and `MQL5/Experts/FiduLync_Supervisor_Probe.mq5` into `MQL5/Experts/`.
