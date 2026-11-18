@@ -659,9 +659,9 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
 }
 
 async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) return null;
+  if (!(process.env.SUPABASE_SECRET_KEY?.trim() || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim())) return null;
   try {
-    const { data, error } = await getSupabaseAdmin().from('macro_snapshots')
+    const { data, error } = await getSupabaseAdmin().from('macro_snapshot_payloads')
       .select('payload,refreshed_at')
       .eq('snapshot_key', 'global')
       .maybeSingle();
@@ -672,7 +672,9 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
     if (!data || !isRecord(data.payload)) return null;
     if (data.payload.source !== 'provider' && data.payload.source !== 'partial') return null;
     const parsed = parseProviderSnapshot(data.payload);
-    if (!parsed || !Number.isFinite(Date.parse(data.refreshed_at))) return null;
+    const refreshedAt = Date.parse(data.refreshed_at);
+    const snapshotAgeMs = Date.now() - refreshedAt;
+    if (!parsed || !Number.isFinite(refreshedAt) || snapshotAgeMs < -5 * 60_000 || snapshotAgeMs > 24 * 60 * 60_000) return null;
     const ecbRates = isRecord(data.payload.ecbRates)
       ? Object.fromEntries(Object.entries(data.payload.ecbRates)
         .filter((entry): entry is [string, number] => /^[A-Z]{3}$/.test(entry[0])
@@ -693,6 +695,22 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
   } catch (error) {
     console.warn('Persisted macro snapshot is unavailable:', error);
     return null;
+  }
+}
+
+async function persistMacroSnapshot(snapshot: MacroSnapshot): Promise<void> {
+  if (snapshot.source !== 'provider' && snapshot.source !== 'partial') return;
+  try {
+    const { error } = await getSupabaseAdmin().from('macro_snapshot_payloads').upsert({
+      snapshot_key: 'global',
+      payload: snapshot,
+      refreshed_at: snapshot.asOf,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'snapshot_key' });
+    if (error) throw error;
+  } catch (error) {
+    // Provider data remains usable for this request even if persistence is unavailable.
+    console.warn('Macro snapshot persistence failed:', error);
   }
 }
 
@@ -721,7 +739,7 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
       } catch (error) {
         console.warn('ECB benchmark exchange rates are unavailable:', error);
       }
-      return mergeWithFallback({
+      const providerSnapshot = mergeWithFallback({
         ...baseline,
         ...parsed,
         currencies: [
@@ -735,11 +753,13 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
         cot: parsed.cot.length > 0 ? parsed.cot : baseline.cot,
         catalysts: parsed.catalysts.length > 0 ? parsed.catalysts : baseline.catalysts,
         source: 'provider',
-        cotSource: 'provider',
+        cotSource: parsed.cot.length > 0 ? 'provider' : (baseline.cotSource ?? 'unavailable'),
         calendarSource: parsed.catalysts.length > 0 ? 'provider' : 'reference',
         asOf: new Date().toISOString(),
         ...(ecbRates ? { ecbRates } : {}),
       });
+      await persistMacroSnapshot(providerSnapshot);
+      return providerSnapshot;
     } catch (error) {
       console.error('Macro data provider unavailable; checking live API adapters:', error);
     }
@@ -748,7 +768,9 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
   try {
     const liveSnapshot = await getLiveProviderSnapshot(baseline);
     if (liveSnapshot) {
-      return mergeWithFallback(liveSnapshot);
+      const merged = mergeWithFallback(liveSnapshot);
+      await persistMacroSnapshot(merged);
+      return merged;
     }
   } catch (error) {
     console.error('Live macro APIs unavailable; checking the persisted snapshot:', error);
