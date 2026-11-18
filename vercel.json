@@ -3,10 +3,6 @@
     {
       "path": "/api/cron/sync-macro",
       "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/cron/reconcile-ea-subscriptions",
-      "schedule": "0 * * * *"
     }
   ]
 }
