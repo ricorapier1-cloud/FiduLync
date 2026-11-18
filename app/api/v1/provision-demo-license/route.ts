@@ -46,7 +46,7 @@ export async function POST(req: Request) {
       expires_at: expiresAt,
       message: 'Demo license successfully provisioned. 1 Live + 2 Demo accounts entitlement active.',
     });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Failed to provision demo license' }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Failed to provision demo license' }, { status: 500 });
   }
 }
