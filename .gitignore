@@ -46,3 +46,6 @@ public/sw.js
 public/sw.js.map
 public/workbox-*.js
 .env.local
+
+# Temporary output for deterministic quant-governance tests
+.quant-test/
