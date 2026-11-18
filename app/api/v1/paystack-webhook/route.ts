@@ -32,7 +32,7 @@ async function attachSubscriptionCode(data: Record<string, unknown>) {
   });
 }
 
-async function applyPaymentFailed(data: Record<string, unknown>) {
+async function applyPaymentFailed(data: Record<string, unknown>, paystackSecret: string) {
   const subscription = data.subscription && typeof data.subscription === 'object'
     ? data.subscription as Record<string, unknown> : {};
   const code = text(subscription.subscription_code) || text(data.subscription_code);
@@ -52,6 +52,18 @@ async function applyPaymentFailed(data: Record<string, unknown>) {
     method: 'PATCH', query: `license_key=eq.${encodeURIComponent(row.license_key)}`,
     body: { status: 'PAST_DUE', grace_until: graceUntil, renewal_reminder_due: true, updated_at: new Date().toISOString() },
   });
+  try {
+    const reminder = await fetch(`https://api.paystack.co/subscription/${encodeURIComponent(code)}/manage/email`, {
+      method: 'POST', headers: { Authorization: `Bearer ${paystackSecret}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({}), cache: 'no-store', signal: AbortSignal.timeout(10_000),
+    });
+    const reminderBody = await reminder.json() as { status?: boolean; message?: string };
+    if (!reminder.ok || reminderBody.status !== true) {
+      console.warn('Paystack subscription management reminder was not sent:', reminderBody.message || reminder.status);
+    }
+  } catch (error) {
+    console.warn('Paystack subscription reminder request failed; renewal_reminder_due remains set:', error);
+  }
 }
 
 async function applySubscriptionDisable(data: Record<string, unknown>) {
@@ -118,7 +130,7 @@ export async function POST(request: Request) {
         await attachSubscriptionCode(data);
         return NextResponse.json({ status: 'subscription_code_recorded' });
       case 'invoice.payment_failed':
-        await applyPaymentFailed(data);
+        await applyPaymentFailed(data, secret);
         return NextResponse.json({ status: 'grace_period_applied' });
       case 'subscription.not_renew':
         await applySubscriptionDisable(data);
