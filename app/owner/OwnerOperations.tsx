@@ -9,6 +9,12 @@ type Overview = {
   generated_at: string;
   market_data: { active_installations: number; total_installations: number; latest_heartbeat: string | null; latest_heartbeat_age_seconds: number | null; latest_candle: { symbol: string; timeframe: string; bar_time: string; broker: string; server: string } | null; latest_candle_age_minutes: number | null; latest_quote: { symbol: string; quote_time: string; broker: string; server: string } | null; latest_quote_age_seconds: number | null };
   installations: Installation[];
+  account_risk: {
+    latest_snapshot: { account_login: number; currency: string; equity: number; margin: number; free_margin: number; open_positions: number; open_risk_cash: number; open_risk_verified: boolean; captured_at: string; consecutive_losses: number | null; loss_streak_verified: boolean; history_synced_at: string | null } | null;
+    snapshot_age_seconds: number | null; snapshot_fresh: boolean; open_risk_verified: boolean;
+    risk_anchors_available: boolean; loss_streak_verified: boolean;
+    latest_decision: { decision: string; symbol: string; evaluated_at: string; blockers: string[] } | null;
+  };
   risk_policy: {
     policy_version: string;
     execution_enabled: boolean;
@@ -93,6 +99,8 @@ export default function OwnerOperations({ accessToken, email, role, onSignOut }:
 
   const activeModule = useMemo(() => modules.find((item) => item.id === active) ?? modules[0], [active]);
   const market = overview?.market_data;
+  const accountRisk = overview?.account_risk;
+  const accountRiskTone = accountRisk?.snapshot_fresh && accountRisk.open_risk_verified && accountRisk.risk_anchors_available ? 'good' : 'warn';
   const quoteAgeSeconds = market?.latest_quote_age_seconds ?? null;
   const quoteFresh = quoteAgeSeconds !== null && quoteAgeSeconds <= 120;
   const heartbeatFresh = market?.latest_heartbeat_age_seconds !== null && market?.latest_heartbeat_age_seconds !== undefined && market.latest_heartbeat_age_seconds <= 180;
@@ -147,7 +155,7 @@ export default function OwnerOperations({ accessToken, email, role, onSignOut }:
             <ReadinessRow label="MT5 terminal heartbeat" value={heartbeatFresh ? 'Recent' : 'Not verified'} note={'Most recent owner connector heartbeat: ' + formatTime(market?.latest_heartbeat)} tone={heartbeatFresh ? 'good' : 'warn'} />
             <ReadinessRow label="Live broker quote" value={quoteFresh ? 'Fresh quote observed' : 'No fresh quote'} note={market?.latest_quote ? market.latest_quote.symbol + ' quote timestamp: ' + formatTime(market.latest_quote.quote_time) : 'Connect an MT5 terminal to provide broker bid/ask observations.'} tone={quoteFresh ? 'good' : 'warn'} />
             <ReadinessRow label="Model validation registry" value="Not connected" note="No signed model approval, walk-forward evidence or release registry is currently exposed in this console." />
-            <ReadinessRow label="Portfolio risk telemetry" value="Not connected" note="No verified account equity, positions, margin or portfolio exposure stream is currently connected." />
+            <ReadinessRow label="Portfolio risk telemetry" value={accountRisk?.snapshot_fresh ? (accountRisk.open_risk_verified && accountRisk.risk_anchors_available ? 'Fresh account snapshot' : 'Partial telemetry') : 'Not verified'} note={accountRisk?.latest_snapshot ? 'Account ' + accountRisk.latest_snapshot.account_login + ' · ' + accountRisk.latest_snapshot.currency + ' equity ' + accountRisk.latest_snapshot.equity.toFixed(2) + ' · ' + accountRisk.latest_snapshot.open_positions + ' open positions · received ' + formatTime(accountRisk.latest_snapshot.captured_at) : 'No MT5 account snapshot has reached the risk control plane yet.'} tone={accountRiskTone} />
             <ReadinessRow label="Tamper-evident audit trail" value="Not configured" note="Administrative actions are not yet written to a dedicated immutable audit ledger." />
           </Panel>
         </div>}
@@ -197,11 +205,13 @@ export default function OwnerOperations({ accessToken, email, role, onSignOut }:
             <ReadinessRow label="Maximum margin usage" value={overview ? overview.risk_policy.max_margin_usage_pct + '%' : '—'} note="Includes existing used margin plus the proposed trade margin." />
             <ReadinessRow label="Maximum spread" value={overview ? overview.risk_policy.max_spread_points + ' points' : '—'} note="Broker symbol point size must be verified per instrument." />
             <ReadinessRow label="Maximum quote age" value={overview ? overview.risk_policy.max_quote_age_ms + ' ms' : '—'} note="Stale quote state results in DEGRADED, never approval." />
-            <ReadinessRow label="Loss-streak breaker" value={overview ? overview.risk_policy.max_consecutive_losses + ' consecutive losses' : '—'} note="Requires complete, account-isolated closed-trade history." />
+            <ReadinessRow label="Loss-streak breaker" value={overview ? overview.risk_policy.max_consecutive_losses + ' consecutive losses' : '—'} note={accountRisk?.loss_streak_verified ? 'Latest verified terminal history reports ' + (accountRisk.latest_snapshot?.consecutive_losses ?? 0) + ' consecutive losses.' : 'Waiting for a fresh MT5 history sync. Missing or stale history blocks supervision.'} tone={accountRisk?.loss_streak_verified ? 'good' : 'warn'} />
             <ReadinessRow label="Minimum reward / risk" value={overview ? overview.risk_policy.reward_risk_minimum.toFixed(2) + 'R' : '—'} note="A threshold, not a guarantee of positive expectancy." />
           </Panel>
-          <Panel title="Account telemetry and overrides" subtitle="The current live account and control surface is intentionally incomplete.">
-            <ReadinessRow label="Portfolio exposure / margin" value="Not connected" note="No live account equity, open positions, leverage, margin level or cross-account exposure telemetry is currently connected." />
+          <Panel title="Account telemetry and overrides" subtitle="Live broker account observations are read-only. Missing or unverified fields block EA supervision.">
+            <ReadinessRow label="Portfolio exposure / margin" value={accountRisk?.snapshot_fresh ? 'Snapshot received' : 'Not connected'} note={accountRisk?.latest_snapshot ? 'Equity ' + accountRisk.latest_snapshot.equity.toFixed(2) + ' ' + accountRisk.latest_snapshot.currency + ' · margin ' + accountRisk.latest_snapshot.margin.toFixed(2) + ' · free margin ' + accountRisk.latest_snapshot.free_margin.toFixed(2) + ' · open risk ' + accountRisk.latest_snapshot.open_risk_cash.toFixed(2) + ' · ' + accountRisk.latest_snapshot.open_positions + ' positions.' : 'No live MT5 account snapshot is available.'} tone={accountRiskTone} />
+            <ReadinessRow label="Daily / weekly / HWM anchors" value={accountRisk?.risk_anchors_available ? 'Available' : 'Not initialized'} note="Anchors are maintained from ordered broker snapshots; first observed snapshot is the baseline, not a reconstruction of older drawdown." tone={accountRisk?.risk_anchors_available ? 'good' : 'warn'} />
+            <ReadinessRow label="Latest EA supervisor decision" value={accountRisk?.latest_decision?.decision ?? 'No request yet'} note={accountRisk?.latest_decision ? accountRisk.latest_decision.symbol + ' · ' + formatTime(accountRisk.latest_decision.evaluated_at) + ' · ' + accountRisk.latest_decision.blockers.join(', ') : 'No authenticated EA risk proposal has been evaluated yet.'} tone={accountRisk?.latest_decision?.decision === 'APPROVE' ? 'good' : 'warn'} />
             <ReadinessRow label="Emergency execution disable" value="Server policy disabled" note="No browser toggle exists. Any future change requires a server-enforced, audited owner action." tone="good" />
             <ReadinessRow label="Administrative override" value="Prohibited" note="Owner access must not override SL/TP, margin checks, exposure caps, signal quality gates or account risk constraints." tone="good" />
           </Panel>
