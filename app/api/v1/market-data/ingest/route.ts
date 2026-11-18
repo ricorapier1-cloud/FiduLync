@@ -44,7 +44,7 @@ export async function POST(request: Request) {
   }
   if (!isRecord(body) || !Array.isArray(body.quotes) || !Array.isArray(body.candles)
     || body.quotes.length > 50 || body.candles.length > 1_000
-    || body.quotes.length + body.candles.length === 0 && body.position_snapshot == null) {
+    || body.quotes.length + body.candles.length === 0 && body.account_snapshot == null && body.position_snapshot == null) {
     return NextResponse.json({ error: 'Payload must contain up to 50 quotes and 1,000 candles.' }, { status: 400 });
   }
 
