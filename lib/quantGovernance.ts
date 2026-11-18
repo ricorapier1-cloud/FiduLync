@@ -44,6 +44,7 @@ export type RiskContext = {
   ask: number;
   quoteAgeMs: number;
   spreadPoints: number;
+  atrPrice: number;
   equity: number;
   freeMargin: number;
   usedMargin: number;
@@ -73,10 +74,28 @@ export type RiskPolicy = {
   maxHighWaterDrawdownPct: number;
   maxMarginUsagePct: number;
   maxSpreadPoints: number;
+  maxSpreadAtrRatio: number;
   maxQuoteAgeMs: number;
   maxConsecutiveLosses: number;
   rewardRiskMinimum: number;
 };
+
+export type ClosedBar = { high: number; low: number; close: number };
+
+/** ATR over closed bars only. Input must be chronological and contain period + 1 bars. */
+export function calculateTrueRangeAtr(bars: ClosedBar[], period = 14): number | null {
+  if (!Number.isInteger(period) || period < 2 || bars.length < period + 1) return null;
+  if (!bars.every((bar) => finitePositive(bar.high) && finitePositive(bar.low) && finitePositive(bar.close) && bar.high >= bar.low)) return null;
+  const ranges: number[] = [];
+  for (let index = 1; index < bars.length; index += 1) {
+    const current = bars[index];
+    const previousClose = bars[index - 1].close;
+    ranges.push(Math.max(current.high - current.low, Math.abs(current.high - previousClose), Math.abs(current.low - previousClose)));
+  }
+  const recent = ranges.slice(-period);
+  const atr = recent.reduce((sum, value) => sum + value, 0) / period;
+  return finitePositive(atr) ? atr : null;
+}
 
 export type RiskGovernanceResult = {
   schemaVersion: '1.0';
@@ -143,7 +162,7 @@ function validateProposalShape(p: RiskProposal, ctx: RiskContext, policy: RiskPo
   if (!['LIVE', 'DELAYED', 'REFERENCE', 'STALE', 'UNAVAILABLE'].includes(ctx.marketDataHealth)
     || !['LIVE', 'DELAYED', 'REFERENCE', 'STALE', 'UNAVAILABLE'].includes(ctx.macroDataHealth)) issues.push('INVALID_DATA_HEALTH_STATE');
   const required = [p.entryPrice, p.stopLoss, p.takeProfit, ctx.bid, ctx.ask, ctx.quoteAgeMs,
-    ctx.spreadPoints, ctx.equity, ctx.freeMargin, ctx.usedMargin, ctx.estimatedMargin, ctx.currentOpenRiskCash,
+    ctx.spreadPoints, ctx.atrPrice, ctx.equity, ctx.freeMargin, ctx.usedMargin, ctx.estimatedMargin, ctx.currentOpenRiskCash,
     ctx.dailyStartEquity, ctx.weeklyStartEquity, ctx.highWaterMarkEquity, ctx.consecutiveLosses,
     p.requestedRiskPct, policy.maxPerTradeRiskPct, policy.maxPortfolioRiskPct,
     policy.maxDailyDrawdownPct, policy.maxWeeklyDrawdownPct,
@@ -171,7 +190,7 @@ function validateProposalShape(p: RiskProposal, ctx: RiskContext, policy: RiskPo
     || policy.maxDailyDrawdownPct <= 0 || policy.maxDailyDrawdownPct > 100
     || policy.maxWeeklyDrawdownPct <= 0 || policy.maxWeeklyDrawdownPct > 100
     || policy.maxHighWaterDrawdownPct <= 0 || policy.maxHighWaterDrawdownPct > 100
-    || policy.maxSpreadPoints <= 0 || policy.maxQuoteAgeMs <= 0
+    || policy.maxSpreadPoints <= 0 || policy.maxSpreadAtrRatio <= 0 || policy.maxQuoteAgeMs <= 0
     || !Number.isInteger(policy.maxConsecutiveLosses) || policy.maxConsecutiveLosses <= 0
     || policy.rewardRiskMinimum <= 0) {
     issues.push('PROTECTIVE_LIMITS_INVALID');
@@ -207,6 +226,10 @@ export function evaluateRiskProposal(p: RiskProposal, ctx: RiskContext, policy: 
   if (ctx.macroDataHealth !== 'LIVE') blockers.push('MACRO_DATA_NOT_LIVE');
   if (ctx.quoteAgeMs > policy.maxQuoteAgeMs) blockers.push('QUOTE_STALE');
   if (ctx.spreadPoints > policy.maxSpreadPoints) blockers.push('SPREAD_LIMIT_EXCEEDED');
+  const spreadToAtrRatio = (ctx.spreadPoints * ctx.symbolSpec.point) / ctx.atrPrice;
+  if (!Number.isFinite(spreadToAtrRatio) || spreadToAtrRatio > policy.maxSpreadAtrRatio) {
+    blockers.push('SPREAD_TO_ATR_LIMIT_EXCEEDED');
+  }
   if (ctx.newsLockout) blockers.push('HIGH_IMPACT_NEWS_LOCKOUT');
   if (ctx.regime === 'HIGH_VOL_CHOP') blockers.push('HIGH_VOLATILITY_CHOP');
   if (ctx.regime === 'UNAVAILABLE') blockers.push('MARKET_REGIME_UNAVAILABLE');
