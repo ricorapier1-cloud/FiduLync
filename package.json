@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:quant": "tsc lib/quantGovernance.ts --target ES2022 --module commonjs --outDir .quant-test --skipLibCheck --noEmit false && node --test tests/quantGovernance.test.cjs"
+    "test:quant": "tsc lib/quantGovernance.ts --target ES2022 --module commonjs --outDir .quant-test --skipLibCheck --noEmit false && node --test tests/quantGovernance.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
