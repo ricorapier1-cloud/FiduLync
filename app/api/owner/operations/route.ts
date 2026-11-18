@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   try {
     const supabase = getSupabaseAdmin();
     const { data: auth, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !auth.user || auth.user.email?.toLowerCase() !== OWNER_EMAIL) {
+    if (authError || !auth.user || auth.user.email?.toLowerCase() !== OWNER_EMAIL || !auth.user.email_confirmed_at) {
       return NextResponse.json({ error: 'Owner access denied.' }, { status: 403 });
     }
 
