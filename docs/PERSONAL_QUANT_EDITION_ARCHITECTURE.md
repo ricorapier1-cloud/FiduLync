@@ -69,8 +69,8 @@ The Vercel project contains names for Supabase, Upstash, FRED, Finnhub, Twelve D
 - Safety remains fail-closed: missing open-position risk, stale account/quote data, unverified broker sizing/margin, unavailable loss-streak state, or unavailable macro/news context results in ABSTAIN. Server policy also keeps execution permission, model validation and execution-quality verification disabled.
 - The risk proposal endpoint is not yet fully validated end-to-end. The account snapshot table is currently empty because no MT5 terminal has connected.
 - A Vercel deployment attempt was blocked by the account's API deployment daily quota (more than 100 deployments in 24 hours). The last existing preview is older than the latest commits; no production deployment was attempted.
-- GitHub Actions checks have not run for the latest commits because the PR quality workflow is introduced on the feature branch and is not yet present on the base branch. Do not merge merely to trigger it. A local/remote full test run and MT5 MetaEditor compile remain outstanding.
-- The implementation still needs reliable consecutive-loss telemetry, live macro/news state, a reviewed persistent policy-control workflow, security review, full Next.js build/lint/test verification, MetaEditor compilation, Strategy Tester and demo forward validation before any execution permission can be considered.
+- GitHub Actions Pull Request Quality Gate passed on the current implementation checkpoint: TypeScript, quant governance unit tests, ESLint, Next.js production build and Python publisher syntax validation. MQL5 compilation is not covered by this Linux workflow.
+- The implementation still needs reliable consecutive-loss telemetry, a reviewed persistent policy-control workflow, dependency vulnerability triage (npm install reported 14 high-severity advisories), security review, MetaEditor compilation, Strategy Tester and demo forward validation before any execution permission can be considered.
 
 ## 3. Target architecture
 
