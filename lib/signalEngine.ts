@@ -40,6 +40,10 @@ export type MacroSignalPayload = {
   execution_blockers: string[];
   risk_mode: 'DISABLED' | 'PILOT_TREND' | 'PILOT_MEAN_REVERSION';
   market_data_source: 'mt5' | 'configured_provider' | 'twelve_data' | 'unavailable' | 'unknown';
+  technical_data_verified: boolean;
+  macro_data_source: 'fallback' | 'provider' | 'partial';
+  macro_data_verified: boolean;
+  macro_data_age_minutes: number | null;
   latest_market_candle_at: string | null;
   market_candle_counts: { h1: number; h4: number; d1: number };
   timestamp_utc: string;
@@ -91,7 +95,10 @@ export async function getMacroSignal(symbol: string, now = Date.now(), installat
       || (baseCurrency?.twoYearYieldSource === 'provider' && quoteCurrency?.twoYearYieldSource === 'provider');
     // Reference and partial macro snapshots may be useful for display, but they
     // must never create a directional signal for an EA.
-    const macroDataVerified = snapshot.source === 'provider'
+    const macroSnapshotAt = Date.parse(snapshot.asOf);
+    const macroAgeMs = now - macroSnapshotAt;
+    const macroFresh = Number.isFinite(macroSnapshotAt) && macroAgeMs >= -5 * 60_000 && macroAgeMs <= 24 * 60 * 60_000;
+    const macroDataVerified = macroFresh && snapshot.source === 'provider'
       && snapshot.cotSource === 'provider'
       && snapshot.calendarSource === 'provider'
       && verifiedPolicyInputs
@@ -166,6 +173,10 @@ export async function getMacroSignal(symbol: string, now = Date.now(), installat
       execution_blockers: [...new Set(executionBlockers)],
       risk_mode: riskBudget.mode,
       market_data_source: technical.data_source,
+      technical_data_verified: technical.available,
+      macro_data_source: snapshot.source,
+      macro_data_verified: macroDataVerified,
+      macro_data_age_minutes: Number.isFinite(macroAgeMs) ? Math.max(0, Math.round(macroAgeMs / 60_000)) : null,
       latest_market_candle_at: technical.latest_candle_at,
       market_candle_counts: technical.candle_counts,
       timestamp_utc: new Date(now).toISOString(),
