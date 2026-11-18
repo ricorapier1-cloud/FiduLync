@@ -25,6 +25,7 @@ export default function StoreTerminal({ initialSnapshot, session }: StoreTermina
 
   useEffect(() => {
     const timer = window.setInterval(() => router.refresh(), 30_000);
+    if (new URLSearchParams(window.location.search).has('ref')) setCheckoutOpen(true);
     return () => window.clearInterval(timer);
   }, [router]);
 
