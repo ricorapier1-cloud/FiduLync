@@ -27,7 +27,7 @@ export async function GET(request: Request) {
         : Promise.resolve({ data: [], error: null }),
       ids.length ? supabase.from('mt5_open_position_snapshots')
         .select('snapshot_id,captured_at,position_ticket,symbol,side,volume,profit_account_currency,snapshot_complete')
-        .in('installation_id', ids).eq('snapshot_complete', true)
+        .in('installation_id', ids)
         .order('captured_at', { ascending: false }).limit(500)
         : Promise.resolve({ data: [], error: null }),
     ]);
