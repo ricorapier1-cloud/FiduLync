@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 
 type Cycle = 'MONTHLY' | 'ANNUAL';
 type Currency = 'NGN' | 'USD';
@@ -76,7 +76,7 @@ export function PaystackCheckout({
   }, [product, currency, cycle, extraSeats]);
   const money = currency === 'NGN' ? '₦' + amount.toLocaleString('en-NG') : '$' + amount.toLocaleString('en-US');
 
-  async function checkout(event: React.FormEvent) {
+  async function checkout(event: FormEvent) {
     event.preventDefault();
     setBusy(true); setError(''); setNotice('');
     try {
