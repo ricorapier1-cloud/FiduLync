@@ -360,6 +360,7 @@ async function getCftcCot(): Promise<CotPosition[]> {
     'AUSTRALIAN DOLLAR',
     'SWISS FRANC',
     'CANADIAN DOLLAR',
+    'NEW ZEALAND DOLLAR',
     'GOLD',
   ];
   const marketFilter = markets.map((market) => `market_and_exchange_names like '%${market}%'`).join(' OR ');
@@ -390,6 +391,7 @@ async function getCftcCot(): Promise<CotPosition[]> {
     ['AUSTRALIAN DOLLAR - CHICAGO MERCANTILE EXCHANGE', 'AUD'],
     ['SWISS FRANC - CHICAGO MERCANTILE EXCHANGE', 'CHF'],
     ['CANADIAN DOLLAR - CHICAGO MERCANTILE EXCHANGE', 'CAD'],
+    ['NEW ZEALAND DOLLAR - CHICAGO MERCANTILE EXCHANGE', 'NZD'],
     ['GOLD - COMMODITY EXCHANGE INC.', 'GOLD'],
   ];
   const byMarket = new Map<string, Array<{ date: string; netContracts: number; weeklyChange: number }>>();
