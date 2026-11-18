@@ -168,11 +168,24 @@ export async function POST(request: Request) {
       newsLockout: false,
       symbolSpec,
     };
-    const result = !account.open_risk_verified
+    const unavailableBlockers: string[] = [];
+    if (!sizing.valid || !Number.isFinite(estimatedMargin) || estimatedMargin <= 0) {
+      unavailableBlockers.push('BROKER_SIZING_OR_MARGIN_CONTEXT_UNAVAILABLE');
+    }
+    if (!Number.isFinite(context.consecutiveLosses)) unavailableBlockers.push('LOSS_STREAK_CONTEXT_UNAVAILABLE');
+    if (context.macroDataHealth !== 'LIVE') unavailableBlockers.push('MACRO_NEWS_CONTEXT_UNAVAILABLE');
+    if (snapshotAgeMs < 0 || snapshotAgeMs > 30_000) unavailableBlockers.push('ACCOUNT_SNAPSHOT_STALE');
+    if (quoteAgeMs < 0 || quoteAgeMs > 30_000) unavailableBlockers.push('BROKER_QUOTE_STALE');
+
+    const forcedBlockers = [
+      ...(!account.open_risk_verified ? ['OPEN_POSITION_RISK_UNVERIFIED'] : []),
+      ...unavailableBlockers,
+    ];
+    const result = forcedBlockers.length
       ? {
           schemaVersion: '1.0' as const, requestId: proposal.requestId, decision: 'ABSTAIN' as const,
           approvedRiskPct: 0, approvedVolume: 0, estimatedRiskCash: 0, estimatedRewardRisk: null,
-          blockers: ['OPEN_POSITION_RISK_UNVERIFIED'], evaluatedAt: new Date().toISOString(),
+          blockers: forcedBlockers, evaluatedAt: new Date().toISOString(),
         }
       : evaluateRiskProposal(proposal, context, policy);
 
