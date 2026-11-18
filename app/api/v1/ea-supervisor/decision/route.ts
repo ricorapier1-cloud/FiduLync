@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Rate limit exceeded.' }, { status: 429 });
   }
 
-  const token = (request.headers.get('authorization') ?? '').replace(/^Bearer\\s+/i, '').trim();
+  const token = (request.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '').trim();
   const sentAt = Date.parse(request.headers.get('x-mt5-timestamp') ?? '');
   const nonce = request.headers.get('x-mt5-nonce') ?? '';
   if (!token.startsWith('flmt5_') || token.length < 40 || !Number.isFinite(sentAt)
