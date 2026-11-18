@@ -7,6 +7,8 @@ function policy(overrides = {}) {
   return {
     policyVersion: 'personal-v1',
     executionEnabled: true,
+    modelValidated: true,
+    executionQualityVerified: true,
     maxPerTradeRiskPct: 0.5,
     maxPortfolioRiskPct: 2,
     maxDailyDrawdownPct: 4,
@@ -47,8 +49,6 @@ function proposal(overrides = {}) {
     regime: 'TRENDING_EXPANSION',
     marketDataHealth: 'LIVE',
     macroDataHealth: 'LIVE',
-    modelValidated: true,
-    executionQualityVerified: true,
     newsLockout: false,
     symbolSpec: {
       symbol: 'EURUSD',
