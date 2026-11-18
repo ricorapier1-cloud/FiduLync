@@ -239,7 +239,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
           <span className="eyebrow">GLOBAL MACRO / DAILY BRIEF</span>
           <h1 id="macro-title">Read the regime.<br /><span>Position with context.</span></h1>
           <p>Policy divergence, real yields, and positioning pressure across the G10. Decision support, not a trade signal.</p>
-          <Link className="macro-intro-action" href="/store"><BrandGlyph name="trend" size={15} /> Open the AlgoLync vault <BrandGlyph name="arrow-up-right" size={13} /></Link>
+          <Link className="macro-intro-action" href="/store"><BrandGlyph name="trend" size={15} /> Open the Personal EA Lab <BrandGlyph name="arrow-up-right" size={13} /></Link>
         </div>
         <div className="macro-intro-meta mono">
           <span>SNAPSHOT / {liveReferenceAvailable && currencies.length === 0 ? 'ECB REFERENCE' : snapshot.source === 'provider' ? 'UPSTREAM' : snapshot.source === 'partial' ? 'MIXED INPUTS' : 'OFFLINE'}</span>
