@@ -46,6 +46,7 @@ export type MacroSignalPayload = {
   macro_data_age_minutes: number | null;
   latest_market_candle_at: string | null;
   market_candle_counts: { h1: number; h4: number; d1: number };
+  quantitative_indicators: { rsi14: number | null; alma20: number | null; kama10: number | null; hurst_exponent: number | null; trend_r_squared: number | null; adr20_pips: number | null; current_daily_range_adr: number | null; gaussian_z_score: number | null; kaufman_efficiency_ratio: number | null; adx: number | null };
   timestamp_utc: string;
 };
 
@@ -194,6 +195,13 @@ export async function getMacroSignal(symbol: string, now = Date.now(), installat
       macro_data_age_minutes: Number.isFinite(macroAgeMs) ? Math.max(0, Math.round(macroAgeMs / 60_000)) : null,
       latest_market_candle_at: technical.latest_candle_at,
       market_candle_counts: technical.candle_counts,
+      quantitative_indicators: {
+        rsi14: technical.rsi14, alma20: technical.alma20, kama10: technical.kama10,
+        hurst_exponent: technical.hurst_exponent, trend_r_squared: technical.trend_r_squared,
+        adr20_pips: technical.adr20_pips, current_daily_range_adr: technical.current_daily_range_adr,
+        gaussian_z_score: technical.gaussian_z_score, kaufman_efficiency_ratio: technical.kaufman_efficiency_ratio,
+        adx: technical.adx,
+      },
       timestamp_utc: new Date(now).toISOString(),
     };
   };
