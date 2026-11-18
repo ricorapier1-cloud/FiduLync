@@ -53,7 +53,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Paystack payments are not enabled for this environment.' }, { status: 503 });
     }
 
-    const origin = (process.env.NEXT_PUBLIC_APP_URL || 'https://fidulync.vercel.app').replace(/\\/+$/, '');
+    const origin = (process.env.NEXT_PUBLIC_APP_URL || 'https://fidulync.vercel.app').replace(/\/+$/, '');
     const reference = `ALGO-${randomBytes(12).toString('hex').toUpperCase()}`;
     const interval = cycle === 'ANNUAL' ? 'annually' : 'monthly';
     const planResponse = await fetch('https://api.paystack.co/plan', {
