@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 type LicenseRow = {
   license_key: string; status: string | null; expires_at: string | null; grace_until: string | null;
-  ea_slug: string | null; account_mode: string | null; mt5_account: number | null;
+  ea_slug: string | null; account_mode: string | null; mt5_account: number | null; tier: string | null;
 };
 
 function signLease(payload: Record<string, unknown>, secret: string) {
