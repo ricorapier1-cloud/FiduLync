@@ -255,16 +255,18 @@ def build_account_snapshot(account: Any, infos: dict[str, Any]) -> dict[str, Any
     for position in positions:
         info = mt5.symbol_info(position.symbol)
         tick_size = float(getattr(info, "trade_tick_size", 0) or 0) if info else 0.0
-        tick_value = float(getattr(info, "trade_tick_value", 0) or 0) if info else 0.0
+        # Risk must use the broker's loss-side tick value, never the generic
+        # or profit-side value. If unavailable, fail closed for the full account.
+        tick_value_loss = float(getattr(info, "trade_tick_value_loss", 0) or 0) if info else 0.0
         stop_loss = float(getattr(position, "sl", 0) or 0)
         open_price = float(getattr(position, "price_open", 0) or 0)
         volume = float(getattr(position, "volume", 0) or 0)
-        if tick_size <= 0 or tick_value <= 0 or stop_loss <= 0 or open_price <= 0 or volume <= 0:
+        if tick_size <= 0 or tick_value_loss <= 0 or stop_loss <= 0 or open_price <= 0 or volume <= 0:
             risk_verified = False
             open_risk_cash = max(open_risk_cash, equity)
             continue
         distance_ticks = abs(open_price - stop_loss) / tick_size
-        open_risk_cash += distance_ticks * tick_value * volume
+        open_risk_cash += distance_ticks * tick_value_loss * volume
 
     consecutive_losses, loss_streak_verified, history_synced_at = build_verified_loss_streak(positions_result)
     return {
