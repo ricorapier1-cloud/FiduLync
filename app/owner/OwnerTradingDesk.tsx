@@ -124,7 +124,7 @@ export default function OwnerTradingDesk({ accessToken }: Props) {
             {pair.fundamental.blockers.length>0 && <details className="mt-2"><summary className="cursor-pointer text-[9px] text-amber-100">Why fundamental verification is blocked ({pair.fundamental.blockers.length})</summary><ul className="mt-2 list-disc space-y-1 pl-4 text-[9px] text-slate-500">{pair.fundamental.blockers.map((blocker) => <li key={blocker}>{label(blocker)}</li>)}</ul></details>}
           </div>
           <details className="mt-3 rounded-lg border border-white/[0.07] p-3"><summary className="cursor-pointer text-[10px] font-semibold text-slate-300">Advanced quantitative instruments · {pair.quantitative.available ? label(pair.quantitative.regime) : 'unavailable'}</summary>
-            <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[9px] text-slate-500 sm:grid-cols-3">
+            <p className="mt-2 text-[9px] leading-4 text-slate-500">Hurst is a lag-variance scaling estimate; R² measures historical trend-fit quality, not predictive probability. All diagnostics use closed bars.</p><div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[9px] text-slate-500 sm:grid-cols-3">
               <span>ALMA(20) <b className="float-right font-mono text-slate-300">{number(pair.quantitative.alma20, pair.pair==='USDJPY'?3:5)}</b></span>
               <span>KAMA(10) <b className="float-right font-mono text-slate-300">{number(pair.quantitative.kama10, pair.pair==='USDJPY'?3:5)}</b></span>
               <span>Hurst exponent <b className="float-right font-mono text-slate-300">{number(pair.quantitative.hurst_exponent,3)}</b></span>
