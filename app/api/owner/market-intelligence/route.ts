@@ -228,7 +228,8 @@ export async function GET(request: Request) {
         spread_atr_ratio: spreadAtrRatio,
         spread_within_guard: spreadWithinGuard,
         readiness: !installationIds.length ? 'AWAITING_MT5' : !dataComplete ? 'INSUFFICIENT_HISTORY'
-          : !fresh ? 'STALE_OR_MISSING_FEED' : !spreadWithinGuard ? 'SPREAD_GUARD' : 'RESEARCH_READY',
+          : !fresh ? 'STALE_OR_MISSING_FEED' : !spreadWithinGuard ? 'SPREAD_GUARD'
+            : pairFundamental(pair).verified ? 'RESEARCH_INPUTS_READY' : 'FUNDAMENTALS_BLOCKED',
       };
     });
 
