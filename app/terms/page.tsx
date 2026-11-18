@@ -66,12 +66,15 @@ export default function TermsPage() {
               3. Algorithmic Software Licensing &amp; Activation
             </h2>
             <p className="mt-3">
-              AlgoLync strategies (including Eridam Nexus Adaptive Pro and Velocity Vault) are delivered under a proprietary one-time software license:
+              Commercial AlgoLync Expert Advisors are provided under recurring monthly or annual software subscriptions. The specific EA, price, billing interval, included MT5 account seats and renewal date are shown at checkout before payment.
             </p>
             <ul className="mt-2 list-disc pl-5 space-y-1.5 text-slate-300">
-              <li>Each purchase grants a non-exclusive, non-transferable, single-operator lifetime license bound to your designated MetaTrader 5 account.</li>
-              <li>You may not redistribute, resell, sublicense, decompile, reverse-engineer, or publicly share the binary files (.ex5) or client include files (.mqh).</li>
-              <li>Attempting to bypass cloud license validation or broadcast proprietary signals will result in immediate termination of the license key without compensation.</li>
+              <li>Monthly subscriptions renew monthly; annual subscriptions renew annually. Annual pricing is set at ten monthly payments, representing two months free. Renewal is processed by Paystack using the customer's authorization.</li>
+              <li>Each active EA subscription includes one live MT5 account seat and two demo MT5 account seats. Additional live seats are charged at the displayed rate. Account re-binding is self-service and subject to a 72-hour cooldown per slot.</li>
+              <li>Free demo trials are time-limited, EA-specific and restricted to MT5 demo accounts. Demo access does not grant permission to trade a live account.</li>
+              <li>Customers may cancel renewal using the available subscription-management controls. Cancellation prevents future renewal; access remains governed by the paid period and any disclosed grace period.</li>
+              <li>You may not redistribute, resell, sublicense, decompile, reverse-engineer, or publicly share commercial binary files (.ex5) or client include files (.mqh).</li>
+              <li>Attempting to bypass cloud license validation or share subscription credentials may result in suspension or termination under the applicable licence rules.</li>
             </ul>
           </section>
 
@@ -94,10 +97,10 @@ export default function TermsPage() {
               5. Refund Policy
             </h2>
             <p className="mt-3">
-              Due to the nature of electronic digital products and instant server key binding, all software license sales are final and non-refundable once an activation key has been verified against an MT5 account.
+              Subscription cancellations, billing errors, duplicate payments, failed delivery and refund requests are handled under our published Refund &amp; Cancellation Policy. Please review that policy before purchasing.
             </p>
             <p className="mt-2">
-              Our trading desk provides complete setup assistance and onboarding over WhatsApp to ensure your system is properly configured.
+              <Link href="/refund-policy" className="text-emerald-300 underline underline-offset-4">Read the Refund &amp; Cancellation Policy</Link>. For billing assistance, contact fidulync@gmail.com.
             </p>
           </section>
 
@@ -120,6 +123,8 @@ export default function TermsPage() {
               For licensing transfers, account rebinding, or corporate institutional inquiries, contact our desk directly:
             </p>
             <div className="mt-3 font-mono text-xs text-slate-200">
+              <div>Customer Support: fidulync@gmail.com</div>
+              <div>Owner &amp; Compliance Contact: ricorapier1@gmail.com</div>
               <div>Desk Contact: WhatsApp +234 803 721 2445</div>
               <div>Platform: MacroLync &amp; AlgoLync</div>
               <div>Operating Jurisdiction: Federal Republic of Nigeria &amp; International Private E-Commerce</div>
