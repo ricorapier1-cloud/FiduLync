@@ -3,7 +3,7 @@
 **Status:** Approved product direction; implementation plan  
 **Date:** 2026-11-18  
 **Target:** Single-operator personal trading intelligence and EA-supervision platform  
-**Markets:** G10 FX, XAUUSD and XAGUSD  
+**Markets:** G10 FX and XAUUSD. XAGUSD is optional and deferred until explicitly approved with broker-specific contract specifications.  
 **Trading modes:** Discretionary analysis and automated MT5 EAs  
 **EA authority:** Supervisor only — approve, reject, abstain and recommend a risk ceiling; never place broker orders on behalf of the EA.
 
@@ -77,7 +77,7 @@ Use deterministic, testable TypeScript modules for:
 - ATR, ADX, KER/ER, R-squared, z-score, volatility percentile and volatility shock detection.
 - Regime classification: trend expansion, mean reversion, high-volatility chop and unavailable/unknown.
 - Currency strength and pair-relative fundamentals.
-- XAU/XAG macro context: USD, real yields, policy expectations, inflation, risk regime and relevant positioning; do not treat metals as ordinary currency codes.
+- XAU macro context: USD, real yields, policy expectations, inflation, risk regime and relevant positioning; do not treat metals as ordinary currency codes.
 - Correlation and aggregate exposure across all open positions and proposed orders.
 - Spread, slippage, latency, quote age and execution-quality checks.
 - Signal quality, sample size, historical expectancy and calibrated probability only where supported by held-out evidence.
@@ -148,13 +148,13 @@ Personal mode must be clear in the UI. Hide or disable commercial checkout, subs
 **Exit:** only the owner can access personal data; no commercial checkout/escrow path is reachable; no historical records are deleted.
 
 ### Phase 2 — Market data and instrument correctness
-- Define canonical FX, XAUUSD and XAGUSD symbol registry with broker suffix/prefix mapping.
+- Define canonical G10 FX and XAUUSD symbol registry with broker suffix/prefix mapping. Keep XAGUSD disabled unless separately approved.
 - Add broker symbol metadata adapter for tick size/value, digits, contract size, volume constraints, stop/freeze levels, margin and account-currency conversion.
-- Add XAGUSD support end-to-end: ingestion allow-list, technical calculations, macro mapping, spread/volatility limits, sizing and tests.
+- Only add XAGUSD end-to-end support after explicit scope approval and broker-specific data, tick-value, contract-size and sizing tests.
 - Verify quote freshness and closed-candle boundaries; verify at least 200 same-source closed bars per timeframe for signal computation, with longer historical windows for model research.
 - Keep MT5 broker data primary; use external feeds only as clearly labelled historical/reference fallbacks subject to provider terms.
 
-**Exit:** EURUSD, GBPUSD, USDJPY, other configured G10 pairs, XAUUSD and XAGUSD pass symbol/data/specification tests for the chosen broker. Unsupported instruments abstain.
+**Exit:** EURUSD, GBPUSD, USDJPY, other configured G10 pairs and XAUUSD pass symbol/data/specification tests for the chosen broker. Unsupported instruments abstain.
 
 ### Phase 3 — Quantitative core
 - Port and test fail-closed risk primitives from the quant foundation branch.
@@ -203,7 +203,7 @@ Personal mode must be clear in the UI. Hide or disable commercial checkout, subs
 - Supabase RLS and service-role boundaries verified; personal records cannot be read by any other user.
 - All ingestion endpoints validate schema, time, bounds, replay and installation identity.
 - No mixing of broker/provider series; no live labels for delayed/reference values.
-- XAU/XAG sizing tests cover symbol digits, tick value, contract size, min lot and account-currency conversion.
+- XAU sizing tests cover symbol digits, tick value, contract size, min lot and account-currency conversion.
 - All failure paths return reject/abstain and preserve broker-side protective stops.
 - Full audit record for every proposal, decision, order acknowledgement and closed trade.
 - Rollback procedure and database backup/restore test completed.
@@ -220,7 +220,7 @@ The platform can be engineered to high institutional standards for a single oper
 1. Confirm production deployment and access configuration; do not promote a preview deployment.
 2. Review the exact diffs for PR #11 and `feat/institutional-quant-foundation`; port only relevant security, quant and data-readiness work.
 3. Add personal-mode configuration without deleting historical data or useful account telemetry.
-4. Add instrument metadata and XAGUSD support with correct metal sizing.
+4. Add instrument metadata and correct XAUUSD metal sizing; defer XAGUSD pending explicit approval.
 5. Implement the versioned EA proposal/decision contract and central Risk Governor.
 6. Build tests and diagnostics before enabling any trade authorization.
 7. Keep all live execution gates disabled until Windows MT5, broker data, model validation and demo forward tests are complete.
