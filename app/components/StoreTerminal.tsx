@@ -17,6 +17,7 @@ export default function StoreTerminal({ initialSnapshot, session }: StoreTermina
   const [selectedEaSlug, setSelectedEaSlug] = useState('eridam-nexus-pro');
   const [selectedBillingCycle, setSelectedBillingCycle] = useState<'MONTHLY' | 'ANNUAL'>('MONTHLY');
   const [selectedCurrency, setSelectedCurrency] = useState<'NGN' | 'USD'>('NGN');
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
   const router = useRouter();
 
 
@@ -68,24 +69,19 @@ export default function StoreTerminal({ initialSnapshot, session }: StoreTermina
         </section>
 
         <section className="mt-11" aria-labelledby="strategies-heading">
-          <QuantStrategyCatalog onSelectEa={(slug, cycle, currency) => { setSelectedEaSlug(slug); setSelectedBillingCycle(cycle); setSelectedCurrency(currency); }} />
+          <QuantStrategyCatalog onSelectEa={(slug, cycle, currency) => { setSelectedEaSlug(slug); setSelectedBillingCycle(cycle); setSelectedCurrency(currency); setCheckoutOpen(true); }} />
         </section>
 
-                <section id="vault-checkout" className="mt-11 scroll-mt-24" aria-labelledby="provisioning-heading">
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <div className="font-mono text-[9px] tracking-[0.17em] text-emerald-400">SUBSCRIPTION CHECKOUT</div>
-              <h2 id="provisioning-heading" className="mt-1 text-lg font-semibold">Acquire Institutional EA License</h2>
+        {checkoutOpen && <div className="fixed inset-0 z-[90] bg-black/75 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="AlgoLync subscription checkout">
+          <button type="button" aria-label="Close checkout" onClick={() => setCheckoutOpen(false)} className="absolute inset-0 h-full w-full cursor-default" />
+          <aside className="absolute inset-y-0 right-0 w-full max-w-2xl overflow-y-auto border-l border-white/10 bg-[#080c12] p-4 shadow-2xl sm:p-7">
+            <div className="mb-5 flex items-center justify-between border-b border-white/10 pb-4">
+              <div><div className="font-mono text-[9px] tracking-widest text-emerald-300">ALGOLYNC / SECURE CHECKOUT</div><h2 className="mt-1 text-lg font-semibold">Subscription checkout</h2></div>
+              <button type="button" onClick={() => setCheckoutOpen(false)} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-slate-300">Close</button>
             </div>
-            <div className="flex items-center gap-2 font-mono text-[9px] text-emerald-300">
-              <BrandGlyph name="shield" size={13} className="text-emerald-400" />
-              RECURRING SUBSCRIPTION · SEAT ENTITLEMENTS
-            </div>
-          </div>
-          <div className="rounded-xl border border-emerald-500/20 bg-[#06120E]/80 p-5 sm:p-6 shadow-2xl backdrop-blur-sm">
             <PaystackCheckout selectedEaSlug={selectedEaSlug} selectedBillingCycle={selectedBillingCycle} selectedCurrency={selectedCurrency} />
-          </div>
-        </section>
+          </aside>
+        </div>}
 
         <div className="mt-8 flex items-center gap-2 border-t border-white/[0.07] pt-5 text-[10px] leading-5 text-slate-600">
           <BrandGlyph name="shield" size={13} className="shrink-0" />
