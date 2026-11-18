@@ -30,6 +30,16 @@ async function attachSubscriptionCode(data: Record<string, unknown>) {
     method: 'PATCH', query: `initial_reference=eq.${encodeURIComponent(intent.reference)}`,
     body: { subscription_code: subscriptionCode, updated_at: new Date().toISOString() },
   });
+  // subscription.create and charge.success can arrive in either order. Verify and
+  // provision through the same idempotent service from this event as well.
+  const result = await provisionOrExtendLicense(intent.reference, subscriptionCode);
+  if (result.created) {
+    const license = result.license;
+    await sendLicenseDeliveryEmail({
+      email: license.email, licenseKey: license.license_key, mt5Account: license.mt5_account,
+      tier: license.tier, expiresAt: license.expires_at, reference: intent.reference,
+    }).catch((error: unknown) => { console.error('AlgoLync subscription email failed:', error); return false; });
+  }
 }
 
 async function applyPaymentFailed(data: Record<string, unknown>, paystackSecret: string) {
