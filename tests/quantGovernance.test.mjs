@@ -114,6 +114,18 @@ test('fails closed until model validation evidence is server-approved', () => {
   assert.ok(result.blockers.includes('MODEL_NOT_OUT_OF_SAMPLE_VALIDATED'));
 });
 
+test('abstains on a future-dated quote or negative spread', () => {
+  const result = evaluateRiskProposal(proposal(), context({ quoteAgeMs: -1 }), policy());
+  assert.equal(result.decision, 'ABSTAIN');
+  assert.ok(result.blockers.includes('MARKET_OR_ACCOUNT_CONTEXT_INVALID'));
+});
+
+test('abstains on non-positive stop or target prices', () => {
+  const result = evaluateRiskProposal(proposal({ takeProfit: 0 }), context(), policy());
+  assert.equal(result.decision, 'ABSTAIN');
+  assert.ok(result.blockers.includes('PROPOSAL_PRICE_OR_RISK_INVALID'));
+});
+
 test('degrades when market data is not live', () => {
   const result = evaluateRiskProposal(proposal(), context({ marketDataHealth: 'REFERENCE' }), policy());
   assert.equal(result.decision, 'DEGRADED');
