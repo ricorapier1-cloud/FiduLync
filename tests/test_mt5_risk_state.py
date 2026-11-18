@@ -19,11 +19,11 @@ def deal(position_id, entry, timestamp, profit, commission=0, swap=0, fee=0):
 class ConsecutiveClosedLossTests(unittest.TestCase):
     def test_counts_newest_losses_until_first_non_loss(self):
         deals = [
+            deal(14, OUT, 20, -3),
+            deal(13, OUT, 50, 4),
             deal(10, OUT, 100, -12),
             deal(11, OUT, 200, -8),
             deal(12, OUT, 300, -5),
-            deal(13, OUT, 400, 4),
-            deal(14, OUT, 500, -3),
         ]
         self.assertEqual(consecutive_closed_loss_streak(deals, set(), {OUT, OUT_BY, INOUT}), 3)
 
