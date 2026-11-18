@@ -6,7 +6,7 @@ import { supabaseInsert, supabaseQuery, supabaseRead } from '@/lib/supabaseAdmin
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-type Installation = { id: string; status: string };
+type Installation = { id: string; status: string; last_seen_at?: string | null };
 type Quote = { symbol: string; bid: number; ask: number; quote_time: string; spread_points: number; digits?: number; point?: number; tick_size?: number; tick_value?: number; tick_value_loss?: number; tick_value_profit?: number; contract_size?: number; volume_min?: number; volume_max?: number; volume_step?: number; stop_level_points?: number; margin_per_lot_buy?: number; margin_per_lot_sell?: number; broker?: string; server?: string };
 type Candle = { symbol: string; timeframe: 'H1' | 'H4' | 'D1'; bar_time: string; open: number; high: number; low: number; close: number; tick_volume?: number; spread_points?: number; real_volume?: number; is_closed?: boolean; broker?: string; server?: string; digits?: number; point?: number; tick_size?: number; tick_value?: number; contract_size?: number };
 type PositionSnapshot = { snapshot_id: string; captured_at: string; account_login: number; expected_positions: number; positions: Record<string, unknown>[] };
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     const tokenHash = createHash('sha256').update(token).digest('hex');
     const installations = await supabaseRead<Installation[]>(
       'mt5_installations',
-      `select=id,status&token_hash=eq.${tokenHash}&status=eq.active&limit=1`
+      `select=id,status,last_seen_at&token_hash=eq.${tokenHash}&status=eq.active&limit=1`
     );
     const installation = installations?.[0];
     if (!installation) return NextResponse.json({ error: 'Publisher token is invalid or revoked.' }, { status: 401 });
@@ -307,10 +307,13 @@ export async function POST(request: Request) {
       if (!manifest) throw new Error('Position snapshot completion manifest could not be stored.');
       positionsReceived = positionRows.length;
     }
-    await supabaseQuery('mt5_installations', {
-      method: 'PATCH', query: `id=eq.${installation.id}`,
-      prefer: 'return=representation', body: { last_seen_at: new Date().toISOString() },
-    });
+    const lastSeenEpoch = installation.last_seen_at ? Date.parse(installation.last_seen_at) : Number.NaN;
+    if (!Number.isFinite(lastSeenEpoch) || Date.now() - lastSeenEpoch >= 10_000 || lastSeenEpoch > Date.now() + 5 * 60_000) {
+      await supabaseQuery('mt5_installations', {
+        method: 'PATCH', query: `id=eq.${installation.id}`,
+        prefer: 'return=representation', body: { last_seen_at: new Date().toISOString() },
+      });
+    }
     return NextResponse.json({
       accepted: true, installation_id: installation.id,
       quotes_received: quotes.length, candles_received: candles.length, account_snapshot_received: Boolean(accountSnapshot),
