@@ -170,15 +170,24 @@ export async function GET(request: Request) {
     });
 
     const rawMacro = macroResult.data?.payload as MacroSnapshot | undefined;
-    const macroStrength = rawMacro ? getCurrencyStrengthIndex(rawMacro) : [];
-    const macroRates = rawMacro?.currencies.map((currency) => currency.policyRate).filter(Number.isFinite) ?? [];
+    const verifiedMacro = rawMacro ? {
+      ...rawMacro,
+      currencies: rawMacro.currencies.filter((currency) => currency.policyRateSource === 'provider' && currency.inflationSource === 'provider'),
+      cot: rawMacro.cot.filter((position) => {
+        const observedAt = position.asOf ? Date.parse(position.asOf) : Number.NaN;
+        const age = Date.now() - observedAt;
+        return Number.isFinite(observedAt) && age >= -5 * 60_000 && age <= 14 * 24 * 60 * 60_000;
+      }),
+    } : null;
+    const macroStrength = verifiedMacro ? getCurrencyStrengthIndex(verifiedMacro) : [];
+    const macroRates = verifiedMacro?.currencies.map((currency) => currency.policyRate).filter(Number.isFinite) ?? [];
     const policySpread = macroRates.length ? Math.max(...macroRates) - Math.min(...macroRates) : null;
     const macroRecordedAt = macroResult.data?.refreshed_at ?? rawMacro?.asOf ?? null;
     const macroAgeHours = macroRecordedAt ? (Date.now() - Date.parse(macroRecordedAt)) / 3_600_000 : null;
     const macro = rawMacro && macroRecordedAt ? {
       regime_label: rawMacro.source.toUpperCase() + (rawMacro.source === 'partial' ? ' · PARTIAL' : ''),
-      top_long: macroStrength[0]?.currency ?? '',
-      top_short: macroStrength.at(-1)?.currency ?? '',
+      top_long: macroStrength.length >= 2 ? macroStrength[0].currency : '',
+      top_short: macroStrength.length >= 2 ? macroStrength.at(-1)?.currency ?? '' : '',
       policy_spread: policySpread,
       provenance: [rawMacro.source, 'COT '+(rawMacro.cotSource ?? 'unavailable'), 'Calendar '+(rawMacro.calendarSource ?? 'reference')].join(' · '),
       csi_scores: Object.fromEntries(macroStrength.map((item) => [item.currency, item.score])),
