@@ -4,7 +4,7 @@ import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { supabaseInsert, supabaseRead } from '@/lib/supabaseAdmin';
 import { getPersonalRiskPolicy } from '@/lib/riskPolicy';
 import { getMacroSignal } from '@/lib/signalEngine';
-import { calculateBrokerAwareVolume, calculateTrueRangeAtr, evaluateRiskProposal, type RiskContext, type RiskProposal } from '@/lib/quantGovernance';
+import { calculateBrokerAwareVolume, calculateTrueRangeAtr, evaluateRiskProposal, isRiskAnchorFresh, type RiskContext, type RiskProposal } from '@/lib/quantGovernance';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -226,12 +226,7 @@ export async function POST(request: Request) {
     });
     const estimatedMargin = sizing.valid && marginPerLot > 0 ? sizing.volume * marginPerLot : Number.NaN;
     const historySyncedAt = account.history_synced_at ? Date.parse(account.history_synced_at) : Number.NaN;
-    const riskStateUpdatedAt = Date.parse(state.updated_at);
-    const riskStateSnapshotAt = Date.parse(state.last_snapshot_at);
-    const riskStateFresh = Number.isFinite(riskStateUpdatedAt) && Number.isFinite(riskStateSnapshotAt)
-      && Date.now() - riskStateUpdatedAt >= 0 && Date.now() - riskStateUpdatedAt <= 30_000
-      && Date.now() - riskStateSnapshotAt >= 0 && Date.now() - riskStateSnapshotAt <= 30_000
-      && Math.abs(riskStateSnapshotAt - capturedAt) <= 5_000;
+    const riskStateFresh = isRiskAnchorFresh(state.updated_at, state.last_snapshot_at, account.captured_at);
     const lossStreakFresh = account.loss_streak_verified && account.consecutive_losses !== null
       && Number.isSafeInteger(account.consecutive_losses) && Number.isFinite(historySyncedAt)
       && Date.now() - historySyncedAt >= 0 && Date.now() - historySyncedAt <= 30_000;
