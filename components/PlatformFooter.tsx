@@ -50,7 +50,7 @@ export default function PlatformFooter() {
               </li>
               <li>
                 <Link href="/store" className="transition hover:text-emerald-300">
-                  AlgoLync Strategy Vault &amp; Store
+                  Personal EA Lab
                 </Link>
               </li>
               <li>
@@ -71,7 +71,7 @@ export default function PlatformFooter() {
             <ul className="mt-3 space-y-2 text-xs">
               <li>
                 <a
-                  href="https://wa.me/2348037212445?text=Hello%20Desk%2C%20I%20have%20an%20enquiry%20regarding%20AlgoLync%20EAs"
+                  href="https://wa.me/2348037212445?text=Hello%2C%20I%20need%20help%20with%20my%20FiduLync%20Personal%20Quant%20workspace"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 text-emerald-300 transition hover:underline"
@@ -89,11 +89,11 @@ export default function PlatformFooter() {
             <span className="font-mono text-[10px] uppercase tracking-widest text-slate-300">MT5 Include Files</span>
             <div className="mt-3 flex flex-col gap-2 text-xs">
               <a
-                href="/mql5/MacroLyncLicense.mqh"
+                href="/mql5/MacroLyncBridge.mqh"
                 download
                 className="inline-flex items-center gap-2 rounded border border-white/[0.1] bg-white/[0.03] px-3 py-1.5 text-[11px] text-slate-300 transition hover:border-emerald-400/40 hover:text-emerald-300"
               >
-                <BrandGlyph name="arrow-down" size={13} /> MacroLyncLicense.mqh
+                <BrandGlyph name="arrow-down" size={13} /> MacroLyncBridge.mqh
               </a>
               <a
                 href="/mql5/MacroLyncBridge.mqh"
@@ -116,12 +116,12 @@ export default function PlatformFooter() {
             Trading foreign exchange (Forex) and Contracts for Difference (CFDs) on margin carries a high level of risk and may not be suitable for all investors. High leverage can work against you as well as for you. Before deciding to trade foreign exchange or utilize automated Expert Advisors, you should carefully consider your investment objectives, level of experience, and risk appetite. There is a possibility that you could sustain a loss of some or all of your initial capital. Past performance, backtests, or hypothetical results are not indicative of future market outcomes.
           </p>
           <p className="mt-2 text-slate-500">
-            MacroLync and AlgoLync provide quantitative analysis, macro intelligence models, and execution software tools for research and automated trading execution. We do not provide personalized financial, legal, or investment advice.
+            FiduLync Personal Quant provides market research, risk planning and EA supervision tools for the owner's own trading. It is not a broker or investment adviser, does not place orders, and does not guarantee trading results.
           </p>
         </div>
 
         <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-white/[0.06] pt-6 font-mono text-[10px] text-slate-400">
-          <div>© {new Date().getFullYear()} MacroLync &amp; AlgoLync. All rights reserved.</div>
+          <div>© {new Date().getFullYear()} FiduLync Personal Quant. All rights reserved.</div>
           <div className="flex items-center gap-4">
             <Link href="/faq" className="hover:text-slate-300">FAQ</Link>
             <Link href="/terms" className="hover:text-slate-300">Terms of Service</Link>
