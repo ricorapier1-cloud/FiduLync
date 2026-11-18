@@ -70,7 +70,7 @@ export async function provisionOrExtendLicense(referenceInput: string, suppliedS
     terms = subscription;
   } else {
     // Backward compatibility for older one-off reference formats only.
-    if (reference.split('_').length >= 4) return provisionLicenseForReference(reference);
+    if (reference.split('_').length >= 4) {\n      const legacy = await provisionLicenseForReference(reference);\n      return { ...legacy, idempotentReplay: false, billingCycle: legacy.plan === 'LIFETIME' ? 'ANNUAL' : 'MONTHLY' };\n    }
     throw new Error('No stored checkout intent or recurring subscription matches this payment.');
   }
 
