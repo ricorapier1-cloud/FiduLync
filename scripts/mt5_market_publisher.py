@@ -60,6 +60,8 @@ POSITION_REFRESH_SECONDS = max(3, int(os.getenv("MT5_POSITION_REFRESH_SECONDS", 
 LOSS_STREAK_REFRESH_SECONDS = max(15, min(25, int(os.getenv("MT5_LOSS_STREAK_REFRESH_SECONDS", "20"))))
 _loss_streak_cache: tuple[int, str] | None = None
 _loss_streak_last_attempt = 0.0
+_execution_last_sync_epoch: float | None = None
+_execution_seen_event_ids: set[str] = set()
 # Deliberately require an explicit verified deployment URL. The production
 # deployment may not yet contain the personal-quant account-snapshot endpoint.
 INGEST_URL = os.getenv("FIDULYNC_INGEST_URL", "").strip()
@@ -292,6 +294,59 @@ def build_account_snapshot(account: Any, infos: dict[str, Any], positions_result
     }
 
 
+def build_execution_events() -> tuple[list[dict[str, Any]], float | None]:
+    """Read terminal-confirmed fills/closes; latency and requested-price slippage need EA hooks."""
+    global _execution_last_sync_epoch
+    now = datetime.now(timezone.utc)
+    start_epoch = _execution_last_sync_epoch - 60 if _execution_last_sync_epoch is not None else now.timestamp() - 24 * 60 * 60
+    try:
+        deals = mt5.history_deals_get(datetime.fromtimestamp(start_epoch, tz=timezone.utc), now)
+    except Exception as exc:
+        print(f"WARNING: MT5 execution history unavailable: {exc}")
+        return [], None
+    if deals is None:
+        print(f"WARNING: MT5 execution history query failed: {mt5.last_error()}")
+        return [], None
+    exit_entries = {int(getattr(mt5, "DEAL_ENTRY_OUT", 1)), int(getattr(mt5, "DEAL_ENTRY_OUT_BY", 3)), int(getattr(mt5, "DEAL_ENTRY_INOUT", 2))}
+    buy_type = int(getattr(mt5, "DEAL_TYPE_BUY", 0))
+    sell_type = int(getattr(mt5, "DEAL_TYPE_SELL", 1))
+    events: list[dict[str, Any]] = []
+    for deal in deals:
+        ticket = int(getattr(deal, "ticket", 0) or 0)
+        deal_type = int(getattr(deal, "type", -1))
+        if ticket <= 0 or deal_type not in (buy_type, sell_type):
+            continue
+        event_id = str(ticket)
+        if event_id in _execution_seen_event_ids:
+            continue
+        symbol = str(getattr(deal, "symbol", "") or "").upper()
+        price = float(getattr(deal, "price", 0) or 0)
+        volume = float(getattr(deal, "volume", 0) or 0)
+        event_epoch = float(getattr(deal, "time_msc", 0) or 0) / 1000
+        if not symbol or price <= 0 or volume <= 0 or event_epoch <= 0:
+            continue
+        entry = int(getattr(deal, "entry", -1))
+        events.append({"event_id": event_id, "event_type": "DEAL_CLOSE" if entry in exit_entries else "FILL",
+            "symbol": symbol, "side": "BUY" if deal_type == buy_type else "SELL",
+            "fill_price": price, "volume": volume, "event_time": utc_iso(event_epoch),
+            "broker_code": str(getattr(deal, "reason", "") or "")[:80]})
+    events.sort(key=lambda item: item["event_time"])
+    if len(events) > 500:
+        events = events[:500]
+        sync_epoch = datetime.fromisoformat(events[-1]["event_time"].replace("Z", "+00:00")).timestamp()
+    else:
+        sync_epoch = now.timestamp()
+    return events, sync_epoch
+
+def mark_execution_events_sent(events: list[dict[str, Any]], sync_epoch: float | None) -> None:
+    global _execution_last_sync_epoch
+    _execution_seen_event_ids.update(str(event["event_id"]) for event in events)
+    if len(_execution_seen_event_ids) > 20_000:
+        _execution_seen_event_ids.clear()
+        _execution_seen_event_ids.update(str(event["event_id"]) for event in events)
+    if sync_epoch is not None:
+        _execution_last_sync_epoch = sync_epoch
+
 def build_position_snapshot(account: Any, positions_result: Any) -> dict[str, Any] | None:
     """Build a complete point-in-time position set; None means do not publish."""
     if positions_result is None:
@@ -334,8 +389,9 @@ def post_batch(
     candles: list[dict[str, Any]],
     account_snapshot: dict[str, Any] | None = None,
     position_snapshot: dict[str, Any] | None = None,
+    execution_events: list[dict[str, Any]] | None = None,
 ) -> None:
-    if not quotes and not candles and account_snapshot is None and position_snapshot is None:
+    if not quotes and not candles and account_snapshot is None and position_snapshot is None and not execution_events:
         return
     # The API caps each request at 1,000 candles. Split broad FX universes safely,
     # sending the account snapshot and quotes only with the first chunk.
@@ -344,7 +400,7 @@ def post_batch(
         batch_quotes = quotes if index == 0 else []
         batch_snapshot = account_snapshot if index == 0 else None
         body = json.dumps(
-            {"quotes": batch_quotes, "candles": chunk, "account_snapshot": batch_snapshot, "position_snapshot": position_snapshot if index == 0 else None},
+            {"quotes": batch_quotes, "candles": chunk, "account_snapshot": batch_snapshot, "position_snapshot": position_snapshot if index == 0 else None, "execution_events": execution_events if index == 0 else []},
             separators=(",", ":"),
         ).encode("utf-8")
         now = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
@@ -415,16 +471,20 @@ def main() -> int:
             # Keep the quote/account/position channel light and frequent.
             account_snapshot = None
             position_snapshot = None
+            execution_events: list[dict[str, Any]] = []
+            execution_sync_epoch: float | None = None
             now_monotonic = time.monotonic()
             if now_monotonic - last_position_refresh >= POSITION_REFRESH_SECONDS:
                 positions_result = mt5.positions_get()
                 account_snapshot = build_account_snapshot(account, infos, positions_result)
                 position_snapshot = build_position_snapshot(account, positions_result)
+                execution_events, execution_sync_epoch = build_execution_events()
             quotes = build_quotes(infos, account)
             try:
-                post_batch(quotes, [], account_snapshot, position_snapshot)
+                post_batch(quotes, [], account_snapshot, position_snapshot, execution_events)
                 if account_snapshot is not None:
                     last_position_refresh = time.monotonic()
+                    mark_execution_events_sent(execution_events, execution_sync_epoch)
             except Exception as exc:
                 print(f"Quote/account publish failed: {exc}")
 
