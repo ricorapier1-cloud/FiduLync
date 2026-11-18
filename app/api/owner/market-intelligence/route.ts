@@ -37,6 +37,25 @@ function rsi(values: number[], period = 14): number | null {
   if (losses === 0) return gains === 0 ? 50 : 100;
   return 100 - 100 / (1 + gains / losses);
 }
+function selectSingleSeries(rows: Candle[], timeframe: string): Candle[] {
+  const groups = new Map<string, Candle[]>();
+  for (const row of rows) {
+    const key = [row.symbol, row.broker, row.server].join('|');
+    const group = groups.get(key) ?? [];
+    group.push(row);
+    groups.set(key, group);
+  }
+  const candidates = [...groups.values()].map((group) => {
+    const ordered = [...group].sort((a, b) => Date.parse(a.bar_time) - Date.parse(b.bar_time));
+    const latest = ordered.at(-1);
+    const ageMinutes = latest ? (Date.now() - Date.parse(latest.bar_time)) / 60000 : Number.POSITIVE_INFINITY;
+    const freshnessLimit = timeframe === 'H1' ? 180 : timeframe === 'H4' ? 720 : 2880;
+    return { ordered, fresh: ageMinutes >= 0 && ageMinutes <= freshnessLimit, latestTime: latest ? Date.parse(latest.bar_time) : 0 };
+  });
+  candidates.sort((a, b) => Number(b.fresh) - Number(a.fresh) || b.ordered.length - a.ordered.length || b.latestTime - a.latestTime);
+  return candidates[0]?.ordered ?? [];
+}
+
 function frameAnalysis(rows: Candle[], timeframe: string) {
   const bars = [...rows].sort((a, b) => Date.parse(a.bar_time) - Date.parse(b.bar_time));
   const closes = bars.map((bar) => Number(bar.close));
@@ -105,10 +124,12 @@ export async function GET(request: Request) {
       const frames = {} as Record<string, ReturnType<typeof frameAnalysis>>;
       FRAMES.forEach((timeframe, frameIndex) => {
         const result = candleResults[pairIndex * FRAMES.length + frameIndex];
-        const rows = (result.data ?? []) as Candle[];
+        const rows = selectSingleSeries((result.data ?? []) as Candle[], timeframe);
         frames[timeframe] = frameAnalysis(rows, timeframe);
       });
-      const quote = quoteRows.find((row) => row.symbol.toUpperCase().startsWith(pair));
+      const h1Source = frames.H1;
+      const quote = quoteRows.find((row) => row.symbol === h1Source.symbol && row.broker === h1Source.broker && row.server === h1Source.server)
+        ?? quoteRows.find((row) => row.symbol.toUpperCase().startsWith(pair));
       const quoteAgeSeconds = quote ? (Date.now() - Date.parse(quote.quote_time)) / 1000 : null;
       const quoteFresh = quoteAgeSeconds !== null && quoteAgeSeconds >= 0 && quoteAgeSeconds <= 120;
       const h1Atr = frames.H1.atr14;
