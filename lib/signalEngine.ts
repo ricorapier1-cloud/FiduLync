@@ -116,7 +116,12 @@ export async function getMacroSignal(symbol: string, now = Date.now(), installat
     const score = fundamental && macroDataVerified
       ? Math.max(-100, Math.min(100, Math.round(fundamental.score * 0.6 + technical.score * 0.4)))
       : 0;
-    const strengths = getCurrencyStrengthIndex(snapshot);
+    const freshCot = snapshot.cot.filter((position) => {
+      const observedAt = position.asOf ? Date.parse(position.asOf) : Number.NaN;
+      const age = now - observedAt;
+      return Number.isFinite(observedAt) && age >= -5 * 60_000 && age <= 14 * 24 * 60 * 60_000;
+    });
+    const strengths = getCurrencyStrengthIndex({ ...snapshot, cot: freshCot });
     const baseStrength = strengths.find((item) => item.currency === normalizedSymbol.slice(0, 3))?.score;
     const quoteStrength = strengths.find((item) => item.currency === normalizedSymbol.slice(3))?.score;
     // Gold is not a G10 currency. Model XAUUSD against the inverse USD strength
