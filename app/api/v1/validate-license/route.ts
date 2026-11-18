@@ -4,6 +4,20 @@ import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
+type LicenseRecord = {
+  license_key: string;
+  status: string;
+  expires_at: string | null;
+  max_live_slots: number | null;
+  max_demo_slots: number | null;
+  email?: string | null;
+};
+
+type BoundAccountRecord = {
+  account_number: number | string;
+  account_type: 'LIVE' | 'DEMO';
+};
+
 export async function POST(req: Request) {
   const ip = getClientIp(req);
   if (!checkRateLimit(ip, 60)) {
@@ -47,7 +61,7 @@ export async function POST(req: Request) {
     }
 
     // 2. Query license from Supabase
-    const licenses = await supabaseRead<any[]>('licenses', `license_key=eq.${encodeURIComponent(licenseKey)}&select=license_key,status,expires_at,max_live_slots,max_demo_slots,email`);
+    const licenses = await supabaseRead<LicenseRecord[]>('licenses', `license_key=eq.${encodeURIComponent(licenseKey)}&select=license_key,status,expires_at,max_live_slots,max_demo_slots,email`);
     if (!licenses || licenses.length === 0) {
       return NextResponse.json({ valid: false, message: 'Invalid license key' }, { status: 404 });
     }
