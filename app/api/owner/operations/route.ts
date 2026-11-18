@@ -113,6 +113,7 @@ export async function GET(request: Request) {
         max_high_water_drawdown_pct: riskPolicy.maxHighWaterDrawdownPct,
         max_margin_usage_pct: riskPolicy.maxMarginUsagePct,
         max_spread_points: riskPolicy.maxSpreadPoints,
+        max_spread_atr_ratio: riskPolicy.maxSpreadAtrRatio,
         max_quote_age_ms: riskPolicy.maxQuoteAgeMs,
         max_consecutive_losses: riskPolicy.maxConsecutiveLosses,
         reward_risk_minimum: riskPolicy.rewardRiskMinimum,
