@@ -139,6 +139,8 @@ def build_quotes(infos: dict[str, Any], account: Any) -> list[dict[str, Any]]:
             "point": point,
             "tick_size": float(info.trade_tick_size),
             "tick_value": float(info.trade_tick_value),
+            "tick_value_loss": float(getattr(info, "trade_tick_value_loss", 0.0) or 0.0),
+            "tick_value_profit": float(getattr(info, "trade_tick_value_profit", 0.0) or 0.0),
             "contract_size": float(info.trade_contract_size),
             "volume_min": float(info.volume_min),
             "volume_max": float(info.volume_max),
