@@ -71,13 +71,13 @@ function nearNewsLockoutTransition(snapshot: MacroSnapshot, now: number, symbol:
     && Math.abs(Math.abs(Date.parse(catalyst.scheduledAt) - now) - NEWS_BLACKOUT_MS) <= 15_000);
 }
 
-export async function getMacroSignal(symbol: string, now = Date.now()): Promise<MacroSignalPayload | null> {
+export async function getMacroSignal(symbol: string, now = Date.now(), installationId?: string): Promise<MacroSignalPayload | null> {
   const normalizedSymbol = symbol.toUpperCase();
   if (!isSupportedSignalSymbol(normalizedSymbol)) return null;
 
   const snapshot = await getMacroSnapshot();
   const calculateSignal = async (): Promise<MacroSignalPayload> => {
-    const technical = await getTechnicalSignal(normalizedSymbol);
+    const technical = await getTechnicalSignal(normalizedSymbol, installationId);
     const fundamental = getFundamentalSignal(snapshot, normalizedSymbol);
     const baseCurrency = snapshot.currencies.find((currency) => currency.code === normalizedSymbol.slice(0, 3));
     const quoteCurrency = snapshot.currencies.find((currency) => currency.code === normalizedSymbol.slice(3));
@@ -158,5 +158,5 @@ export async function getMacroSignal(symbol: string, now = Date.now()): Promise<
     };
   };
   if (nearNewsLockoutTransition(snapshot, now, normalizedSymbol)) return calculateSignal();
-  return getCachedData(`signal:${normalizedSymbol}`, calculateSignal, 15);
+  return getCachedData(`signal:${installationId ?? 'active'}:${normalizedSymbol}`, calculateSignal, 15);
 }
