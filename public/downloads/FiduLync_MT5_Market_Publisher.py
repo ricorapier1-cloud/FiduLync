@@ -9,7 +9,7 @@ Install:
 Run:
     set FIDULYNC_PUBLISHER_TOKEN=flmt5_...
     set MT5_SYMBOL_MAP=EURUSD=EURUSD,GBPUSD=GBPUSD,USDJPY=USDJPY,XAUUSD=XAUUSD
-    py scripts/mt5_market_publisher.py
+    py FiduLync_MT5_Market_Publisher.py
 
 For broker suffixes, map canonical symbols to broker symbols, for example:
     MT5_SYMBOL_MAP=EURUSD=EURUSD.a,GBPUSD=GBPUSD.a,USDJPY=USDJPY.a,XAUUSD=XAUUSD.a
@@ -24,6 +24,8 @@ import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any
+
+from mt5_risk_state import consecutive_closed_loss_streak
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -192,6 +194,33 @@ def build_candles(
     return candles, pending
 
 
+def build_verified_loss_streak(positions: Any) -> tuple[int | None, bool, str]:
+    """Calculate the current losing streak from the terminal's available deal history."""
+    synced_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    if positions is None:
+        return None, False, synced_at
+    try:
+        deals = mt5.history_deals_get(datetime(2000, 1, 1, tzinfo=timezone.utc), datetime.now(timezone.utc))
+    except Exception as exc:
+        print(f"WARNING: MT5 closed-trade history unavailable: {exc}")
+        return None, False, synced_at
+    if deals is None:
+        print(f"WARNING: MT5 history_deals_get failed: {mt5.last_error()}")
+        return None, False, synced_at
+
+    open_position_ids = {
+        int(getattr(position, "identifier", getattr(position, "ticket", 0)) or 0)
+        for position in positions
+    }
+    exit_entries = {
+        int(getattr(mt5, "DEAL_ENTRY_OUT", 1)),
+        int(getattr(mt5, "DEAL_ENTRY_OUT_BY", 3)),
+        int(getattr(mt5, "DEAL_ENTRY_INOUT", 2)),
+    }
+    consecutive_losses = consecutive_closed_loss_streak(deals, open_position_ids, exit_entries)
+    return consecutive_losses, True, synced_at
+
+
 def build_account_snapshot(account: Any, infos: dict[str, Any]) -> dict[str, Any]:
     equity = float(account.equity)
     open_risk_cash = 0.0
@@ -214,6 +243,7 @@ def build_account_snapshot(account: Any, infos: dict[str, Any]) -> dict[str, Any
         distance_ticks = abs(open_price - stop_loss) / tick_size
         open_risk_cash += distance_ticks * tick_value * volume
 
+    consecutive_losses, loss_streak_verified, history_synced_at = build_verified_loss_streak(positions)
     return {
         "account_login": int(account.login),
         "currency": str(account.currency or "USD").upper(),
@@ -225,11 +255,13 @@ def build_account_snapshot(account: Any, infos: dict[str, Any]) -> dict[str, Any
         "open_positions": len(positions),
         "open_risk_cash": min(max(0.0, open_risk_cash), max(equity, open_risk_cash)),
         "open_risk_verified": risk_verified,
+        "consecutive_losses": consecutive_losses,
+        "loss_streak_verified": loss_streak_verified,
+        "history_synced_at": history_synced_at,
         "broker": str(account.company or "")[:100],
         "server": str(account.server or "")[:120],
         "captured_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
     }
-
 
 def post_batch(quotes: list[dict[str, Any]], candles: list[dict[str, Any]], account_snapshot: dict[str, Any] | None = None) -> None:
     if not quotes and not candles:
