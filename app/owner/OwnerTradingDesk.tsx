@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 type Frame = {
   timeframe: string; symbol: string | null; bars: number; last_close: number | null;
-  ema20: number | null; ema50: number | null; atr14: number | null; rsi14: number | null;
+  ema20: number | null; ema50: number | null; ema200: number | null; atr14: number | null; rsi14: number | null;
   bias: string; last_bar_at: string | null; age_minutes: number | null; fresh: boolean;
   broker: string | null; server: string | null;
 };
@@ -96,14 +96,14 @@ export default function OwnerTradingDesk({ accessToken }: Props) {
     </div>
 
     <Panel title="Pair intelligence matrix">
-      <p className="mb-4 text-[10px] leading-5 text-slate-500">EMA(20/50), ATR(14), RSI(14) and directional state are calculated from closed broker candles. All three timeframes must have adequate history before multi-timeframe alignment is treated as complete.</p>
+      <p className="mb-4 text-[10px] leading-5 text-slate-500">EMA(20/50/200), Wilder ATR(14), Wilder RSI(14) and directional state are calculated from validated closed broker candles. All three timeframes require at least 200 bars before multi-timeframe alignment is treated as complete.</p>
       <div className="grid gap-3 xl:grid-cols-2">
         {(data?.pairs ?? []).map((pair) => <article key={pair.pair} className="rounded-xl border border-white/[0.08] bg-black/10 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2"><div className="text-base font-semibold tracking-wide text-white">{pair.pair}</div><span className={'rounded-full border px-2 py-1 text-[9px] uppercase '+tone(pair.readiness)}>{label(pair.readiness)}</span></div>
           <div className="mt-3 grid grid-cols-3 gap-2">
             {['D1','H4','H1'].map((tf) => <div key={tf} className="rounded-lg bg-white/[0.03] p-2"><div className="text-[9px] text-slate-500">{tf}</div><div className={'mt-1 text-[10px] font-semibold '+(pair.frames[tf]?.bias==='BULLISH'?'text-emerald-200':pair.frames[tf]?.bias==='BEARISH'?'text-rose-200':'text-slate-300')}>{pair.frames[tf]?.bias ? label(pair.frames[tf].bias) : 'no data'}</div><div className="mt-1 text-[9px] text-slate-500">{pair.frames[tf]?.bars ?? 0} bars</div></div>)}
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[10px]"><div className="text-slate-500">Bid / ask <span className="float-right font-mono text-slate-300">{pair.quote ? number(pair.quote.bid, pair.pair==='USDJPY'?3:5)+' / '+number(pair.quote.ask,pair.pair==='USDJPY'?3:5) : '—'}</span></div><div className="text-slate-500">Spread <span className="float-right font-mono text-slate-300">{pair.quote ? number(pair.quote.spread_points,1)+' pts' : '—'}</span></div><div className="text-slate-500">H1 ATR(14) <span className="float-right font-mono text-slate-300">{number(pair.frames.H1?.atr14, pair.pair==='USDJPY'?3:5)}</span></div><div className="text-slate-500">H1 RSI(14) <span className="float-right font-mono text-slate-300">{number(pair.frames.H1?.rsi14,1)}</span></div><div className="text-slate-500">Spread / ATR <span className="float-right font-mono text-slate-300">{pair.spread_atr_ratio===null?'—':(pair.spread_atr_ratio*100).toFixed(2)+'%'}</span></div><div className="text-slate-500">Quote age <span className="float-right font-mono text-slate-300">{pair.quote?pair.quote.age_seconds+'s':'—'}</span></div></div>
+          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[10px]"><div className="text-slate-500">Bid / ask <span className="float-right font-mono text-slate-300">{pair.quote ? number(pair.quote.bid, pair.pair==='USDJPY'?3:5)+' / '+number(pair.quote.ask,pair.pair==='USDJPY'?3:5) : '—'}</span></div><div className="text-slate-500">Spread <span className="float-right font-mono text-slate-300">{pair.quote ? number(pair.quote.spread_points,1)+' pts' : '—'}</span></div><div className="text-slate-500">H1 ATR(14) <span className="float-right font-mono text-slate-300">{number(pair.frames.H1?.atr14, pair.pair==='USDJPY'?3:5)}</span></div><div className="text-slate-500">H1 RSI(14) <span className="float-right font-mono text-slate-300">{number(pair.frames.H1?.rsi14,1)}</span></div><div className="text-slate-500">H1 EMA200 <span className="float-right font-mono text-slate-300">{number(pair.frames.H1?.ema200, pair.pair==='USDJPY'?3:5)}</span></div><div className="text-slate-500">Spread / ATR <span className="float-right font-mono text-slate-300">{pair.spread_atr_ratio===null?'—':(pair.spread_atr_ratio*100).toFixed(2)+'%'}</span></div><div className="text-slate-500">Quote age <span className="float-right font-mono text-slate-300">{pair.quote?pair.quote.age_seconds+'s':'—'}</span></div></div>
           <div className="mt-3 flex items-center justify-between border-t border-white/[0.07] pt-3 text-[10px]"><span className="text-slate-500">MTF alignment</span><span className={'font-semibold '+tone(pair.multi_timeframe_bias)}>{label(pair.multi_timeframe_bias)}</span></div>
         </article>)}
       </div>
