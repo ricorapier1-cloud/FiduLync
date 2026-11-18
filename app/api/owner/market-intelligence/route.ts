@@ -25,17 +25,22 @@ function atr(bars: Candle[], period = 14): number | null {
     Math.abs(bar.high - bars[index].close),
     Math.abs(bar.low - bars[index].close),
   ));
-  const selected = ranges.slice(-period);
-  return selected.reduce((sum, value) => sum + value, 0) / selected.length;
+  let value = ranges.slice(0, period).reduce((sum, item) => sum + item, 0) / period;
+  for (const range of ranges.slice(period)) value = (value * (period - 1) + range) / period;
+  return value;
 }
 function rsi(values: number[], period = 14): number | null {
   if (values.length < period + 1) return null;
   const changes = values.slice(1).map((value, index) => value - values[index]);
-  const selected = changes.slice(-period);
-  const gains = selected.reduce((sum, value) => sum + Math.max(value, 0), 0) / period;
-  const losses = selected.reduce((sum, value) => sum + Math.max(-value, 0), 0) / period;
-  if (losses === 0) return gains === 0 ? 50 : 100;
-  return 100 - 100 / (1 + gains / losses);
+  const seed = changes.slice(0, period);
+  let averageGain = seed.reduce((sum, value) => sum + Math.max(value, 0), 0) / period;
+  let averageLoss = seed.reduce((sum, value) => sum + Math.max(-value, 0), 0) / period;
+  for (const change of changes.slice(period)) {
+    averageGain = (averageGain * (period - 1) + Math.max(change, 0)) / period;
+    averageLoss = (averageLoss * (period - 1) + Math.max(-change, 0)) / period;
+  }
+  if (averageLoss === 0) return averageGain === 0 ? 50 : 100;
+  return 100 - 100 / (1 + averageGain / averageLoss);
 }
 function selectSingleSeries(rows: Candle[], timeframe: string): Candle[] {
   const groups = new Map<string, Candle[]>();
@@ -57,7 +62,9 @@ function selectSingleSeries(rows: Candle[], timeframe: string): Candle[] {
 }
 
 function frameAnalysis(rows: Candle[], timeframe: string) {
-  const bars = [...rows].sort((a, b) => Date.parse(a.bar_time) - Date.parse(b.bar_time));
+  const bars = rows.filter((bar) => [bar.open, bar.high, bar.low, bar.close].every((value) => Number.isFinite(value) && value > 0)
+    && bar.high >= bar.low && bar.high >= Math.max(bar.open, bar.close) && bar.low <= Math.min(bar.open, bar.close))
+    .sort((a, b) => Date.parse(a.bar_time) - Date.parse(b.bar_time));
   const closes = bars.map((bar) => Number(bar.close));
   const fast = ema(closes, 20);
   const slow = ema(closes, 50);
