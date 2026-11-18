@@ -41,6 +41,8 @@ export default function OwnerControlPlane({accessToken}:Props) {
    const body=await response.json() as Snapshot & {error?:string};
    if(!response.ok) throw new Error(body.error||'Control-plane request failed.');
    setSnapshot(body);
+   const productResponse=await fetch('/api/owner/products',{headers:{Authorization:'Bearer '+accessToken},cache:'no-store'});
+   if(productResponse.ok){const productBody=await productResponse.json() as {products:PricingProduct[]};setPricingProducts(productBody.products??[]);if(!pricingSlug&&productBody.products?.[0])setPricingSlug(productBody.products[0].slug);}
    const probe=await fetch('/api/owner/diagnostics',{headers:{Authorization:'Bearer '+accessToken},cache:'no-store'});
    if(probe.ok) setDiagnostics(await probe.json() as Diagnostics);
   } catch(e) { setError(e instanceof Error?e.message:'Unable to load owner data.'); }
