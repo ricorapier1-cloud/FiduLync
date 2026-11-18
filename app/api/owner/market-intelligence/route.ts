@@ -192,7 +192,7 @@ export async function GET(request: Request) {
       csi_scores: Object.fromEntries(macroStrength.map((item) => [item.currency, item.score])),
       recorded_at: macroRecordedAt,
       age_hours: macroAgeHours === null ? 0 : Math.max(0, Math.round(macroAgeHours)),
-      fresh: macroAgeHours !== null && macroAgeHours >= -0.01 && macroAgeHours <= 24,
+      fresh: rawMacro.source !== 'fallback' && macroAgeHours !== null && macroAgeHours >= -0.01 && macroAgeHours <= 24,
     } : null;
     return NextResponse.json({
       generated_at: new Date().toISOString(),
