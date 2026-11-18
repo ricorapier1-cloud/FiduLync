@@ -236,3 +236,14 @@ The first code milestone is committed on `feat/personal-quant-edition`:
 - Added six focused unit cases and a pull-request CI step to run them.
 
 This is a pure governance foundation only. It is not yet wired into the dashboard, MT5 bridge, persistent proposal audit, or broker execution path. No API credentials, Supabase schema, production deployment, or live execution setting has been changed. CI must pass before the module is treated as validated; broker-specific tick-value conversion and integration contract tests remain required.
+
+
+### Personal interface and privacy conversion
+
+- Reframed the application shell, footer, FAQ and terms for the single-operator Personal Quant workspace.
+- Retired the active Paystack checkout, customer license portal and commercial strategy catalogue UI; the legacy API routes and schema remain untouched pending replacement of the old EA licensing contract.
+- Replaced the public store page with a personal EA Lab containing sample source downloads and MT5 onboarding guidance.
+- Removed shared fleet heartbeat and trade-history payloads from the public EA Lab render path. Private diagnostics remain under the authenticated Owner Console.
+- Replaced illustrative analytics metrics with an explicit verified-data empty state.
+- Added a mobile-friendly manual risk planner. It requires the operator to enter and confirm broker tick/volume specifications rather than guessing them.
+- Changed signal presentation so research readiness is not labelled as trade permission; the page states that no broker order is placed.
