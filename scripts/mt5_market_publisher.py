@@ -244,11 +244,12 @@ def build_verified_loss_streak(positions: Any) -> tuple[int | None, bool, str | 
     return consecutive_losses, True, synced_at
 
 
-def build_account_snapshot(account: Any, infos: dict[str, Any]) -> dict[str, Any]:
+def build_account_snapshot(account: Any, infos: dict[str, Any], positions_result: Any = None) -> dict[str, Any]:
     equity = float(account.equity)
     open_risk_cash = 0.0
     risk_verified = True
-    positions_result = mt5.positions_get()
+    if positions_result is None:
+        positions_result = mt5.positions_get()
     positions = positions_result if positions_result is not None else ()
     if positions_result is None:
         risk_verified = False
@@ -289,8 +290,47 @@ def build_account_snapshot(account: Any, infos: dict[str, Any]) -> dict[str, Any
     }
 
 
-def post_batch(quotes: list[dict[str, Any]], candles: list[dict[str, Any]], account_snapshot: dict[str, Any] | None = None) -> None:
-    if not quotes and not candles:
+def build_position_snapshot(account: Any, positions_result: Any) -> dict[str, Any] | None:
+    """Build a complete point-in-time position set; None means do not publish."""
+    if positions_result is None:
+        return None
+    captured_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    rows: list[dict[str, Any]] = []
+    for position in positions_result:
+        symbol = str(getattr(position, "symbol", "") or "")
+        info = mt5.symbol_info(symbol)
+        ticket = int(getattr(position, "ticket", 0) or 0)
+        volume = float(getattr(position, "volume", 0) or 0)
+        price_open = float(getattr(position, "price_open", 0) or 0)
+        position_type = int(getattr(position, "type", -1))
+        if not symbol or ticket <= 0 or volume <= 0 or price_open <= 0 or position_type not in (int(mt5.POSITION_TYPE_BUY), int(mt5.POSITION_TYPE_SELL)) or info is None:
+            print("WARNING: incomplete position metadata; refusing to publish a complete snapshot.")
+            return None
+        rows.append({
+            "position_ticket": ticket,
+            "position_identifier": int(getattr(position, "identifier", 0) or 0) or None,
+            "symbol": symbol.upper(),
+            "side": "BUY" if position_type == int(mt5.POSITION_TYPE_BUY) else "SELL",
+            "volume": volume,
+            "price_open": price_open,
+            "stop_loss": float(getattr(position, "sl", 0) or 0) or None,
+            "take_profit": float(getattr(position, "tp", 0) or 0) or None,
+            "profit_account_currency": float(getattr(position, "profit", 0) or 0),
+            "contract_size": float(getattr(info, "trade_contract_size", 0) or 0) or None,
+            "tick_size": float(getattr(info, "trade_tick_size", 0) or 0) or None,
+            "tick_value_loss": float(getattr(info, "trade_tick_value_loss", 0) or 0) or None,
+            "quote_currency": str(getattr(info, "currency_profit", "") or "").upper() or None,
+            "base_currency": str(getattr(info, "currency_base", "") or "").upper() or None,
+        })
+    return {"snapshot_id": str(uuid.uuid4()), "captured_at": captured_at, "account_login": int(account.login), "expected_positions": len(rows), "positions": rows}
+
+def post_batch(
+    quotes: list[dict[str, Any]],
+    candles: list[dict[str, Any]],
+    account_snapshot: dict[str, Any] | None = None,
+    position_snapshot: dict[str, Any] | None = None,
+) -> None:
+    if not quotes and not candles and position_snapshot is None:
         return
     # The API caps each request at 1,000 candles. Split broad FX universes safely,
     # sending the account snapshot and quotes only with the first chunk.
@@ -299,7 +339,7 @@ def post_batch(quotes: list[dict[str, Any]], candles: list[dict[str, Any]], acco
         batch_quotes = quotes if index == 0 else []
         batch_snapshot = account_snapshot if index == 0 else None
         body = json.dumps(
-            {"quotes": batch_quotes, "candles": chunk, "account_snapshot": batch_snapshot},
+            {"quotes": batch_quotes, "candles": chunk, "account_snapshot": batch_snapshot, "position_snapshot": position_snapshot if index == 0 else None},
             separators=(",", ":"),
         ).encode("utf-8")
         now = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
@@ -359,11 +399,14 @@ def main() -> int:
                 continue
 
             quotes = build_quotes(infos, account)
+            positions_result = mt5.positions_get()
+            account_snapshot = build_account_snapshot(account, infos, positions_result)
+            position_snapshot = build_position_snapshot(account, positions_result)
             for index, (timeframe_name, timeframe_value) in enumerate(TIMEFRAMES.items()):
                 candles, pending = build_candles(timeframe_name, timeframe_value, infos, last_sent)
                 batch_quotes = quotes if index == 0 else []
                 try:
-                    post_batch(batch_quotes, candles, build_account_snapshot(account, infos) if index == 0 else None)
+                    post_batch(batch_quotes, candles, account_snapshot if index == 0 else None, position_snapshot if index == 0 else None)
                     last_sent.update(pending)
                 except Exception as exc:
                     print(f"Publish failed for {timeframe_name}: {exc}")
