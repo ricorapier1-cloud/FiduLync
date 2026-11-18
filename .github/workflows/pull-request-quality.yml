@@ -1,4 +1,5 @@
 name: Pull Request Quality Gate
+# Revalidate the complete Personal Quant and preserved legacy licensing workflows.
 
 on:
   pull_request:
