@@ -26,6 +26,18 @@ type RiskState = {
   daily_start_equity: number; weekly_start_equity: number; high_water_mark_equity: number;
 };
 
+type PriorDecision = {
+  account_login: number;
+  decision: 'APPROVE' | 'REDUCE' | 'REJECT' | 'ABSTAIN';
+  approved_risk_pct: number;
+  approved_volume: number;
+  estimated_risk_cash: number;
+  estimated_reward_risk: number | null;
+  blockers: string[];
+  evaluated_at: string;
+  proposal: Record<string, unknown>;
+};
+
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -86,10 +98,36 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Proposal installation does not match its authenticated publisher.' }, { status: 403 });
     }
 
+    const accountLogin = Number(body.account_login);
+    const proposalEvidence = {
+      request_id: proposal.requestId, installation_id: proposal.installationId, symbol: proposal.symbol,
+      side: proposal.side, entry_price: proposal.entryPrice, stop_loss: proposal.stopLoss,
+      take_profit: proposal.takeProfit, requested_risk_pct: proposal.requestedRiskPct,
+    };
+    // A retried request ID returns its original immutable decision. Reusing the
+    // same ID for different inputs is a conflict, never a fresh evaluation.
+    const priorDecisions = await supabaseRead<PriorDecision[]>(
+      'mt5_risk_decisions',
+      `select=account_login,decision,approved_risk_pct,approved_volume,estimated_risk_cash,estimated_reward_risk,blockers,evaluated_at,proposal&installation_id=eq.${installation.id}&account_login=eq.${accountLogin}&request_id=eq.${encodeURIComponent(proposal.requestId)}&limit=1`,
+    );
+    if (priorDecisions === null) throw new Error('Prior decision idempotency lookup failed.');
+    const prior = priorDecisions[0];
+    if (prior) {
+      const sameProposal = Object.keys(proposalEvidence).every((key) => prior.proposal?.[key] === proposalEvidence[key as keyof typeof proposalEvidence]);
+      if (!sameProposal) {
+        return NextResponse.json({ error: 'Request ID was already used for a different proposal.' }, { status: 409 });
+      }
+      return NextResponse.json({
+        schemaVersion: '1.0', requestId: proposal.requestId, decision: prior.decision,
+        approvedRiskPct: prior.approved_risk_pct, approvedVolume: prior.approved_volume,
+        estimatedRiskCash: prior.estimated_risk_cash, estimatedRewardRisk: prior.estimated_reward_risk,
+        blockers: prior.blockers, evaluatedAt: prior.evaluated_at,
+      }, { status: 200, headers: { 'Cache-Control': 'no-store, max-age=0', 'Idempotency-Replayed': 'true' } });
+    }
+
     const nonceRows = await supabaseInsert('mt5_ingest_nonces', { installation_id: installation.id, nonce });
     if (!nonceRows) return NextResponse.json({ error: 'Replay protection could not be stored.' }, { status: 503 });
 
-    const accountLogin = Number(body.account_login);
     const [accounts, quotes, states, macroSignal] = await Promise.all([
       supabaseRead<AccountSnapshot[]>(
         'mt5_account_snapshots',
