@@ -171,7 +171,7 @@ export default function CustomerLicensePortal() {
               <p className="mt-3 font-mono text-lg">{seat.mt5_login || '—'}</p>
               <p className="mt-1 text-[10px] text-slate-500">{seat.broker_server || 'Broker not specified'}</p>
               {seat.rebind_available_at && seat.mt5_login && <p className={`mt-2 text-[10px] ${cooldown ? 'text-amber-300' : 'text-emerald-300'}`}>{cooldown ? 'Rebind cooldown: ' + remaining(seat.rebind_available_at) : 'Rebinding available'}</p>}
-              {!demoLocked && <button type="button" disabled={Boolean(cooldown) || busy} onClick={() => { setSelectedSeat(seat); setNewLogin(''); setBrokerServer(seat.broker_server || ''); }} className="mt-4 rounded border border-cyan-300/30 px-3 py-2 text-[10px] font-semibold text-cyan-100 disabled:opacity-40">{seat.mt5_login ? 'Rebind this slot' : 'Bind MT5 login'}</button>
+              {!demoLocked && <button type="button" disabled={Boolean(cooldown) || busy} onClick={() => { setSelectedSeat(seat); setNewLogin(''); setBrokerServer(seat.broker_server || ''); }} className="mt-4 rounded border border-cyan-300/30 px-3 py-2 text-[10px] font-semibold text-cyan-100 disabled:opacity-40">{seat.mt5_login ? 'Rebind this slot' : 'Bind MT5 login'}</button>}
             </div>;
           })}
           {seats.length === 0 && <p className="text-xs text-slate-500">No account slots are configured for this license.</p>}
