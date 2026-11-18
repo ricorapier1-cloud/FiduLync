@@ -114,7 +114,7 @@ export async function GET(request: Request) {
         multi_role_access: 'owner_only',
         step_up_authentication: 'not_configured',
         model_validation_registry: 'not_connected',
-        portfolio_risk_telemetry: accountRisk && accountSnapshotFresh && accountRisk.open_risk_verified && riskAnchorsAvailable ? 'connected' : accountRisk ? 'partial' : 'not_connected',
+        portfolio_risk_telemetry: accountRisk && accountSnapshotFresh && accountRisk.open_risk_verified && riskAnchorsAvailable && lossStreakFresh ? 'connected' : accountRisk ? 'partial' : 'not_connected',
       },
     }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
   } catch (error) {
