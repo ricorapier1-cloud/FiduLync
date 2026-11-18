@@ -43,7 +43,7 @@ export async function POST(request: Request) {
 
     const licenses = await supabaseRead<LicenseRow[]>(
       'licenses',
-      `license_key=eq.${encodeURIComponent(licenseKey)}&select=license_key,status,expires_at,grace_until,ea_slug,account_mode,mt5_account&limit=1`
+      `license_key=eq.${encodeURIComponent(licenseKey)}&select=license_key,status,expires_at,grace_until,ea_slug,account_mode,mt5_account,tier&limit=1`
     );
     const license = licenses?.[0];
     if (!license || license.ea_slug !== eaSlug) {
