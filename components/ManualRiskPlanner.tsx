@@ -160,7 +160,7 @@ export default function ManualRiskPlanner() {
 
           <label className="mt-5 flex items-start gap-3 rounded-xl border border-amber-400/20 bg-amber-400/5 p-4 text-xs leading-5 text-amber-100/80">
             <input type="checkbox" checked={specVerified} onChange={(event) => setSpecVerified(event.target.checked)} className="mt-1 accent-emerald-400" />
-            <span><strong className="text-amber-100">I verified these symbol specifications in my broker's MT5 terminal.</strong><br />Tick value must be expressed in the account currency and correspond to one lot. Changing a specification field clears this confirmation.</span>
+            <span><strong className="text-amber-100">I verified these symbol specifications in my broker&apos;s MT5 terminal.</strong><br />Tick value must be expressed in the account currency and correspond to one lot. Changing a specification field clears this confirmation.</span>
           </label>
         </section>
 
