@@ -106,7 +106,7 @@ export default function OwnerOperations({ accessToken, email, role, onSignOut }:
   const accountRisk = overview?.account_risk;
   const accountRiskTone = accountRisk?.snapshot_fresh && accountRisk.open_risk_verified && accountRisk.risk_anchors_available && accountRisk.loss_streak_verified ? 'good' : 'warn';
   const quoteAgeSeconds = market?.latest_quote_age_seconds ?? null;
-  const quoteFresh = quoteAgeSeconds !== null && quoteAgeSeconds <= 120;
+  const quoteFresh = quoteAgeSeconds !== null && quoteAgeSeconds <= 2;
   const heartbeatFresh = market?.latest_heartbeat_age_seconds !== null && market?.latest_heartbeat_age_seconds !== undefined && market.latest_heartbeat_age_seconds <= 180;
   const candleAgeMinutes = market?.latest_candle_age_minutes ?? null;
   const candleTimeframe = market?.latest_candle?.timeframe;
