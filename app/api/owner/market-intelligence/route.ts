@@ -115,6 +115,58 @@ export async function GET(request: Request) {
 
     const quoteRows = (quoteResult.data ?? []) as Quote[];
     const policy = getPersonalRiskPolicy();
+    const rawMacro = macroResult as MacroSnapshot;
+    const macroTimestamp = Date.parse(rawMacro.asOf);
+    const macroAgeMs = Date.now() - macroTimestamp;
+    const macroFresh = Number.isFinite(macroTimestamp) && macroAgeMs >= -5 * 60_000 && macroAgeMs <= 24 * 60 * 60_000;
+    const regionByCurrency: Record<string, string> = { USD: 'US', EUR: 'EU', GBP: 'UK', JPY: 'JP', CHF: 'CH', CAD: 'CA', AUD: 'AU', NZD: 'NZ', SEK: 'SE', NOK: 'NO' };
+    const pairFundamental = (pair: string) => {
+      const baseCode = pair.slice(0, 3);
+      const quoteCode = pair.slice(3);
+      const base = rawMacro.currencies.find((currency) => currency.code === baseCode);
+      const quote = rawMacro.currencies.find((currency) => currency.code === quoteCode);
+      const policyVerified = Boolean(quote && quote.policyRateSource === 'provider' && quote.inflationSource === 'provider'
+        && (pair === 'XAUUSD' || (base && base.policyRateSource === 'provider' && base.inflationSource === 'provider')));
+      const hasComparableYields = base?.twoYearYield !== undefined && quote?.twoYearYield !== undefined;
+      const yieldVerified = !hasComparableYields
+        || (base?.twoYearYieldSource === 'provider' && quote?.twoYearYieldSource === 'provider');
+      const cotMarkets = pair === 'XAUUSD' ? ['GOLD'] : [baseCode, quoteCode].filter((code) => code !== 'USD');
+      const cotRows = cotMarkets.map((market) => rawMacro.cot.find((position) => position.market === market));
+      const cotFresh = cotMarkets.length > 0 && cotRows.every((position) => {
+        const observedAt = position?.asOf ? Date.parse(position.asOf) : Number.NaN;
+        const age = Date.now() - observedAt;
+        return Number.isFinite(observedAt) && age >= -5 * 60_000 && age <= 14 * 24 * 60 * 60_000;
+      });
+      const calendarVerified = rawMacro.calendarSource === 'provider' && macroFresh;
+      const blockers = [
+        ...(!macroFresh || rawMacro.source === 'fallback' ? ['MACRO_SNAPSHOT_NOT_FRESH_OR_PROVIDER'] : []),
+        ...(!policyVerified ? ['PAIR_POLICY_OR_INFLATION_INPUTS_UNVERIFIED'] : []),
+        ...(!yieldVerified ? ['COMPARABLE_TWO_YEAR_YIELDS_UNVERIFIED'] : []),
+        ...(!cotFresh ? ['RELEVANT_COT_POSITIONING_MISSING_OR_STALE'] : []),
+        ...(!calendarVerified ? ['ECONOMIC_CALENDAR_NOT_PROVIDER_VERIFIED'] : []),
+      ];
+      const regions = [regionByCurrency[baseCode], regionByCurrency[quoteCode]].filter(Boolean);
+      const relevantEvents = rawMacro.calendarSource === 'provider' ? rawMacro.catalysts.filter((event) =>
+        regions.includes(event.region) && Date.parse(event.scheduledAt) >= Date.now() - 60 * 60_000
+        && Date.parse(event.scheduledAt) <= Date.now() + 7 * 24 * 60 * 60_000) : [];
+      const policyDiff = base ? base.policyRate - (quote?.policyRate ?? 0) : -(quote?.policyRate ?? 0);
+      const realYieldDiff = base
+        ? (base.policyRate - base.inflation) - ((quote?.policyRate ?? 0) - (quote?.inflation ?? 0))
+        : -((quote?.policyRate ?? 0) - (quote?.inflation ?? 0));
+      const baseCot = rawMacro.cot.find((position) => position.market === (baseCode === 'XAU' ? 'GOLD' : baseCode));
+      const quoteCot = rawMacro.cot.find((position) => position.market === quoteCode);
+      return {
+        verified: blockers.length === 0,
+        status: blockers.length === 0 ? 'VERIFIED' : 'BLOCKED',
+        blockers,
+        policy_rate_diff_bps: quote ? Math.round(policyDiff * 100) : null,
+        real_yield_diff_bps: quote ? Math.round(realYieldDiff * 100) : null,
+        cot_position_diff: Math.round((baseCot?.percentile ?? 50) - (quoteCot?.percentile ?? 50)),
+        upcoming_events: relevantEvents.length,
+        high_impact_news_lockout: relevantEvents.some((event) => event.impact === 'High'
+          && Math.abs(Date.parse(event.scheduledAt) - Date.now()) <= 30 * 60_000),
+      };
+    };
     const pairs = PAIRS.map((pair, pairIndex) => {
       const sourceGroups = new Map<string, Record<string, Candle[]>>();
       FRAMES.forEach((timeframe, frameIndex) => {
@@ -169,6 +221,7 @@ export async function GET(request: Request) {
         pair,
         quote: quote ? { ...quote, age_seconds: Math.max(0, Math.round(quoteAgeSeconds ?? 0)), fresh: quoteFresh } : null,
         frames,
+        fundamental: pairFundamental(pair),
         multi_timeframe_bias: aligned,
         data_complete: dataComplete,
         data_fresh: fresh,
@@ -179,7 +232,6 @@ export async function GET(request: Request) {
       };
     });
 
-    const rawMacro = macroResult as MacroSnapshot;
     const verifiedMacro = rawMacro ? {
       ...rawMacro,
       currencies: rawMacro.currencies.filter((currency) => currency.policyRateSource === 'provider' && currency.inflationSource === 'provider'),
