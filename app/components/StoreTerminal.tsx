@@ -199,12 +199,12 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="font-mono text-[9px] tracking-[0.17em] text-slate-500">01 / VPS TELEMETRY</div>
-              <h2 className="mt-1 text-lg font-semibold">Customer account privacy</h2>
-              <p className="mt-1 text-xs text-slate-400">Fleet-wide account balances and trade details are not displayed in the public Store. Bind your own licensed MT5 account below to view its private telemetry.</p>
+              <h2 className="mt-1 text-lg font-semibold">Personal terminal privacy</h2>
+              <p className="mt-1 text-xs text-slate-400">This workspace is intended for the owner's connected MT5 terminals. Review installation identity and access controls before sharing telemetry.</p>
             </div>
             <div className="shrink-0 text-right font-mono text-[9px] text-slate-500">
               <div>{initialFleet.heartbeats.length} RECENT NODES</div>
-              <div>{telemetryError || (initialFleet.configured ? 'SHARED STORE' : 'LOCAL FALLBACK')}</div>
+              <div>{telemetryError || (initialFleet.configured ? 'TELEMETRY CONNECTED' : 'TELEMETRY OFFLINE')}</div>
             </div>
           </div>
         </section>
