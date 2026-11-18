@@ -131,13 +131,17 @@ export async function GET(request: Request) {
         const orderedByFrame = Object.fromEntries(FRAMES.map((timeframe) => [timeframe,
           [...(grouped[timeframe] ?? [])].sort((a, b) => Date.parse(a.bar_time) - Date.parse(b.bar_time)),
         ])) as Record<string, Candle[]>;
+        const analyses = FRAMES.map((timeframe) => frameAnalysis(orderedByFrame[timeframe] ?? [], timeframe));
         const completeFrames = FRAMES.filter((timeframe) => (orderedByFrame[timeframe]?.length ?? 0) >= 200).length;
         const availableFrames = FRAMES.filter((timeframe) => (orderedByFrame[timeframe]?.length ?? 0) > 0).length;
+        const freshFrames = analyses.filter((analysis) => analysis.fresh).length;
+        const freshCompleteFrames = analyses.filter((analysis) => analysis.fresh && analysis.bars >= 200).length;
         const totalBars = FRAMES.reduce((sum, timeframe) => sum + (orderedByFrame[timeframe]?.length ?? 0), 0);
         const latestTime = Math.max(0, ...FRAMES.map((timeframe) => Date.parse(orderedByFrame[timeframe]?.at(-1)?.bar_time ?? '') || 0));
-        return { key, orderedByFrame, completeFrames, availableFrames, totalBars, latestTime };
+        return { key, orderedByFrame, completeFrames, availableFrames, freshFrames, freshCompleteFrames, totalBars, latestTime };
       });
-      candidates.sort((a, b) => b.completeFrames - a.completeFrames || b.availableFrames - a.availableFrames
+      candidates.sort((a, b) => b.freshCompleteFrames - a.freshCompleteFrames || b.freshFrames - a.freshFrames
+        || b.completeFrames - a.completeFrames || b.availableFrames - a.availableFrames
         || b.totalBars - a.totalBars || b.latestTime - a.latestTime);
       const selectedSource = candidates[0];
       const frames = {} as Record<string, ReturnType<typeof frameAnalysis>>;
