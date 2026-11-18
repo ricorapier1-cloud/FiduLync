@@ -102,7 +102,7 @@ export async function POST(request: Request) {
         'mt5_risk_state',
         `select=daily_start_equity,weekly_start_equity,high_water_mark_equity&installation_id=eq.${installation.id}&account_login=eq.${accountLogin}&limit=1`,
       ),
-      getMacroSignal(proposal.symbol).catch((error) => {
+      getMacroSignal(proposal.symbol, Date.now(), installation.id).catch((error) => {
         console.warn('EA supervisor macro context unavailable:', error);
         return null;
       }),
