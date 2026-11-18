@@ -219,7 +219,7 @@ export function evaluateRiskProposal(p: RiskProposal, policy: RiskPolicy, now = 
 
   const volumeResult = calculateBrokerAwareVolume({
     equity: p.equity,
-    riskPct: Math.min(p.requestedRiskPct, p.limits.maxPerTradeRiskPct),
+    riskPct: Math.min(p.requestedRiskPct, policy.maxPerTradeRiskPct),
     entryPrice: p.entryPrice,
     stopLoss: p.stopLoss,
     specification: p.symbolSpec,
