@@ -103,12 +103,20 @@ export async function POST(request: Request) {
     const quote = quotes?.[0];
     const state = states?.[0];
     if (!account || !quote || !state) {
-      return NextResponse.json({
+      const blockers = [!account ? 'ACCOUNT_SNAPSHOT_UNAVAILABLE' : !quote ? 'BROKER_QUOTE_UNAVAILABLE' : 'RISK_ANCHORS_UNAVAILABLE'];
+      const evaluatedAt = new Date().toISOString();
+      const abstention = {
         schemaVersion: '1.0', requestId: proposal.requestId, decision: 'ABSTAIN',
         approvedRiskPct: 0, approvedVolume: 0, estimatedRiskCash: 0,
-        blockers: [!account ? 'ACCOUNT_SNAPSHOT_UNAVAILABLE' : !quote ? 'BROKER_QUOTE_UNAVAILABLE' : 'RISK_ANCHORS_UNAVAILABLE'],
-        evaluatedAt: new Date().toISOString(),
-      }, { status: 200, headers: { 'Cache-Control': 'no-store' } });
+        blockers, evaluatedAt,
+      };
+      const audit = await supabaseInsert('mt5_risk_decisions', {
+        installation_id: installation.id, account_login: accountLogin,
+        request_id: proposal.requestId, symbol: proposal.symbol, decision: 'ABSTAIN',
+        approved_risk_pct: 0, approved_volume: 0, blockers, evaluated_at: evaluatedAt,
+      });
+      if (!audit) throw new Error('Risk abstention audit could not be persisted.');
+      return NextResponse.json(abstention, { status: 200, headers: { 'Cache-Control': 'no-store' } });
     }
 
     const capturedAt = Date.parse(account.captured_at);
