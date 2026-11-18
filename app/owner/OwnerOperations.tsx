@@ -35,7 +35,7 @@ type Overview = {
   database: { reachable: boolean; installation_records: number };
   governance: { audit_log: string; multi_role_access: string; step_up_authentication: string; model_validation_registry: string; portfolio_risk_telemetry: string };
 };
-type ModuleId = 'overview' | 'trading' | 'governance' | 'market' | 'research' | 'risk' | 'security' | 'reliability';
+type ModuleId = 'overview' | 'trading' | 'market' | 'risk' | 'research' | 'governance' | 'security' | 'reliability' | 'platform';
 
 const modules: { id: ModuleId; label: string; short: string; description: string }[] = [
   { id: 'overview', label: 'Command overview', short: 'Overview', description: 'Operational posture and critical exceptions' },
@@ -46,6 +46,7 @@ const modules: { id: ModuleId; label: string; short: string; description: string
   { id: 'risk', label: 'Risk control centre', short: 'Risk controls', description: 'Risk policy, exposure visibility and fail-safe controls' },
   { id: 'security', label: 'Security and audit', short: 'Security', description: 'Authentication, credential lifecycle and accountability' },
   { id: 'reliability', label: 'System reliability', short: 'Reliability', description: 'Service health, data pipeline and release readiness' },
+  { id: 'platform', label: 'Platform administration', short: 'Platform admin', description: 'Store, customers, licensing, payments and provider administration' },
 ];
 
 function formatTime(value: string | null | undefined) {
@@ -74,7 +75,7 @@ function ReadinessRow({ label, value, note, tone = 'warn' }: { label: string; va
 }
 
 export default function OwnerOperations({ accessToken, email, role, onSignOut }: Props) {
-  const [active, setActive] = useState<ModuleId>('overview');
+  const [active, setActive] = useState<ModuleId>('trading');
   const [overview, setOverview] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -135,9 +136,8 @@ export default function OwnerOperations({ accessToken, email, role, onSignOut }:
   }
 
   return <main className="mx-auto min-h-[75vh] w-full max-w-7xl px-4 py-7 text-slate-100 sm:px-6 lg:px-8">
-    <OwnerControlPlane accessToken={accessToken} />
     <header className="mb-6 flex flex-col gap-4 border-b border-white/[0.08] pb-6 sm:flex-row sm:items-end sm:justify-between">
-      <div><div className="font-mono text-[9px] tracking-[0.22em] text-emerald-300">FIDULYNC / INSTITUTIONAL OPERATIONS</div><h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Governance & control centre</h1><p className="mt-2 max-w-2xl text-xs leading-6 text-slate-400">A private control plane for platform integrity, market-data operations, research governance and risk oversight.</p></div>
+      <div><div className="font-mono text-[9px] tracking-[0.22em] text-emerald-300">FIDULYNC / INSTITUTIONAL OPERATIONS</div><h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Quantitative command centre</h1><p className="mt-2 max-w-2xl text-xs leading-6 text-slate-400">Private trading intelligence, portfolio protection, EA supervision and platform governance. Research first; execution remains disabled.</p></div>
       <div className="flex flex-wrap items-center gap-2"><Status tone="good">Owner identity verified</Status><button onClick={() => void refresh()} disabled={refreshing} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-slate-200 hover:bg-white/5 disabled:opacity-50">{refreshing ? 'Refreshing…' : 'Refresh data'}</button><button onClick={onSignOut} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-slate-300 hover:bg-white/5">Sign out</button></div>
     </header>
     <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-white/[0.08] bg-[#0c131c] px-4 py-3 text-[10px] text-slate-400"><span>OWNER <b className="ml-1 text-slate-200">{email}</b></span><span>ROLE <b className="ml-1 text-emerald-200">{role.toUpperCase()}</b></span><span>SUPPORT <b className="ml-1 text-slate-200">fidulync@gmail.com</b></span><span className="sm:ml-auto">Updated {overview ? formatTime(overview.generated_at) : '—'}</span></div>
@@ -163,6 +163,8 @@ export default function OwnerOperations({ accessToken, email, role, onSignOut }:
         </div>}
 
         {active === 'trading' && <OwnerTradingDesk accessToken={accessToken} />}
+
+        {active === 'platform' && <OwnerControlPlane accessToken={accessToken} />}
 
         {active === 'governance' && <Panel title="Platform governance" subtitle="Least-privilege administration. Privileged roles are not fabricated before their authorization controls exist.">
           <ReadinessRow label="Primary owner" value="Verified" note={email + ' is the sole configured owner identity.'} tone="good" />
