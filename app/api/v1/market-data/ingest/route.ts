@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 type Installation = { id: string; status: string };
-type Quote = { symbol: string; bid: number; ask: number; quote_time: string; spread_points: number; digits?: number; point?: number; broker?: string; server?: string };
+type Quote = { symbol: string; bid: number; ask: number; quote_time: string; spread_points: number; digits?: number; point?: number; tick_size?: number; tick_value?: number; contract_size?: number; broker?: string; server?: string };
 type Candle = { symbol: string; timeframe: 'H1' | 'H4' | 'D1'; bar_time: string; open: number; high: number; low: number; close: number; tick_volume?: number; spread_points?: number; real_volume?: number; is_closed?: boolean; broker?: string; server?: string; digits?: number; point?: number; tick_size?: number; tick_value?: number; contract_size?: number };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -57,6 +57,21 @@ export async function POST(request: Request) {
     });
     if (!nonceRows) throw new Error('Replay protection could not be stored.');
 
+    const accountSnapshot = body.account_snapshot;
+    if (accountSnapshot !== undefined) {
+      if (!isRecord(accountSnapshot)
+        || !Number.isSafeInteger(accountSnapshot.account_login) || Number(accountSnapshot.account_login) <= 0
+        || typeof accountSnapshot.currency !== 'string' || !/^[A-Z]{3,8}$/.test(accountSnapshot.currency)
+        || !['balance','equity','margin','free_margin','open_risk_cash'].every((key) =>
+          typeof accountSnapshot[key] === 'number' && Number.isFinite(accountSnapshot[key]) && (accountSnapshot[key] as number) >= 0)
+        || (accountSnapshot.equity as number) <= 0
+        || !Number.isSafeInteger(accountSnapshot.open_positions) || (accountSnapshot.open_positions as number) < 0
+        || typeof accountSnapshot.open_risk_verified !== 'boolean'
+        || typeof accountSnapshot.captured_at !== 'string' || !validTime(accountSnapshot.captured_at, false)) {
+        return NextResponse.json({ error: 'Account snapshot failed validation.' }, { status: 400 });
+      }
+    }
+
     const quotes: Quote[] = [];
     for (const raw of body.quotes) {
       if (!isRecord(raw) || !validSymbol(raw.symbol) || !validTime(raw.quote_time, false)
@@ -64,6 +79,12 @@ export async function POST(request: Request) {
         || typeof raw.ask !== 'number' || !Number.isFinite(raw.ask) || raw.ask < raw.bid
         || typeof raw.spread_points !== 'number' || !Number.isFinite(raw.spread_points) || raw.spread_points < 0) {
         return NextResponse.json({ error: 'One or more quotes failed validation.' }, { status: 400 });
+      }
+      if (raw.point !== undefined && (typeof raw.point !== 'number' || !Number.isFinite(raw.point) || raw.point <= 0)
+        || raw.tick_size !== undefined && (typeof raw.tick_size !== 'number' || !Number.isFinite(raw.tick_size) || raw.tick_size <= 0)
+        || raw.tick_value !== undefined && (typeof raw.tick_value !== 'number' || !Number.isFinite(raw.tick_value) || raw.tick_value <= 0)
+        || raw.contract_size !== undefined && (typeof raw.contract_size !== 'number' || !Number.isFinite(raw.contract_size) || raw.contract_size <= 0)) {
+        return NextResponse.json({ error: 'Quote broker metadata failed validation.' }, { status: 400 });
       }
       quotes.push({ ...raw, symbol: raw.symbol.toUpperCase() } as Quote);
     }
@@ -96,13 +117,38 @@ export async function POST(request: Request) {
       });
       if (!result) throw new Error('Candle storage failed.');
     }
+    if (accountSnapshot) {
+      const accountLogin = Number(accountSnapshot.account_login);
+      const snapshotResult = await supabaseQuery('mt5_account_snapshots', {
+        method: 'POST',
+        query: 'on_conflict=installation_id,account_login',
+        prefer: 'resolution=merge-duplicates,return=minimal',
+        body: [{
+          installation_id: installation.id,
+          account_login: accountLogin,
+          currency: accountSnapshot.currency,
+          balance: accountSnapshot.balance,
+          equity: accountSnapshot.equity,
+          margin: accountSnapshot.margin,
+          free_margin: accountSnapshot.free_margin,
+          margin_level: typeof accountSnapshot.margin_level === 'number' && Number.isFinite(accountSnapshot.margin_level) ? accountSnapshot.margin_level : null,
+          open_positions: accountSnapshot.open_positions,
+          open_risk_cash: accountSnapshot.open_risk_cash,
+          open_risk_verified: accountSnapshot.open_risk_verified,
+          broker: typeof accountSnapshot.broker === 'string' ? accountSnapshot.broker.slice(0, 100) : null,
+          server: typeof accountSnapshot.server === 'string' ? accountSnapshot.server.slice(0, 120) : null,
+          captured_at: accountSnapshot.captured_at,
+        }],
+      });
+      if (!snapshotResult) throw new Error('Account snapshot storage failed.');
+    }
     await supabaseQuery('mt5_installations', {
       method: 'PATCH', query: `id=eq.${installation.id}`,
       prefer: 'return=representation', body: { last_seen_at: new Date().toISOString() },
     });
     return NextResponse.json({
       accepted: true, installation_id: installation.id,
-      quotes_received: quotes.length, candles_received: candles.length,
+      quotes_received: quotes.length, candles_received: candles.length, account_snapshot_received: Boolean(accountSnapshot),
       received_at_utc: new Date().toISOString(),
     }, { status: 202, headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
