@@ -155,13 +155,7 @@ export default function StoreTerminal({ bridgeSource, initialSnapshot, session }
             >
               <BrandGlyph name="arrow-down" size={15} /> Research Bridge (.mqh)
             </a>
-            <a
-              href="/mql5/MacroLyncBridge.mqh"
-              download
-              className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-white/[0.12] bg-white/[0.05] px-3.5 text-xs font-medium text-slate-200 transition hover:bg-white/[0.08]"
-            >
-              <BrandGlyph name="arrow-down" size={15} /> Signal Bridge (.mqh)
-            </a>
+            
           </div>
         </div>
 
