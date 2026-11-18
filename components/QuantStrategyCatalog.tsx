@@ -1,308 +1,122 @@
 'use client';
 
-import React, { useState } from 'react';
-import { EA_CATALOG, EaProduct } from '@/lib/eaCatalog';
+import { useEffect, useMemo, useState } from 'react';
 
-function InteractiveSparkline({ points, color }: { points: number[]; color: 'emerald' | 'cyan' | 'amber' }) {
-  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+type Metrics = {
+  win_rate?: string; profit_factor?: string; sharpe?: string; max_drawdown?: string;
+  equity_curve?: number[]; provenance?: string;
+};
+type Product = {
+  slug: string; name: string; tagline: string; version: string; category: string;
+  monthly_price_ngn: number; monthly_price_usd: number; annual_price_ngn: number; annual_price_usd: number;
+  extra_seat_price_ngn: number; extra_seat_price_usd: number; demo_days: number;
+  included_live_seats: number; included_demo_seats: number; metrics_json: Metrics;
+  ex5_artifact_url: string | null;
+};
+type Cycle = 'MONTHLY' | 'ANNUAL';
+type Currency = 'NGN' | 'USD';
 
-  const min = Math.min(...points);
-  const max = Math.max(...points);
-  const range = max - min || 1;
-  const width = 280;
-  const height = 64;
-  const padY = 8;
-
-  const strokeColor =
-    color === 'emerald' ? '#34d399' : color === 'cyan' ? '#38bdf8' : '#fbbf24';
-  const fillColor =
-    color === 'emerald' ? 'rgba(52, 211, 153, 0.12)' : color === 'cyan' ? 'rgba(56, 189, 248, 0.12)' : 'rgba(251, 191, 36, 0.12)';
-
-  const coords = points.map((p, i) => {
-    const x = (i / (points.length - 1)) * width;
-    const y = height - padY - ((p - min) / range) * (height - padY * 2);
-    return { x, y, value: p };
-  });
-
-  const pathD = coords.reduce((acc, c, i) => `${acc} ${i === 0 ? 'M' : 'L'} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`, '');
-  const areaD = `${pathD} L ${width} ${height} L 0 ${height} Z`;
-
-  return (
-    <div className="relative mt-3 rounded-lg border border-white/[0.06] bg-black/40 p-2.5">
-      <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
-        <span className="flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: strokeColor }} />
-          HISTORICAL EXPECTANCY (EQUITY CURVE)
-        </span>
-        <span className="text-slate-300">
-          {hoverIndex !== null ? `Step ${hoverIndex + 1}: ${points[hoverIndex].toFixed(1)} pts` : `+${(((max - min) / min) * 100).toFixed(1)}% Cum.`}
-        </span>
-      </div>
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        className="mt-1.5 w-full overflow-visible"
-        onMouseLeave={() => setHoverIndex(null)}
-      >
-        <path d={areaD} fill={fillColor} />
-        <path d={pathD} fill="none" stroke={strokeColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        {coords.map((c, i) => (
-          <circle
-            key={i}
-            cx={c.x}
-            cy={c.y}
-            r={hoverIndex === i ? 4 : 2}
-            fill={hoverIndex === i ? '#ffffff' : strokeColor}
-            className="cursor-pointer transition-all"
-            onMouseEnter={() => setHoverIndex(i)}
-          />
-        ))}
-      </svg>
-    </div>
-  );
+function Sparkline({ values }: { values: number[] }) {
+  if (!values || values.length < 2) return <div className="mt-4 flex h-14 items-center rounded-lg border border-white/[0.06] px-3 text-[10px] text-slate-500">Equity curve not published</div>;
+  const min = Math.min(...values), max = Math.max(...values), range = max - min || 1;
+  const points = values.map((value, index) => `${(index / (values.length - 1)) * 300},${52 - ((value - min) / range) * 44}`).join(' ');
+  return <div className="mt-4 rounded-lg border border-white/[0.06] bg-black/30 p-2"><div className="mb-1 font-mono text-[9px] tracking-wider text-slate-500">REFERENCE EQUITY CURVE</div><svg viewBox="0 0 300 56" className="h-14 w-full" role="img" aria-label="Reference equity curve"><polyline points={points} fill="none" stroke="#34d399" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg></div>;
 }
 
-export function QuantStrategyCatalog({ onSelectEa }: { onSelectEa?: (slug: string) => void }) {
-  const [demoModalEa, setDemoModalEa] = useState<EaProduct | null>(null);
-  const [generatedDemoKey, setGeneratedDemoKey] = useState<string | null>(null);
-  const [loadingDemo, setLoadingDemo] = useState(false);
+export function QuantStrategyCatalog({ onSelectEa }: { onSelectEa?: (slug: string, cycle: Cycle, currency: Currency) => void }) {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [category, setCategory] = useState('ALL');
+  const [cycle, setCycle] = useState<Cycle>('MONTHLY');
+  const [currency, setCurrency] = useState<Currency>('NGN');
+  const [demoProduct, setDemoProduct] = useState<Product | null>(null);
+  const [email, setEmail] = useState('');
+  const [mt5Login, setMt5Login] = useState('');
+  const [demoKey, setDemoKey] = useState('');
+  const [demoDownload, setDemoDownload] = useState('');
+  const [demoError, setDemoError] = useState('');
+  const [demoBusy, setDemoBusy] = useState(false);
 
-  const handleGenerateDemo = async (ea: EaProduct) => {
-    setDemoModalEa(ea);
-    setLoadingDemo(true);
-    setGeneratedDemoKey(null);
+  useEffect(() => {
+    let active = true;
+    fetch('/api/v1/products', { cache: 'no-store' })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Catalogue unavailable.');
+        if (active) setProducts(data.products || []);
+      })
+      .catch((error) => { if (active) setDemoError(error instanceof Error ? error.message : 'Catalogue unavailable.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
 
+  const categories = useMemo(() => ['ALL', ...Array.from(new Set(products.map((item) => item.category)))], [products]);
+  const visible = products.filter((item) => category === 'ALL' || item.category === category);
+  const price = (item: Product) => currency === 'NGN'
+    ? (cycle === 'MONTHLY' ? item.monthly_price_ngn : item.annual_price_ngn)
+    : (cycle === 'MONTHLY' ? item.monthly_price_usd : item.annual_price_usd);
+  const money = (amount: number) => currency === 'NGN' ? `₦${amount.toLocaleString('en-NG')}` : `$${amount.toLocaleString('en-US')}`;
+
+  async function requestDemo(event: React.FormEvent) {
+    event.preventDefault();
+    if (!demoProduct) return;
+    setDemoBusy(true); setDemoError(''); setDemoKey(''); setDemoDownload('');
     try {
-      const res = await fetch('/api/v1/provision-demo-license', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ea_slug: ea.slug }),
+      const response = await fetch('/api/v1/provision-demo-license', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, mt5_login: mt5Login, ea_slug: demoProduct.slug }),
       });
-      const data = await res.json();
-      if (data.success && data.license_key) {
-        setGeneratedDemoKey(data.license_key);
-      } else {
-        setGeneratedDemoKey(`ALGO-DEMO-${ea.slug.split('-')[0].toUpperCase()}-PREVIEW`);
-      }
-    } catch {
-      setGeneratedDemoKey(`ALGO-DEMO-${ea.slug.split('-')[0].toUpperCase()}-OFFLINE`);
-    } finally {
-      setLoadingDemo(false);
-    }
-  };
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Demo request was not completed.');
+      setDemoKey(result.license_key);
+      setDemoDownload(result.download_url);
+    } catch (error) {
+      setDemoError(error instanceof Error ? error.message : 'Demo request failed.');
+    } finally { setDemoBusy(false); }
+  }
 
-  return (
-    <div className="w-full">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-white/[0.08] pb-4">
-        <div>
-          <div className="flex items-center gap-2 font-mono text-[10px] tracking-widest text-emerald-400 uppercase">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
-            QUANT MARKETPLACE &amp; STRATEGY VAULT
-          </div>
-          <h2 className="mt-1 text-xl font-bold tracking-tight text-white sm:text-2xl">
-            Algorithmic Trading Systems &amp; Verified MQL5 Artifacts
-          </h2>
-          <p className="mt-1 text-xs text-slate-400">
-            Download open-source demo EAs for chart testing, or provision institutional cloud-authenticated licenses for live accounts.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 font-mono text-[11px] text-slate-400">
-          <span className="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-emerald-300">
-            MT5 Build 4150+ Ready
-          </span>
-          <span className="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-slate-300">
-            WebRequest Cloud Gated
-          </span>
-        </div>
+  return <div className="w-full">
+    <div className="mb-5 flex flex-wrap items-end justify-between gap-4 border-b border-white/[0.08] pb-5">
+      <div><div className="font-mono text-[10px] tracking-[0.18em] text-emerald-300">ALGOLYNC / STRATEGY MARKETPLACE</div><h2 className="mt-2 text-2xl font-semibold">Quantitative EA catalogue</h2><p className="mt-1 text-xs text-slate-400">Product pricing and availability are read from the live catalogue in Supabase.</p></div>
+      <div className="flex flex-wrap gap-2">
+        <div className="flex rounded-lg border border-white/10 bg-black/30 p-1">{(['MONTHLY', 'ANNUAL'] as const).map((value) => <button key={value} type="button" onClick={() => setCycle(value)} className={`rounded px-3 py-2 text-[10px] font-semibold ${cycle === value ? 'bg-emerald-300 text-slate-950' : 'text-slate-400'}`}>{value === 'ANNUAL' ? 'Annual · 2 months free' : 'Monthly'}</button>)}</div>
+        <div className="flex rounded-lg border border-white/10 bg-black/30 p-1">{(['NGN', 'USD'] as const).map((value) => <button key={value} type="button" onClick={() => setCurrency(value)} className={`rounded px-3 py-2 text-[10px] font-semibold ${currency === value ? 'bg-cyan-300 text-slate-950' : 'text-slate-400'}`}>{value === 'NGN' ? '₦ NGN' : '$ USD'}</button>)}</div>
       </div>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {EA_CATALOG.map((strategy) => {
-          const badgeStyles =
-            strategy.badgeColor === 'emerald'
-              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
-              : strategy.badgeColor === 'cyan'
-              ? 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300'
-              : 'border-amber-500/30 bg-amber-500/10 text-amber-300';
-
-          const pricingLabel =
-            strategy.tierCategory === 'SANDBOX'
-              ? '100% Free Open-Source Demo'
-              : `₦${strategy.monthlyPriceNgn.toLocaleString()} / mo ($${strategy.monthlyPriceUsd}) · 1 Live + 2 Demo Included`;
-
-          return (
-            <article
-              key={strategy.id}
-              className="flex flex-col justify-between rounded-xl border border-white/[0.08] bg-[#0c1017] p-5 shadow-lg transition-all hover:border-white/20 hover:shadow-black/50"
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2">
-                  <span className={`rounded px-2 py-0.5 font-mono text-[9px] font-semibold tracking-wider uppercase border ${badgeStyles}`}>
-                    {strategy.badge}
-                  </span>
-                  <span className="font-mono text-[10px] text-slate-500">
-                    {strategy.version}
-                  </span>
-                </div>
-
-                <h3 className="mt-3 text-lg font-bold text-white tracking-tight">
-                  {strategy.name}
-                </h3>
-                <p className="mt-1 text-xs font-medium text-emerald-400/90 font-mono">
-                  {strategy.headline}
-                </p>
-                <p className="mt-2 text-xs leading-relaxed text-slate-400">
-                  {strategy.description}
-                </p>
-
-                {/* Pricing Banner */}
-                <div className="mt-3 rounded border border-white/[0.08] bg-black/40 px-3 py-1.5 font-mono text-[11px] text-emerald-300 flex items-center justify-between">
-                  <span>SUBSCRIPTION:</span>
-                  <span className="font-bold text-white">{pricingLabel}</span>
-                </div>
-
-                {/* Telemetry and Stats Grid */}
-                <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg border border-white/[0.05] bg-black/30 p-2.5 font-mono text-[11px]">
-                  <div>
-                    <span className="text-[9px] text-slate-500 uppercase block">Win Rate</span>
-                    <strong className="text-emerald-400 font-semibold">{strategy.winRate}</strong>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-500 uppercase block">Profit Factor</span>
-                    <strong className="text-white font-semibold">{strategy.profitFactor}</strong>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-500 uppercase block">Sharpe Ratio</span>
-                    <strong className="text-white font-semibold">{strategy.sharpeRatio}</strong>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-500 uppercase block">Max Drawdown</span>
-                    <strong className="text-amber-400 font-semibold">{strategy.maxDrawdown}</strong>
-                  </div>
-                </div>
-
-                <div className="mt-3 space-y-1 font-mono text-[10px] text-slate-400">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Pairs:</span>
-                    <span className="text-slate-300 font-semibold">{strategy.targetPairs}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Timeframe:</span>
-                    <span className="text-slate-300">{strategy.timeframe}</span>
-                  </div>
-                </div>
-
-                {/* Interactive SVG Sparkline */}
-                <InteractiveSparkline points={strategy.equityCurvePoints} color={strategy.badgeColor} />
-                <p className="mt-1.5 text-[9px] text-slate-500 italic">
-                  * {strategy.provenanceNote}
-                </p>
-              </div>
-
-              {/* DUAL ACTION BUTTON WORKFLOW */}
-              <div className="mt-5 space-y-2 pt-3 border-t border-white/[0.08]">
-                {/* Button A: Instant 1-Click Demo Key & Download */}
-                <button
-                  type="button"
-                  onClick={() => handleGenerateDemo(strategy)}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2.5 text-xs font-semibold text-slate-200 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
-                >
-                  <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                  </svg>
-                  1-Click Demo Key &amp; Download (.mq5)
-                </button>
-
-                {/* Button B: Provision Real EA License (Anchored to checkout) */}
-                <a
-                  href="#vault-checkout"
-                  onClick={() => onSelectEa && onSelectEa(strategy.slug)}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-4 py-2.5 text-xs font-bold text-emerald-300 shadow-md shadow-emerald-950/30 transition-all hover:border-emerald-400 hover:bg-emerald-500 hover:text-black"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  {strategy.tierCategory === 'SANDBOX' ? 'Download Free Sandbox Artifact' : `Subscribe Live License (${strategy.name.split(' ')[0]})`}
-                </a>
-              </div>
-            </article>
-          );
-        })}
-      </div>
-
-      {/* 1-CLICK DEMO PROVISIONING MODAL */}
-      {demoModalEa && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl border border-emerald-500/40 bg-[#07130e] p-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-emerald-500/20 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                <h3 className="font-mono text-sm font-bold text-emerald-400 uppercase tracking-wider">
-                  Instant Demo License Provisioned
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDemoModalEa(null)}
-                className="text-slate-400 hover:text-white font-mono text-sm"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="mt-4 space-y-4 font-mono">
-              <div>
-                <span className="text-[10px] text-slate-400 uppercase block">Selected Algorithm</span>
-                <p className="text-sm font-bold text-white">{demoModalEa.name} ({demoModalEa.version})</p>
-              </div>
-
-              <div className="rounded-lg border border-emerald-500/30 bg-black/70 p-3">
-                <span className="text-[10px] text-emerald-400/80 uppercase block mb-1">
-                  14-Day Sandbox Demo License Key
-                </span>
-                {loadingDemo ? (
-                  <div className="py-2 text-xs text-emerald-300/60 animate-pulse">
-                    Generating cryptographic sandbox entitlement…
-                  </div>
-                ) : (
-                  <code className="block select-all text-sm font-bold text-emerald-400">
-                    {generatedDemoKey}
-                  </code>
-                )}
-                <span className="mt-1 block text-[9px] text-slate-500">
-                  * Bound exclusively to MT5 Demo accounts (`ACCOUNT_TRADE_MODE_DEMO`). Real accounts blocked.
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                <a
-                  href={demoModalEa.demoDownloadUrl}
-                  download={demoModalEa.demoFilename}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-xs font-bold text-black hover:bg-emerald-400 transition-colors"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  Download {demoModalEa.demoFilename}
-                </a>
-
-                <a
-                  href="/downloads/MacroLyncLicense.mqh"
-                  download="MacroLyncLicense.mqh"
-                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-white/10 transition-colors"
-                >
-                  Download Cloud Gate Helper (MacroLyncLicense.mqh)
-                </a>
-              </div>
-
-              <div className="rounded border border-white/5 bg-white/[0.02] p-2.5 text-[10px] text-slate-400 leading-relaxed">
-                <strong>Quick MT5 Setup:</strong> Copy your EA into MT5 <code className="text-slate-300">MQL5/Experts</code>, copy the <code className="text-slate-300">.mqh</code> file into <code className="text-slate-300">MQL5/Include</code>, and whitelist <code className="text-emerald-400">https://fidulync.vercel.app</code> in MT5 Tools → Options → Expert Advisors → Allow WebRequest.
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
-  );
-}
+    <div className="mb-5 flex flex-wrap gap-2">{categories.map((value) => <button key={value} type="button" onClick={() => setCategory(value)} className={`rounded-full border px-3 py-1.5 text-[10px] font-mono ${category === value ? 'border-emerald-300/50 bg-emerald-300/10 text-emerald-200' : 'border-white/10 text-slate-400'}`}>{value === 'ALL' ? 'All strategies' : value.replaceAll('_', ' ')}</button>)}</div>
+    {loading && <p className="py-12 text-center text-xs text-slate-500">Loading live EA catalogue…</p>}
+    {!loading && visible.length === 0 && <p className="py-12 text-center text-xs text-slate-500">No active strategies are currently published.</p>}
+    <div className="grid gap-4 md:grid-cols-2">
+      {visible.map((item) => {
+        const metrics = item.metrics_json || {};
+        const isSandbox = item.category.toUpperCase() === 'SANDBOX' || price(item) === 0;
+        return <article key={item.slug} className="flex flex-col rounded-xl border border-white/[0.09] bg-[#0c1017] p-5">
+          <div className="flex items-center justify-between gap-2"><span className="rounded border border-emerald-300/20 bg-emerald-300/[0.07] px-2 py-1 font-mono text-[9px] text-emerald-200">{item.category}</span><span className="font-mono text-[10px] text-slate-500">v{item.version}</span></div>
+          <h3 className="mt-3 text-lg font-semibold text-white">{item.name}</h3><p className="mt-1 text-xs text-slate-400">{item.tagline}</p>
+          <div className="mt-4 grid grid-cols-2 gap-2 rounded-lg bg-black/30 p-3 font-mono">
+            {[['Win rate', metrics.win_rate || '—'], ['Profit factor', metrics.profit_factor || '—'], ['Sharpe', metrics.sharpe || '—'], ['Max drawdown', metrics.max_drawdown || '—']].map(([label, value]) => <div key={label}><div className="text-[9px] text-slate-500">{label}</div><div className="mt-1 text-sm text-slate-200">{value}</div></div>)}
+          </div>
+          <Sparkline values={metrics.equity_curve || []} />
+          <p className="mt-2 text-[9px] leading-4 text-slate-500">{metrics.provenance || 'Performance metrics are not yet verified.'}</p>
+          <div className="mt-4 flex items-end justify-between gap-3 border-t border-white/[0.07] pt-4"><div><div className="font-mono text-[9px] text-slate-500">{isSandbox ? 'SANDBOX' : cycle + ' SUBSCRIPTION'}</div><div className="mt-1 text-xl font-semibold text-white">{money(price(item))}<span className="ml-1 text-[10px] font-normal text-slate-500">{isSandbox ? 'free' : cycle === 'MONTHLY' ? '/ month' : '/ year'}</span></div><div className="mt-1 text-[9px] text-slate-500">{item.included_live_seats} live · {item.included_demo_seats} demo seats included</div></div><div className="flex flex-col gap-2">
+            {item.ex5_artifact_url ? <button type="button" onClick={() => { setDemoProduct(item); setDemoKey(''); setDemoError(''); }} className="rounded-lg border border-white/15 px-3 py-2 text-[10px] font-semibold text-slate-200 hover:border-emerald-300/40">Get Free Demo (.ex5)</button> : <span className="rounded-lg border border-white/10 px-3 py-2 text-center text-[10px] text-slate-500">EX5 not published</span>}
+            {!isSandbox && <button type="button" onClick={() => onSelectEa?.(item.slug, cycle, currency)} className="rounded-lg bg-emerald-300 px-3 py-2 text-[10px] font-bold text-slate-950">Subscribe Live</button>}
+          </div></div>
+        </article>;
+      })}
+    </div>
 
-export default QuantStrategyCatalog;
+    {demoProduct && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Request free EA demo">
+      <form onSubmit={requestDemo} className="w-full max-w-md rounded-2xl border border-emerald-300/30 bg-[#09120f] p-6 shadow-2xl">
+        <div className="flex items-center justify-between"><div><div className="font-mono text-[9px] tracking-wider text-emerald-300">14-DAY DEMO REQUEST</div><h3 className="mt-2 text-lg font-semibold">{demoProduct.name}</h3></div><button type="button" onClick={() => setDemoProduct(null)} className="text-slate-400">✕</button></div>
+        {!demoKey ? <>
+          <label className="mt-5 block text-xs text-slate-400">Email address<input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-2 h-11 w-full rounded border border-white/10 bg-black/30 px-3 text-sm text-white" placeholder="you@example.com" /></label>
+          <label className="mt-3 block text-xs text-slate-400">MT5 Demo login<input required inputMode="numeric" value={mt5Login} onChange={(e) => setMt5Login(e.target.value)} className="mt-2 h-11 w-full rounded border border-white/10 bg-black/30 px-3 font-mono text-sm text-white" placeholder="Actual demo account login" /></label>
+          <p className="mt-3 text-[10px] leading-5 text-slate-500">One demo per email per EA and one demo per MT5 login. Demo keys are restricted to demo accounts.</p>
+          {demoError && <p role="alert" className="mt-3 text-xs text-rose-300">{demoError}</p>}
+          <button disabled={demoBusy} className="mt-5 w-full rounded-lg bg-emerald-300 px-4 py-3 text-xs font-bold text-slate-950 disabled:opacity-50">{demoBusy ? 'Checking eligibility…' : 'Request demo license'}</button>
+        </> : <div className="mt-5"><p className="text-xs text-emerald-200">Demo license issued.</p><code className="mt-3 block break-all rounded bg-black/40 p-3 text-sm text-emerald-300">{demoKey}</code><a href={demoDownload} className="mt-4 block rounded-lg bg-emerald-300 px-4 py-3 text-center text-xs font-bold text-slate-950">Download demo EA (.ex5)</a></div>}
+      </form>
+    </div>}
+  </div>;
+}
