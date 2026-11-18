@@ -24,6 +24,8 @@ import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any
+
+from mt5_risk_state import consecutive_closed_loss_streak
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -210,37 +212,12 @@ def build_verified_loss_streak(positions: Any) -> tuple[int | None, bool, str]:
         int(getattr(position, "identifier", getattr(position, "ticket", 0)) or 0)
         for position in positions
     }
-    grouped: dict[int, dict[str, float]] = {}
     exit_entries = {
         int(getattr(mt5, "DEAL_ENTRY_OUT", 1)),
         int(getattr(mt5, "DEAL_ENTRY_OUT_BY", 3)),
         int(getattr(mt5, "DEAL_ENTRY_INOUT", 2)),
     }
-    for deal in deals:
-        position_id = int(getattr(deal, "position_id", 0) or 0)
-        if position_id <= 0:
-            continue
-        item = grouped.setdefault(position_id, {"net": 0.0, "last_exit": 0.0})
-        item["net"] += sum(float(getattr(deal, field, 0.0) or 0.0)
-                           for field in ("profit", "commission", "swap", "fee"))
-        if int(getattr(deal, "entry", -1)) in exit_entries:
-            exit_time = float(getattr(deal, "time_msc", 0) or 0) / 1000.0
-            if exit_time <= 0:
-                exit_time = float(getattr(deal, "time", 0) or 0)
-            item["last_exit"] = max(item["last_exit"], exit_time)
-
-    closed = [
-        (item["last_exit"], item["net"])
-        for position_id, item in grouped.items()
-        if position_id not in open_position_ids and item["last_exit"] > 0
-    ]
-    closed.sort(key=lambda item: item[0], reverse=True)
-    consecutive_losses = 0
-    for _, net_profit in closed:
-        if net_profit < 0:
-            consecutive_losses += 1
-        else:
-            break
+    consecutive_losses = consecutive_closed_loss_streak(deals, open_position_ids, exit_entries)
     return consecutive_losses, True, synced_at
 
 
