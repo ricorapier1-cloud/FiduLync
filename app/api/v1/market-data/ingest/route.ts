@@ -75,6 +75,10 @@ export async function POST(request: Request) {
         || (snapshot.equity as number) <= 0
         || !Number.isSafeInteger(snapshot.open_positions) || (snapshot.open_positions as number) < 0
         || typeof snapshot.open_risk_verified !== 'boolean'
+        || (snapshot.consecutive_losses !== undefined && (!Number.isSafeInteger(snapshot.consecutive_losses) || Number(snapshot.consecutive_losses) < 0 || Number(snapshot.consecutive_losses) > 10000))
+        || (snapshot.loss_streak_verified !== undefined && typeof snapshot.loss_streak_verified !== 'boolean')
+        || (snapshot.history_synced_at !== undefined && snapshot.history_synced_at !== null && (typeof snapshot.history_synced_at !== 'string' || !validTime(snapshot.history_synced_at, false)))
+        || (snapshot.loss_streak_verified === true && (!Number.isSafeInteger(snapshot.consecutive_losses) || typeof snapshot.history_synced_at !== 'string' || !validTime(snapshot.history_synced_at, false)))
         || typeof snapshot.captured_at !== 'string' || !validTime(snapshot.captured_at, false)) {
         return NextResponse.json({ error: 'Account snapshot failed validation.' }, { status: 400 });
       }
@@ -150,6 +154,9 @@ export async function POST(request: Request) {
           open_positions: accountSnapshot.open_positions,
           open_risk_cash: accountSnapshot.open_risk_cash,
           open_risk_verified: accountSnapshot.open_risk_verified,
+          consecutive_losses: Number.isSafeInteger(accountSnapshot.consecutive_losses) ? accountSnapshot.consecutive_losses : null,
+          loss_streak_verified: accountSnapshot.loss_streak_verified === true,
+          history_synced_at: typeof accountSnapshot.history_synced_at === 'string' ? accountSnapshot.history_synced_at : null,
           broker: typeof accountSnapshot.broker === 'string' ? accountSnapshot.broker.slice(0, 100) : null,
           server: typeof accountSnapshot.server === 'string' ? accountSnapshot.server.slice(0, 120) : null,
           captured_at: accountSnapshot.captured_at,
