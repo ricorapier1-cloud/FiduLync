@@ -12,7 +12,7 @@ export async function GET(request: Request) {
 
   try {
     const { data, error } = await getSupabaseAdmin().auth.getUser(token);
-    if (error || !data.user || data.user.email?.toLowerCase() !== OWNER_EMAIL) {
+    if (error || !data.user || data.user.email?.toLowerCase() !== OWNER_EMAIL || !data.user.email_confirmed_at) {
       return NextResponse.json({ authenticated: false }, { status: 403 });
     }
     return NextResponse.json({
