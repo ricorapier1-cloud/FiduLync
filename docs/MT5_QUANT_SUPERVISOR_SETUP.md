@@ -19,10 +19,10 @@ Do not change these flags to true just to force an approval. They require indepe
 3. Set environment variables in that Windows session:
    - `FIDULYNC_PUBLISHER_TOKEN` to the one-time token.
    - `FIDULYNC_INGEST_URL` to `https://fidulync.vercel.app/api/v1/market-data/ingest`.
-   - `MT5_SYMBOL_MAP` to canonical-to-broker symbols. The initial supported map is EURUSD, GBPUSD, USDJPY and XAUUSD. Add broker suffixes where needed.
+   - `MT5_SYMBOL_MAP` to canonical-to-broker symbols. The default map covers seven major USD FX pairs (EURUSD, GBPUSD, USDJPY, USDCHF, USDCAD, AUDUSD, NZDUSD) plus XAUUSD. Add broker suffixes where needed. Historical candle batches are chunked to respect the API request limit.
 4. Run `py scripts/mt5_market_publisher.py`. Confirm accepted quote/candle batches and account snapshots in the owner diagnostics. The publisher reads the connected terminal; it does not request or store the broker password.
 5. Copy `MQL5/Include/FiduLync/QuantSupervisor.mqh` into the terminal's `MQL5/Include/FiduLync/` directory and `MQL5/Experts/FiduLync_Supervisor_Probe.mq5` into `MQL5/Experts/`.
-6. Compile the probe in MetaEditor. In MT5, open Tools → Options → Expert Advisors and add `https://fidulync.vercel.app` to the allowed WebRequest URLs.
+6. If the broker uses suffixes, set the probe's `InpCanonicalSymbol` to the matching canonical publisher symbol (for example, `EURUSD` for chart symbol `EURUSD.a`). Compile the probe in MetaEditor. In MT5, open Tools → Options → Expert Advisors and add `https://fidulync.vercel.app` to the allowed WebRequest URLs.
 7. Attach the probe to a demo-account chart. Enter the installation ID and publisher token in its inputs. Review the Experts log and confirm that unavailable/stale data produces a non-approval decision.
 
 ## Operational and validation limitations
