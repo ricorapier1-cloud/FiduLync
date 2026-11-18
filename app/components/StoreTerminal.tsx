@@ -50,9 +50,6 @@ function getServerOrigin() {
   return '';
 }
 
-function formatCurrency(value: number | null) {
-  return value === null ? '—' : value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 function isSignalResult(value: unknown): value is SignalResult {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
@@ -293,50 +290,6 @@ export default function StoreTerminal({ bridgeSource, initialSnapshot, session }
       </div>
     </div>
   );
-}
-
-function StrategyCard({
-  name,
-  version,
-  description,
-  pairs: targetPairs,
-  timeframe,
-  shield,
-  virtualization,
-  drawdown,
-}: {
-  name: string;
-  version: string;
-  description: string;
-  pairs: string;
-  timeframe: string;
-  shield: string;
-  virtualization: string;
-  drawdown: string;
-}) {
-  return (
-    <article className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-5 sm:p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="font-mono text-[9px] tracking-[0.14em] text-emerald-300">PROPRIETARY ALGORITHM</div>
-          <h3 className="mt-2 text-base font-semibold">{name}</h3>
-        </div>
-        <span className="rounded border border-white/[0.08] px-2 py-1 font-mono text-[9px] text-slate-500">{version}</span>
-      </div>
-      <p className="mt-3 text-xs leading-5 text-slate-400">{description}</p>
-      <dl className="mt-5 grid gap-3 border-t border-white/[0.07] pt-4 sm:grid-cols-2">
-        <Spec label="TARGET PAIRS" value={targetPairs} />
-        <Spec label="TIMEFRAME" value={timeframe} />
-        <Spec label="EQUITY SHIELD" value={shield} />
-        <Spec label="GHOST VIRTUALIZATION" value={virtualization} />
-        <Spec label="DRAWDOWN CAP" value={drawdown} />
-      </dl>
-    </article>
-  );
-}
-
-function Spec({ label, value }: { label: string; value: string }) {
-  return <div><dt className="font-mono text-[8px] tracking-wide text-slate-600">{label}</dt><dd className="mt-1 text-[10px] leading-4 text-slate-300">{value}</dd></div>;
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
