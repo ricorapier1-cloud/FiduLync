@@ -126,7 +126,6 @@ export async function GET(request: Request) {
         : Promise.resolve({ data: [], error: null }))),
     ]);
     if (quoteResult.error) throw quoteResult.error;
-    if (macroResult.error) throw macroResult.error;
     for (const result of candleResults) if (result.error) throw result.error;
 
     const quoteRows = (quoteResult.data ?? []) as Quote[];
