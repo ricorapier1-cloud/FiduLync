@@ -8,7 +8,7 @@ import { getMacroSnapshot } from '@/lib/macroEngine';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Personal EA Lab & MT5 Monitor',
+  title: 'Personal EA Lab',
   description: 'Personal EA research library, live signal diagnostics and the MacroLync MT5 bridge.'
 };
 
