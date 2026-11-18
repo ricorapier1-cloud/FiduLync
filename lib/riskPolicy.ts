@@ -12,6 +12,8 @@ import type { RiskPolicy } from '@/lib/quantGovernance';
 export const DEFAULT_PERSONAL_RISK_POLICY: Readonly<RiskPolicy> = Object.freeze({
   policyVersion: 'personal-quant-1.0.0',
   executionEnabled: false,
+  modelValidated: false,
+  executionQualityVerified: false,
   maxPerTradeRiskPct: 1.0,
   maxPortfolioRiskPct: 2.0,
   maxDailyDrawdownPct: 4.0,
