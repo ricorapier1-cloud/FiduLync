@@ -60,7 +60,6 @@ export async function validateCustomerLicense(mt5Account: number, licenseKey: st
     return trials.length === 1 && Date.parse(trials[0].expires_at) > Date.now();
   }
 
-  if (Number(license.mt5_account) === mt5Account) return true;
   if (!license.ea_slug) return false;
   const seats = await supabaseRows<{ mt5_login: number | string }>('ea_license_seats', new URLSearchParams({
     select: 'mt5_login', license_key: `eq.${key}`, ea_slug: `eq.${license.ea_slug}`,
