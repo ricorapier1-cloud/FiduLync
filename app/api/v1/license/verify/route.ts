@@ -82,7 +82,7 @@ export async function POST(request: Request) {
         'ea_license_seats',
         `license_key=eq.${encodeURIComponent(licenseKey)}&ea_slug=eq.${encodeURIComponent(eaSlug)}&slot_type=eq.${slotType}&mt5_login=eq.${mt5Login}&select=mt5_login&limit=1`
       );
-      accountAuthorized = Boolean(seats?.length) || Number(license.mt5_account) === mt5Login;
+      accountAuthorized = Boolean(seats?.length);
     }
 
     if (!accountAuthorized) {
