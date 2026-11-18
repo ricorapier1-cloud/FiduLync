@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 
 type Metrics = {
   win_rate?: string; profit_factor?: string; sharpe?: string; max_drawdown?: string;
@@ -57,7 +57,7 @@ export function QuantStrategyCatalog({ onSelectEa }: { onSelectEa?: (slug: strin
     : (cycle === 'MONTHLY' ? item.monthly_price_usd : item.annual_price_usd);
   const money = (amount: number) => currency === 'NGN' ? `₦${amount.toLocaleString('en-NG')}` : `$${amount.toLocaleString('en-US')}`;
 
-  async function requestDemo(event: React.FormEvent) {
+  async function requestDemo(event: FormEvent) {
     event.preventDefault();
     if (!demoProduct) return;
     setDemoBusy(true); setDemoError(''); setDemoKey(''); setDemoDownload('');
