@@ -88,7 +88,8 @@ function isCotPosition(value: unknown): value is CotPosition {
     && isFiniteNumber(value.percentile)
     && value.percentile >= 0
     && value.percentile <= 100
-    && isFiniteNumber(value.weeklyChange);
+    && isFiniteNumber(value.weeklyChange)
+    && (value.asOf === undefined || (typeof value.asOf === 'string' && Number.isFinite(Date.parse(value.asOf))));
 }
 
 function isCatalyst(value: unknown): value is EconomicCatalyst {
@@ -424,7 +425,7 @@ async function getCftcCot(): Promise<CotPosition[]> {
     const percentile = history.length
       ? Math.round(((below + equal / 2) / history.length) * 100)
       : 50;
-    return [{ market, netContracts: latest.netContracts, percentile, weeklyChange: latest.weeklyChange }];
+    return [{ market, netContracts: latest.netContracts, percentile, weeklyChange: latest.weeklyChange, asOf: latest.date }];
   });
   if (!positions.length) throw new Error('CFTC returned no supported currency or gold positions.');
   return positions;
