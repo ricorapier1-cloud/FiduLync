@@ -9,10 +9,11 @@ import PlatformFooter from '@/components/PlatformFooter';
 
 const links = [
   { href: '/', label: 'MacroLync', icon: 'shield' },
-  { href: '/store', label: 'AlgoLync Vault', icon: 'chart' },
-  { href: '/account', label: 'My License', icon: 'shield' },
-  { href: '/faq', label: 'FAQ', icon: 'activity' },
-  { href: '/terms', label: 'Terms & Risk', icon: 'shield-alert' },
+  { href: '/risk', label: 'Risk Planner', icon: 'gauge' },
+  { href: '/store', label: 'EA Lab', icon: 'chart' },
+  { href: '/analytics', label: 'Performance', icon: 'activity' },
+  { href: '/faq', label: 'Help', icon: 'activity' },
+  { href: '/terms', label: 'Risk & Data', icon: 'shield-alert' },
   { href: '/owner', label: 'Owner Console', icon: 'shield' },
 ] as const satisfies readonly { href: string; label: string; icon: BrandGlyphName }[];
 
@@ -21,10 +22,9 @@ const macroLinks = [
   { href: '#bias', label: 'Pair bias', icon: 'gauge' },
   { href: '#catalysts', label: 'Catalysts', icon: 'calendar' },
   { href: '#positioning', label: 'Positioning', icon: 'radio' },
-  { href: '/store', label: 'AlgoLync Vault', icon: 'chart' },
-  { href: '/account', label: 'My License', icon: 'shield' },
-  { href: '/faq', label: 'FAQ', icon: 'activity' },
-  { href: '/terms', label: 'Terms & Risk', icon: 'shield-alert' },
+  { href: '/risk', label: 'Risk planner', icon: 'gauge' },
+  { href: '/store', label: 'EA Lab', icon: 'chart' },
+  { href: '/analytics', label: 'Performance', icon: 'activity' },
   { href: '/owner', label: 'Owner Console', icon: 'shield' },
 ] as const satisfies readonly { href: string; label: string; icon: BrandGlyphName }[];
 
@@ -42,7 +42,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
             <span className="brand-mark"><BrandGlyph name="shield" size={19} strokeWidth={2.2} /></span>
             <span className="brand-copy">
               <span className="brand-name">Macro<span>Lync</span></span>
-              <span className="brand-caption">INSTITUTIONAL FX TERMINAL</span>
+              <span className="brand-caption">PERSONAL QUANT TERMINAL</span>
             </span>
           </Link>
 
@@ -68,7 +68,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> 
             </a>
             <Link className="secure-pill" href={isHome ? '/store' : '/'}>
-              <span className="secure-dot" /> {isHome ? 'AlgoLync Vault' : 'Macro terminal'}
+              <span className="secure-dot" /> {isHome ? 'EA Lab' : 'Macro terminal'}
             </Link>
             <button
               type="button"
@@ -91,7 +91,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
             onClick={(event) => event.stopPropagation()}
           >
             <div className="drawer-heading">
-              <span className="eyebrow">{isHome ? 'MACROLYNC' : 'ALGOLYNC VAULT'}</span>
+              <span className="eyebrow">{isHome ? 'MACROLYNC' : 'PERSONAL EA LAB'}</span>
               <button
                 type="button"
                 className="icon-button"
