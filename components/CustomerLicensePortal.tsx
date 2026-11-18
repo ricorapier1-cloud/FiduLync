@@ -150,7 +150,7 @@ export default function CustomerLicensePortal() {
       {tab === 'subscriptions' && <section className="mt-5 rounded-xl border border-white/10 bg-[#0a111b] p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div><h2 className="font-semibold">{product?.name || data.license.ea_slug || 'AlgoLync EA subscription'}</h2><p className="mt-1 text-xs text-slate-400">{data.license.tier.replaceAll('_', ' ')} · {data.masked_email}</p></div>
-          <span className="rounded border border-emerald-300/30 bg-emerald-300/10 px-3 py-1 font-mono text-[10px] text-emerald-200">{data.license.status.toUpperCase()}</span>
+          <span className="rounded border border-emerald-300/30 bg-emerald-300/10 px-3 py-1 font-mono text-[10px] text-emerald-200">{displayStatus}</span>
         </div>
         <p className="mt-4 text-xs leading-5 text-slate-400">Included entitlement: one live MT5 account and two demo MT5 accounts. Additional live seats depend on your subscription order.</p>
         <div className="mt-5 flex flex-wrap gap-2">
