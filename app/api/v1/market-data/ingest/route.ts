@@ -67,17 +67,18 @@ export async function POST(request: Request) {
       if (!isRecord(rawAccountSnapshot)) {
         return NextResponse.json({ error: 'Account snapshot failed validation.' }, { status: 400 });
       }
-      accountSnapshot = rawAccountSnapshot;
-      if (!Number.isSafeInteger(accountSnapshot.account_login) || Number(accountSnapshot.account_login) <= 0
-        || typeof accountSnapshot.currency !== 'string' || !/^[A-Z]{3,8}$/.test(accountSnapshot.currency)
+      const snapshot = rawAccountSnapshot;
+      if (!Number.isSafeInteger(snapshot.account_login) || Number(snapshot.account_login) <= 0
+        || typeof snapshot.currency !== 'string' || !/^[A-Z]{3,8}$/.test(snapshot.currency)
         || !['balance','equity','margin','free_margin','open_risk_cash'].every((key) =>
-          typeof accountSnapshot?.[key] === 'number' && Number.isFinite(accountSnapshot[key]) && (accountSnapshot[key] as number) >= 0)
-        || (accountSnapshot.equity as number) <= 0
-        || !Number.isSafeInteger(accountSnapshot.open_positions) || (accountSnapshot.open_positions as number) < 0
-        || typeof accountSnapshot.open_risk_verified !== 'boolean'
-        || typeof accountSnapshot.captured_at !== 'string' || !validTime(accountSnapshot.captured_at, false)) {
+          typeof snapshot[key] === 'number' && Number.isFinite(snapshot[key]) && (snapshot[key] as number) >= 0)
+        || (snapshot.equity as number) <= 0
+        || !Number.isSafeInteger(snapshot.open_positions) || (snapshot.open_positions as number) < 0
+        || typeof snapshot.open_risk_verified !== 'boolean'
+        || typeof snapshot.captured_at !== 'string' || !validTime(snapshot.captured_at, false)) {
         return NextResponse.json({ error: 'Account snapshot failed validation.' }, { status: 400 });
       }
+      accountSnapshot = snapshot;
     }
 
     const quotes: Quote[] = [];
