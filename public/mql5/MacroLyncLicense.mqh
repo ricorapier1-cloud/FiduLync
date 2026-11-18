@@ -157,6 +157,15 @@ bool VerifyAlgolyncLicense()
    return true;
 }
 
+// Licence expiry or a temporary API outage must never disable protective
+// management of positions that are already open. EAs should continue exits,
+// stop-loss updates, break-even, trailing and emergency risk controls.
+bool AlgoLyncMayManageExistingPositions()
+{
+   return true;
+}
+
+// Only new exposure is gated by the current 24-hour cloud lease.
 bool AlgoLyncMayOpenNewTrades()
 {
    return AlgoLyncLeaseIsValid();
