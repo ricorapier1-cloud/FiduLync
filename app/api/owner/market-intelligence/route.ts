@@ -12,7 +12,7 @@ export const runtime = 'nodejs';
 const PAIRS = ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'USDCAD', 'AUDUSD', 'NZDUSD', 'XAUUSD'] as const;
 const FRAMES = ['D1', 'H4', 'H1'] as const;
 type Candle = { installation_id: string; symbol: string; timeframe: string; bar_time: string; open: number; high: number; low: number; close: number; is_closed: boolean; broker: string; server: string };
-type Quote = { symbol: string; bid: number; ask: number; quote_time: string; spread_points: number; point: number; broker: string; server: string };
+type Quote = { installation_id: string; symbol: string; bid: number; ask: number; quote_time: string; spread_points: number; point: number; broker: string; server: string };
 
 function ema(values: number[], period: number): number | null {
   if (values.length < period) return null;
@@ -70,6 +70,7 @@ function frameAnalysis(rows: Candle[], timeframe: string) {
   return {
     timeframe,
     symbol: bars.at(-1)?.symbol ?? null,
+    installation_id: bars.at(-1)?.installation_id ?? null,
     bars: bars.length,
     last_close: last,
     ema20: fast,
@@ -99,7 +100,7 @@ export async function GET(request: Request) {
 
     const [quoteResult, macroResult, ...candleResults] = await Promise.all([
       installationIds.length
-        ? supabase.from('mt5_market_quotes').select('symbol,bid,ask,quote_time,spread_points,point,broker,server')
+        ? supabase.from('mt5_market_quotes').select('installation_id,symbol,bid,ask,quote_time,spread_points,point,broker,server')
             .in('installation_id', installationIds).order('quote_time', { ascending: false }).limit(1000)
         : Promise.resolve({ data: [], error: null }),
       getMacroSnapshot(),
@@ -145,7 +146,7 @@ export async function GET(request: Request) {
       });
       const h1Source = frames.H1;
       const quote = h1Source.symbol
-        ? quoteRows.find((row) => row.symbol === h1Source.symbol && row.broker === h1Source.broker && row.server === h1Source.server)
+        ? quoteRows.find((row) => row.installation_id === h1Source.installation_id && row.symbol === h1Source.symbol && row.broker === h1Source.broker && row.server === h1Source.server)
         : undefined;
       const quoteAgeSeconds = quote ? (Date.now() - Date.parse(quote.quote_time)) / 1000 : null;
       const quoteFresh = quoteAgeSeconds !== null && quoteAgeSeconds >= 0 && quoteAgeSeconds <= 120;
