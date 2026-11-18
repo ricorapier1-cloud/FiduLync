@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     const cycle: Cycle = body.billing_cycle === 'ANNUAL' || body.plan === 'ANNUAL' ? 'ANNUAL' : 'MONTHLY';
     const extraSeats = [0, 1, 3, 5].includes(Number(body.extra_live_seats)) ? Number(body.extra_live_seats) : 0;
 
-    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(eaSlug)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(eaSlug)) {
       return NextResponse.json({ success: false, error: 'A valid email and active EA selection are required.' }, { status: 400 });
     }
 
