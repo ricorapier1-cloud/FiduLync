@@ -3,8 +3,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import BrandGlyph from '@/components/BrandGlyph';
-import { PaystackCheckout } from '@/components/PaystackCheckout';
-import { QuantStrategyCatalog } from '@/components/QuantStrategyCatalog';
 import LiveAccountMonitor from '@/components/LiveAccountMonitor';
 import type { HeartbeatRecord } from '@/lib/eaHeartbeat';
 import { getCurrencyStrengthIndex, type getLiquiditySession } from '@/lib/currencyStrength';
@@ -90,7 +88,6 @@ function isSignalResult(value: unknown): value is SignalResult {
 }
 
 export default function StoreTerminal({ initialFleet, telemetryError, bridgeSource, initialSnapshot, initialTradeExpectancy, session }: StoreTerminalProps) {
-  const [selectedEaSlug, setSelectedEaSlug] = useState('eridam-nexus-pro');
   const router = useRouter();
   const [symbol, setSymbol] = useState('EURUSD');
   const endpoint = useSyncExternalStore(subscribeToOrigin, getBrowserOrigin, getServerOrigin);
@@ -98,52 +95,6 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
   const [signalError, setSignalError] = useState('');
   const [testing, setTesting] = useState(false);
   const [copyState, setCopyState] = useState('');
-  const [licenseKeyInput, setLicenseKeyInput] = useState('');
-  const [mt5AccountInput, setMt5AccountInput] = useState('');
-  const [verifyingLicense, setVerifyingLicense] = useState(false);
-  const [licenseResponse, setLicenseResponse] = useState<{
-    valid: boolean;
-    message?: string;
-    account?: string;
-    mt5_account?: string | number;
-    license_type?: string;
-    tier?: string;
-    expires_at?: string | null;
-    error?: string;
-    reason?: string;
-  } | null>(null);
-
-  async function testLicenseVerification() {
-    if (!licenseKeyInput.trim() || !mt5AccountInput.trim()) {
-      setLicenseResponse({
-        valid: false,
-        error: 'Please enter both your License Key and MT5 Account login number.',
-      });
-      return;
-    }
-    setVerifyingLicense(true);
-    setLicenseResponse(null);
-    try {
-      const res = await fetch('/api/v1/validate-license', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          license_key: licenseKeyInput.trim(),
-          mt5_account: mt5AccountInput.trim(),
-        }),
-      });
-      const data = await res.json();
-      setLicenseResponse(data);
-    } catch {
-      setLicenseResponse({
-        valid: false,
-        error: 'Unable to connect to license verification endpoint.',
-      });
-    } finally {
-      setVerifyingLicense(false);
-    }
-  }
-
   const currencyStrength = getCurrencyStrengthIndex(initialSnapshot);
 
   useEffect(() => {
@@ -260,8 +211,18 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
 
         <LiveAccountMonitor />
 
-        <section className="mt-11" aria-labelledby="strategies-heading">
-          <QuantStrategyCatalog onSelectEa={(slug) => setSelectedEaSlug(slug)} />
+        <section className="mt-11" aria-labelledby="personal-library-heading">
+          <div className="mb-4">
+            <div className="font-mono text-[9px] tracking-[0.17em] text-emerald-400">02 / PERSONAL EA LIBRARY</div>
+            <h2 id="personal-library-heading" className="mt-1 text-lg font-semibold">Research and demo EA files</h2>
+            <p className="mt-2 max-w-3xl text-xs leading-5 text-slate-400">Free sample source files for later MetaEditor compilation and Strategy Tester work. They are research fixtures, not verified profitable systems or production-ready live robots.</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <a href="/downloads/Eridam_Nexus_Adaptive_Demo.mq5" download className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-4 transition hover:border-emerald-400/30"><strong className="text-sm text-white">Eridam Nexus Adaptive — Demo</strong><span className="mt-2 block text-[11px] leading-5 text-slate-400">Multi-regime volatility sample for EURUSD, GBPUSD and XAUUSD.</span><span className="mt-3 block font-mono text-[10px] text-emerald-300">DOWNLOAD .MQ5</span></a>
+            <a href="/downloads/Velocity_Vault_Momentum_Demo.mq5" download className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-4 transition hover:border-emerald-400/30"><strong className="text-sm text-white">Velocity Vault Momentum — Demo</strong><span className="mt-2 block text-[11px] leading-5 text-slate-400">Session-expansion momentum sample for controlled testing.</span><span className="mt-3 block font-mono text-[10px] text-emerald-300">DOWNLOAD .MQ5</span></a>
+            <a href="/downloads/MacroLync_G10_Breakout_Test.mq5" download className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-4 transition hover:border-emerald-400/30"><strong className="text-sm text-white">MacroLync G10 ATR Breakout — Test</strong><span className="mt-2 block text-[11px] leading-5 text-slate-400">Source fixture for MetaEditor compilation and Strategy Tester checks.</span><span className="mt-3 block font-mono text-[10px] text-emerald-300">DOWNLOAD .MQ5</span></a>
+            <a href="/mql5/MacroLyncBridge.mqh" download className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-4 transition hover:border-emerald-400/30"><strong className="text-sm text-white">MacroLync MT5 Bridge</strong><span className="mt-2 block text-[11px] leading-5 text-slate-400">MQL5 include for the existing FiduLync telemetry and research bridge.</span><span className="mt-3 block font-mono text-[10px] text-emerald-300">DOWNLOAD .MQH</span></a>
+          </div>
         </section>
 
         <section className="mt-11 grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]" aria-label="Signal tester and MT5 connection">
@@ -390,156 +351,19 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
           </div>
         </section>
 
-                <section id="vault-checkout" className="mt-11 scroll-mt-24" aria-labelledby="provisioning-heading">
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <div className="font-mono text-[9px] tracking-[0.17em] text-emerald-400">05 / INSTANT VAULT ACCESS & LICENSE PROVISIONING</div>
-              <h2 id="provisioning-heading" className="mt-1 text-lg font-semibold">Acquire Institutional EA License</h2>
-            </div>
-            <div className="flex items-center gap-2 font-mono text-[9px] text-emerald-300">
-              <BrandGlyph name="shield" size={13} className="text-emerald-400" />
-              LIFETIME MT5 ACCOUNT BINDING
-            </div>
-          </div>
-          <div className="rounded-xl border border-emerald-500/20 bg-[#06120E]/80 p-5 sm:p-6 shadow-2xl backdrop-blur-sm">
-            <PaystackCheckout selectedEaSlug={selectedEaSlug} />
-          </div>
+        <section className="mt-11 rounded-xl border border-white/[0.08] bg-[#0c1016] p-5 sm:p-6" aria-labelledby="mt5-personal-setup-heading">
+          <div className="font-mono text-[9px] tracking-[0.17em] text-slate-500">05 / PERSONAL MT5 ONBOARDING</div>
+          <h2 id="mt5-personal-setup-heading" className="mt-1 text-lg font-semibold">Connect your own MT5 terminal when ready</h2>
+          <ol className="mt-4 grid gap-3 text-xs leading-5 text-slate-300 sm:grid-cols-2">
+            <li className="rounded-lg border border-white/[0.06] bg-black/20 p-3"><strong className="text-white">1. Compile on Windows MT5</strong><br />Place EA source in MQL5/Experts and the bridge include in MQL5/Include, then compile in MetaEditor.</li>
+            <li className="rounded-lg border border-white/[0.06] bg-black/20 p-3"><strong className="text-white">2. Allow the research endpoint</strong><br />In MT5 WebRequest settings, allow <code className="text-emerald-300">https://fidulync.vercel.app</code>.</li>
+            <li className="rounded-lg border border-white/[0.06] bg-black/20 p-3"><strong className="text-white">3. Register the terminal</strong><br />Use the private owner console to register the terminal and its installation credential. Never share broker passwords.</li>
+            <li className="rounded-lg border border-white/[0.06] bg-black/20 p-3"><strong className="text-white">4. Start in shadow/demo mode</strong><br />Verify quotes, closed candles, broker symbol specifications and EA telemetry before considering any live use.</li>
+          </ol>
+          <p className="mt-4 text-[11px] leading-5 text-amber-200/80">No personal EA execution approval is enabled by this page. Keep broker-side stop-loss protection and the EA's local risk controls active.</p>
         </section>
 
-        <section className="mt-11" aria-labelledby="licensing-heading">
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <div className="font-mono text-[9px] tracking-[0.17em] text-slate-500">06 / CLIENT LICENSING & ONE-TIME ACTIVATION</div>
-              <h2 id="licensing-heading" className="mt-1 text-lg font-semibold">Terminal Authorization & Key Manager</h2>
-            </div>
-            <div className="flex items-center gap-2 font-mono text-[9px] text-slate-400">
-              <BrandGlyph name="shield" size={13} className="text-emerald-400" />
-              ONE-TIME LIFETIME PURCHASE VALIDATION
-            </div>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-            <div className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-5 sm:p-6">
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-[10px] uppercase tracking-wider text-emerald-300">License Verification Console</span>
-              </div>
-
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="license-key-input" className="block font-mono text-[9px] tracking-wide text-slate-500">
-                    ONE-TIME LICENSE KEY
-                  </label>
-                  <input
-                    id="license-key-input"
-                    type="text"
-                    value={licenseKeyInput}
-                    onChange={(e) => setLicenseKeyInput(e.target.value)}
-                    placeholder="ALGOLYNX-PRO-XXXXX"
-                    className="mt-1.5 h-10 w-full rounded-md border border-white/[0.1] bg-[#080a0f] px-3 font-mono text-xs text-slate-100 outline-none focus:border-emerald-300/40"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="mt5-account-input" className="block font-mono text-[9px] tracking-wide text-slate-500">
-                    MT5 ACCOUNT LOGIN NUMBER
-                  </label>
-                  <input
-                    id="mt5-account-input"
-                    type="text"
-                    value={mt5AccountInput}
-                    onChange={(e) => setMt5AccountInput(e.target.value)}
-                    placeholder="e.g. 5839201"
-                    className="mt-1.5 h-10 w-full rounded-md border border-white/[0.1] bg-[#080a0f] px-3 font-mono text-xs text-slate-100 outline-none focus:border-emerald-300/40"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={testLicenseVerification}
-                disabled={verifyingLicense}
-                className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-emerald-400 px-4 text-xs font-semibold text-[#07120d] transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <BrandGlyph name="shield" size={14} />
-                {verifyingLicense ? 'Verifying Terminal...' : 'Verify & Authorize MT5 Account'}
-              </button>
-
-              {licenseResponse && (
-                <div
-                  className={`mt-4 rounded-lg border p-4 ${
-                    licenseResponse.valid
-                      ? 'border-emerald-400/25 bg-emerald-400/[0.04]'
-                      : 'border-rose-400/25 bg-rose-400/[0.04]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={`font-mono text-xs font-semibold ${
-                        licenseResponse.valid ? 'text-emerald-300' : 'text-rose-300'
-                      }`}
-                    >
-                      {licenseResponse.valid ? 'TERMINAL AUTHORIZED' : 'VERIFICATION REJECTED'}
-                    </span>
-                    <span className="font-mono text-[9px] text-slate-400">
-                      {licenseResponse.tier || 'Standard'}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-xs text-slate-300">
-                    {licenseResponse.message || licenseResponse.error || licenseResponse.reason || 'No additional verification details were returned.'}
-                  </p>
-                  {licenseResponse.valid && (
-                    <div className="mt-3 grid grid-cols-2 gap-2 border-t border-white/[0.06] pt-3 font-mono text-[10px]">
-                      <div>
-                        <span className="text-slate-500">BOUND ACCOUNT:</span>
-                        <div className="text-slate-200">{licenseResponse.account ?? licenseResponse.mt5_account ?? '—'}</div>
-                      </div>
-                      <div>
-                        <span className="text-slate-500">LICENSE DURATION:</span>
-                        <div className="text-emerald-300">One-Time Lifetime</div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-5 sm:p-6">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-slate-400">MetaTrader 5 Setup Checklist</span>
-              <ol className="mt-3 space-y-3 text-xs leading-5 text-slate-300">
-                <li className="flex items-start gap-2.5">
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-400/10 font-mono text-[10px] text-emerald-300">1</span>
-                  <span>
-                    Download <strong className="text-slate-100">MacroLyncLicense.mqh</strong> and place it into your MT5 terminal folder: <code className="rounded bg-black/40 px-1 py-0.5 font-mono text-[10px] text-emerald-200">MQL5/Include/</code>.
-                  </span>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-400/10 font-mono text-[10px] text-emerald-300">2</span>
-                  <span>
-                    In MT5, open <strong className="text-slate-100">Tools → Options → Expert Advisors</strong>. Check <strong className="text-slate-100">Allow WebRequest for listed URL</strong>.
-                  </span>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-400/10 font-mono text-[10px] text-emerald-300">3</span>
-                  <div className="w-full">
-                    <span>Add this exact server URL to the allowlist:</span>
-                    <div className="mt-1.5 flex items-center justify-between rounded border border-white/[0.08] bg-black/30 px-2.5 py-1.5 font-mono text-[10px] text-emerald-300">
-                      <span>https://fidulync.vercel.app</span>
-                      <button
-                        type="button"
-                        onClick={() => void copyText('Server origin', 'https://fidulync.vercel.app')}
-                        className="text-slate-400 hover:text-white"
-                        title="Copy URL"
-                      >
-                        <BrandGlyph name="copy" size={12} />
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              </ol>
-            </div>
-          </div>
-        </section>
-
-        <div className="mt-8 flex items-center gap-2 border-t border-white/[0.07] pt-5 text-[10px] leading-5 text-slate-600">
+                <div className="mt-8 flex items-center gap-2 border-t border-white/[0.07] pt-5 text-[10px] leading-5 text-slate-600">
           <BrandGlyph name="shield" size={13} className="shrink-0" />
           <span>Internal research tooling. Trading is risky; every EA must retain its own account-level equity and drawdown protections.</span>
         </div>
