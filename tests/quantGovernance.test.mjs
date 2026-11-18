@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import quant from '../.quant-test/quantGovernance.js';
 
-const { evaluateRiskProposal, calculateBrokerAwareVolume, calculateTrueRangeAtr } = quant;
+const { evaluateRiskProposal, calculateBrokerAwareVolume, calculateTrueRangeAtr, isRiskAnchorFresh } = quant;
 
 function proposal(overrides = {}) {
   return {
@@ -240,4 +240,14 @@ test('closed-bar ATR requires sufficient valid history', () => {
   assert.ok(calculateTrueRangeAtr(bars, 14) > 0);
   assert.equal(calculateTrueRangeAtr(bars.slice(0, 14), 14), null);
   assert.equal(calculateTrueRangeAtr([{ high: 1, low: 2, close: 1 }], 2), null);
+});
+
+
+test('risk anchors must be fresh and synchronized with the account snapshot', () => {
+  const now = Date.UTC(2026, 10, 18, 12, 0, 0);
+  const iso = (offset) => new Date(now + offset).toISOString();
+  assert.equal(isRiskAnchorFresh(iso(-1000), iso(-1000), iso(-1500), now), true);
+  assert.equal(isRiskAnchorFresh(iso(-31_000), iso(-1000), iso(-1000), now), false);
+  assert.equal(isRiskAnchorFresh(iso(1000), iso(-1000), iso(-1000), now), false);
+  assert.equal(isRiskAnchorFresh(iso(-1000), iso(-1000), iso(-10_000), now), false);
 });
