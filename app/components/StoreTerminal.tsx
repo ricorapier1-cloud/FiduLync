@@ -3,18 +3,12 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import BrandGlyph from '@/components/BrandGlyph';
-import LiveAccountMonitor from '@/components/LiveAccountMonitor';
-import type { HeartbeatRecord } from '@/lib/eaHeartbeat';
 import { getCurrencyStrengthIndex, type getLiquiditySession } from '@/lib/currencyStrength';
-import type { TradeExpectancy } from '@/lib/tradeLedger';
 import type { MacroSnapshot } from '@/types/macro';
 
 type StoreTerminalProps = {
-  initialFleet: { configured: boolean; heartbeats: HeartbeatRecord[] };
-  telemetryError: string;
   bridgeSource: string;
   initialSnapshot: MacroSnapshot;
-  initialTradeExpectancy: TradeExpectancy;
   session: ReturnType<typeof getLiquiditySession>;
 };
 
@@ -87,7 +81,7 @@ function isSignalResult(value: unknown): value is SignalResult {
     && typeof result.timestamp_utc === 'string';
 }
 
-export default function StoreTerminal({ initialFleet, telemetryError, bridgeSource, initialSnapshot, initialTradeExpectancy, session }: StoreTerminalProps) {
+export default function StoreTerminal({ bridgeSource, initialSnapshot, session }: StoreTerminalProps) {
   const router = useRouter();
   const [symbol, setSymbol] = useState('EURUSD');
   const endpoint = useSyncExternalStore(subscribeToOrigin, getBrowserOrigin, getServerOrigin);
@@ -195,22 +189,6 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
           <p className="mt-3 text-[9px] leading-4 text-slate-500">CSI is a relative policy/real-rate model adjusted for available COT data, not a price-return index.</p>
         </section>
 
-        <section className="mt-8 rounded-xl border border-white/[0.08] bg-[#0c1016] p-4 sm:p-5" aria-label="Fleet telemetry privacy">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="font-mono text-[9px] tracking-[0.17em] text-slate-500">01 / VPS TELEMETRY</div>
-              <h2 className="mt-1 text-lg font-semibold">Personal terminal privacy</h2>
-              <p className="mt-1 text-xs text-slate-400">This workspace is intended for the owner's connected MT5 terminals. Review installation identity and access controls before sharing telemetry.</p>
-            </div>
-            <div className="shrink-0 text-right font-mono text-[9px] text-slate-500">
-              <div>{initialFleet.heartbeats.length} RECENT NODES</div>
-              <div>{telemetryError || (initialFleet.configured ? 'TELEMETRY CONNECTED' : 'TELEMETRY OFFLINE')}</div>
-            </div>
-          </div>
-        </section>
-
-        <LiveAccountMonitor />
-
         <section className="mt-11" aria-labelledby="personal-library-heading">
           <div className="mb-4">
             <div className="font-mono text-[9px] tracking-[0.17em] text-emerald-400">02 / PERSONAL EA LIBRARY</div>
@@ -296,61 +274,6 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
           </div>
         </section>
 
-        <section className="mt-11" aria-labelledby="expectancy-heading">
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <div className="font-mono text-[9px] tracking-[0.17em] text-slate-500">05 / CLOSED-TRADE LEDGER</div>
-              <h2 id="expectancy-heading" className="mt-1 text-lg font-semibold">Live Strategy Expectancy &amp; Risk Metrics</h2>
-            </div>
-            <div className="font-mono text-[9px] text-slate-500">
-              {initialTradeExpectancy.configured ? 'UPSTASH REDIS' : 'IN-PROCESS FALLBACK'} · {initialTradeExpectancy.total_trades} CLOSED
-            </div>
-          </div>
-          <div className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-4 sm:p-5">
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-              <ExpectancyMetric label="WIN RATE" value={initialTradeExpectancy.win_rate_pct === null ? '—' : `${initialTradeExpectancy.win_rate_pct.toFixed(1)}%`} />
-              <ExpectancyMetric label="PROFIT FACTOR" value={initialTradeExpectancy.profit_factor === null
-                ? initialTradeExpectancy.total_trades > 0 && (initialTradeExpectancy.win_rate_pct ?? 0) > 0 ? '∞' : '—'
-                : initialTradeExpectancy.profit_factor.toFixed(2)} />
-              <ExpectancyMetric label="AVERAGE R" value={initialTradeExpectancy.average_r_multiple === null ? '—' : `${initialTradeExpectancy.average_r_multiple.toFixed(2)}R`} />
-              <ExpectancyMetric label="MAX DRAWDOWN" value={initialTradeExpectancy.max_drawdown_pct === null ? '—' : `${initialTradeExpectancy.max_drawdown_pct.toFixed(2)}%`} />
-              <ExpectancyMetric label="SAMPLE SIZE" value={String(initialTradeExpectancy.total_trades)} />
-            </div>
-            <p className="mt-3 text-[9px] leading-4 text-slate-500">Drawdown is measured against the closed-trade cumulative P&amp;L peak; account-equity drawdown requires an account balance baseline.</p>
-            <div className="mt-5 border-t border-white/[0.07] pt-4">
-              <h3 className="font-mono text-[9px] tracking-[0.15em] text-slate-500">RECENT CLOSED TRADES</h3>
-              {initialTradeExpectancy.recent_closed_trades.length === 0 ? (
-                <p className="mt-3 text-xs text-slate-500">No closed trades have been reported.</p>
-              ) : (
-                <div className="mt-3 overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-left font-mono text-[9px]">
-                    <thead className="text-slate-600"><tr>
-                      <th className="pb-2 pr-3 font-normal">CLOSED UTC</th>
-                      <th className="pb-2 pr-3 font-normal">SYMBOL</th>
-                      <th className="pb-2 pr-3 font-normal">DIRECTION</th>
-                      <th className="pb-2 pr-3 font-normal">P&amp;L USD</th>
-                      <th className="pb-2 pr-3 font-normal">R</th>
-                      <th className="pb-2 font-normal">REGIME</th>
-                    </tr></thead>
-                    <tbody className="divide-y divide-white/[0.05]">
-                      {initialTradeExpectancy.recent_closed_trades.map((trade) => (
-                        <tr key={`${trade.symbol}-${trade.ticket}`} className="text-slate-300">
-                          <td className="py-2 pr-3 text-slate-500">{new Date(trade.closed_at_utc).toLocaleString('en-GB', { timeZone: 'UTC', dateStyle: 'short', timeStyle: 'short' })}</td>
-                          <td className="py-2 pr-3">{trade.symbol}</td>
-                          <td className="py-2 pr-3">{trade.direction}</td>
-                          <td className={`py-2 pr-3 ${trade.profit_usd >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{trade.profit_usd.toFixed(2)}</td>
-                          <td className="py-2 pr-3">{trade.r_multiple.toFixed(2)}R</td>
-                          <td className="py-2">{trade.regime}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-
         <section className="mt-11 rounded-xl border border-white/[0.08] bg-[#0c1016] p-5 sm:p-6" aria-labelledby="mt5-personal-setup-heading">
           <div className="font-mono text-[9px] tracking-[0.17em] text-slate-500">05 / PERSONAL MT5 ONBOARDING</div>
           <h2 id="mt5-personal-setup-heading" className="mt-1 text-lg font-semibold">Connect your own MT5 terminal when ready</h2>
@@ -420,9 +343,3 @@ function Metric({ label, value }: { label: string; value: string }) {
   return <div><div className="font-mono text-[8px] text-slate-600">{label}</div><div className="mt-1 text-slate-200">{value}</div></div>;
 }
 
-function ExpectancyMetric({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-md border border-white/[0.06] bg-black/20 px-3 py-3">
-    <div className="font-mono text-[8px] tracking-wide text-slate-600">{label}</div>
-    <div className="mt-2 font-mono text-sm text-slate-100">{value}</div>
-  </div>;
-}
