@@ -2,7 +2,7 @@
 
 export function WhatsAppSupportButton() {
   const defaultMessage = encodeURIComponent(
-    'Hello AlgoLync Desk, I have an inquiry regarding MacroLync telemetry, EA license provisioning, and MT5 integration.'
+    'Hello, I need help with my FiduLync Personal Quant workspace and MT5 research bridge.'
   );
 
   return (
@@ -10,8 +10,8 @@ export function WhatsAppSupportButton() {
       href={`https://wa.me/2348037212445?text=${defaultMessage}`}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label="Contact AlgoLync Support Desk on WhatsApp"
-      title="Chat with AlgoLync Support Desk (+2348037212445)"
+      aria-label="Contact FiduLync support on WhatsApp"
+      title="Chat with FiduLync support (+2348037212445)"
       className="fixed bottom-20 sm:bottom-6 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full border border-emerald-400/40 bg-[#061611]/95 text-emerald-400 shadow-xl shadow-black/80 backdrop-blur-md transition-all duration-200 hover:scale-110 hover:border-emerald-400 hover:bg-emerald-500 hover:text-black focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
     >
       <span className="absolute -top-1 -right-1 flex h-3 w-3">
