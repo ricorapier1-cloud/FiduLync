@@ -48,8 +48,6 @@ export type RiskProposal = {
   regime: GovernanceRegime;
   marketDataHealth: DataHealth;
   macroDataHealth: DataHealth;
-  modelValidated: boolean;
-  executionQualityVerified: boolean;
   newsLockout: boolean;
   symbolSpec: BrokerSymbolSpecification;
 };
@@ -58,6 +56,8 @@ export type RiskPolicy = {
   /** Server-owned policy identifier; never accept this object from an EA/client. */
   policyVersion: string;
   executionEnabled: boolean;
+  modelValidated: boolean;
+  executionQualityVerified: boolean;
   maxPerTradeRiskPct: number;
   maxPortfolioRiskPct: number;
   maxDailyDrawdownPct: number;
@@ -183,8 +183,8 @@ export function evaluateRiskProposal(p: RiskProposal, policy: RiskPolicy, now = 
   if (blockers.length) return result('ABSTAIN');
 
   if (!policy.executionEnabled) blockers.push('EXECUTION_NOT_ENABLED_BY_OWNER');
-  if (!p.modelValidated) blockers.push('MODEL_NOT_OUT_OF_SAMPLE_VALIDATED');
-  if (!p.executionQualityVerified) blockers.push('EXECUTION_QUALITY_NOT_VERIFIED');
+  if (!policy.modelValidated) blockers.push('MODEL_NOT_OUT_OF_SAMPLE_VALIDATED');
+  if (!policy.executionQualityVerified) blockers.push('EXECUTION_QUALITY_NOT_VERIFIED');
   if (!p.symbolSpec.verified) blockers.push('BROKER_SYMBOL_SPEC_NOT_VERIFIED');
   if (p.marketDataHealth !== 'LIVE') blockers.push('MARKET_DATA_NOT_LIVE');
   if (p.macroDataHealth !== 'LIVE') blockers.push('MACRO_DATA_NOT_LIVE');
