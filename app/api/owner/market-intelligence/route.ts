@@ -159,9 +159,9 @@ export async function GET(request: Request) {
         verified: blockers.length === 0,
         status: blockers.length === 0 ? 'VERIFIED' : 'BLOCKED',
         blockers,
-        policy_rate_diff_bps: quote ? Math.round(policyDiff * 100) : null,
-        real_yield_diff_bps: quote ? Math.round(realYieldDiff * 100) : null,
-        cot_position_diff: Math.round((baseCot?.percentile ?? 50) - (quoteCot?.percentile ?? 50)),
+        policy_rate_diff_bps: policyVerified && quote ? Math.round(policyDiff * 100) : null,
+        real_yield_diff_bps: policyVerified && quote ? Math.round(realYieldDiff * 100) : null,
+        cot_position_diff: cotFresh ? Math.round((baseCot?.percentile ?? 50) - (quoteCot?.percentile ?? 50)) : null,
         upcoming_events: relevantEvents.length,
         high_impact_news_lockout: relevantEvents.some((event) => event.impact === 'High'
           && Math.abs(Date.parse(event.scheduledAt) - Date.now()) <= 30 * 60_000),
