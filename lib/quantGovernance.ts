@@ -150,6 +150,12 @@ function validateProposalShape(p: RiskProposal, ctx: RiskContext, policy: RiskPo
     policy.maxHighWaterDrawdownPct, policy.maxMarginUsagePct, policy.maxSpreadPoints,
     policy.maxQuoteAgeMs, policy.maxConsecutiveLosses, policy.rewardRiskMinimum];
   if (!required.every(Number.isFinite)) issues.push('NON_FINITE_OR_MISSING_NUMERIC_INPUT');
+  if (!finitePositive(p.entryPrice) || !finitePositive(p.stopLoss) || !finitePositive(p.takeProfit)
+    || p.requestedRiskPct > 100) issues.push('PROPOSAL_PRICE_OR_RISK_INVALID');
+  if (ctx.quoteAgeMs < 0 || ctx.spreadPoints < 0 || !Number.isInteger(ctx.consecutiveLosses)
+    || ctx.consecutiveLosses < 0 || typeof ctx.newsLockout !== 'boolean') {
+    issues.push('MARKET_OR_ACCOUNT_CONTEXT_INVALID');
+  }
   if (!finitePositive(ctx.equity) || !finitePositive(ctx.dailyStartEquity)
     || !finitePositive(ctx.weeklyStartEquity) || !finitePositive(ctx.highWaterMarkEquity)) {
     issues.push('ACCOUNT_EQUITY_STATE_INVALID');
@@ -159,12 +165,15 @@ function validateProposalShape(p: RiskProposal, ctx: RiskContext, policy: RiskPo
   if (!Number.isFinite(ctx.symbolSpec.stopLevelPoints) || ctx.symbolSpec.stopLevelPoints < 0
     || !finitePositive(ctx.symbolSpec.point)) issues.push('BROKER_STOP_METADATA_INVALID');
   if (ctx.freeMargin < 0 || ctx.usedMargin < 0 || ctx.estimatedMargin < 0 || ctx.currentOpenRiskCash < 0) issues.push('INVALID_ACCOUNT_EXPOSURE');
-  if (p.requestedRiskPct <= 0 || policy.maxPerTradeRiskPct <= 0
-    || policy.maxPortfolioRiskPct <= 0) issues.push('RISK_LIMITS_INVALID');
+  if (p.requestedRiskPct <= 0 || policy.maxPerTradeRiskPct <= 0 || policy.maxPerTradeRiskPct > 100
+    || policy.maxPortfolioRiskPct <= 0 || policy.maxPortfolioRiskPct > 100) issues.push('RISK_LIMITS_INVALID');
   if (policy.maxMarginUsagePct <= 0 || policy.maxMarginUsagePct > 100
-    || policy.maxDailyDrawdownPct <= 0 || policy.maxWeeklyDrawdownPct <= 0
-    || policy.maxHighWaterDrawdownPct <= 0 || policy.maxSpreadPoints <= 0
-    || policy.maxQuoteAgeMs <= 0 || policy.rewardRiskMinimum <= 0) {
+    || policy.maxDailyDrawdownPct <= 0 || policy.maxDailyDrawdownPct > 100
+    || policy.maxWeeklyDrawdownPct <= 0 || policy.maxWeeklyDrawdownPct > 100
+    || policy.maxHighWaterDrawdownPct <= 0 || policy.maxHighWaterDrawdownPct > 100
+    || policy.maxSpreadPoints <= 0 || policy.maxQuoteAgeMs <= 0
+    || !Number.isInteger(policy.maxConsecutiveLosses) || policy.maxConsecutiveLosses <= 0
+    || policy.rewardRiskMinimum <= 0) {
     issues.push('PROTECTIVE_LIMITS_INVALID');
   }
   return issues;
