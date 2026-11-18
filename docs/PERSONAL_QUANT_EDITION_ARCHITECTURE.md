@@ -286,3 +286,13 @@ This is a pure governance foundation only. It is not yet wired into the dashboar
 - Added broker loss-side and profit-side tick-value fields to the MT5 quote schema. The publisher transmits the broker's loss-side tick value, ingestion validates it, and supervisor sizing now uses the loss-side value rather than the generic tick value. Existing rows remain nullable and therefore fail closed until refreshed by the updated publisher.
 - Added closed-bar H1 ATR calculation and a volatility-relative spread gate (12% of ATR by default), in addition to the absolute broker spread ceiling. The supervisor requires 15 closed H1 candles for the ATR calculation; unavailable history forces ABSTAIN.
 - Added unit coverage for ATR history validation and abnormal spread relative to ATR. These changes have not yet passed the complete CI workflow or a live MT5 broker test.
+
+
+## Evidence and portfolio-risk readiness — 2026-11-18 (latest)
+- Added protected Supabase evidence stores for MT5 open-position snapshots, model-version validation records, and execution-quality events. RLS is enabled and browser-role privileges are revoked; these tables are service-role only.
+- Execution-quality events are append-only. The model registry requires dataset/code fingerprints and reviewer metadata before a record can enter APPROVED state. The existence of a registry is not evidence that any model is validated; no model has been approved by this change.
+- The position snapshot table is a storage foundation only. A complete position publisher, atomic snapshot lifecycle, account-currency conversion graph and portfolio concentration/stress calculator are still required before currency exposure can be treated as verified.
+- Corrected MT5 open-position stop-risk calculation to use `trade_tick_value_loss`. If loss-side tick value, stop-loss, price or volume is missing, the account open-risk figure is marked unverified and the supervisor must not treat it as safe.
+- Owner operations now distinguishes configured-but-empty model/execution evidence from connected/verified telemetry. Position and execution evidence remain explicitly pending terminal data.
+- These schema changes were applied to the connected Supabase project and verified by querying `information_schema.tables`. The security advisor continues to report service-role-only RLS tables without policies; these are intentionally not exposed to browser roles. Leaked-password protection and owner step-up authentication remain unresolved dashboard/auth configuration items.
+- The newest Git branch commits are being built as Vercel preview deployments. They are not considered production until a READY preview passes route/runtime checks and the exact approved commit is promoted to the production domain.
