@@ -29,12 +29,6 @@ export function PaystackCheckout({
   const [licenseKey, setLicenseKey] = useState('');
 
   useEffect(() => {
-    setSlug(selectedEaSlug);
-    setCycle(selectedBillingCycle);
-    setCurrency(selectedCurrency);
-  }, [selectedEaSlug, selectedBillingCycle, selectedCurrency]);
-
-  useEffect(() => {
     let active = true;
     fetch('/api/v1/products', { cache: 'no-store' })
       .then(async (response) => {
@@ -50,7 +44,6 @@ export function PaystackCheckout({
     const reference = new URLSearchParams(window.location.search).get('ref');
     if (!reference) return;
     let active = true;
-    setBusy(true); setError('');
     fetch('/api/v1/verify-payment?reference=' + encodeURIComponent(reference), { cache: 'no-store' })
       .then(async (response) => {
         const data = await response.json();
