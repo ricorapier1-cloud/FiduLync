@@ -4,6 +4,23 @@ import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
+type LicenseRecord = {
+  license_key: string;
+  status: string;
+  expires_at: string | null;
+  max_live_slots: number | null;
+  max_demo_slots: number | null;
+};
+
+type BoundAccountRecord = {
+  id?: string;
+  account_number: number | string;
+  account_type: 'LIVE' | 'DEMO';
+  broker_server?: string | null;
+  rebind_cooldown_until?: string | null;
+  created_at?: string;
+};
+
 export async function GET(req: Request) {
   const ip = getClientIp(req);
   if (!checkRateLimit(ip, 30)) {
@@ -30,7 +47,7 @@ export async function GET(req: Request) {
 
   try {
     // 1. Fetch license
-    const licenses = await supabaseRead<any[]>('licenses', `license_key=eq.${encodeURIComponent(licenseKey)}&select=license_key,status,expires_at,max_live_slots,max_demo_slots`);
+    const licenses = await supabaseRead<LicenseRecord[]>('licenses', `license_key=eq.${encodeURIComponent(licenseKey)}&select=license_key,status,expires_at,max_live_slots,max_demo_slots`);
     if (!licenses || licenses.length === 0) {
       return NextResponse.json({ error: 'License key not found' }, { status: 404 });
     }
@@ -89,7 +106,7 @@ export async function POST(req: Request) {
     }
 
     // 1. Check license validity
-    const licenses = await supabaseRead<any[]>('licenses', `license_key=eq.${encodeURIComponent(licenseKey)}&select=license_key,status,expires_at,max_live_slots,max_demo_slots`);
+    const licenses = await supabaseRead<LicenseRecord[]>('licenses', `license_key=eq.${encodeURIComponent(licenseKey)}&select=license_key,status,expires_at,max_live_slots,max_demo_slots`);
     if (!licenses || licenses.length === 0) {
       return NextResponse.json({ error: 'License key not found' }, { status: 404 });
     }
