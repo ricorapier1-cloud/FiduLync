@@ -43,6 +43,7 @@ DEFAULT_SYMBOL_MAP = {
     "USDCAD": "USDCAD",
     "AUDUSD": "AUDUSD",
     "NZDUSD": "NZDUSD",
+    "EURJPY": "EURJPY",
     "XAUUSD": "XAUUSD",
 }
 TIMEFRAMES = {
