@@ -217,8 +217,9 @@ export default function StoreTerminal({ bridgeSource, initialSnapshot, session }
               <div className="mt-4 rounded-lg border border-white/[0.08] bg-black/20 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="font-mono text-xs text-slate-300">{signal.symbol} · {signal.regime}</div>
-                  <span className={`rounded border px-2 py-1 font-mono text-[9px] ${signal.safe_to_trade ? 'border-emerald-300/20 text-emerald-300' : 'border-amber-300/20 text-amber-300'}`}>{signal.safe_to_trade ? 'TRADE PERMITTED' : 'DEFENSIVE HOLD'}</span>
+                  <span className={`rounded border px-2 py-1 font-mono text-[9px] ${signal.safe_to_trade ? 'border-emerald-300/20 text-emerald-300' : 'border-amber-300/20 text-amber-300'}`}>{signal.safe_to_trade ? 'RISK GATES PASSED' : 'SUPERVISORY HOLD'}</span>
                 </div>
+                <p className="mt-2 text-[10px] leading-5 text-slate-500">Research readiness only — this status is not an order approval. The EA supervisor must independently validate the authenticated proposal, current broker quote, account risk and local protections. FiduLync does not place orders.</p>
                 <div className="mt-4 grid grid-cols-2 gap-3 text-[10px]">
                   <Metric label="BIAS" value={`${signal.bias} · ${signal.confluence_score}`} />
                   <Metric label="NEWS LOCKOUT" value={signal.news_lockout ? 'ACTIVE' : 'CLEAR'} />
@@ -235,7 +236,7 @@ export default function StoreTerminal({ bridgeSource, initialSnapshot, session }
                   <Metric label="ATR TARGET" value={signal.atr_tp_pips === null ? '425 bps (G8)' : `${signal.atr_tp_pips} pips`} />
                 </div>
                 {!signal.safe_to_trade && <div className="mt-3 rounded border border-amber-300/15 bg-amber-300/5 p-3">
-                  <p className="font-mono text-[9px] tracking-wide text-amber-200">EXECUTION BLOCKERS</p>
+                  <p className="font-mono text-[9px] tracking-wide text-amber-200">SUPERVISORY GATE BLOCKERS</p>
                   <p className="mt-1 text-[10px] leading-5 text-slate-300">{signal.execution_blockers.join(' · ') || 'Execution permission is not enabled.'}</p>
                 </div>}
               </div>
