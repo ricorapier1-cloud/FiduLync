@@ -56,7 +56,7 @@ export default function TermsPage() {
               MacroLync and AlgoLync operate exclusively as quantitative software vendors and macroeconomic research intelligence providers. None of the content, currency bias scores, regime indicators, or API endpoints constitute personal financial, tax, or investment advice.
             </p>
             <p className="mt-2">
-              All trading decisions remain solely at your own discretion and risk. MacroLync and AlgoLync do not act as a broker, custodian, portfolio manager, or registered financial adviser.
+              All trading decisions remain solely at your own discretion and risk. MacroLync and AlgoLync do not act as a broker, custodian, portfolio manager, or registered financial adviser. FiduLync does not receive, hold, manage or transfer customer trading capital or third-party funds. Customers deposit and withdraw trading funds directly with their own brokers.
             </p>
           </section>
 
