@@ -1,16 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import BrandGlyph, { type BrandGlyphName } from '@/components/BrandGlyph';
 import WhatsAppSupportButton from '@/components/WhatsAppSupportButton';
 import PlatformFooter from '@/components/PlatformFooter';
 
+const ownerSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const ownerSupabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const ownerSupabase = ownerSupabaseUrl && ownerSupabaseKey
+  ? createClient(ownerSupabaseUrl, ownerSupabaseKey, { auth: { persistSession: true, autoRefreshToken: true } })
+  : null;
+
 const links = [
   { href: '/', label: 'MacroLync', icon: 'shield' },
   { href: '/store', label: 'AlgoLync Vault', icon: 'chart' },
-  { href: '/account', label: 'My License', icon: 'shield' },
+  { href: '/portal', label: 'My License', icon: 'shield' },
   { href: '/faq', label: 'FAQ', icon: 'activity' },
   { href: '/terms', label: 'Terms & Risk', icon: 'shield-alert' },
   { href: '/owner', label: 'Owner Console', icon: 'shield' },
@@ -134,7 +141,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
 
       {!isHome && (
         <nav className="mobile-tabbar" aria-label="Bottom navigation">
-          {links.map(({ href, label, icon }) => (
+          {visibleLinks.map(({ href, label, icon }) => (
             <Link
               key={href}
               href={href}
