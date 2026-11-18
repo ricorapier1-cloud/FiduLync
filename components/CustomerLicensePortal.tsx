@@ -103,6 +103,7 @@ export default function CustomerLicensePortal() {
 
   const money = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const product = data?.license.ea_slug ? products.find((item) => item.slug === data.license.ea_slug) : undefined;
+  const displayStatus = data?.license.tier.toUpperCase() === 'DEMO_TRIAL' ? 'DEMO_TRIAL' : data?.license.status.toUpperCase() || 'UNKNOWN';
   const remaining = (value: string | null) => {
     if (!value) return '';
     const ms = Date.parse(value) - now;
@@ -135,7 +136,7 @@ export default function CustomerLicensePortal() {
     {data && <>
       <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          ['LICENSE STATUS', data.license.status.toUpperCase()],
+          ['LICENSE STATUS', displayStatus],
           ['EA PRODUCT', data.license.ea_slug || 'Unassigned'],
           ['MT5 LOGIN', data.selected_mt5_account ? String(data.selected_mt5_account) : 'Not bound yet'],
           ['NEXT BILLING / EXPIRY', data.license.expires_at ? new Date(data.license.expires_at).toLocaleDateString() : '—'],
