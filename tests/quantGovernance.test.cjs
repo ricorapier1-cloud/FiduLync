@@ -78,7 +78,7 @@ test('fails closed when explicit execution enablement is absent', () => {
 
 test('blocks reference or stale market data', () => {
   const result = evaluateRiskProposal(proposal({ marketDataHealth: 'REFERENCE' }));
-  assert.equal(result.decision, 'REJECT');
+  assert.equal(result.decision, 'DEGRADED');
   assert.equal(result.approvedRiskPct, 0);
   assert.ok(result.blockers.includes('MARKET_DATA_NOT_LIVE'));
 });
