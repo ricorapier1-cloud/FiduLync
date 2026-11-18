@@ -18,7 +18,7 @@ async function attachSubscriptionCode(data: Record<string, unknown>) {
 
   const intents = await supabaseRead<Array<{ reference: string }>>(
     'ea_subscription_intents',
-    `email=eq.${encodeURIComponent(email)}&paystack_plan_code=eq.${encodeURIComponent(planCode)}&status=eq.PENDING&select=reference&order=created_at.desc&limit=1`
+    `email=eq.${encodeURIComponent(email)}&paystack_plan_code=eq.${encodeURIComponent(planCode)}&select=reference&order=created_at.desc&limit=1`
   );
   const intent = intents?.[0];
   if (!intent) return;
