@@ -3,6 +3,23 @@ import assert from 'node:assert/strict';
 import quant from '../.quant-test/quantGovernance.js';
 const { evaluateRiskProposal, calculateBrokerAwareVolume } = quant;
 
+function policy(overrides = {}) {
+  return {
+    policyVersion: 'personal-v1',
+    maxPerTradeRiskPct: 0.5,
+    maxPortfolioRiskPct: 2,
+    maxDailyDrawdownPct: 4,
+    maxWeeklyDrawdownPct: 8,
+    maxHighWaterDrawdownPct: 15,
+    maxMarginUsagePct: 20,
+    maxSpreadPoints: 30,
+    maxQuoteAgeMs: 2000,
+    maxConsecutiveLosses: 3,
+    rewardRiskMinimum: 1.5,
+    ...overrides,
+  };
+}
+
 function proposal(overrides = {}) {
   return {
     requestId: 'req-001',
