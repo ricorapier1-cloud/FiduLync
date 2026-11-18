@@ -107,7 +107,7 @@ export async function getMacroSignal(symbol: string, now = Date.now(), installat
       const age = now - observedAt;
       return Number.isFinite(observedAt) && age >= -5 * 60_000 && age <= 14 * 24 * 60 * 60_000;
     });
-    const macroDataVerified = macroFresh && snapshot.source === 'provider'
+    const macroDataVerified = macroFresh && snapshot.source !== 'fallback'
       && snapshot.cotSource === 'provider'
       && snapshot.calendarSource === 'provider'
       && verifiedPolicyInputs
