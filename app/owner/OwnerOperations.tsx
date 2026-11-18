@@ -223,7 +223,8 @@ export default function OwnerOperations({ accessToken, email, role, onSignOut }:
           <ReadinessRow label="Connector secret storage" value="SHA-256 hash only" note="MT5 installation credentials are returned once and stored as hashes; individual installations can be revoked." tone="good" />
           <ReadinessRow label="Broker credentials" value="Not exposed" note="No MT5 account passwords or broker trading credentials are requested by the data-only connector." tone="good" />
           <ReadinessRow label="Dedicated audit ledger" value="Partial · decision evidence only" note="Risk-decision evidence is append-only. A complete owner-action audit trail for sign-ins, connector lifecycle, policy changes and privileged reads is still required." />
-          <ReadinessRow label="MFA / step-up verification" value="Email OTP only" note="The current owner sign-in uses passwordless email OTP. Passkeys or stronger step-up authentication are not yet configured." tone="warn" />
+          <ReadinessRow label="MFA / step-up verification" value="Email OTP only" note="The owner uses passwordless email verification. Passkeys or authenticator-based step-up are not yet configured." tone="warn" />
+          <ReadinessRow label="Auth email delivery" value="Pending end-to-end test" note="Supabase default SMTP may restrict delivery to project-team addresses. Production needs verified custom SMTP, a numeric OTP template using the Token variable, and /owner in the Auth redirect allowlist." tone="warn" />
           <ReadinessRow label="Dual approval" value="Not configured" note="For future high-impact actions, require independent approval rather than a single administrator self-approving." />
         </Panel>}
 
