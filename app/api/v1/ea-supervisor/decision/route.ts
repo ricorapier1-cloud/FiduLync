@@ -4,7 +4,7 @@ import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { supabaseInsert, supabaseRead } from '@/lib/supabaseAdmin';
 import { getPersonalRiskPolicy } from '@/lib/riskPolicy';
 import { getMacroSignal } from '@/lib/signalEngine';
-import { calculateBrokerAwareVolume, evaluateRiskProposal, type RiskContext, type RiskProposal } from '@/lib/quantGovernance';
+import { calculateBrokerAwareVolume, calculateTrueRangeAtr, evaluateRiskProposal, type RiskContext, type RiskProposal } from '@/lib/quantGovernance';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -140,7 +140,7 @@ export async function POST(request: Request) {
     const nonceRows = await supabaseInsert('mt5_ingest_nonces', { installation_id: installation.id, nonce });
     if (!nonceRows) return NextResponse.json({ error: 'Replay protection could not be stored.' }, { status: 503 });
 
-    const [accounts, quotes, states, macroSignal] = await Promise.all([
+    const [accounts, quotes, states, candles, macroSignal] = await Promise.all([
       supabaseRead<AccountSnapshot[]>(
         'mt5_account_snapshots',
         `select=account_login,currency,balance,equity,margin,free_margin,open_positions,open_risk_cash,open_risk_verified,captured_at,consecutive_losses,loss_streak_verified,history_synced_at&installation_id=eq.${installation.id}&account_login=eq.${accountLogin}&limit=1`,
@@ -153,6 +153,10 @@ export async function POST(request: Request) {
         'mt5_risk_state',
         `select=daily_start_equity,weekly_start_equity,high_water_mark_equity,updated_at,last_snapshot_at&installation_id=eq.${installation.id}&account_login=eq.${accountLogin}&limit=1`,
       ),
+      supabaseRead<Array<{ high: number; low: number; close: number }>>(
+        'mt5_market_candles',
+        `select=high,low,close&installation_id=eq.${installation.id}&symbol=eq.${encodeURIComponent(proposal.symbol)}&timeframe=eq.H1&order=bar_time.desc&limit=15`,
+      ),
       getMacroSignal(proposal.symbol, Date.now(), installation.id).catch((error) => {
         console.warn('EA supervisor macro context unavailable:', error);
         return null;
@@ -162,6 +166,8 @@ export async function POST(request: Request) {
     const account = accounts?.[0];
     const quote = quotes?.[0];
     const state = states?.[0];
+    const atrBars = candles?.slice().reverse() ?? [];
+    const atrPrice = calculateTrueRangeAtr(atrBars, 14);
     if (!account || !quote || !state) {
       const blockers = [!account ? 'ACCOUNT_SNAPSHOT_UNAVAILABLE' : !quote ? 'BROKER_QUOTE_UNAVAILABLE' : 'RISK_ANCHORS_UNAVAILABLE'];
       const evaluatedAt = new Date().toISOString();
@@ -234,6 +240,7 @@ export async function POST(request: Request) {
       ask: quote.ask,
       quoteAgeMs: Number.isFinite(quoteAgeMs) ? quoteAgeMs : Number.MAX_SAFE_INTEGER,
       spreadPoints: quote.spread_points,
+      atrPrice: atrPrice ?? Number.NaN,
       equity: account.equity,
       freeMargin: account.free_margin,
       usedMargin: account.margin,
@@ -254,6 +261,7 @@ export async function POST(request: Request) {
       unavailableBlockers.push('BROKER_SIZING_OR_MARGIN_CONTEXT_UNAVAILABLE');
     }
     if (!Number.isFinite(context.consecutiveLosses)) unavailableBlockers.push('LOSS_STREAK_CONTEXT_UNAVAILABLE');
+    if (!atrPrice || !Number.isFinite(atrPrice)) unavailableBlockers.push('VOLATILITY_CONTEXT_UNAVAILABLE');
     if (context.macroDataHealth !== 'LIVE') unavailableBlockers.push('MACRO_NEWS_CONTEXT_UNAVAILABLE');
     if (!macroSignal || macroSignal.market_data_source === 'unavailable') unavailableBlockers.push('TECHNICAL_MARKET_CONTEXT_UNAVAILABLE');
     if (snapshotAgeMs < 0 || snapshotAgeMs > 30_000) unavailableBlockers.push('ACCOUNT_SNAPSHOT_STALE');
