@@ -296,6 +296,9 @@ def build_position_snapshot(account: Any, positions_result: Any) -> dict[str, An
     """Build a complete point-in-time position set; None means do not publish."""
     if positions_result is None:
         return None
+    if len(positions_result) > 500:
+        print("WARNING: open-position count exceeds the 500-row snapshot limit; publishing risk telemetry without a complete position manifest.")
+        return None
     captured_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     rows: list[dict[str, Any]] = []
     for position in positions_result:
