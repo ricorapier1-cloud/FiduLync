@@ -75,7 +75,7 @@ export async function POST(request: Request) {
         || (snapshot.equity as number) <= 0
         || !Number.isSafeInteger(snapshot.open_positions) || (snapshot.open_positions as number) < 0
         || typeof snapshot.open_risk_verified !== 'boolean'
-        || (snapshot.consecutive_losses !== undefined && (!Number.isSafeInteger(snapshot.consecutive_losses) || Number(snapshot.consecutive_losses) < 0 || Number(snapshot.consecutive_losses) > 10000))
+        || (snapshot.consecutive_losses !== undefined && snapshot.consecutive_losses !== null && (!Number.isSafeInteger(snapshot.consecutive_losses) || Number(snapshot.consecutive_losses) < 0 || Number(snapshot.consecutive_losses) > 10000))
         || (snapshot.loss_streak_verified !== undefined && typeof snapshot.loss_streak_verified !== 'boolean')
         || (snapshot.history_synced_at !== undefined && snapshot.history_synced_at !== null && (typeof snapshot.history_synced_at !== 'string' || !validTime(snapshot.history_synced_at, false)))
         || (snapshot.loss_streak_verified === true && (!Number.isSafeInteger(snapshot.consecutive_losses) || typeof snapshot.history_synced_at !== 'string' || !validTime(snapshot.history_synced_at, false)))
