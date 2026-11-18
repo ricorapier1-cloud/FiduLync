@@ -26,6 +26,8 @@ jobs:
         run: |
           npm audit --json > /tmp/fidulync-npm-audit.json || true
           node -e "const r=require('/tmp/fidulync-npm-audit.json'); const v=r.vulnerabilities||{}; console.log('Dependency audit totals:', JSON.stringify(r.metadata?.vulnerabilities||{})); for (const [name,item] of Object.entries(v)) console.log(name, 'severity='+item.severity, 'direct='+item.isDirect, 'fixAvailable='+JSON.stringify(item.fixAvailable));"
+      - name: Enforce production dependency audit
+        run: npm audit --omit=dev --audit-level=high
       - name: TypeScript
         run: npx tsc --noEmit
       - name: Quant governance unit tests
