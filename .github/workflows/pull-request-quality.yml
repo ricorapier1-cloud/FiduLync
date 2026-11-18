@@ -3,6 +3,8 @@ name: Pull Request Quality Gate
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [feat/personal-quant-edition]
 
 permissions:
   contents: read
