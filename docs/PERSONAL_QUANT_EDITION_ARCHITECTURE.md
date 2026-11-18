@@ -31,7 +31,7 @@ Audit performed against the connected GitHub, Vercel and Supabase resources on 2
 - Supabase project: `iimlfvjoingcumqkvssk`; PostgreSQL 17.6; region `eu-central-1`; status `ACTIVE_HEALTHY`.
 
 ### Deployment finding
-The latest Vercel deployment inspected was READY, but its deployment target was null and the project metadata reported `live: false`. Its source branch was `feature/institutional-saas-marketplace-hardening`, not `main`. Therefore a successful preview build must not be described as a verified production release. Confirm the intended production branch, production target, aliases, access protection and runtime behavior before any release.
+The latest overall Vercel deployment inspected was READY but had target `null` (preview) and came from `feature/institutional-saas-marketplace-hardening`, not `main`. Separately, Vercel deployment history confirms a READY **production-target** deployment from `main` at commit `c3c2218adf9d89363457450352d0b4b1bcb0fc48` (deployment `dpl_DfdibmbCWQMxUTr71QaPkWF2XVqu`). Therefore a production deployment exists, but the newest overall preview is not production and must not be promoted blindly. The project metadata also reported `live: false`, which should be reconciled with deployment/domain status. Confirm the production alias, SSO/access protection, actual runtime behavior and expected owner access before changing release settings.
 
 ### Existing code and capabilities observed
 - Next.js 16.4.6, React 19.2.8, TypeScript 5, Supabase JS and Upstash Redis.
