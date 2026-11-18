@@ -4,7 +4,7 @@
 
 #include <FiduLync/QuantSupervisor.mqh>
 
-input string InpFiduLyncBaseUrl="https://fidulync.vercel.app";
+input string InpFiduLyncBaseUrl=""; // Set only to a deployment containing the supervisor API.
 input string InpInstallationId="";
 input string InpCanonicalSymbol=""; // Canonical publisher symbol when broker symbols have suffixes.
 input string InpPublisherToken="";
@@ -17,7 +17,7 @@ datetime LastBarTime=0;
 
 int OnInit()
 {
-   if(InpInstallationId=="" || InpPublisherToken=="")
+   if(InpFiduLyncBaseUrl=="" || InpInstallationId=="" || InpPublisherToken=="")
    {
       Print("FiduLync probe: enter the installation ID and publisher token from your private owner console.");
       return INIT_PARAMETERS_INCORRECT;
