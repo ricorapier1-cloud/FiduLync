@@ -46,7 +46,7 @@ export default function PersonalQuantGuidePage() {
             <li>From the Personal EA Lab, download both <a href="/downloads/FiduLync_MT5_Market_Publisher.py" className="text-emerald-300 underline">FiduLync_MT5_Market_Publisher.py</a> and <a href="/downloads/mt5_risk_state.py" className="text-emerald-300 underline">mt5_risk_state.py</a>. Save them in the same folder.</li>
             <li>Set the private token and the exact verified deployment URL in that Windows session. Do not point the publisher at production until the updated ingestion route has been deployed and verified.</li>
             <li>Set broker symbol suffix mappings if necessary. The default universe includes major FX pairs and XAUUSD.</li>
-            <li>Run the publisher. It sends broker quotes, closed H1/H4/D1 candles, account/margin snapshots and a loss-streak estimate derived from the terminal's available closed-deal history. It never sends orders.</li>
+            <li>Run the publisher. It sends broker quotes, closed H1/H4/D1 candles, account/margin snapshots and a loss-streak estimate derived from the terminal&apos;s available closed-deal history. It never sends orders.</li>
           </ol>
           <pre className="mt-4 overflow-x-auto rounded-lg border border-white/10 bg-black/40 p-4 text-xs leading-6 text-slate-300"><code>{`set FIDULYNC_PUBLISHER_TOKEN=YOUR_ONE_TIME_TOKEN
 set FIDULYNC_INGEST_URL=https://YOUR_VERIFIED_DEPLOYMENT/api/v1/market-data/ingest
