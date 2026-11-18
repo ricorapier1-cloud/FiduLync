@@ -36,8 +36,8 @@ type Intelligence = {
 type Props = { accessToken: string };
 
 function tone(value: string) {
-  if (['BULLISH', 'BEARISH', 'RESEARCH_READY'].includes(value)) return 'text-emerald-200 border-emerald-300/20 bg-emerald-300/10';
-  if (['MIXED', 'SPREAD_GUARD', 'STALE_OR_MISSING_FEED'].includes(value)) return 'text-amber-100 border-amber-300/20 bg-amber-300/10';
+  if (['BULLISH', 'BEARISH', 'RESEARCH_INPUTS_READY'].includes(value)) return 'text-emerald-200 border-emerald-300/20 bg-emerald-300/10';
+  if (['MIXED', 'SPREAD_GUARD', 'STALE_OR_MISSING_FEED', 'FUNDAMENTALS_BLOCKED'].includes(value)) return 'text-amber-100 border-amber-300/20 bg-amber-300/10';
   return 'text-slate-300 border-white/10 bg-white/[0.04]';
 }
 function label(value: string) { return value.replaceAll('_', ' ').toLowerCase(); }
