@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     }
 
     const origin = (process.env.NEXT_PUBLIC_APP_URL || 'https://fidulync.vercel.app').replace(/\\/+$/, '');
-    const reference = `ALGO_${randomBytes(12).toString('hex').toUpperCase()}`;
+    const reference = `ALGO-${randomBytes(12).toString('hex').toUpperCase()}`;
     const interval = cycle === 'ANNUAL' ? 'annually' : 'monthly';
     const planResponse = await fetch('https://api.paystack.co/plan', {
       method: 'POST',
