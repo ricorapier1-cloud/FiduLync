@@ -18,7 +18,7 @@ type AccountSnapshot = {
 };
 type Quote = {
   symbol: string; bid: number; ask: number; quote_time: string; spread_points: number;
-  point: number | null; tick_size: number | null; tick_value: number | null; contract_size: number | null;
+  point: number | null; tick_size: number | null; tick_value: number | null; tick_value_loss: number | null; tick_value_profit: number | null; contract_size: number | null;
   volume_min: number | null; volume_max: number | null; volume_step: number | null; stop_level_points: number | null;
   margin_per_lot_buy: number | null; margin_per_lot_sell: number | null;
 };
@@ -147,7 +147,7 @@ export async function POST(request: Request) {
       ),
       supabaseRead<Quote[]>(
         'mt5_market_quotes',
-        `select=symbol,bid,ask,quote_time,spread_points,point,tick_size,tick_value,contract_size,volume_min,volume_max,volume_step,stop_level_points,margin_per_lot_buy,margin_per_lot_sell&installation_id=eq.${installation.id}&symbol=eq.${encodeURIComponent(proposal.symbol)}&limit=1`,
+        `select=symbol,bid,ask,quote_time,spread_points,point,tick_size,tick_value,tick_value_loss,tick_value_profit,contract_size,volume_min,volume_max,volume_step,stop_level_points,margin_per_lot_buy,margin_per_lot_sell&installation_id=eq.${installation.id}&symbol=eq.${encodeURIComponent(proposal.symbol)}&limit=1`,
       ),
       supabaseRead<RiskState[]>(
         'mt5_risk_state',
@@ -197,14 +197,14 @@ export async function POST(request: Request) {
     const symbolSpec = {
       symbol: quote.symbol,
       tickSize: Number(quote.tick_size ?? 0),
-      tickValuePerLot: Number(quote.tick_value ?? 0),
+      tickValuePerLot: Number(quote.tick_value_loss ?? 0),
       volumeMin: Number(quote.volume_min ?? 0),
       volumeMax: Number(quote.volume_max ?? 0),
       volumeStep: Number(quote.volume_step ?? 0),
       contractSize: Number(quote.contract_size ?? 0),
       stopLevelPoints: Number(quote.stop_level_points ?? 0),
       point: Number(quote.point ?? 0),
-      verified: Number(quote.tick_size) > 0 && Number(quote.tick_value) > 0
+      verified: Number(quote.tick_size) > 0 && Number(quote.tick_value_loss) > 0
         && Number(quote.contract_size) > 0 && Number(quote.point) > 0
         && Number(quote.volume_min) > 0 && Number(quote.volume_max) >= Number(quote.volume_min)
         && Number(quote.volume_step) > 0 && Number(quote.stop_level_points) >= 0,
@@ -294,7 +294,8 @@ export async function POST(request: Request) {
         },
         quote: {
           bid: quote.bid, ask: quote.ask, spread_points: quote.spread_points,
-          quote_time: quote.quote_time, symbol_spec: symbolSpec,
+          quote_time: quote.quote_time, tick_value_loss: quote.tick_value_loss,
+          tick_value_profit: quote.tick_value_profit, symbol_spec: symbolSpec,
         },
         risk_anchors: {
           daily_start_equity: state.daily_start_equity, weekly_start_equity: state.weekly_start_equity,
