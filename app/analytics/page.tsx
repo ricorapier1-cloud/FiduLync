@@ -1,78 +1,58 @@
 import Link from 'next/link';
+import type { Metadata } from 'next';
 
-const REGIME_HISTORY = [
-  { quarter: '2026 Q3', regime: 'POLICY DIVERGENCE', topSpread: 'USD / JPY (+145)', winRate: '64.2%', profitFactor: '1.94', maxDd: '4.1%' },
-  { quarter: '2026 Q2', regime: 'CARRY COMPRESSION', topSpread: 'NOK / CHF (+108)', winRate: '61.8%', profitFactor: '1.78', maxDd: '4.8%' },
-  { quarter: '2026 Q1', regime: 'DISINFLATION PIVOT', topSpread: 'GBP / JPY (+122)', winRate: '66.0%', profitFactor: '2.11', maxDd: '3.6%' },
-  { quarter: '2025 Q4', regime: 'RATE HOLD PLATEAU', topSpread: 'AUD / CHF (+96)', winRate: '59.4%', profitFactor: '1.65', maxDd: '5.2%' },
+export const metadata: Metadata = {
+  title: 'Performance Lab',
+  description: 'Performance measurement framework for verified personal MT5 trade history.',
+};
+
+const metrics = [
+  ['Net expectancy', 'Average net result per trade after commission, swap and execution costs.'],
+  ['Profit factor', 'Gross profit divided by gross loss, with the sample size shown.'],
+  ['Drawdown', 'Peak-to-trough equity decline using a consistent equity series.'],
+  ['Sharpe / Sortino', 'Return quality adjusted for total and downside volatility.'],
+  ['MAE / MFE', 'Maximum adverse and favourable excursion for each closed trade.'],
+  ['Regime attribution', 'Performance split by symbol, timeframe, strategy and market regime.'],
 ];
 
-export default function AnalyticsPage() {
+export default function PerformanceLabPage() {
   return (
-    <main className="min-h-screen bg-[#030A08] text-emerald-50 px-4 py-10 pb-36">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-8 flex items-center justify-between">
-          <Link href="/" className="text-xs font-mono text-emerald-400 hover:underline">
-            ← BACK TO MACRO TERMINAL
-          </Link>
-          <Link href="/store" className="text-xs font-mono px-3 py-1.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20">
-            OPEN ALGOLYNX VAULT →
-          </Link>
-        </div>
-
-        <div className="mb-8">
-          <p className="text-xs font-mono text-emerald-400 tracking-widest mb-2">QUANTITATIVE VALIDATION / G10 REGIMES</p>
-          <h1 className="text-3xl font-bold tracking-tight mb-2">Regime History & Execution Telemetry</h1>
-          <p className="text-sm text-emerald-200/70">
-            Historical policy-divergence spread performance filtered by COT percentile extremes and rollover risk shields.
+    <main className="min-h-screen bg-[#030A08] px-4 py-10 pb-36 text-emerald-50">
+      <div className="mx-auto max-w-4xl">
+        <Link href="/" className="font-mono text-xs text-emerald-400 hover:underline">← BACK TO MACRO TERMINAL</Link>
+        <header className="mb-8 mt-8">
+          <p className="mb-2 font-mono text-xs tracking-widest text-emerald-400">PERFORMANCE LAB / EVIDENCE FIRST</p>
+          <h1 className="mb-3 text-3xl font-bold tracking-tight">Measure what your account actually did.</h1>
+          <p className="max-w-3xl text-sm leading-6 text-emerald-100/70">
+            Verified performance reporting is not populated yet. The old illustrative win-rate and profit-factor figures have been removed;
+            no historical result will be displayed until it is derived from authenticated, account-isolated MT5 trade records with costs.
           </p>
-        </div>
+        </header>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-          <div className="bg-[#06120E] border border-emerald-500/20 rounded-lg p-4">
-            <p className="text-[10px] font-mono text-emerald-400/70">AGGREGATE PF</p>
-            <p className="text-2xl font-mono font-bold text-emerald-400 mt-1">1.87</p>
-          </div>
-          <div className="bg-[#06120E] border border-emerald-500/20 rounded-lg p-4">
-            <p className="text-[10px] font-mono text-emerald-400/70">MEAN WIN RATE</p>
-            <p className="text-2xl font-mono font-bold text-white mt-1">62.8%</p>
-          </div>
-          <div className="bg-[#06120E] border border-emerald-500/20 rounded-lg p-4">
-            <p className="text-[10px] font-mono text-emerald-400/70">PEAK DRAWDOWN</p>
-            <p className="text-2xl font-mono font-bold text-emerald-300 mt-1">5.2%</p>
-          </div>
-          <div className="bg-[#06120E] border border-emerald-500/20 rounded-lg p-4">
-            <p className="text-[10px] font-mono text-emerald-400/70">POLICY INPUTS</p>
-            <p className="text-2xl font-mono font-bold text-emerald-400 mt-1">11 / 11</p>
-          </div>
-        </div>
+        <section className="rounded-xl border border-amber-300/20 bg-amber-300/[0.04] p-5">
+          <div className="font-mono text-[10px] tracking-widest text-amber-200">DATA STATUS / NOT YET VALIDATED</div>
+          <h2 className="mt-2 text-lg font-semibold text-white">Awaiting verified owner trade history</h2>
+          <p className="mt-2 text-xs leading-5 text-emerald-100/70">
+            Connect and verify your own MT5 terminal in the restricted Owner Console. Once the ingestion and account-isolation checks pass,
+            the Performance Lab can calculate metrics from real closed trades. Until then, blank is more accurate than a fabricated score.
+          </p>
+          <Link href="/owner" className="mt-4 inline-flex rounded-lg border border-emerald-300/30 px-4 py-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-300/10">
+            Open Owner Console
+          </Link>
+        </section>
 
-        <div className="bg-[#06120E] border border-emerald-500/25 rounded-xl overflow-x-auto">
-          <table className="w-full text-left font-mono text-xs">
-            <thead className="border-b border-emerald-500/20 text-emerald-400/80 bg-black/30">
-              <tr>
-                <th className="p-3.5">WINDOW</th>
-                <th className="p-3.5">DOMINANT REGIME</th>
-                <th className="p-3.5">TOP CSI SPREAD</th>
-                <th className="p-3.5">WIN RATE</th>
-                <th className="p-3.5">PROFIT FACTOR</th>
-                <th className="p-3.5">MAX DD</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-emerald-500/10">
-              {REGIME_HISTORY.map((row) => (
-                <tr key={row.quarter} className="hover:bg-emerald-500/5">
-                  <td className="p-3.5 font-bold text-emerald-300">{row.quarter}</td>
-                  <td className="p-3.5">{row.regime}</td>
-                  <td className="p-3.5 text-emerald-400">{row.topSpread}</td>
-                  <td className="p-3.5">{row.winRate}</td>
-                  <td className="p-3.5 font-bold">{row.profitFactor}</td>
-                  <td className="p-3.5 text-emerald-200/70">{row.maxDd}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <section className="mt-8 grid gap-3 sm:grid-cols-2">
+          {metrics.map(([name, description]) => (
+            <article key={name} className="rounded-lg border border-emerald-500/15 bg-[#06120E] p-4">
+              <h3 className="font-mono text-xs font-semibold text-emerald-300">{name}</h3>
+              <p className="mt-2 text-xs leading-5 text-emerald-100/65">{description}</p>
+            </article>
+          ))}
+        </section>
+        <p className="mt-6 text-[10px] leading-5 text-emerald-100/45">
+          All future reports must show trade count, date range, broker/account scope, data completeness, and whether results are gross or net of costs.
+          Historical backtests and live account results must remain separate.
+        </p>
       </div>
     </main>
   );
