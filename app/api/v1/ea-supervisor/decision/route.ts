@@ -122,7 +122,18 @@ export async function POST(request: Request) {
       const audit = await supabaseInsert('mt5_risk_decisions', {
         installation_id: installation.id, account_login: accountLogin,
         request_id: proposal.requestId, symbol: proposal.symbol, decision: 'ABSTAIN',
-        approved_risk_pct: 0, approved_volume: 0, blockers, evaluated_at: evaluatedAt,
+        policy_version: getPersonalRiskPolicy().policyVersion,
+        approved_risk_pct: 0, approved_volume: 0, estimated_risk_cash: 0, estimated_reward_risk: null,
+        blockers, evaluated_at: evaluatedAt,
+        proposal: {
+          request_id: proposal.requestId, installation_id: proposal.installationId, symbol: proposal.symbol,
+          side: proposal.side, entry_price: proposal.entryPrice, stop_loss: proposal.stopLoss,
+          take_profit: proposal.takeProfit, requested_risk_pct: proposal.requestedRiskPct,
+        },
+        context_snapshot: {
+          account_snapshot_available: Boolean(account), quote_available: Boolean(quote),
+          risk_anchors_available: Boolean(state),
+        },
       });
       if (!audit) throw new Error('Risk abstention audit could not be persisted.');
       return NextResponse.json(abstention, { status: 200, headers: { 'Cache-Control': 'no-store' } });
@@ -202,8 +213,38 @@ export async function POST(request: Request) {
     const audit = await supabaseInsert('mt5_risk_decisions', {
       installation_id: installation.id, account_login: accountLogin,
       request_id: proposal.requestId, symbol: proposal.symbol, decision: result.decision,
+      policy_version: policy.policyVersion,
       approved_risk_pct: result.approvedRiskPct, approved_volume: result.approvedVolume,
+      estimated_risk_cash: result.estimatedRiskCash, estimated_reward_risk: result.estimatedRewardRisk,
       blockers: result.blockers, evaluated_at: result.evaluatedAt,
+      proposal: {
+        request_id: proposal.requestId, installation_id: proposal.installationId, symbol: proposal.symbol,
+        side: proposal.side, entry_price: proposal.entryPrice, stop_loss: proposal.stopLoss,
+        take_profit: proposal.takeProfit, requested_risk_pct: proposal.requestedRiskPct,
+      },
+      context_snapshot: {
+        account: {
+          currency: account.currency, balance: account.balance, equity: account.equity,
+          margin: account.margin, free_margin: account.free_margin, open_positions: account.open_positions,
+          open_risk_cash: account.open_risk_cash, open_risk_verified: account.open_risk_verified,
+          captured_at: account.captured_at,
+        },
+        quote: {
+          bid: quote.bid, ask: quote.ask, spread_points: quote.spread_points,
+          quote_time: quote.quote_time, symbol_spec: symbolSpec,
+        },
+        risk_anchors: {
+          daily_start_equity: state.daily_start_equity, weekly_start_equity: state.weekly_start_equity,
+          high_water_mark_equity: state.high_water_mark_equity,
+        },
+        calculated_margin: estimatedMargin,
+        macro: macroSignal ? {
+          regime: macroSignal.regime, news_lockout: macroSignal.news_lockout,
+          market_data_source: macroSignal.market_data_source,
+          execution_blockers: macroSignal.execution_blockers,
+          timestamp_utc: macroSignal.timestamp_utc,
+        } : null,
+      },
     });
     if (!audit) throw new Error('Risk decision audit could not be persisted.');
 
