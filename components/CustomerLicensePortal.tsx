@@ -93,10 +93,11 @@ export default function CustomerLicensePortal() {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Account slot could not be updated.');
-      setMessage('MT5 account slot updated. A 72-hour re-binding cooldown now applies to this slot.');
       setSelectedSeat(null); setNewLogin(''); setBrokerServer('');
       await loadSeats(license.trim());
       await load();
+      setMessage('MT5 account slot updated. The 72-hour re-binding cooldown is now active for this slot.');
+      setMessage('MT5 account slot updated. The 72-hour re-binding cooldown is now active for this slot.');
     } catch (e) { setError(e instanceof Error ? e.message : 'Seat binding failed.'); }
     finally { setBusy(false); }
   }
