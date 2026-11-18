@@ -67,3 +67,71 @@ export async function validateCustomerLicense(mt5Account: number, licenseKey: st
   }).toString());
   return seats.length === 1 && Number(seats[0].mt5_login) === mt5Account;
 }
+
+export type CustomerHeartbeat = {
+  mt5_account: number;
+  license_key: string;
+  ea_name: string;
+  balance: number;
+  equity: number;
+  floating_pnl: number;
+  drawdown_pct: number;
+  open_positions: number;
+  status: string;
+  updated_at?: string;
+};
+
+export async function saveCustomerHeartbeat(input: CustomerHeartbeat) {
+  await supabaseWrite('ea_heartbeats',
+    'on_conflict=mt5_account',
+    { ...input, updated_at: new Date().toISOString() },
+    'resolution=merge-duplicates,return=minimal'
+  );
+}
+
+export async function getCustomerHeartbeat(mt5Account: number, licenseKey: string) {
+  const query = new URLSearchParams({
+    select: 'mt5_account,ea_name,balance,equity,floating_pnl,drawdown_pct,open_positions,status,updated_at',
+    mt5_account: `eq.${mt5Account}`,
+    license_key: `eq.${licenseKey}`,
+    limit: '1',
+  });
+  const rows = await supabaseRows<Omit<CustomerHeartbeat, 'license_key'> & { updated_at: string }>('ea_heartbeats', query.toString());
+  if (!rows.length) return null;
+  const row = rows[0];
+  const heartbeatAge = Date.now() - Date.parse(row.updated_at);
+  const online = (row.status === 'RUNNING' || row.status === 'ONLINE')
+    && Number.isFinite(heartbeatAge) && heartbeatAge >= 0 && heartbeatAge <= 15 * 60_000;
+  return { ...row, connection_status: online ? 'ONLINE' as const : 'OFFLINE' as const };
+}
+
+export type CustomerTrade = {
+  mt5_account: number;
+  license_key: string;
+  ticket: string;
+  symbol: string;
+  direction: 'LONG' | 'SHORT';
+  entry_price: number;
+  exit_price: number;
+  profit_usd: number;
+  r_multiple: number;
+  confluence_score: number;
+  regime: string;
+  closed_at_utc: string;
+};
+
+export async function saveCustomerTrade(trade: CustomerTrade) {
+  await supabaseWrite('trade_ledger', 'on_conflict=mt5_account,ticket,symbol',
+    trade as unknown as Record<string, unknown>, 'resolution=ignore-duplicates,return=minimal');
+}
+
+export async function getCustomerTrades(mt5Account: number, licenseKey: string) {
+  const query = new URLSearchParams({
+    select: 'ticket,symbol,direction,entry_price,exit_price,profit_usd,r_multiple,confluence_score,regime,closed_at_utc',
+    mt5_account: `eq.${mt5Account}`,
+    license_key: `eq.${licenseKey}`,
+    order: 'closed_at_utc.desc',
+    limit: '20',
+  });
+  return supabaseRows<Omit<CustomerTrade, 'mt5_account' | 'license_key'>>( 'trade_ledger', query.toString());
+}
