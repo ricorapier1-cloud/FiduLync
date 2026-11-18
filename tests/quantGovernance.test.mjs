@@ -45,24 +45,12 @@ function proposal(overrides = {}) {
       point: 0.00001,
       verified: true,
     },
-    limits: {
-      maxPerTradeRiskPct: 0.5,
-      maxPortfolioRiskPct: 2,
-      maxDailyDrawdownPct: 4,
-      maxWeeklyDrawdownPct: 8,
-      maxHighWaterDrawdownPct: 15,
-      maxMarginUsagePct: 20,
-      maxSpreadPoints: 30,
-      maxQuoteAgeMs: 2000,
-      maxConsecutiveLosses: 3,
-      rewardRiskMinimum: 1.5,
-    },
     ...overrides,
   };
 }
 
 test('approves only a fully verified proposal and floors volume to broker step', () => {
-  const result = evaluateRiskProposal(proposal(), Date.UTC(2026, 10, 18));
+  const result = evaluateRiskProposal(proposal(), policy(), Date.UTC(2026, 10, 18));
   assert.equal(result.decision, 'APPROVE');
   assert.equal(result.approvedRiskPct, 0.5);
   assert.equal(result.approvedVolume, 0.25);
@@ -70,22 +58,29 @@ test('approves only a fully verified proposal and floors volume to broker step',
   assert.deepEqual(result.blockers, []);
 });
 
+test('server-owned policy caps requested risk even if the proposal asks for more', () => {
+  const result = evaluateRiskProposal(proposal({ requestedRiskPct: 5 }), policy());
+  assert.equal(result.decision, 'APPROVE');
+  assert.equal(result.approvedRiskPct, 0.5);
+  assert.equal(result.approvedVolume, 0.25);
+});
+
 test('fails closed when explicit execution enablement is absent', () => {
-  const result = evaluateRiskProposal(proposal({ explicitExecutionEnablement: false }));
+  const result = evaluateRiskProposal(proposal({ explicitExecutionEnablement: false }), policy());
   assert.equal(result.decision, 'REJECT');
   assert.equal(result.approvedVolume, 0);
   assert.ok(result.blockers.includes('EXECUTION_NOT_EXPLICITLY_ENABLED'));
 });
 
 test('blocks reference or stale market data', () => {
-  const result = evaluateRiskProposal(proposal({ marketDataHealth: 'REFERENCE' }));
+  const result = evaluateRiskProposal(proposal({ marketDataHealth: 'REFERENCE' }), policy());
   assert.equal(result.decision, 'DEGRADED');
   assert.equal(result.approvedRiskPct, 0);
   assert.ok(result.blockers.includes('MARKET_DATA_NOT_LIVE'));
 });
 
 test('blocks daily drawdown breach and does not issue volume', () => {
-  const result = evaluateRiskProposal(proposal({ equity: 9500 }));
+  const result = evaluateRiskProposal(proposal({ equity: 9500 }), policy());
   assert.equal(result.decision, 'REJECT');
   assert.equal(result.approvedVolume, 0);
   assert.ok(result.blockers.includes('DAILY_DRAWDOWN_LIMIT_REACHED'));
@@ -108,8 +103,7 @@ test('uses existing margin plus proposed margin for the margin ceiling', () => {
   const result = evaluateRiskProposal(proposal({
     usedMargin: 1500,
     estimatedMargin: 1000,
-    limits: { ...proposal().limits, maxMarginUsagePct: 20 },
-  }));
+  }), policy({ maxMarginUsagePct: 20 }));
   assert.equal(result.decision, 'REJECT');
   assert.ok(result.blockers.includes('MARGIN_USAGE_LIMIT_EXCEEDED'));
 });
