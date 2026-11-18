@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import OwnerControlPlane from './OwnerControlPlane';
+import OwnerTradingDesk from './OwnerTradingDesk';
 
 type Props = { accessToken: string; email: string; role: string; onSignOut: () => void };
 type Installation = { id: string; label: string; status: 'active' | 'revoked'; created_at: string; last_seen_at: string | null; broker: string | null; server: string | null };
@@ -34,10 +35,11 @@ type Overview = {
   database: { reachable: boolean; installation_records: number };
   governance: { audit_log: string; multi_role_access: string; step_up_authentication: string; model_validation_registry: string; portfolio_risk_telemetry: string };
 };
-type ModuleId = 'overview' | 'governance' | 'market' | 'research' | 'risk' | 'security' | 'reliability';
+type ModuleId = 'overview' | 'trading' | 'governance' | 'market' | 'research' | 'risk' | 'security' | 'reliability';
 
 const modules: { id: ModuleId; label: string; short: string; description: string }[] = [
   { id: 'overview', label: 'Command overview', short: 'Overview', description: 'Operational posture and critical exceptions' },
+  { id: 'trading', label: 'Quantitative trading desk', short: 'Trading desk', description: 'Pair intelligence, multi-timeframe technicals and macro context' },
   { id: 'governance', label: 'Platform governance', short: 'Governance', description: 'Identity, privileged access and platform policy' },
   { id: 'market', label: 'Market data operations', short: 'Market data', description: 'Broker connectors, freshness and feed integrity' },
   { id: 'research', label: 'Quant research oversight', short: 'Quant research', description: 'Model provenance, validation and release controls' },
@@ -159,6 +161,8 @@ export default function OwnerOperations({ accessToken, email, role, onSignOut }:
             <ReadinessRow label="Tamper-evident audit trail" value="Not configured" note="Administrative actions are not yet written to a dedicated immutable audit ledger." />
           </Panel>
         </div>}
+
+        {active === 'trading' && <OwnerTradingDesk accessToken={accessToken} />}
 
         {active === 'governance' && <Panel title="Platform governance" subtitle="Least-privilege administration. Privileged roles are not fabricated before their authorization controls exist.">
           <ReadinessRow label="Primary owner" value="Verified" note={email + ' is the sole configured owner identity.'} tone="good" />
