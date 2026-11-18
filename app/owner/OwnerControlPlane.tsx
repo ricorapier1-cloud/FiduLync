@@ -116,7 +116,7 @@ export default function OwnerControlPlane({accessToken}:Props) {
    {snapshot.licenses.filter(x=>x.payment_reference).slice(0,20).map(x=><div key={x.id} className="flex flex-col gap-1 rounded-lg border border-white/[0.07] p-3 sm:flex-row sm:justify-between"><span className="text-slate-300">{x.email} · {x.tier}</span><span className="font-mono text-[10px] text-slate-500">{x.payment_reference}</span></div>)}
   </div>}
   {snapshot&&section==='Product pricing'&&<div className="mt-5 space-y-4">
-   <Panel title="EA subscription pricing" subtitle="The estimator is a transparent heuristic using the product's declared Sharpe metric, asset coverage and strategy tier. It is a starting suggestion, not a performance valuation.">
+   <section className="space-y-4 rounded-xl border border-white/[0.08] bg-[#0a1017] p-5"><header><h3 className="text-sm font-semibold text-slate-100">EA subscription pricing</h3><p className="mt-1 text-xs text-slate-500">The estimator uses declared Sharpe, asset coverage and strategy tier as a transparent heuristic, not a performance valuation.</p></header>
     <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
      <label className="text-xs text-slate-400">EA product<select value={pricingSlug} onChange={e=>setPricingSlug(e.target.value)} className="mt-2 h-10 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-white">{pricingProducts.map(p=><option key={p.slug} value={p.slug}>{p.name} · {p.category}</option>)}</select></label>
      <div className="flex items-end"><button disabled={!estimate} onClick={()=>estimate&&setPricingDraft(estimate)} className="h-10 rounded-lg border border-cyan-300/30 px-4 text-xs text-cyan-100 disabled:opacity-40">Apply estimator</button></div>
@@ -126,7 +126,7 @@ export default function OwnerControlPlane({accessToken}:Props) {
      {(['monthly_price_ngn','monthly_price_usd','annual_price_ngn','annual_price_usd','extra_seat_price_ngn','extra_seat_price_usd'] as const).map(field=><label key={field} className="text-[10px] text-slate-400">{field.replaceAll('_',' ').toUpperCase()}<input type="number" min="0" step={field.endsWith('_ngn')?'1':'0.01'} value={pricingDraft[field]} onChange={e=>setPricingDraft(current=>({...current,[field]:Number(e.target.value)}))} className="mt-2 h-10 w-full rounded-lg border border-white/10 bg-black/20 px-3 text-sm text-white"/></label>)}
     </div>
     <div className="flex flex-wrap items-center gap-3"><button onClick={()=>void savePricing()} disabled={pricingSaving||!pricingProduct} className="rounded-lg bg-emerald-300 px-4 py-2.5 text-xs font-semibold text-slate-950 disabled:opacity-50">{pricingSaving?'Saving…':'Save manual pricing'}</button>{pricingNotice&&<span className="text-xs text-emerald-200">{pricingNotice}</span>}</div>
-   </Panel>
+   </section>
   </div>}
   {snapshot&&section==='Data providers'&&<div className="mt-5 space-y-2">
    <div className="mb-3 rounded-lg border border-white/[0.08] bg-white/[0.02] p-3 text-[11px] text-slate-300">Live diagnostics: {diagnostics?diagnostics.overall+' · '+diagnostics.summary.errors+' errors · '+diagnostics.summary.blockers+' blockers':'Not yet probed'}</div>
