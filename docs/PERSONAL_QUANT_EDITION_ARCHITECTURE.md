@@ -254,3 +254,12 @@ This is a pure governance foundation only. It is not yet wired into the dashboar
 - Risk thresholds, owner execution enablement, model-validation evidence and execution-quality evidence are held in a server-only policy module, not accepted from an EA or browser proposal.
 - The initial policy inherits the owner's established guardrails (1.0% maximum per-trade risk, 2.0% portfolio open-risk ceiling, 4% daily drawdown, 8% weekly drawdown, 15% high-water drawdown and 10% margin usage ceiling).
 - Execution enablement and model/execution evidence are false by default. The initial policy therefore cannot issue an APPROVE decision; the evaluator is tested with a separate enabled fixture to verify sizing and gates, not to enable production trading.
+
+
+### Supabase live-state audit — 2026-11-18
+
+- The existing project already contains `mt5_installations`, `mt5_market_quotes`, `mt5_market_candles` and `mt5_ingest_nonces`; the market tables carry broker digits, point, tick size, tick value and contract-size metadata.
+- The inspected MT5 installation, quote, candle, heartbeat and trade-ledger tables currently report zero rows. No MT5 terminal has populated this project at the time of the audit.
+- The sensitive MT5, owner-audit, licensing and legacy escrow tables have RLS enabled. A direct grant check returned no `anon` or `authenticated` table privileges for the selected sensitive tables. Their no-policy RLS advisor findings are consistent with service-role-only access; do not add broad browser policies to silence the informational linter.
+- Supabase Security Advisor also reports leaked-password protection disabled. This remains a separate owner-auth hardening task; it was not changed during this implementation.
+- No schema migration, row deletion or credential rotation was performed.
