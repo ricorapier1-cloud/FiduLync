@@ -32,11 +32,11 @@ export default function PlatformFooter() {
                 <BrandGlyph name="shield" size={16} />
               </span>
               <span className="text-base font-semibold tracking-tight text-slate-100">
-                Macro<span className="text-emerald-400">Lync</span> &amp; Algo<span className="text-emerald-400">Lync</span>
+                Fidu<span className="text-emerald-400">Lync</span> Personal Quant
               </span>
             </div>
             <p className="mt-3 text-xs leading-5 text-slate-400">
-              Institutional quantitative macroeconomic intelligence terminal, proprietary EA execution architecture, and automated MT5 telemetry bridge.
+              Private quantitative market research, disciplined risk planning and supervisory tooling for the owner&apos;s own MT5 trading.
             </p>
           </div>
 
@@ -55,7 +55,7 @@ export default function PlatformFooter() {
               </li>
               <li>
                 <Link href="/faq" className="transition hover:text-emerald-300">
-                  Terminal &amp; Strategy FAQ
+                  Personal Quant Help
                 </Link>
               </li>
               <li>
@@ -80,7 +80,7 @@ export default function PlatformFooter() {
                   WhatsApp: +234 803 721 2445
                 </a>
               </li>
-              <li className="text-slate-400">Lagos / London Trading Desk Hours</li>
+              <li className="text-slate-400">Technical Support Hours</li>
               <li className="text-slate-500 font-mono text-[11px]">Mon – Fri: 07:00 – 21:00 UTC</li>
             </ul>
           </div>
@@ -95,13 +95,7 @@ export default function PlatformFooter() {
               >
                 <BrandGlyph name="arrow-down" size={13} /> MacroLyncBridge.mqh
               </a>
-              <a
-                href="/mql5/MacroLyncBridge.mqh"
-                download
-                className="inline-flex items-center gap-2 rounded border border-white/[0.1] bg-white/[0.03] px-3 py-1.5 text-[11px] text-slate-300 transition hover:border-emerald-400/40 hover:text-emerald-300"
-              >
-                <BrandGlyph name="arrow-down" size={13} /> MacroLyncBridge.mqh
-              </a>
+
             </div>
           </div>
         </div>
