@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import quant from '../.quant-test/quantGovernance.js';
 
-const { evaluateRiskProposal, calculateBrokerAwareVolume } = quant;
+const { evaluateRiskProposal, calculateBrokerAwareVolume, calculateTrueRangeAtr } = quant;
 
 function proposal(overrides = {}) {
   return {
@@ -24,6 +24,7 @@ function context(overrides = {}) {
     ask: 1.1002,
     quoteAgeMs: 250,
     spreadPoints: 20,
+    atrPrice: 0.002,
     equity: 10000,
     freeMargin: 9000,
     usedMargin: 1000,
@@ -66,6 +67,7 @@ function policy(overrides = {}) {
     maxHighWaterDrawdownPct: 15,
     maxMarginUsagePct: 20,
     maxSpreadPoints: 30,
+    maxSpreadAtrRatio: 0.12,
     maxQuoteAgeMs: 2000,
     maxConsecutiveLosses: 3,
     rewardRiskMinimum: 1.5,
@@ -224,4 +226,18 @@ test('rejects when the proposed margin exceeds available free margin', () => {
   assert.equal(result.decision, 'REJECT');
   assert.equal(result.approvedVolume, 0);
   assert.ok(result.blockers.includes('INSUFFICIENT_FREE_MARGIN'));
+});
+
+
+test('dynamic spread guard rejects abnormal spread relative to ATR', () => {
+  const result = evaluateRiskProposal(proposal(), context({ spreadPoints: 25, atrPrice: 0.001 }), policy());
+  assert.equal(result.decision, 'REJECT');
+  assert.ok(result.blockers.includes('SPREAD_TO_ATR_LIMIT_EXCEEDED'));
+});
+
+test('closed-bar ATR requires sufficient valid history', () => {
+  const bars = Array.from({ length: 15 }, (_, index) => ({ high: 1.102 + index * 0.0001, low: 1.100 + index * 0.0001, close: 1.101 + index * 0.0001 }));
+  assert.ok(calculateTrueRangeAtr(bars, 14) > 0);
+  assert.equal(calculateTrueRangeAtr(bars.slice(0, 14), 14), null);
+  assert.equal(calculateTrueRangeAtr([{ high: 1, low: 2, close: 1 }], 2), null);
 });
