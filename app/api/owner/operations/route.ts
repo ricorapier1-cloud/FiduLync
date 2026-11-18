@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
+import { getPersonalRiskPolicy } from '@/lib/riskPolicy';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,6 +19,7 @@ export async function GET(request: Request) {
     }
 
     const userId = auth.user.id;
+    const riskPolicy = getPersonalRiskPolicy();
     const { data: installations, error: installationError } = await supabase.from('mt5_installations')
       .select('id,label,status,created_at,last_seen_at,broker,server')
       .eq('user_id', userId).order('created_at', { ascending: false }).limit(20);
@@ -61,6 +63,22 @@ export async function GET(request: Request) {
         latest_quote_age_seconds: quoteAgeMs === null ? null : Math.max(0, Math.round(quoteAgeMs / 1000)),
       },
       installations: installations ?? [],
+      risk_policy: {
+        policy_version: riskPolicy.policyVersion,
+        execution_enabled: riskPolicy.executionEnabled,
+        model_validated: riskPolicy.modelValidated,
+        execution_quality_verified: riskPolicy.executionQualityVerified,
+        max_per_trade_risk_pct: riskPolicy.maxPerTradeRiskPct,
+        max_portfolio_risk_pct: riskPolicy.maxPortfolioRiskPct,
+        max_daily_drawdown_pct: riskPolicy.maxDailyDrawdownPct,
+        max_weekly_drawdown_pct: riskPolicy.maxWeeklyDrawdownPct,
+        max_high_water_drawdown_pct: riskPolicy.maxHighWaterDrawdownPct,
+        max_margin_usage_pct: riskPolicy.maxMarginUsagePct,
+        max_spread_points: riskPolicy.maxSpreadPoints,
+        max_quote_age_ms: riskPolicy.maxQuoteAgeMs,
+        max_consecutive_losses: riskPolicy.maxConsecutiveLosses,
+        reward_risk_minimum: riskPolicy.rewardRiskMinimum,
+      },
       database: { reachable: true, installation_records: installations?.length ?? 0 },
       governance: {
         audit_log: 'not_configured',
