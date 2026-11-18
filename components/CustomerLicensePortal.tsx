@@ -97,7 +97,6 @@ export default function CustomerLicensePortal() {
       await loadSeats(license.trim());
       await load();
       setMessage('MT5 account slot updated. The 72-hour re-binding cooldown is now active for this slot.');
-      setMessage('MT5 account slot updated. The 72-hour re-binding cooldown is now active for this slot.');
     } catch (e) { setError(e instanceof Error ? e.message : 'Seat binding failed.'); }
     finally { setBusy(false); }
   }
