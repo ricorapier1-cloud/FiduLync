@@ -93,6 +93,7 @@ public:
       ArrayResize(data,copied-1);
       char response[];
       string response_headers;
+      string headers;
       // ISO-8601 UTC timestamp required by the API.
       MqlDateTime utc;
       TimeToStruct(TimeGMT(),utc);
