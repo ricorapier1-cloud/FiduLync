@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 type Installation = { id: string; status: string };
-type Quote = { symbol: string; bid: number; ask: number; quote_time: string; spread_points: number; digits?: number; point?: number; tick_size?: number; tick_value?: number; contract_size?: number; volume_min?: number; volume_max?: number; volume_step?: number; stop_level_points?: number; margin_per_lot_buy?: number; margin_per_lot_sell?: number; broker?: string; server?: string };
+type Quote = { symbol: string; bid: number; ask: number; quote_time: string; spread_points: number; digits?: number; point?: number; tick_size?: number; tick_value?: number; tick_value_loss?: number; tick_value_profit?: number; contract_size?: number; volume_min?: number; volume_max?: number; volume_step?: number; stop_level_points?: number; margin_per_lot_buy?: number; margin_per_lot_sell?: number; broker?: string; server?: string };
 type Candle = { symbol: string; timeframe: 'H1' | 'H4' | 'D1'; bar_time: string; open: number; high: number; low: number; close: number; tick_volume?: number; spread_points?: number; real_volume?: number; is_closed?: boolean; broker?: string; server?: string; digits?: number; point?: number; tick_size?: number; tick_value?: number; contract_size?: number };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -96,6 +96,8 @@ export async function POST(request: Request) {
       if (raw.point !== undefined && (typeof raw.point !== 'number' || !Number.isFinite(raw.point) || raw.point <= 0)
         || raw.tick_size !== undefined && (typeof raw.tick_size !== 'number' || !Number.isFinite(raw.tick_size) || raw.tick_size <= 0)
         || raw.tick_value !== undefined && (typeof raw.tick_value !== 'number' || !Number.isFinite(raw.tick_value) || raw.tick_value <= 0)
+        || raw.tick_value_loss !== undefined && (typeof raw.tick_value_loss !== 'number' || !Number.isFinite(raw.tick_value_loss) || raw.tick_value_loss < 0)
+        || raw.tick_value_profit !== undefined && (typeof raw.tick_value_profit !== 'number' || !Number.isFinite(raw.tick_value_profit) || raw.tick_value_profit < 0)
         || raw.contract_size !== undefined && (typeof raw.contract_size !== 'number' || !Number.isFinite(raw.contract_size) || raw.contract_size <= 0)
         || raw.volume_min !== undefined && (typeof raw.volume_min !== 'number' || !Number.isFinite(raw.volume_min) || raw.volume_min <= 0)
         || raw.volume_max !== undefined && (typeof raw.volume_max !== 'number' || !Number.isFinite(raw.volume_max) || raw.volume_max <= 0)
