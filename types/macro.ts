@@ -18,6 +18,7 @@ export type CotPosition = {
   netContracts: number;
   percentile: number;
   weeklyChange: number;
+  asOf?: string;
 };
 
 export type EconomicCatalyst = {
