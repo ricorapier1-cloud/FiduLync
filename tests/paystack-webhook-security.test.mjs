@@ -40,3 +40,12 @@ test('does not downgrade to the legacy signature when a configured modern signat
   });
   assert.equal(verifyPaystackWebhookSignature(body, headers, { legacySecret, webhookSecret }, 1_800_000_000), false);
 });
+
+test('fails closed when a configured modern signing secret has an invalid format', () => {
+  const legacySignature = createHmac('sha512', legacySecret).update(body).digest('hex');
+  const headers = new Headers({
+    'paystack-signature': 't=1800000000,v1=whk_test:' + 'a'.repeat(128),
+    'x-paystack-signature': legacySignature,
+  });
+  assert.equal(verifyPaystackWebhookSignature(body, headers, { legacySecret, webhookSecret: 'wrong-prefix-secret' }, 1_800_000_000), false);
+});
