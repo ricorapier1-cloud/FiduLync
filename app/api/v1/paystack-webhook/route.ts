@@ -119,6 +119,14 @@ async function processEvent(eventName: string, data: PaystackData, reference: st
     return;
   }
 
+  if (eventName === 'subscription.not_renew') {
+    const code = subscriptionCode(data);
+    if (!code) throw new Error('Non-renewing subscription event is missing its subscription code.');
+    const updated = await patchSubscription(code, { renewal_reminder_due: true });
+    if (!updated) throw new Error('No AlgoLync licence is associated with the non-renewing subscription.');
+    return;
+  }
+
   if (eventName === 'subscription.disable') {
     const code = subscriptionCode(data);
     if (!code) throw new Error('Disabled subscription event is missing its subscription code.');
