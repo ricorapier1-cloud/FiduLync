@@ -2,7 +2,7 @@ import 'server-only';
 
 import { getFallbackSnapshot, loadMacroSnapshot } from '@/lib/macroData';
 import { getCachedData } from '@/lib/redisCache';
-import type { MacroSnapshot } from '@/types/macro';
+import type { MacroCurrency, MacroSnapshot } from '@/types/macro';
 
 export type FundamentalSignal = {
   score: number;
