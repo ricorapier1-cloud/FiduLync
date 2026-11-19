@@ -248,7 +248,7 @@ public:
          json+="\"spread_points\":"+NumberOrNull(event.spread_points,event.has_spread,3)+",";
          json+="\"slippage_points\":"+NumberOrNull(event.slippage_points,event.has_slippage,3)+",";
          json+="\"latency_ms\":"+IntegerOrNull(event.latency_ms,event.has_latency)+",";
-         json+="\"broker_code\":"+IntegerOrNull(event.broker_code,event.has_broker_code)+"}";
+         json+="\"broker_code\":"+(event.has_broker_code ? "\""+IntegerToString(event.broker_code)+"\"" : "null")+"}";
       }
       json+="]}";
       char data[];
