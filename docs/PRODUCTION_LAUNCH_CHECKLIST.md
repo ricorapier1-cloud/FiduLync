@@ -43,7 +43,7 @@ Other configured market-data providers may require `FX_API_KEY`, `FRED_API_KEY`,
 4. In Paystack Dashboard → Settings → API Keys & Webhooks, set the webhook URL to `https://fidulync.vercel.app/api/paystack/webhook`. If Paystack's timestamped webhook signing secret is enabled, add its dashboard-issued `whsec_...` value to Vercel as `PAYSTACK_WEBHOOK_SECRET`. Until then, the endpoint supports legacy `x-paystack-signature` verification.
 5. Configure `RESEND_API_KEY` and `LICENSE_FROM_EMAIL` in Vercel Production so licence delivery and account-transfer codes can be emailed. Verify the sender domain with the email provider first.
 6. Deploy after changing environment variables.
-7. Test a successful payment, failed payment, duplicate webhook delivery, subscription creation, invoice failure, invoice renewal and cancellation using a Paystack test account in Preview before enabling live sales.
+7. Test a successful payment, failed payment, duplicate webhook delivery, subscription creation, invoice failure, invoice renewal, non-renewal and cancellation using a Paystack test account in Preview before enabling live sales.
 
 ## MT5 / EA bridge setup (when a laptop is available)
 
