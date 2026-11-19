@@ -237,7 +237,7 @@ public:
          if(i>0) json+=",";
          FLExecutionEvent event=m_events[i];
          json+="{\"account_login\":"+IntegerToString((long)AccountInfoInteger(ACCOUNT_LOGIN))+",";
-         json+="{\"event_id\":\""+JsonEscape(event.event_id)+"\",";
+         json+="\"event_id\":\""+JsonEscape(event.event_id)+"\",";
          json+="\"event_type\":\""+event.event_type+"\",";
          json+="\"symbol\":\""+JsonEscape(event.symbol)+"\",";
          json+="\"side\":\""+event.side+"\",";
