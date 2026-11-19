@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { createClient, type Session } from '@supabase/supabase-js';
+import Link from 'next/link';
 import OwnerOperations from './OwnerOperations';
 
 const OWNER_EMAIL = 'ricorapier1@gmail.com';
@@ -209,12 +210,13 @@ export default function OwnerAccessPage() {
   }
 
   if (status?.authenticated && session) {
-    return <OwnerOperations accessToken={session.access_token} email={status.email || OWNER_EMAIL} role={status.role || 'owner'} onSignOut={signOut} />;
+    return <><div className="px-5 pt-4"><Link href="/" className="font-mono text-xs text-emerald-300 hover:underline">← BACK TO TERMINAL</Link></div><OwnerOperations accessToken={session.access_token} email={status.email || OWNER_EMAIL} role={status.role || 'owner'} onSignOut={signOut} /></>;
   }
 
   return (
     <main className="mx-auto flex min-h-[75vh] w-full max-w-lg items-center px-5 py-12 text-slate-100">
       <div className="w-full rounded-2xl border border-white/10 bg-[#0c1118] p-6 shadow-2xl sm:p-8">
+        <Link href="/" className="mb-5 inline-block font-mono text-[10px] tracking-wider text-emerald-300 hover:underline">← BACK TO TERMINAL</Link>
         <div className="font-mono text-[10px] tracking-[0.2em] text-emerald-300">FIDULYNC / PRIVATE QUANT CONTROL PLANE</div>
         <h1 className="mt-3 text-2xl font-semibold">{recoveryMode ? 'Set a new password' : 'Owner sign-in'}</h1>
         <p className="mt-3 text-xs leading-6 text-slate-400">
