@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import test from 'node:test';
+import guards from '../.quant-test/institutionalGuards.js';
 
 const source = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
@@ -32,4 +33,38 @@ test('Quant Lab is a distinct technical research surface', () => {
   }
   assert.match(component, /technical_data_verified/);
   assert.match(component, /macro_data_verified/);
+});
+
+test('macro relative-value ranking never invents a pair or claims execution eligibility', () => {
+  const candidate = guards.getTopRelativeValueCandidate([
+    { currency: 'USD', score: 80 },
+    { currency: 'EUR', score: 20 },
+    { currency: 'JPY', score: -30 },
+    { currency: 'NOK', score: 99 },
+    { currency: 'GBP', score: Number.POSITIVE_INFINITY },
+  ]);
+  assert.deepEqual(candidate, { pair: 'USDJPY', direction: 'LONG', spread: 110, base: 'USD', quote: 'JPY' });
+  assert.equal(guards.getTopRelativeValueCandidate([{ currency: 'USD', score: 10 }]), null);
+  assert.equal(guards.getTopRelativeValueCandidate([{ currency: 'USD', score: 10 }, { currency: 'EUR', score: 10 }]), null);
+});
+
+test('top-pair endpoint and banner describe macro candidates, never executable trades', () => {
+  const route = source('../app/api/v1/top-pairs/route.ts');
+  const banner = source('../components/TopPairBanner.tsx');
+  assert.match(route, /execution_eligibility:\s*'NOT_EVALUATED'/);
+  assert.doesNotMatch(route, /safe_to_trade|top_executable_pair/);
+  assert.match(banner, /MACRO RELATIVE-VALUE RESEARCH/);
+  assert.match(banner, /Execution: NOT EVALUATED/);
+});
+
+test('private alert dispatch fails closed without its dedicated secret', () => {
+  const route = source('../app/api/v1/dispatch-alert/route.ts');
+  assert.match(route, /ALGO_PRIVATE_API_KEY/);
+  assert.match(route, /Private alert dispatch is not configured/);
+  assert.doesNotMatch(route, /process\.env\.CRON_SECRET/);
+});
+
+test('public commercial product-readiness route is retired', () => {
+  const route = source('../app/api/v1/product-readiness/route.ts');
+  assert.match(route, /status:\s*410/);
 });
