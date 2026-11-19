@@ -2,67 +2,83 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Terms, Privacy & Risk Disclosure',
-  description: 'Personal-use terms and trading risk disclosure for FiduLync Personal Quant.',
+  title: 'Terms of Use & Trading Risk Disclosure',
+  description: 'Terms, licensing conditions and risk disclosures for FiduLync, MacroLync and AlgoLync.',
 };
 
 const sections = [
   {
-    title: '1. Personal-use scope',
-    body: 'FiduLync Personal Quant is provided for the owner\'s own research, risk planning and supervision of the owner\'s MetaTrader 5 installations. The current confirmed instrument scope is G10 foreign exchange pairs and XAUUSD. XAGUSD is not enabled in the initial scope. The application is not currently offered as a customer subscription, EA marketplace, escrow service or signal-selling service.',
+    title: '1. Platform scope and separate products',
+    body: 'FiduLync provides software tools for market research, quantitative analysis, account-risk monitoring, MT5 connectivity and AlgoLync Expert Advisor licensing. MacroLync research outputs, AlgoLync EA products, customer licensing and any owner-only control-plane tools are separate services with distinct permissions. Availability of a feature does not mean it is approved for live trading.',
   },
   {
-    title: '2. No brokerage or investment advice',
-    body: 'FiduLync is software for quantitative research and risk analysis. It is not a broker, dealer, custodian, portfolio manager or investment adviser. Market commentary, model outputs, technical indicators, confluence scores and risk calculations are informational only and are not personalized investment advice or instructions to trade.',
+    title: '2. No broker, investment adviser or fiduciary relationship',
+    body: 'FiduLync, MacroLync and AlgoLync are software providers, not banks, brokers, dealers, custodians, portfolio managers or investment advisers. Nothing in the platform is a personalized recommendation, solicitation, offer to buy or sell a financial instrument, or a promise to execute a trade. Users remain solely responsible for their trading decisions and compliance with the laws and broker terms applicable to them.',
   },
   {
-    title: '3. Trading risk and no performance guarantee',
-    body: 'Foreign exchange and precious-metals trading involve substantial risk, including leverage, slippage, gaps, spread widening, rejected orders, financing costs, outages and loss of capital. Backtests and historical metrics do not guarantee future results. No win rate, return, profit factor or drawdown outcome is promised. Use demo and shadow testing before any live deployment.',
+    title: '3. High-risk leveraged trading warning',
+    body: 'Foreign exchange, CFDs, futures, precious metals and other leveraged products carry a high level of risk and may not be suitable for all investors. Leverage magnifies gains and losses. You may lose some or all of your invested capital; depending on the product, broker agreement and jurisdiction, losses may exceed the initial deposit. Prices can gap, spreads can widen, liquidity can disappear, orders can be rejected or filled at materially different prices, and systems or connectivity can fail. Do not trade money you cannot afford to lose. Seek independent professional advice where appropriate.',
   },
   {
-    title: '4. EA supervision and execution boundary',
-    body: 'The intended architecture separates research signals from execution permission. FiduLync does not directly place, modify or close broker orders. Any future supervisory approval is not a guarantee that an order will be safe or profitable. The EA remains responsible for rechecking live quotes, broker rules, volume limits and account state, and for maintaining local risk controls and broker-side stop-loss protection.',
+    title: '4. Expert Advisors and automated trading risk',
+    body: 'An EA can submit orders rapidly and repeatedly and may behave unexpectedly because of software defects, configuration errors, broker restrictions, market gaps, VPS/network interruptions, stale data, terminal restarts or third-party service outages. Always test on a demo account and in a controlled forward-test environment before considering live use. Keep broker-side stop-loss protection and independent account-level risk limits. Never assume that a cloud licence check, signal, model score or risk approval guarantees a safe order or prevents loss.',
   },
   {
-    title: '5. Data quality and external providers',
-    body: 'Market data may be supplied by a connected MT5 terminal or configured third-party providers. Foreign exchange has no single consolidated global tape; broker quotes are the execution reference for that broker account. Provider data may be delayed, incomplete, revised, rate-limited or unavailable. The application must identify reference, delayed, stale and unavailable data and must not treat those states as live execution data.',
+    title: '5. Backtests, simulated results and live verified telemetry',
+    body: 'All illustrative curves, sample win rates, profit factors, Sharpe ratios, drawdowns and other simulated or backtested figures must be labelled as simulated/backtested, with their assumptions and limitations. They are not verified customer results and do not predict future performance. Backtests may be affected by overfitting, look-ahead or survivorship bias, data gaps, broker-specific price histories, spread/commission/swap assumptions, latency, slippage, partial fills and execution constraints. Live verified telemetry is a separate category and may only be labelled verified when it is derived from authenticated, account-isolated broker/MT5 records with a stated sample period, trade count, account currency, broker/server and methodology. If such evidence is unavailable, the platform must show “Not available” rather than invent or infer a live statistic.',
   },
   {
-    title: '6. Security and account credentials',
-    body: 'Never provide FiduLync with your broker password, remote desktop password or one-time authentication code. Connector tokens and API keys must be kept secret and revocable. Use only the restricted owner identity and installation-specific credentials. You are responsible for securing your device, email account, MT5 terminal and broker account.',
+    title: '6. Model, signal and research limitations',
+    body: 'Technical indicators, macroeconomic data, currency-strength scores, correlations, regime classifications, forecasts and confluence scores are model outputs based on available data and assumptions. They may be delayed, incomplete, revised, erroneous or unavailable. A score is not a calibrated probability unless explicitly validated as one. Historical relationships can break down. Missing, stale or inconsistent data should cause the affected feature to abstain or display an unavailable state rather than silently substitute fabricated values.',
   },
   {
-    title: '7. Personal data and telemetry',
-    body: 'The application may process owner account identifiers, terminal installation identifiers, market data, EA heartbeat telemetry and trade records for the purpose of operating the personal research workspace. Access to privileged owner diagnostics must be authenticated. Credentials and provider API keys must not be exposed in browser code, public logs or user-visible diagnostics. Historical records should not be deleted as part of the product conversion.',
+    title: '7. Licensing, account seats and product delivery',
+    body: 'An AlgoLync licence is issued only after the payment provider confirms a successful transaction and the server durably records the entitlement. The standard included seat allowance is one LIVE MT5 account and two DEMO MT5 accounts per eligible paid licence, subject to the product entitlement displayed at checkout. Account assignment is enforced server-side. Replacing an assigned account is subject to a 72-hour cooldown; a request may be rejected until the cooldown expires. Demo licences are time-limited and DEMO-only. A one-time licence is a non-recurring purchase for the stated product/version entitlement; it does not imply unlimited future upgrades, support or perpetual availability unless expressly stated at checkout. Monthly licences are time-limited and require a successful renewal payment to continue; automatic renewal is not implied unless the checkout clearly states and obtains consent for it.',
   },
   {
-    title: '8. Availability and technical limitations',
-    body: 'The service depends on hosting, database, network, broker terminal and external data-provider availability. API quotas, data licensing terms, broker rules and provider restrictions continue to apply. Personal use does not grant permission to redistribute third-party data. Some functions require a Windows MT5 terminal and MetaEditor and cannot be fully verified from a mobile browser.',
+    title: '8. Payments, cancellations and refunds',
+    body: 'Payments are processed through Paystack or another clearly identified payment provider. The platform stores payment references and entitlement records; payment-card and bank credentials should be entered only on the provider-hosted payment interface. The exact price, currency, licence duration, included seats and any applicable taxes or fees are shown before payment. Cancellation, renewal and refund terms must be displayed at checkout and will be applied subject to mandatory consumer-protection law in the customer’s jurisdiction. A payment redirect or browser success message alone does not prove that a licence has been issued.',
   },
   {
-    title: '9. Changes and acceptance',
-    body: 'These terms describe the current personal-use product boundary and may be updated as the application is implemented and tested. Do not enable live trading based solely on the presence of a feature or a successful software build. A production release requires independent security, data, broker and demo validation.',
+    title: '9. Data, broker and third-party provider terms',
+    body: 'Market data may originate from a connected MT5 broker terminal or third-party providers. FX has no single consolidated global tape; the customer’s broker quote is the relevant execution reference for that account. Provider data can be delayed, incomplete, rate-limited, revised or subject to redistribution restrictions. Users must comply with the provider’s commercial-use, display, caching and redistribution terms. FiduLync does not grant rights to redistribute third-party market data.',
+  },
+  {
+    title: '10. Security and account responsibility',
+    body: 'Never share a broker trading password, remote-desktop password, owner-console password, publisher token or API secret. Use strong unique passwords and enable available account security controls. Connector credentials are installation-scoped and should be revoked if exposed. Customer licences and MT5 seat assignments are sensitive bearer credentials; protect them and do not post them publicly. The platform may suspend credentials or entitlements where fraud, abuse, compromise or material security risk is reasonably suspected.',
+  },
+  {
+    title: '11. Availability, limitations and liability',
+    body: 'The platform depends on hosting, database, payment provider, email, broker terminal, VPS, network and external data services. Planned maintenance, outages, API quotas and third-party terms may affect availability. To the maximum extent permitted by applicable law, the software is supplied without a guarantee of uninterrupted service, error-free operation or trading performance. Nothing in these terms excludes liability that cannot lawfully be excluded.',
+  },
+  {
+    title: '12. Legal review and jurisdiction',
+    body: 'These operational terms and risk notices are a product disclosure baseline, not legal advice and not a representation that the platform is licensed or compliant in every country. Before opening commercial sales or enabling live payment processing, the operator must obtain jurisdiction-specific legal, tax, privacy and financial-services advice and publish the applicable company identity, contact address, governing law, complaint process, cancellation terms and statutory disclosures.',
   },
 ];
 
 export default function TermsPage() {
   return (
-    <main className="mx-auto min-h-[75vh] w-full max-w-4xl px-5 py-10 pb-36 text-slate-100">
-      <Link href="/" className="font-mono text-xs text-emerald-300 hover:underline">← BACK TO MACRO TERMINAL</Link>
+    <main className="mx-auto min-h-[75vh] w-full max-w-4xl px-5 py-10 pb-44 text-slate-100">
+      <Link href="/" className="font-mono text-xs text-emerald-300 hover:underline">← BACK TO TERMINAL</Link>
       <header className="mb-8 mt-8">
-        <p className="font-mono text-[10px] tracking-[0.2em] text-emerald-300">FIDULYNC PERSONAL QUANT / POLICY</p>
-        <h1 className="mt-3 text-3xl font-semibold">Terms &amp; Risk Disclosure</h1>
-        <p className="mt-3 text-xs leading-6 text-slate-400">Personal-use product scope, data handling and trading-risk boundaries. Effective date: 18 November 2026.</p>
+        <p className="font-mono text-[10px] tracking-[0.2em] text-emerald-300">FIDULYNC / MACROLYNC / ALGOLYNC</p>
+        <h1 className="mt-3 text-3xl font-semibold">Terms of Use &amp; Trading Risk Disclosure</h1>
+        <p className="mt-3 text-xs leading-6 text-slate-400">Operational product terms and material trading-risk notices. Effective date: 19 November 2026.</p>
+        <p className="mt-3 text-xs leading-5 text-amber-200">Important: this baseline disclosure requires review by qualified counsel in every market where the products are sold. It is not a legal opinion or a claim of regulatory approval.</p>
       </header>
       <div className="space-y-4">
         {sections.map((section) => (
-          <section id={section.title.startsWith("7.") ? "privacy" : undefined} key={section.title} className="rounded-xl border border-white/10 bg-[#0c1118] p-5">
+          <section key={section.title} className="rounded-xl border border-white/10 bg-[#0c1118] p-5">
             <h2 className="text-sm font-semibold text-white">{section.title}</h2>
             <p className="mt-3 text-xs leading-6 text-slate-400">{section.body}</p>
           </section>
         ))}
       </div>
-      <p className="mt-8 text-[10px] leading-5 text-slate-500">This is an operational disclosure for the personal workspace, not a substitute for legal advice or any provider&apos;s data licence.</p>
+      <div className="mt-8 flex flex-wrap gap-4 text-xs">
+        <Link href="/privacy" className="text-emerald-300 underline">Read Privacy Notice</Link>
+        <Link href="/faq" className="text-emerald-300 underline">Help &amp; FAQ</Link>
+      </div>
     </main>
   );
 }
