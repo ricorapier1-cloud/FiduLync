@@ -33,6 +33,9 @@ export default function OwnerResearchGovernance({ accessToken }: Props) {
   const [data, setData] = useState<ResearchData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [validationJson, setValidationJson] = useState(JSON.stringify({ model_key: 'my-ea-model', model_version: '1.0.0', market_scope: ['EURUSD'], timeframe_scope: ['H1'], dataset_fingerprint: 'REPLACE_WITH_64_CHAR_SHA256', code_fingerprint: 'REPLACE_WITH_64_CHAR_SHA256', risk_pct_per_trade: 1, trades: [] }, null, 2));
+  const [validationBusy, setValidationBusy] = useState(false);
+  const [validationMessage, setValidationMessage] = useState('');
   const refresh = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -44,6 +47,27 @@ export default function OwnerResearchGovernance({ accessToken }: Props) {
     } catch (err) { setError(err instanceof Error ? err.message : 'Research evidence unavailable.'); }
     finally { setLoading(false); }
   }, [accessToken]);
+  const submitValidation = useCallback(async () => {
+    setValidationBusy(true);
+    setValidationMessage('');
+    try {
+      const payload = JSON.parse(validationJson) as Record<string, unknown>;
+      const response = await fetch('/api/owner/research-governance/validate', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer '+accessToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const body = await response.json() as { error?: string; model?: { id: number; status: string } };
+      if (!response.ok) throw new Error(body.error || 'Model validation failed.');
+      setValidationMessage('Validation report registered as '+(body.model?.status ?? 'PENDING')+' · model ID '+(body.model?.id ?? '—')+'. Execution remains disabled.');
+      await refresh();
+    } catch (err) {
+      setValidationMessage(err instanceof Error ? err.message : 'Validation submission failed.');
+    } finally {
+      setValidationBusy(false);
+    }
+  }, [accessToken, refresh, validationJson]);
+
   useEffect(() => { const task = Promise.resolve().then(() => refresh()); return () => { void task; }; }, [refresh]);
 
   return <div className="space-y-5">
@@ -70,6 +94,12 @@ export default function OwnerResearchGovernance({ accessToken }: Props) {
             {Object.keys(model.validation_metrics ?? {}).length>0 && <details className="mt-3"><summary className="cursor-pointer text-[10px] text-slate-400">Validation metrics</summary><pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-[10px] text-slate-500">{JSON.stringify(model.validation_metrics,null,2)}</pre></details>}
           </article>) : <p className="text-xs text-slate-500">No model records have been registered yet.</p>}
         </div>
+      </section>
+      <section className="rounded-2xl border border-white/[0.09] bg-[#0c131c] p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="text-sm font-semibold text-white">Run model validation</h3><p className="mt-1 text-[10px] leading-5 text-slate-500">Paste JSON with 100–5,000 broker-reconciled trade outcomes in R, dataset/code SHA-256 fingerprints, model identity and scopes. The server computes chronological holdout, walk-forward, bootstrap Monte Carlo and cost stress. New records remain PENDING for independent review.</p></div><button onClick={() => void submitValidation()} disabled={validationBusy} className="rounded-lg border border-sky-300/20 bg-sky-300/10 px-3 py-2 text-xs text-sky-100 disabled:opacity-50">{validationBusy?'Validating…':'Validate & register'}</button></div>
+        <textarea value={validationJson} onChange={(event)=>setValidationJson(event.target.value)} rows={9} spellCheck={false} className="mt-4 w-full rounded-xl border border-white/10 bg-black/30 p-3 font-mono text-[10px] leading-5 text-slate-200 outline-none focus:border-sky-300/40" aria-label="Model validation JSON payload"/>
+        {validationMessage && <p role="status" className="mt-3 text-[10px] leading-5 text-slate-300">{validationMessage}</p>}
+        <p className="mt-2 text-[9px] leading-4 text-amber-100">Never submit fabricated or summary-only trades. Retain the underlying dataset for independent review.</p>
       </section>
       <section className="rounded-2xl border border-white/[0.09] bg-[#0c131c] p-5">
         <h3 className="text-sm font-semibold text-white">Intermarket lead-lag research</h3>
