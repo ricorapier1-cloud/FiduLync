@@ -69,6 +69,9 @@ export async function POST(req: Request) {
     if (license.expires_at && new Date(license.expires_at).getTime() <= Date.now()) return json({ valid: false, message: 'License has expired.' }, 403);
     if (license.tier === 'DEMO_14D' && accountType !== 'DEMO') return json({ valid: false, message: 'Demo entitlements cannot be used on live trading accounts.' }, 403);
     if (!license.ea_slug || (requestedEaSlug && requestedEaSlug !== license.ea_slug)) return json({ valid: false, message: 'This license is not entitled to the requested EA product.' }, 403);
+    const products = await supabaseRead<Array<{ slug: string; is_active: boolean }>>('ea_products', `slug=eq.${encodeURIComponent(license.ea_slug)}&is_active=eq.true&select=slug,is_active`);
+    if (!products) throw new Error('Product entitlement database unavailable.');
+    if (!products[0]) return json({ valid: false, message: 'The licensed EA product is no longer active.' }, 403);
 
     const seats = await supabaseRead<SeatRecord[]>('ea_license_seats',
       `license_key=eq.${encodeURIComponent(licenseKey)}&ea_slug=eq.${encodeURIComponent(license.ea_slug)}&select=slot_type,slot_number,mt5_login,broker_server,rebind_available_at`);
