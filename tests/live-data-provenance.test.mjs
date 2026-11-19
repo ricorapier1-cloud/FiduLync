@@ -6,7 +6,8 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const macroData = read('../lib/macroData.ts');
 const macroEngine = read('../lib/macroEngine.ts');
 const currencyStrength = read('../lib/currencyStrength.ts');
-const dashboard = read('../app/components/MacroDashboard.tsx');\nconst marketFeeds = read('../lib/marketFeeds.ts');
+const dashboard = read('../app/components/MacroDashboard.tsx');
+const marketFeeds = read('../lib/marketFeeds.ts');
 
 test('provider outage returns an empty, untimestamped macro fallback', () => {
   const fallback = macroData.match(/export function getFallbackSnapshot\(\): MacroSnapshot \{[\s\S]*?\n\}/)?.[0];
