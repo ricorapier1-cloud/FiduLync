@@ -12,11 +12,11 @@ export type DistributedRateLimitResult =
   | { allowed: false; remaining: 0; retryAfterSeconds: number; unavailable: false }
   | { allowed: false; remaining: 0; retryAfterSeconds: 0; unavailable: true };
 
-export function getClientIp(req: Request): string | null {
+export function getClientIp(req: Request): string {
   // Vercel terminates the public connection and supplies x-real-ip.
   // Do not trust arbitrary client-provided X-Forwarded-For values.
   const value = req.headers.get('x-real-ip')?.trim();
-  if (!value || value.length > 64 || value.includes(',') || !/^[0-9a-fA-F:.]+$/.test(value)) return null;
+  if (!value || value.length > 64 || value.includes(',') || !/^[0-9a-fA-F:.]+$/.test(value)) return '';
   return value;
 }
 
