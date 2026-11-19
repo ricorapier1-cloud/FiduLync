@@ -1,24 +1,21 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
+import { requireOwner } from '@/lib/ownerAuth';
+import { enforceDistributedRateLimit } from '@/lib/rateLimit';
 import { getPersonalRiskPolicy } from '@/lib/riskPolicy';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-const OWNER_EMAIL = 'ricorapier1@gmail.com';
-
 export async function GET(request: Request) {
-  const authorization = request.headers.get('authorization') || '';
-  const token = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
-  if (!token) return NextResponse.json({ error: 'Owner authentication required.' }, { status: 401 });
+  const owner = await requireOwner(request);
+  if (!owner) return NextResponse.json({ error: 'Owner authentication required.' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
+  const rate = await enforceDistributedRateLimit(request, 'owner-operations', 30, 60_000);
+  if (rate.unavailable) return NextResponse.json({ error: 'Owner operations are temporarily unavailable.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+  if (!rate.allowed) return NextResponse.json({ error: 'Owner operations rate limit exceeded.' }, { status: 429, headers: { 'Cache-Control': 'no-store' } });
 
   try {
     const supabase = getSupabaseAdmin();
-    const { data: auth, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !auth.user || auth.user.email?.toLowerCase() !== OWNER_EMAIL || !auth.user.email_confirmed_at) {
-      return NextResponse.json({ error: 'Owner access denied.' }, { status: 403 });
-    }
-
-    const userId = auth.user.id;
+    const userId = owner.id;
     const riskPolicy = getPersonalRiskPolicy();
     const { data: installations, error: installationError } = await supabase.from('mt5_installations')
       .select('id,label,status,created_at,last_seen_at,broker,server')
@@ -76,7 +73,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       generated_at: new Date().toISOString(),
-      owner: { email: OWNER_EMAIL, role: 'owner' },
+      owner: { email: owner.email, role: 'owner' },
       market_data: {
         active_installations: activeInstallations.length,
         total_installations: installations?.length ?? 0,
