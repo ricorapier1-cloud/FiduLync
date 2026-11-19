@@ -58,7 +58,7 @@ The MT5 publisher must run on the same Windows machine/VPS as the already logged
 1. Install MetaTrader 5 and log in to the intended broker account.
 2. Download FiduLync_MT5_Market_Publisher.py and mt5_risk_state.py from the Personal EA Lab.
 3. Install Python and the MetaTrader5 package: py -m pip install MetaTrader5.
-4. Register the terminal in /owner and set FIDULYNC_PUBLISHER_TOKEN in the Windows environment.
+4. Register the terminal in /owner and set FIDULYNC_INGEST_URL to https://fidulync.vercel.app/api/v1/market-data/ingest and FIDULYNC_PUBLISHER_TOKEN in the Windows environment.
 5. Configure canonical-to-broker symbol mappings, including suffixes, for example EURUSD=EURUSD.a and XAUUSD=XAUUSD.a.
 6. Run the publisher and confirm fresh quotes, closed candles, account snapshots and installation heartbeat in the owner console.
 7. Download QuantSupervisor.mqh to MQL5/Include/FiduLync/QuantSupervisor.mqh. Compile the EA and the no-trade connectivity probe in MetaEditor.
