@@ -4,23 +4,30 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 
 
-class AlgoLyncSecurityContractTests(unittest.TestCase):
+class PersonalQuantSecurityContractTests(unittest.TestCase):
     def read(self, path: str) -> str:
         return (ROOT / path).read_text(encoding="utf-8")
 
-    def test_public_license_endpoints_use_distributed_fail_closed_limits(self):
+    def test_retired_commercial_endpoints_fail_closed_with_gone(self):
         routes = (
             "app/api/v1/validate-license/route.ts",
-            "app/api/v1/bind-account/route.ts",
+            "app/api/v1/license/verify/route.ts",
+            "app/api/v1/license/heartbeat/route.ts",
+            "app/api/v1/license-bind/route.ts",
+            "app/api/v1/license-transfer/route.ts",
+            "app/api/v1/lookup-license/route.ts",
             "app/api/v1/provision-demo-license/route.ts",
-            "app/api/owner/verify/route.ts",
+            "app/api/v1/create-checkout/route.ts",
+            "app/api/v1/customer-portal/route.ts",
+            "app/api/v1/paystack-webhook/route.ts",
+            "app/api/paystack/webhook/route.ts",
+            "app/api/owner/licenses/route.ts",
         )
         for route in routes:
             with self.subTest(route=route):
                 source = self.read(route)
-                self.assertIn("enforceDistributedRateLimit", source)
-                self.assertIn("rate.unavailable", source)
-                self.assertNotIn("checkRateLimit(", source)
+                self.assertIn("status: 410", source)
+                self.assertIn("Personal Quant Edition", source)
 
     def test_rate_limiter_uses_trusted_proxy_ip_and_durable_rpc(self):
         source = self.read("lib/rateLimit.ts")
@@ -33,58 +40,6 @@ class AlgoLyncSecurityContractTests(unittest.TestCase):
         self.assertIn("occurred_at", migration)
         self.assertIn("GRANT EXECUTE", migration)
 
-    def test_license_validation_has_no_demo_prefix_or_local_development_bypass(self):
-        source = self.read("app/api/v1/validate-license/route.ts")
-        self.assertIn("ea_license_seats", source)
-        self.assertIn("rpc/bind_algolync_seat", source)
-        self.assertIn("account_type", source)
-        self.assertIn("DEMO_14D", source)
-        self.assertNotIn("LOCAL_DEV", source)
-        self.assertNotIn("startsWith('ALGO-DEMO')", source)
-
-    def test_account_binding_uses_atomic_server_side_rebind_rpc(self):
-        source = self.read("app/api/v1/bind-account/route.ts")
-        self.assertIn("rpc/bind_algolync_seat", source)
-        self.assertIn("previous_account_number", source)
-        migration = self.read("supabase/migrations/20261119103452_atomic_algolync_seat_binding.sql")
-        self.assertIn("interval '72 hours'", migration)
-        self.assertIn("FOR UPDATE", migration)
-        self.assertIn("included_live_seats", migration)
-        self.assertIn("included_demo_seats", migration)
-
-    def test_demo_provisioning_is_persisted_and_demo_only(self):
-        source = self.read("app/api/v1/provision-demo-license/route.ts")
-        self.assertIn("persistLicense", source)
-        self.assertIn("isSupabaseConfigured", source)
-        self.assertIn("included_live_seats: 0", source)
-        self.assertIn("included_demo_seats: 2", source)
-        catalog = self.read("components/QuantStrategyCatalog.tsx")
-        self.assertNotIn("-PREVIEW", catalog)
-        self.assertNotIn("-OFFLINE", catalog)
-        self.assertIn("No license key was issued", catalog)
-
-    def test_payments_use_database_pricing_and_exact_amount_before_minting(self):
-        checkout = self.read("app/api/v1/create-checkout/route.ts")
-        provision = self.read("lib/provisionLicense.ts")
-        self.assertIn("one_time_price_ngn", checkout)
-        self.assertIn("one_time_price_usd", checkout)
-        self.assertIn("ALGO_${eaSlug}_${plan}_${currency}", checkout)
-        self.assertIn("paidAmount !== expectedAmount", provision)
-        self.assertIn("rpc/provision_algolync_license_v2", provision)
-        self.assertNotIn("persisted || candidate", provision)
-
-    def test_storefront_and_risk_disclosure_are_canonical(self):
-        store = self.read("app/store/page.tsx")
-        licensing = self.read("app/licensing/page.tsx")
-        terms = self.read("app/terms/page.tsx")
-        self.assertIn("LegacyStoreTerminal", store)
-        self.assertIn("redirect('/store')", licensing)
-        self.assertIn("Backtests, simulated results and live verified telemetry", terms)
-        self.assertIn("72-hour cooldown", terms)
-        self.assertIn("high level of risk", terms)
-
-
-
     def test_owner_login_is_password_only_with_recovery_only_email(self):
         for path in ("app/owner/page.tsx", "components/OwnerConsole.tsx"):
             with self.subTest(path=path):
@@ -94,54 +49,92 @@ class AlgoLyncSecurityContractTests(unittest.TestCase):
                 self.assertNotIn("signInWithOtp", source)
                 self.assertNotIn("verifyOtp", source)
 
-    def test_privileged_owner_mutations_are_authenticated_and_audited(self):
+    def test_private_owner_mutations_verify_the_owner_identity(self):
         owner_routes = (
-            "app/api/owner/licenses/route.ts",
+            "app/api/owner/operations/route.ts",
             "app/api/owner/mt5-installations/route.ts",
             "app/api/owner/control-plane/route.ts",
-            "app/api/owner/operations/route.ts",
-            "app/api/owner/market-intelligence/route.ts",
-            "app/api/owner/diagnostics/route.ts",
+            "app/api/owner/research-governance/route.ts",
+            "app/api/owner/research-governance/models/route.ts",
+            "app/api/owner/research-governance/validate/route.ts",
+            "app/api/owner/artifacts/upload-url/route.ts",
+            "app/api/owner/artifacts/register/route.ts",
             "app/api/mt5/installations/route.ts",
         )
         for route in owner_routes:
             with self.subTest(route=route):
-                self.assertIn("requireOwner", self.read(route))
-        revoke = self.read("app/api/owner/licenses/route.ts")
-        self.assertIn("export async function DELETE", revoke)
-        self.assertIn("rpc/revoke_algolync_license", revoke)
-        control = self.read("app/owner/OwnerControlPlane.tsx")
-        self.assertIn("Revoke licence", control)
-        diagnostics = self.read("app/api/owner/diagnostics/route.ts")
-        self.assertNotIn("x-algo-key", diagnostics)
+                self.assertIn("requireOwner(request)", self.read(route))
 
-    def test_secondary_pages_have_explicit_terminal_navigation(self):
-        pages = (
-            "app/store/page.tsx",
-            "app/account/page.tsx",
-            "app/owner/page.tsx",
-            "app/privacy/page.tsx",
-            "app/terms/page.tsx",
-            "app/faq/page.tsx",
-            "app/guide/page.tsx",
-        )
-        for page in pages:
+    def test_mt5_market_ingestion_uses_installation_tokens_and_replay_protection(self):
+        source = self.read("app/api/v1/market-data/ingest/route.ts")
+        self.assertIn("x-mt5-timestamp", source)
+        self.assertIn("x-mt5-nonce", source)
+        self.assertIn("mt5_ingest_nonces", source)
+        self.assertIn("token_hash", source)
+        self.assertIn("mt5_market_candles", source)
+        self.assertIn("on_conflict=installation_id,symbol,timeframe,bar_time", source)
+        self.assertIn("installation.status", source)
+
+    def test_legacy_shared_secret_macro_signal_is_browser_same_origin_only(self):
+        source = self.read("app/api/v1/macro-signal/route.ts")
+        self.assertIn("isSameOriginBrowserRequest", source)
+        self.assertNotIn("isAlgoAuthorized", source)
+        self.assertNotIn("ALGO_PRIVATE_API_KEY", source)
+
+    def test_personal_ea_lab_contains_no_customer_checkout_or_license_ui(self):
+        store = self.read("app/store/page.tsx")
+        terminal = self.read("app/components/StoreTerminal.tsx")
+        owner = self.read("app/owner/OwnerOperations.tsx")
+        self.assertIn("StoreTerminal", store)
+        self.assertNotIn("LegacyStoreTerminal", store)
+        self.assertNotIn("Paystack", terminal)
+        self.assertNotIn("Checkout", terminal)
+        self.assertNotIn("license_key", terminal)
+        self.assertIn("QuantSupervisor.mqh", terminal)
+        self.assertIn("GHOST PROTOCOL", terminal)
+        self.assertNotIn("OwnerControlPlane", owner)
+        self.assertNotIn("id: 'platform'", owner)
+
+    def test_personal_policy_and_ghost_gate_are_fail_closed(self):
+        policy = self.read("lib/riskPolicy.ts")
+        ghost = self.read("lib/quantRisk.ts")
+        signal = self.read("lib/signalEngine.ts")
+        self.assertIn("executionEnabled: false", policy)
+        self.assertIn("modelValidated: false", policy)
+        self.assertIn("maxPerTradeRiskPct: 1.0", policy)
+        self.assertIn("maxHighWaterDrawdownPct: 15.0", policy)
+        self.assertIn("maxConsecutiveLosses: 3", policy)
+        self.assertIn("GHOST_PROTOCOL_THRESHOLD = 0.65", ghost)
+        self.assertIn("safeToTrade = riskBudget.approved && ghost.allowed", signal)
+        self.assertIn("quoteAgeMs <= personalRiskPolicy.maxQuoteAgeMs", signal)
+
+    def test_mt5_publisher_and_historical_backfill_are_read_only(self):
+        publisher = self.read("scripts/mt5_market_publisher.py")
+        backfill = self.read("scripts/mt5_historical_backfill.py")
+        supervisor = self.read("public/downloads/QuantSupervisor.mqh")
+        self.assertIn("FIDULYNC_INGEST_URL", publisher)
+        self.assertIn("copy_rates_from_pos", publisher)
+        self.assertIn("copy_rates_range", backfill)
+        self.assertIn("MT5_BACKFILL_START", backfill)
+        self.assertIn("1996-01-01", backfill)
+        self.assertNotIn("order_send", publisher)
+        self.assertNotIn("order_send", backfill)
+        self.assertIn("x-mt5-timestamp", supervisor)
+        self.assertIn("x-mt5-nonce", supervisor)
+
+    def test_secondary_customer_pages_redirect_to_private_owner_console(self):
+        for page in ("app/account/page.tsx", "app/customer/page.tsx", "app/licensing/page.tsx"):
             with self.subTest(page=page):
-                source = self.read(page)
-                if page == "app/store/page.tsx":
-                    source += self.read("app/components/LegacyStoreTerminal.tsx")
-                if page == "app/account/page.tsx":
-                    source += self.read("components/AlgoLyncAccountPortal.tsx")
-                self.assertIn("BACK TO TERMINAL", source)
-        shell = self.read("components/PlatformShell.tsx")
-        self.assertIn("const mobileLinks = [", shell)
-        self.assertIn("AlgoLync Store", shell)
+                self.assertIn("redirect('/owner')", self.read(page))
 
-    def test_mql5_client_sends_actual_account_mode(self):
-        source = self.read("mql5/MacroLyncLicense.mqh")
-        self.assertIn("ACCOUNT_TRADE_MODE", source)
-        self.assertIn("account_number", source)
-        self.assertIn("account_type", source)
+    def test_personal_risk_policy_discloses_research_only_boundary(self):
+        terms = self.read("app/terms/page.tsx")
+        readme = self.read("README.md")
+        self.assertIn("Personal Quant Edition", terms)
+        self.assertIn("not investment advice", terms)
+        self.assertIn("does not place, modify or close broker orders", terms)
+        self.assertIn("FRED", terms)
+        self.assertIn("Personal, non-commercial use only", readme)
 
 
 if __name__ == "__main__":
