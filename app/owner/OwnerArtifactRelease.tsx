@@ -40,7 +40,7 @@ export default function OwnerArtifactRelease({ accessToken }: { accessToken: str
       if (!response.ok || !Array.isArray(payload.artifacts) || !Array.isArray(payload.products)) throw new Error(payload.error || 'Artifact registry could not be loaded.');
       setArtifacts(payload.artifacts);
       setProducts(payload.products);
-      if (payload.products.length > 0 && !payload.products.some((product) => product.slug === slug)) setSlug(payload.products[0].slug);
+      if (payload.products.length > 0) setSlug((current) => payload.products?.some((product) => product.slug === current) ? current : payload.products?.[0]?.slug ?? current);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Artifact registry could not be loaded.');
     } finally {
