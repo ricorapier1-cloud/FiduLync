@@ -96,6 +96,7 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
   const [copyState, setCopyState] = useState('');
   const [licenseKeyInput, setLicenseKeyInput] = useState('');
   const [mt5AccountInput, setMt5AccountInput] = useState('');
+  const [mt5AccountType, setMt5AccountType] = useState<'LIVE' | 'DEMO'>('LIVE');
   const [verifyingLicense, setVerifyingLicense] = useState(false);
   const [licenseResponse, setLicenseResponse] = useState<{
     valid: boolean;
@@ -125,7 +126,9 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           license_key: licenseKeyInput.trim(),
-          mt5_account: mt5AccountInput.trim(),
+          account_number: mt5AccountInput.trim(),
+          account_type: mt5AccountType,
+          ea_slug: selectedEaSlug,
         }),
       });
       const data = await res.json();
@@ -420,7 +423,7 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
                 <span className="font-mono text-[10px] uppercase tracking-wider text-emerald-300">License Verification Console</span>
               </div>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <div>
                   <label htmlFor="license-key-input" className="block font-mono text-[9px] tracking-wide text-slate-500">
                     ONE-TIME LICENSE KEY
@@ -446,6 +449,13 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
                     placeholder="e.g. 5839201"
                     className="mt-1.5 h-10 w-full rounded-md border border-white/[0.1] bg-[#080a0f] px-3 font-mono text-xs text-slate-100 outline-none focus:border-emerald-300/40"
                   />
+                </div>
+                <div>
+                  <label htmlFor="mt5-account-type" className="block font-mono text-[9px] tracking-wide text-slate-500">ACCOUNT MODE</label>
+                  <select id="mt5-account-type" value={mt5AccountType} onChange={(event) => setMt5AccountType(event.target.value as 'LIVE' | 'DEMO')} className="mt-1.5 h-10 w-full rounded-md border border-white/[0.1] bg-[#080a0f] px-3 font-mono text-xs text-slate-100 outline-none focus:border-emerald-300/40">
+                    <option value="LIVE">LIVE</option>
+                    <option value="DEMO">DEMO</option>
+                  </select>
                 </div>
               </div>
 
