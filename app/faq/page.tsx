@@ -62,7 +62,7 @@ export default function HelpPage() {
           </details>
         ))}
       </div>
-      <p className="mt-8 text-xs text-slate-500">For account access or technical issues, use the support link in the application. Never send passwords or secret keys.</p>
+      <p className="mt-8 text-xs text-slate-500">For account access, use the private Owner Console. Never send passwords, publisher tokens or API keys in chat or screenshots.</p>
     </main>
   );
 }
