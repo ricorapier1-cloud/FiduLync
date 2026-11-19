@@ -65,7 +65,7 @@ The MT5 publisher must run on the same Windows machine/VPS as the already logged
 8. Configure the EA with the installation ID and private publisher token. Keep token-bearing .set files private.
 9. Run MetaEditor compilation with zero errors and zero warnings, Strategy Tester, and demo forward testing before considering live use.
 
-The Windows MT5 environment is required for actual MQL5 compilation and broker-terminal validation. A web build cannot prove that an EA compiles or that a broker feed is live.
+For long-term research, run the separate Historical Candle Backfill utility once after the terminal is connected. It imports only broker-provided closed H1/H4/D1 bars from the configured start date (default 1996-01-01), in bounded batches, and reports actual coverage. Broker retention may be shorter than 30 years; missing periods remain missing and must never be synthesized. The Windows MT5 environment is required for actual MQL5 compilation and broker-terminal validation. A web build cannot prove that an EA compiles or that a broker feed is live.
 
 ## Server environment
 
