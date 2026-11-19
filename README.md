@@ -111,3 +111,8 @@ npm run build
 ```
 
 Trading involves substantial risk. Signals are research and execution inputs, not guarantees; EAs must retain independent account-level exposure, equity, and drawdown controls.
+
+
+## Institutional hardening standard
+
+See [Institutional Platform Hardening Standard](docs/INSTITUTIONAL_PLATFORM_HARDENING_SPEC.md) for the security, licensing, navigation, disclosure and release gates.
