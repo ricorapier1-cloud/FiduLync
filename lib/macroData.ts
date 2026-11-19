@@ -93,6 +93,8 @@ function isCurrency(value: unknown): value is MacroCurrency {
     && (value.twoYearYieldSource === undefined || value.twoYearYieldSource === 'provider' || value.twoYearYieldSource === 'reference')
     && (value.policyRateSource === undefined || value.policyRateSource === 'provider' || value.policyRateSource === 'reference')
     && (value.inflationSource === undefined || value.inflationSource === 'provider' || value.inflationSource === 'reference')
+    && (value.policyRateProvider === undefined || ['fred', 'alpha-vantage', 'macro-provider', 'ecb', 'bank-of-canada', 'bank-of-england', 'bank-of-japan', 'reserve-bank-of-australia', 'reserve-bank-of-new-zealand', 'swiss-national-bank'].includes(String(value.policyRateProvider)))
+    && (value.inflationProvider === undefined || ['fred', 'alpha-vantage', 'macro-provider', 'ecb', 'bank-of-canada', 'world-bank'].includes(String(value.inflationProvider)))
     && (value.policyRateAsOf === undefined || (typeof value.policyRateAsOf === 'string' && Number.isFinite(Date.parse(value.policyRateAsOf))))
     && (value.inflationAsOf === undefined || (typeof value.inflationAsOf === 'string' && Number.isFinite(Date.parse(value.inflationAsOf))))
     && (value.policyRateSourceUrl === undefined || (typeof value.policyRateSourceUrl === 'string' && value.policyRateSourceUrl.startsWith('https://')))
