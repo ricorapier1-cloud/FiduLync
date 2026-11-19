@@ -153,10 +153,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
       return ['frankfurter', 'exchangerate-api', 'gold-api'].includes(quote.source)
         && age >= 0 && age <= 48 * 60 * 60_000;
     })
-    || (Object.keys(snapshot.ecbRates ?? {}).length > 0
-      && Number.isFinite(Date.parse(snapshot.asOf))
-      && now - Date.parse(snapshot.asOf) >= 0
-      && now - Date.parse(snapshot.asOf) <= 24 * 60 * 60_000)
+
   );
   const verifiedMacroCurrencies = currencies.filter((currency) => currency.code !== 'XAU'
     && currency.policyRateSource === 'provider' && currency.inflationSource === 'provider');
@@ -305,7 +302,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
             <thead><tr><th>CCY</th><th>POLICY AUTHORITY</th><th>POLICY RATE</th><th>INFLATION</th><th>2Y YIELD</th><th>REAL RATE</th><th>POLICY STANCE</th></tr></thead>
             <tbody>{currencies.length === 0 ? <tr><td colSpan={7}>No provider-verified policy observations are available.</td></tr> : currencies.map((currency) => {
               const realRate = currency.policyRate - currency.inflation;
-              return <tr key={currency.code}><td><span className="macro-currency-code mono">{currency.code}</span></td><td>{currency.centralBank}</td><td className="mono">{formatRate(currency.policyRate)}<small>{currency.policyRateSource === 'provider' ? 'PROVIDER' : 'REFERENCE'}</small></td><td><span className="mono">{formatRate(currency.inflation)}</span><small>{currency.corePce !== undefined && currency.cpi !== undefined ? `Core PCE ${formatRate(currency.corePce)} · CPI ${formatRate(currency.cpi)}` : currency.inflationLabel}</small></td><td className="mono">{currency.twoYearYield === undefined ? '—' : <>{formatRate(currency.twoYearYield)}<small>{currency.twoYearYieldSource === 'provider' ? 'PROVIDER' : 'REFERENCE'}</small></>}</td><td className={`mono ${realRate >= 0 ? 'macro-positive' : 'macro-negative'}`}>{realRate > 0 ? '+' : ''}{formatRate(realRate)}</td><td><span className="macro-stance">{currency.stance}</span></td></tr>;
+              return <tr key={currency.code}><td><span className="macro-currency-code mono">{currency.code}</span></td><td>{currency.centralBank}</td><td className="mono">{formatRate(currency.policyRate)}<small>{currency.policyRateSource === 'provider' ? `OBS ${currency.policyRateAsOf ?? 'DATE UNKNOWN'}` : 'REFERENCE'}</small></td><td><span className="mono">{formatRate(currency.inflation)}</span><small>{currency.corePce !== undefined && currency.cpi !== undefined ? `Core PCE ${formatRate(currency.corePce)} (${currency.corePceAsOf ?? 'date n/a'}) · CPI ${formatRate(currency.cpi)} (${currency.cpiAsOf ?? 'date n/a'})` : `${currency.inflationLabel} · OBS ${currency.inflationAsOf ?? 'DATE UNKNOWN'}`}</small></td><td className="mono">{currency.twoYearYield === undefined ? '—' : <>{formatRate(currency.twoYearYield)}<small>{currency.twoYearYieldSource === 'provider' ? `OBS ${currency.twoYearYieldAsOf ?? 'DATE UNKNOWN'}` : 'REFERENCE'}</small></>}</td><td className={`mono ${realRate >= 0 ? 'macro-positive' : 'macro-negative'}`}>{realRate > 0 ? '+' : ''}{formatRate(realRate)}</td><td><span className="macro-stance">{currency.stance}</span></td></tr>;
             })}</tbody>
           </table>
           <div className="macro-currency-cards">{currencies.map((currency) => {
