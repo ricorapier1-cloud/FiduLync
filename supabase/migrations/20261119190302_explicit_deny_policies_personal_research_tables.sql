@@ -1,0 +1,16 @@
+drop policy if exists "macro_observations_deny_browser_roles" on public.macro_observations;
+create policy "macro_observations_deny_browser_roles" on public.macro_observations for all to anon, authenticated using (false) with check (false);
+drop policy if exists "feed_health_events_deny_browser_roles" on public.feed_health_events;
+create policy "feed_health_events_deny_browser_roles" on public.feed_health_events for all to anon, authenticated using (false) with check (false);
+drop policy if exists "cross_asset_snapshots_deny_browser_roles" on public.cross_asset_snapshots;
+create policy "cross_asset_snapshots_deny_browser_roles" on public.cross_asset_snapshots for all to anon, authenticated using (false) with check (false);
+drop policy if exists "research_hypotheses_deny_browser_roles" on public.research_hypotheses;
+create policy "research_hypotheses_deny_browser_roles" on public.research_hypotheses for all to anon, authenticated using (false) with check (false);
+drop policy if exists "research_runs_deny_browser_roles" on public.research_runs;
+create policy "research_runs_deny_browser_roles" on public.research_runs for all to anon, authenticated using (false) with check (false);
+drop policy if exists "validation_reports_deny_browser_roles" on public.validation_reports;
+create policy "validation_reports_deny_browser_roles" on public.validation_reports for all to anon, authenticated using (false) with check (false);
+drop policy if exists "macro_event_surprises_deny_browser_roles" on public.macro_event_surprises;
+create policy "macro_event_surprises_deny_browser_roles" on public.macro_event_surprises for all to anon, authenticated using (false) with check (false);
+drop policy if exists "forex_driver_snapshots_deny_browser_roles" on public.forex_driver_snapshots;
+create policy "forex_driver_snapshots_deny_browser_roles" on public.forex_driver_snapshots for all to anon, authenticated using (false) with check (false);
