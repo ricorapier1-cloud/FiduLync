@@ -59,4 +59,10 @@ export type MarketQuote = {
   changePercent: number | null;
   timestamp: string;
   source: 'mt5' | 'finnhub' | 'frankfurter' | 'exchangerate-api' | 'gold-api';
+  bid?: number;
+  ask?: number;
+  spread_points?: number;
+  point?: number;
+  broker?: string;
+  server?: string;
 };
