@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 
+type Product = { slug: string; name: string };
+
 type Artifact = {
   ea_slug: string;
   storage_path: string;
@@ -16,6 +18,7 @@ type Artifact = {
 
 export default function OwnerArtifactRelease({ accessToken }: { accessToken: string }) {
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [slug, setSlug] = useState('eridam-nexus-pro');
   const [version, setVersion] = useState('1.0.0');
   const [file, setFile] = useState<File | null>(null);
@@ -33,9 +36,11 @@ export default function OwnerArtifactRelease({ accessToken }: { accessToken: str
         headers: { Authorization: 'Bearer ' + accessToken },
         cache: 'no-store',
       });
-      const payload = await response.json() as { artifacts?: Artifact[]; error?: string };
-      if (!response.ok || !Array.isArray(payload.artifacts)) throw new Error(payload.error || 'Artifact registry could not be loaded.');
+      const payload = await response.json() as { artifacts?: Artifact[]; products?: Product[]; error?: string };
+      if (!response.ok || !Array.isArray(payload.artifacts) || !Array.isArray(payload.products)) throw new Error(payload.error || 'Artifact registry could not be loaded.');
       setArtifacts(payload.artifacts);
+      setProducts(payload.products);
+      if (payload.products.length > 0 && !payload.products.some((product) => product.slug === slug)) setSlug(payload.products[0].slug);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Artifact registry could not be loaded.');
     } finally {
@@ -131,9 +136,8 @@ export default function OwnerArtifactRelease({ accessToken }: { accessToken: str
 
       <form onSubmit={upload} className="grid gap-3 sm:grid-cols-2">
         <label className="text-[10px] text-slate-400">EA product
-          <select value={slug} onChange={(event) => setSlug(event.target.value)} className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-[#080e15] px-3 text-xs text-white">
-            <option value="eridam-nexus-pro">Eridam Nexus Adaptive Pro</option>
-            <option value="velocity-vault">Velocity Vault Momentum</option>
+          <select value={slug} onChange={(event) => setSlug(event.target.value)} disabled={products.length === 0} className="mt-1.5 h-10 w-full rounded-lg border border-white/10 bg-[#080e15] px-3 text-xs text-white disabled:opacity-50">
+            {products.map((product) => <option key={product.slug} value={product.slug}>{product.name}</option>)}
           </select>
         </label>
         <label className="text-[10px] text-slate-400">Artifact version
@@ -172,7 +176,7 @@ export default function OwnerArtifactRelease({ accessToken }: { accessToken: str
       </label>
       {error && <p role="alert" className="rounded-lg border border-rose-300/20 bg-rose-300/5 p-3 text-[10px] text-rose-200">{error}</p>}
       {notice && <p role="status" className="rounded-lg border border-emerald-300/20 bg-emerald-300/5 p-3 text-[10px] text-emerald-200">{notice}</p>}
-      <p className="text-[9px] leading-4 text-slate-500">The app verifies that the private object exists and records its SHA-256 metadata. It cannot independently prove the MetaEditor build or trading performance; those checks require the Windows MT5 terminal and your explicit owner attestation.</p>
+      <p className="text-[9px] leading-4 text-slate-500">The app verifies the private object and re-downloads it to compare the actual bytes with the registered SHA-256 before release approval. It cannot independently prove the MetaEditor build or trading performance; those checks require the Windows MT5 terminal and your explicit owner attestation.</p>
     </div>
   );
 }
