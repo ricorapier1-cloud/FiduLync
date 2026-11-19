@@ -10,6 +10,7 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
   const [currency, setCurrency] = useState<'NGN' | 'USD'>('NGN');
   const [email, setEmail] = useState('');
   const [mt5Account, setMt5Account] = useState('');
+  const [riskAcknowledged, setRiskAcknowledged] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -58,6 +59,10 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
+    if (!riskAcknowledged) {
+      setErrorMsg('Please acknowledge the trading-risk disclosure and terms before continuing.');
+      return;
+    }
     setLoading(true);
     setErrorMsg(null);
     setSuccessMsg(null);
@@ -334,9 +339,15 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
             </p>
           </div>
 
+          <div className="rounded-xl border border-amber-300/20 bg-amber-300/[0.04] p-3.5 text-[11px] leading-5 text-slate-300">
+            <strong className="text-amber-200">Trading risk disclosure:</strong> Forex and leveraged products can cause substantial losses, including loss of the full amount invested. EA software, simulated metrics and historical backtests do not guarantee future results. Monthly access lasts 30 days and must be renewed by a new payment; the one-time option is non-recurring.
+            <p className="mt-2"><a href="/terms" target="_blank" rel="noreferrer" className="text-emerald-300 underline">Read full Terms &amp; Risk Disclosure</a> · <a href="/privacy" target="_blank" rel="noreferrer" className="text-emerald-300 underline">Privacy Notice</a></p>
+            <label className="mt-3 flex items-start gap-2 text-xs text-slate-200"><input type="checkbox" checked={riskAcknowledged} onChange={(event) => setRiskAcknowledged(event.target.checked)} required className="mt-0.5" /><span>I have read and acknowledge the trading risks, product terms, licence duration and data-processing notice.</span></label>
+          </div>
+
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !riskAcknowledged}
             className="w-full rounded-xl bg-emerald-500 py-3.5 font-mono text-sm font-bold text-black shadow-lg shadow-emerald-500/20 transition-all hover:bg-emerald-400 disabled:opacity-50"
           >
             {loading ? 'INITIALIZING PAYSTACK CHECKOUT…' : `PROVISION ${currentEa.name.toUpperCase()} • ${priceDisplay}`}
