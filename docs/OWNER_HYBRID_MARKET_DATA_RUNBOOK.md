@@ -35,7 +35,7 @@ The repository includes scripts/mt5_market_publisher.py. It uses the official Me
 3. Create a publisher token in /owner, then set it only in the local environment as FIDULYNC_PUBLISHER_TOKEN.
 4. Set FIDULYNC_INGEST_URL to https://fidulync.vercel.app/api/v1/market-data/ingest.
 5. Set MT5_SYMBOL_MAP for the symbols actually offered by the broker, including suffixes, for example EURUSD=EURUSD.a,GBPUSD=GBPUSD.a,USDJPY=USDJPY.a,XAUUSD=XAUUSD.a. Partial maps are supported; unavailable symbols are not fabricated.
-6. Run py scripts/mt5_market_publisher.py. It sends bounded recent closed H1/H4/D1 bars and refreshed broker quotes, then only new closed bars. It never opens or modifies trades.
+6. Keep MT5_PUBLISH_INTERVAL_SECONDS=1 (the default; the Ghost Protocol quote-age ceiling is 2 seconds). Run py scripts/mt5_market_publisher.py. It sends bounded recent closed H1/H4/D1 bars and refreshed broker quotes, then only new closed bars. It never opens or modifies trades.
 7. Check the owner console's publisher last-seen time, quote age and market diagnostics. If the publisher stops, quotes become stale and Ghost Protocol abstains.
 
 ## Historical 1996–2026 research backfill
