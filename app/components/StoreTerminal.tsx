@@ -108,16 +108,6 @@ export default function StoreTerminal({ initialSnapshot, session }: StoreTermina
     }
   }
 
-  async function copyText(label: string, value: string) {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopyState(`${label} copied`);
-    } catch (error) {
-      console.error(`Unable to copy ${label.toLowerCase()}:`, error);
-      setCopyState('Clipboard access is unavailable');
-    }
-  }
-
   return (
     <div className="min-h-screen bg-[#080a0f] text-slate-100">
       <div className="mx-auto w-full max-w-7xl px-5 py-9 sm:px-8 lg:py-12 pb-44 sm:pb-16">
