@@ -38,7 +38,7 @@ export async function POST(request: Request) {
       return json({ error: 'The uploaded private .ex5 object could not be verified.' }, 409);
     }
 
-    const recorded = await supabaseQuery('rpc/record_ea_product_artifact_upload', {
+    const recorded = await supabaseQuery<Record<string, unknown>>('rpc/record_ea_product_artifact_upload', {
       method: 'POST',
       body: {
         p_ea_slug: slug,
@@ -52,12 +52,12 @@ export async function POST(request: Request) {
     if (!recorded) throw new Error('Artifact registration and owner audit transaction did not complete.');
     return json({
       uploaded: true,
-      release_approved: false,
+      release_approved: recorded.release_approved === true,
       ea_slug: slug,
       artifact_version: version,
       sha256,
       size_bytes: size,
-      message: 'Private .ex5 stored and SHA-256 metadata registered. Owner release approval and MT5 compatibility verification are still required.',
+      message: recorded.release_approved === true ? 'The identical private .ex5 was already registered and remains approved.' : 'Private .ex5 stored and SHA-256 metadata registered. Owner release approval and MT5 compatibility verification are still required.',
     }, 201);
   } catch (error) {
     console.error('Owner artifact registration failed:', error instanceof Error ? error.message : String(error));
