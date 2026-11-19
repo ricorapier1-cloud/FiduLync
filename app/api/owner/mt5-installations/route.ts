@@ -53,6 +53,7 @@ export async function POST(request: Request) {
         metadata: { label, broker, server },
       });
     } catch (auditError) {
+      console.error('MT5 installation audit failed; revoking unlogged token:', auditError);
       await supabaseQuery('mt5_installations', { method: 'PATCH', query: `id=eq.${rows[0].id}&user_id=eq.${owner.id}`, body: { status: 'revoked' } });
       throw new Error('Installation audit failed; the token was revoked and not returned.');
     }
