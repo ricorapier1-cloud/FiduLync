@@ -9,6 +9,7 @@ type Installation = { id: string; label: string; status: string; broker: string 
 
 export default function OwnerConsole() {
   const [email, setEmail] = useState('ricorapier1@gmail.com');
+  const [password, setPassword] = useState('');
   const [session, setSession] = useState<Session | null>(null);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
@@ -76,18 +77,34 @@ export default function OwnerConsole() {
     }
   }
 
-  async function sendLoginLink() {
+  async function signInWithPassword() {
     if (!supabase) { setError('Supabase public authentication settings are not configured.'); return; }
     if (email.trim().toLowerCase() !== 'ricorapier1@gmail.com') { setError('Only the registered owner email can access this console.'); return; }
+    if (!password) { setError('Enter your owner password.'); return; }
     setBusy(true); setError(''); setNotice('');
     try {
-      const { error: authError } = await supabase.auth.signInWithOtp({
+      const { error: authError } = await supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
-        options: { emailRedirectTo: `${window.location.origin}/owner` },
+        password,
       });
       if (authError) throw authError;
-      setNotice('A secure sign-in link has been sent to the owner inbox. Open it on this device to continue.');
-    } catch (e) { setError(e instanceof Error ? e.message : 'Could not send owner sign-in link.'); }
+      setPassword('');
+      setNotice('Password accepted. Verifying the owner session with the server…');
+    } catch (e) { setError(e instanceof Error ? e.message : 'Owner password sign-in failed.'); }
+    finally { setBusy(false); }
+  }
+
+  async function requestPasswordReset() {
+    if (!supabase) { setError('Supabase public authentication settings are not configured.'); return; }
+    if (email.trim().toLowerCase() !== 'ricorapier1@gmail.com') { setError('Enter the registered owner email address.'); return; }
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+        redirectTo: new URL('/owner', window.location.origin).toString(),
+      });
+      if (resetError) throw resetError;
+      setNotice('If password recovery is enabled, a password-reset link will be sent to the owner inbox. Use it only to reset a forgotten password.');
+    } catch (e) { setError(e instanceof Error ? e.message : 'Password recovery could not be requested.'); }
     finally { setBusy(false); }
   }
 
@@ -157,11 +174,15 @@ export default function OwnerConsole() {
     {notice && <p role="status" className="mb-4 rounded border border-emerald-400/20 bg-emerald-400/5 p-3 text-sm text-emerald-200">{notice}</p>}
     {!ownerSession ? <section className="rounded-xl border border-white/10 bg-[#0a111b] p-6">
       <h2 className="text-lg font-semibold">Verify owner identity</h2>
-      <p className="mt-2 text-sm text-slate-400">A one-time secure sign-in link will be sent to the owner email. Customer support addresses cannot access this console.</p>
+      <p className="mt-2 text-sm text-slate-400">Sign in with the registered owner email and password. Customer support addresses cannot access this console.</p>
       <label className="mt-5 block text-xs text-slate-400">Owner email
-        <input value={email} onChange={e=>setEmail(e.target.value)} type="email" autoComplete="email" className="mt-2 h-11 w-full rounded border border-white/10 bg-black/30 px-3 text-sm text-white" />
+        <input value={email} onChange={e=>setEmail(e.target.value)} type="email" autoComplete="username" className="mt-2 h-11 w-full rounded border border-white/10 bg-black/30 px-3 text-sm text-white" />
       </label>
-      <button disabled={busy} onClick={()=>void sendLoginLink()} className="mt-4 h-11 rounded bg-emerald-300 px-5 text-sm font-semibold text-slate-950 disabled:opacity-50">{busy?'SENDING…':'SEND SECURE SIGN-IN LINK'}</button>
+      <label className="mt-4 block text-xs text-slate-400">Owner password
+        <input value={password} onChange={e=>setPassword(e.target.value)} type="password" autoComplete="current-password" className="mt-2 h-11 w-full rounded border border-white/10 bg-black/30 px-3 text-sm text-white" />
+      </label>
+      <button disabled={busy || !password} onClick={()=>void signInWithPassword()} className="mt-4 h-11 rounded bg-emerald-300 px-5 text-sm font-semibold text-slate-950 disabled:opacity-50">{busy?'SIGNING IN…':'SIGN IN WITH PASSWORD'}</button>
+      <button disabled={busy} onClick={()=>void requestPasswordReset()} className="ml-3 mt-4 h-11 rounded border border-white/15 px-4 text-xs text-slate-300 disabled:opacity-50">Forgot password?</button>
     </section> : <>
       <div className="mb-5 flex items-center justify-between rounded-lg border border-emerald-400/20 bg-emerald-400/5 p-4">
         <div><p className="font-mono text-[10px] text-emerald-300">OWNER VERIFIED</p><p className="mt-1 text-sm">{session?.user.email}</p></div>
