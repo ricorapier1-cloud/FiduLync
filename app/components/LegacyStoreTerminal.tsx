@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import BrandGlyph from '@/components/BrandGlyph';
 import Link from 'next/link';
@@ -15,7 +15,6 @@ import type { MacroSnapshot } from '@/types/macro';
 type StoreTerminalProps = {
   initialFleet: { configured: boolean; heartbeats: HeartbeatRecord[] };
   telemetryError: string;
-  bridgeSource: string;
   initialSnapshot: MacroSnapshot;
   initialTradeExpectancy: TradeExpectancy;
   session: ReturnType<typeof getLiquiditySession>;
@@ -46,19 +45,6 @@ type SignalResult = {
 
 const symbols = ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'USDCAD', 'AUDUSD', 'NZDUSD', 'EURJPY', 'XAUUSD'];
 
-function subscribeToOrigin(onChange: () => void) {
-  window.addEventListener('popstate', onChange);
-  return () => window.removeEventListener('popstate', onChange);
-}
-
-function getBrowserOrigin() {
-  return window.location.origin;
-}
-
-function getServerOrigin() {
-  return '';
-}
-
 function isSignalResult(value: unknown): value is SignalResult {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
   const result = value as Record<string, unknown>;
@@ -86,15 +72,13 @@ function isSignalResult(value: unknown): value is SignalResult {
     && typeof result.timestamp_utc === 'string';
 }
 
-export default function StoreTerminal({ initialFleet, telemetryError, bridgeSource, initialSnapshot, initialTradeExpectancy, session }: StoreTerminalProps) {
+export default function StoreTerminal({ initialFleet, telemetryError, initialSnapshot, initialTradeExpectancy, session }: StoreTerminalProps) {
   const [selectedEaSlug, setSelectedEaSlug] = useState('eridam-nexus-pro');
   const router = useRouter();
   const [symbol, setSymbol] = useState('EURUSD');
-  const endpoint = useSyncExternalStore(subscribeToOrigin, getBrowserOrigin, getServerOrigin);
   const [signal, setSignal] = useState<SignalResult | null>(null);
   const [signalError, setSignalError] = useState('');
   const [testing, setTesting] = useState(false);
-  const [copyState, setCopyState] = useState('');
   const [licenseKeyInput, setLicenseKeyInput] = useState('');
   const [mt5AccountInput, setMt5AccountInput] = useState('');
   const [mt5AccountType, setMt5AccountType] = useState<'LIVE' | 'DEMO'>('LIVE');
@@ -177,16 +161,6 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
       setSignalError('The signal endpoint could not be reached.');
     } finally {
       setTesting(false);
-    }
-  }
-
-  async function copyText(label: string, value: string) {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopyState(`${label} copied`);
-    } catch (error) {
-      console.error(`Unable to copy ${label.toLowerCase()}:`, error);
-      setCopyState('Clipboard access is unavailable');
     }
   }
 
@@ -315,31 +289,23 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
 
           <div className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-5 sm:p-6">
             <div className="font-mono text-[9px] tracking-[0.17em] text-slate-500">04 / MT5 CONNECTION</div>
-            <h2 className="mt-1 text-lg font-semibold">Signal &amp; telemetry bridge</h2>
-            <div className="mt-5 space-y-3 rounded-lg border border-white/[0.07] bg-black/20 p-4 font-mono text-[10px]">
-              <div><span className="text-slate-500">SIGNAL</span><p className="mt-1 break-all text-emerald-200">{endpoint}/api/v1/macro-signal?symbol=EURUSD</p></div>
-              <div><span className="text-slate-500">HEARTBEAT</span><p className="mt-1 break-all text-emerald-200">{endpoint}/api/v1/ea-heartbeat</p></div>
-              <div><span className="text-slate-500">CLOSED-TRADE LEDGER</span><p className="mt-1 break-all text-emerald-200">{endpoint}/api/v1/trade-log</p></div>
-              <div><span className="text-slate-500">REQUIRED HEADER</span><p className="mt-1 text-slate-300">x-algo-key: &lt;ALGO_PRIVATE_API_KEY&gt;</p></div>
-            </div>
+            <h2 className="mt-1 text-lg font-semibold">MT5 integration resources</h2>
+            <p className="mt-3 max-w-2xl text-xs leading-5 text-slate-400">
+              Download the public integration helpers and follow the terminal setup guide. Private authentication details, internal service routes and publisher headers are not displayed in the public storefront.
+            </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <a href="/mql5/MacroLyncBridge.mqh" download className="inline-flex h-9 items-center gap-2 rounded-md border border-white/[0.1] px-3 text-[10px] text-slate-300 hover:border-emerald-300/30">
                 <BrandGlyph name="arrow-down" size={13} /> MacroLyncBridge.mqh
               </a>
-              <button type="button" onClick={() => void copyText('MQL5 bridge source', bridgeSource)} className="inline-flex h-9 items-center gap-2 rounded-md border border-white/[0.1] px-3 text-[10px] text-slate-300 hover:border-emerald-300/30">
-                <BrandGlyph name={copyState === 'MQL5 bridge source copied' ? 'check' : 'copy'} size={13} /> Copy bridge source
-              </button>
+              <a href="/mql5/MacroLyncLicense.mqh" download className="inline-flex h-9 items-center gap-2 rounded-md border border-white/[0.1] px-3 text-[10px] text-slate-300 hover:border-emerald-300/30">
+                <BrandGlyph name="arrow-down" size={13} /> MacroLyncLicense.mqh
+              </a>
             </div>
-            {copyState && <p className="mt-2 text-[10px] text-emerald-300" role="status">{copyState}</p>}
-            <details className="mt-4 rounded-lg border border-white/[0.07] bg-black/20">
-              <summary className="cursor-pointer px-4 py-3 text-[10px] text-slate-300">View exact downloadable bridge source</summary>
-              <pre className="max-h-96 overflow-auto border-t border-white/[0.07] p-4 text-[10px] leading-5 text-slate-400"><code>{bridgeSource}</code></pre>
-            </details>
             <div className="mt-5 flex items-start gap-2 border-t border-white/[0.07] pt-4 text-[10px] leading-5 text-slate-500">
               <BrandGlyph name="shield-alert" size={14} className="mt-0.5 shrink-0 text-amber-300" />
-              <p>Network, timeout, non-200, malformed JSON, or active news lockout returns defensive hold. Keep WebRequest access restricted to this deployed application origin in MT5.</p>
+              <p>Keep all private API credentials in the secure terminal configuration. Never publish service keys or copy private headers into public code.</p>
             </div>
-          </div>
+          </div>/div>
         </section>
 
         <section className="mt-11" aria-labelledby="expectancy-heading">
