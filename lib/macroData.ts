@@ -472,7 +472,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     alphaVantageKey ? getAlphaVantageUsdUpdates(alphaVantageKey) : Promise.resolve(null),
     fmpKey ? getFmpCatalysts(fmpKey) : Promise.resolve(null),
     cotProviderUrl ? getCotProvider(cotProviderUrl, cotProviderToken) : getCftcCot(),
-    getFrankfurterRates(),
+    process.env.FRANKFURTER_COMMERCIAL_USE_APPROVED === 'true' ? getFrankfurterRates() : Promise.resolve(null),
     process.env.FAIRECONOMY_COMMERCIAL_USE_APPROVED === 'true' ? getFairEconomyCatalysts() : Promise.resolve([]),
     getEcbMacroInputs(),
     getBankOfCanadaMacroInputs(),
@@ -783,10 +783,12 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
       const parsed = parseProviderSnapshot(await response.json() as unknown);
       if (!parsed) throw new Error('Macro provider payload failed validation.');
       let ecbRates = persisted?.ecbRates;
-      try {
-        ecbRates = await getFrankfurterRates();
-      } catch (error) {
-        console.warn('ECB benchmark exchange rates are unavailable:', error);
+      if (process.env.FRANKFURTER_COMMERCIAL_USE_APPROVED === 'true') {
+        try {
+          ecbRates = await getFrankfurterRates();
+        } catch (error) {
+          console.warn('ECB benchmark exchange rates are unavailable:', error);
+        }
       }
       const providerSnapshot = mergeWithFallback({
         ...baseline,
