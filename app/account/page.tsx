@@ -8,5 +8,10 @@ export const metadata: Metadata = {
 };
 
 export default function AccountPage() {
-  return <main className=\"mx-auto min-h-[75vh] w-full max-w-7xl px-5 py-8 pb-44 text-slate-100\"><Link href=\"/\" className=\"mb-6 inline-flex font-mono text-xs text-emerald-300 hover:underline\">← BACK TO TERMINAL</Link><AlgoLyncAccountPortal /></main>;
+  return (
+    <main className="mx-auto min-h-[75vh] w-full max-w-7xl px-5 py-8 pb-44 text-slate-100">
+      <Link href="/" className="mb-6 inline-flex font-mono text-xs text-emerald-300 hover:underline">← BACK TO TERMINAL</Link>
+      <AlgoLyncAccountPortal />
+    </main>
+  );
 }
