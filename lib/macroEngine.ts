@@ -15,9 +15,18 @@ export type FundamentalSignal = {
 
 export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnapshot> {
   try {
-    return await getCachedData('macro:snapshot', loadMacroSnapshot, 900, forceRefresh);
+    const snapshot = await getCachedData('macro:snapshot', loadMacroSnapshot, 900, forceRefresh);
+    if (snapshot.source === 'fallback') return getFallbackSnapshot();
+
+    const refreshedAt = Date.parse(snapshot.asOf);
+    const ageMs = Date.now() - refreshedAt;
+    if (!Number.isFinite(refreshedAt) || ageMs < -5 * 60_000 || ageMs > 24 * 60 * 60_000) {
+      console.warn('Macro snapshot exceeded the 24-hour freshness limit; provider data is marked unavailable.');
+      return getFallbackSnapshot();
+    }
+    return snapshot;
   } catch (error) {
-    console.warn('Macro providers and cached snapshots are unavailable; serving reference macro levels.', error);
+    console.warn('Macro providers and cached snapshots are unavailable; no macro observations will be substituted.', error);
     return getFallbackSnapshot();
   }
 }
