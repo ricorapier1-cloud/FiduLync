@@ -33,11 +33,13 @@ function validArtifactInput(value: Record<string, unknown>) {
   const version = typeof value.artifact_version === 'string' ? value.artifact_version.trim() : '';
   const sha256 = typeof value.sha256 === 'string' ? value.sha256.trim().toLowerCase() : '';
   const size = typeof value.size_bytes === 'number' ? value.size_bytes : Number(value.size_bytes);
+  const fileName = typeof value.file_name === 'string' ? value.file_name.trim().toLowerCase() : '';
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)
     || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/.test(version)
     || !/^[a-f0-9]{64}$/.test(sha256)
-    || !Number.isSafeInteger(size) || size <= 0 || size > 25 * 1024 * 1024) return null;
-  return { slug, version, sha256, size };
+    || !Number.isSafeInteger(size) || size <= 0 || size > 25 * 1024 * 1024
+    || !fileName.endsWith('.ex5')) return null;
+  return { slug, version, sha256, size, fileName };
 }
 
 export async function POST(request: Request) {
@@ -57,7 +59,7 @@ export async function POST(request: Request) {
     const encodedPath = storagePath.split('/').map(encodeURIComponent).join('/');
     const signed = await fetch(`${supabaseUrl}/storage/v1/object/upload/sign/algolync-artifacts/${encodedPath}`, {
       method: 'POST',
-      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json', 'x-upsert': 'true' },
       body: JSON.stringify({}),
       cache: 'no-store',
       signal: AbortSignal.timeout(8_000),
