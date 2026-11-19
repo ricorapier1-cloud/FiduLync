@@ -66,7 +66,8 @@ export async function POST(req: Request) {
       const bound = await supabaseQuery<BindResult>('rpc/bind_algolync_seat', { method: 'POST', body: { p_license_key: licenseKey, p_account_number: login, p_account_type: mode, p_broker_server: broker, p_previous_account_number: null } });
       if (!bound || bound.success !== true) return json({ valid: false, message: bound?.reason || 'The account could not be assigned to an available license seat.' }, 403);
     }
-    const lease = createLicenseLease({ sub: licenseKey, license_hash: createHash('sha256').update(licenseKey).digest('hex'), mt5_login: login, account_mode: mode, ea_slug: license.ea_slug });
+    const licenseHash = createHash('sha256').update(licenseKey).digest('hex');
+    const lease = createLicenseLease({ sub: licenseHash, license_hash: licenseHash, mt5_login: login, account_mode: mode, ea_slug: license.ea_slug });
     return json({
       valid: true, license_type: license.tier || 'ALGOLYNC_ACTIVE', mt5_login: login, account_mode: mode,
       account: login, account_type: mode, ea_slug: license.ea_slug, lease_token: lease.token,
