@@ -10,8 +10,8 @@ import { getTradeExpectancy } from '@/lib/tradeLedger';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'AlgoLync Store & Live EA Monitor',
-  description: 'AlgoLync strategy vault, live expert-advisor fleet telemetry, instant Paystack license provisioning, and the MacroLync MT5 signal bridge.',
+  title: 'AlgoLync Store & EA Release Monitor',
+  description: 'AlgoLync strategy catalogue, read-only EA telemetry, release verification and the MacroLync MT5 signal bridge. Paid licensing opens only after approved compiled EA artifacts are available.',
 };
 
 export default async function AlgoLyncStorePage() {
