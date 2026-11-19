@@ -63,6 +63,9 @@ export async function GET(req: Request) {
       || (license.expires_at && new Date(license.expires_at).getTime() <= Date.now())
       || !license.ea_slug) return json({ success: false, error: 'License is inactive, expired, or missing product entitlement.' }, 403);
 
+    const products = await supabaseRead<Array<{ slug: string; is_active: boolean }>>('ea_products', `slug=eq.${encodeURIComponent(license.ea_slug)}&is_active=eq.true&select=slug,is_active`);
+    if (!products) throw new Error('Product entitlement database unavailable.');
+    if (!products[0]) return json({ success: false, error: 'The licensed EA product is no longer active.' }, 403);
     const seats = await supabaseRead<SeatRecord[]>('ea_license_seats',
       `license_key=eq.${encodeURIComponent(licenseKey)}&ea_slug=eq.${encodeURIComponent(license.ea_slug)}&select=slot_type,slot_number,mt5_login,broker_server,bound_at,rebind_available_at&order=slot_type.asc,slot_number.asc`);
     if (!seats) throw new Error('Seat database unavailable.');
@@ -125,6 +128,9 @@ export async function POST(req: Request) {
       || !license.ea_slug) return json({ success: false, error: 'License is inactive, expired, or missing product entitlement.' }, 403);
     if (license.tier === 'DEMO_14D' && accountType !== 'DEMO') return json({ success: false, error: 'Demo entitlements cannot be bound to live accounts.' }, 403);
 
+    const products = await supabaseRead<Array<{ slug: string; is_active: boolean }>>('ea_products', `slug=eq.${encodeURIComponent(license.ea_slug)}&is_active=eq.true&select=slug,is_active`);
+    if (!products) throw new Error('Product entitlement database unavailable.');
+    if (!products[0]) return json({ success: false, error: 'The licensed EA product is no longer active.' }, 403);
     const result = await supabaseQuery<BindResult>('rpc/bind_algolync_seat', {
       method: 'POST',
       body: {
