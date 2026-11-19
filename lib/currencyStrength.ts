@@ -6,7 +6,9 @@ export type CurrencyStrength = { currency: MajorCurrency; score: number };
 
 export function getCurrencyStrengthIndex(snapshot: MacroSnapshot): CurrencyStrength[] {
   const currencies = snapshot.currencies.filter((item) =>
-    MAJOR_CURRENCIES.includes(item.code as MajorCurrency));
+    MAJOR_CURRENCIES.includes(item.code as MajorCurrency)
+    && item.policyRateSource === 'provider'
+    && item.inflationSource === 'provider');
   if (!currencies.length) return [];
   const cot = new Map(snapshot.cot.map((item) => [item.market, item.percentile]));
   const rawScores = currencies.map((currency) => ({
