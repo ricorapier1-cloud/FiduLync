@@ -41,6 +41,7 @@ export async function POST(req: Request) {
   if (rate.unavailable) return json({ valid: false, message: 'License validation is temporarily unavailable. Retry shortly.' }, 503);
   if (!rate.allowed) return json({ valid: false, message: 'Rate limit exceeded.' }, 429);
   if (!isSupabaseConfigured()) return json({ valid: false, message: 'License service is not configured.' }, 503);
+  if (Number(req.headers.get('content-length') ?? 0) > 8192) return json({ valid: false, message: 'Request body exceeds 8 KB.' }, 413);
 
   try {
     const raw: unknown = await req.json();
