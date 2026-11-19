@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import BrandGlyph from '@/components/BrandGlyph';
 
@@ -108,12 +108,6 @@ export default function QuantResearchLab() {
       setLoading(false);
     }
   }
-
-  useEffect(() => {
-    void refresh();
-    // Refresh is intentionally user-driven: no hidden polling or artificial live state.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [symbol]);
 
   const indicators = result?.quantitative_indicators;
   const verifiedTechnical = result?.technical_data_verified === true;
