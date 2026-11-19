@@ -10,7 +10,7 @@ type Installation = { id: string; status: string; last_seen_at?: string | null }
 type Quote = { symbol: string; bid: number; ask: number; quote_time: string; spread_points: number; digits?: number; point?: number; tick_size?: number; tick_value?: number; tick_value_loss?: number; tick_value_profit?: number; contract_size?: number; volume_min?: number; volume_max?: number; volume_step?: number; stop_level_points?: number; margin_per_lot_buy?: number; margin_per_lot_sell?: number; broker?: string; server?: string };
 type Candle = { symbol: string; timeframe: 'H1' | 'H4' | 'D1'; bar_time: string; open: number; high: number; low: number; close: number; tick_volume?: number; spread_points?: number; real_volume?: number; is_closed?: boolean; broker?: string; server?: string; digits?: number; point?: number; tick_size?: number; tick_value?: number; contract_size?: number };
 type PositionSnapshot = { snapshot_id: string; captured_at: string; account_login: number; expected_positions: number; positions: Record<string, unknown>[] };
-type ExecutionEvent = { event_id: string; event_type: 'FILL' | 'DEAL_CLOSE'; symbol: string; side: 'BUY' | 'SELL'; fill_price: number; volume: number; event_time: string; requested_price?: number | null; spread_points?: number | null; slippage_points?: number | null; latency_ms?: number | null; broker_code?: string | null };
+type ExecutionEvent = { account_login?: number; event_id: string; event_type: 'FILL' | 'DEAL_CLOSE'; symbol: string; side: 'BUY' | 'SELL'; fill_price: number; volume: number; event_time: string; requested_price?: number | null; spread_points?: number | null; slippage_points?: number | null; latency_ms?: number | null; broker_code?: string | null };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -126,7 +126,7 @@ export async function POST(request: Request) {
 
     const executionEvents: ExecutionEvent[] = [];
     for (const raw of (body.execution_events ?? []) as unknown[]) {
-      if (!isRecord(raw) || typeof raw.event_id !== 'string' || !/^[A-Za-z0-9._:-]{1,80}$/.test(raw.event_id)
+      if (!isRecord(raw) || (raw.account_login !== undefined && (!Number.isSafeInteger(raw.account_login) || Number(raw.account_login) <= 0)) || typeof raw.event_id !== 'string' || !/^[A-Za-z0-9._:-]{1,80}$/.test(raw.event_id)
         || !['FILL', 'DEAL_CLOSE'].includes(String(raw.event_type))
         || !validSymbol(raw.symbol) || !['BUY', 'SELL'].includes(String(raw.side))
         || typeof raw.fill_price !== 'number' || !Number.isFinite(raw.fill_price) || raw.fill_price <= 0
@@ -228,7 +228,7 @@ export async function POST(request: Request) {
       const eventRows = executionEvents.map((event) => {
         const evidence = {
           installation_id: installation.id,
-          account_login: Number(accountSnapshot?.account_login ?? (positionSnapshot?.account_login ?? 0)),
+          account_login: Number(accountSnapshot?.account_login ?? (positionSnapshot?.account_login ?? event.account_login ?? 0)),
           event_id: event.event_id,
           event_type: event.event_type,
           symbol: event.symbol.toUpperCase(),
