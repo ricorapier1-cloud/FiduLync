@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic';
 type LicenseRecord = {
   license_key: string;
   status: string | null;
+  tier: string | null;
   expires_at: string | null;
   email: string;
   ea_slug: string | null;
@@ -59,7 +60,7 @@ export async function POST(req: Request) {
     if (requestedEaSlug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(requestedEaSlug)) return json({ valid: false, message: 'Invalid ea_slug.' }, 400);
 
     const licenses = await supabaseRead<LicenseRecord[]>('licenses',
-      `license_key=eq.${encodeURIComponent(licenseKey)}&select=license_key,status,expires_at,email,ea_slug,included_live_seats,included_demo_seats,extra_live_seats`);
+      `license_key=eq.${encodeURIComponent(licenseKey)}&select=license_key,status,tier,expires_at,email,ea_slug,included_live_seats,included_demo_seats,extra_live_seats`);
     if (!licenses) throw new Error('License database returned no result.');
     const license = licenses[0];
     if (!license) return json({ valid: false, message: 'Invalid license key.' }, 404);
