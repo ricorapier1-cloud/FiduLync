@@ -97,7 +97,7 @@ export async function DELETE(request: Request) {
   const body = raw as Record<string, unknown>;
   const licenseId = typeof body.license_id === 'string' ? body.license_id.trim() : '';
   const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
-  if (!/^[0-9a-f-]{36}$/i.test(licenseId)) return NextResponse.json({ error: 'A valid license_id is required.' }, { status: 400 });
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(licenseId)) return NextResponse.json({ error: 'A valid license_id is required.' }, { status: 400 });
   if (body.confirm !== true) return NextResponse.json({ error: 'Explicit confirmation is required to revoke a license.' }, { status: 400 });
   if (reason.length < 5 || reason.length > 500) return NextResponse.json({ error: 'Provide a revocation reason between 5 and 500 characters.' }, { status: 400 });
 
