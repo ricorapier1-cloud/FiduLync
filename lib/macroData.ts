@@ -90,6 +90,7 @@ function isCurrency(value: unknown): value is MacroCurrency {
     && (value.corePce === undefined || isFiniteNumber(value.corePce))
     && (value.cpi === undefined || isFiniteNumber(value.cpi))
     && (value.twoYearYield === undefined || isFiniteNumber(value.twoYearYield))
+    && (value.twoYearYieldAsOf === undefined || (typeof value.twoYearYieldAsOf === 'string' && Number.isFinite(Date.parse(value.twoYearYieldAsOf))))
     && (value.twoYearYieldSource === undefined || value.twoYearYieldSource === 'provider' || value.twoYearYieldSource === 'reference')
     && (value.policyRateSource === undefined || value.policyRateSource === 'provider' || value.policyRateSource === 'reference')
     && (value.inflationSource === undefined || value.inflationSource === 'provider' || value.inflationSource === 'reference')
@@ -183,9 +184,13 @@ async function getFredUsdUpdates(apiKey: string) {
   if (twoYearResult.status === 'rejected') console.warn('FRED 2-Year Treasury yield is unavailable:', twoYearResult.reason);
   return {
     policyRate: rateResult.status === 'fulfilled' ? rateResult.value[0]?.value : undefined,
+    policyRateAsOf: rateResult.status === 'fulfilled' ? rateResult.value[0]?.date : undefined,
     corePce: pceResult.status === 'fulfilled' ? latestYearOverYear(pceResult.value) : undefined,
+    corePceAsOf: pceResult.status === 'fulfilled' ? pceResult.value[0]?.date : undefined,
     cpi: cpiResult.status === 'fulfilled' ? latestYearOverYear(cpiResult.value) : undefined,
+    cpiAsOf: cpiResult.status === 'fulfilled' ? cpiResult.value[0]?.date : undefined,
     twoYearYield: twoYearResult.status === 'fulfilled' ? twoYearResult.value[0]?.value : undefined,
+    twoYearYieldAsOf: twoYearResult.status === 'fulfilled' ? twoYearResult.value[0]?.date : undefined,
   };
 }
 
@@ -518,6 +523,7 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
         usd.policyRate = fredResult.value.policyRate;
         usd.policyRateSource = 'provider';
         usd.policyRateProvider = 'fred';
+        usd.policyRateAsOf = fredResult.value.policyRateAsOf;
         hasLiveData = true;
       }
       if (isFiniteNumber(fredResult.value.corePce)) {
@@ -526,17 +532,19 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
         usd.corePce = fredResult.value.corePce;
         usd.inflationSource = 'provider';
         usd.inflationProvider = 'fred';
+        usd.inflationAsOf = fredResult.value.corePceAsOf;
         hasLiveData = true;
       }
       if (isFiniteNumber(fredResult.value.cpi)) {
         usd.cpi = fredResult.value.cpi;
         usd.inflationSource = 'provider';
-        usd.inflationProvider = 'fred';
+        usd.inflationAsOf = fredResult.value.cpiAsOf;
         hasLiveData = true;
       }
       if (isFiniteNumber(fredResult.value.twoYearYield)) {
         usd.twoYearYield = fredResult.value.twoYearYield;
         usd.twoYearYieldSource = 'provider';
+        usd.twoYearYieldAsOf = fredResult.value.twoYearYieldAsOf;
         hasLiveData = true;
       }
       if (!isFiniteNumber(fredResult.value.corePce) && isFiniteNumber(fredResult.value.cpi)) {
