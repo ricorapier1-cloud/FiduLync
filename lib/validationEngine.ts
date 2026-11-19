@@ -71,7 +71,13 @@ export type WalkForwardFold = {
   outOfSample: NetTrade[];
 };
 
-function timestamp(value: string): number | null {\n  if (typeof value !== 'string' || !/(Z|[+-]\\d{2}:?\\d{2})$/i.test(value)) return null;\n  const parsed = Date.parse(value);\n  return Number.isFinite(parsed) ? parsed : null;\n}\n\nexport function evaluateWalkForward(folds: WalkForwardFold[]): {
+function timestamp(value: string): number | null {
+  if (typeof value !== 'string' || !/(Z|[+-]\d{2}:?\d{2})$/i.test(value)) return null;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function evaluateWalkForward(folds: WalkForwardFold[]): {
   eligible: boolean;
   blockers: string[];
   foldCount: number;
