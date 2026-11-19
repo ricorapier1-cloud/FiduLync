@@ -14,8 +14,7 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [productReady, setProductReady] = useState(false);
-  const [productReadinessLoading, setProductReadinessLoading] = useState(true);
+  const [productReadiness, setProductReadiness] = useState<{ slug: string; ready: boolean } | null>(null);
 
   // Account Binding Tab state
   const [licenseKeyInput, setLicenseKeyInput] = useState('');
@@ -37,21 +36,19 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
       ? `₦${priceNgn.toLocaleString()} ${plan === 'MONTHLY' ? '/ month' : 'One-Time'}`
       : `${priceUsd} ${plan === 'MONTHLY' ? '/ month' : 'One-Time'}`;
 
+  const productReadinessLoading = productReadiness?.slug !== selectedSlug;
+  const productReady = productReadiness?.slug === selectedSlug && productReadiness.ready;
+
   useEffect(() => {
     let active = true;
-    setProductReady(false);
-    setProductReadinessLoading(true);
     fetch(`/api/v1/product-readiness?slug=${encodeURIComponent(selectedSlug)}`, { cache: 'no-store' })
       .then(async (response) => {
         const payload = await response.json() as { ready?: unknown };
-        if (active) setProductReady(response.ok && payload.ready === true);
+        if (active) setProductReadiness({ slug: selectedSlug, ready: response.ok && payload.ready === true });
       })
       .catch(() => {
-        if (active) setProductReady(false);
+        if (active) setProductReadiness({ slug: selectedSlug, ready: false });
       })
-      .finally(() => {
-        if (active) setProductReadinessLoading(false);
-      });
     return () => { active = false; };
   }, [selectedSlug]);
 
