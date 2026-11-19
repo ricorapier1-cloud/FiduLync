@@ -237,6 +237,37 @@ export default function QuantResearchLab() {
             <Link href="/analytics" className="inline-flex h-9 items-center rounded-lg border border-white/10 px-3 text-[10px] text-slate-300 hover:border-emerald-300/20">Open performance research</Link>
           </div>
         </section>
+
+        <section className="mt-6 rounded-xl border border-white/[0.08] bg-[#0b121a] p-5" aria-labelledby="fx-drivers-heading">
+          <div className="font-mono text-[9px] tracking-[0.18em] text-cyan-200">MACROLYNC / CAUSAL FX DRIVER MODEL · METHODOLOGY V1</div>
+          <h2 id="fx-drivers-heading" className="mt-2 text-xl font-semibold">What is driving the currency pair?</h2>
+          <p className="mt-2 max-w-4xl text-xs leading-5 text-slate-400">The model separates changes in market expectations from lagging macro levels. These are research weights, not fitted probabilities. Live factor scores are deliberately withheld until the required point-in-time sources are connected and verified.</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {[
+              ['28%', 'Expected rate-path repricing', 'OIS curves / short-rate futures; changes in the expected policy path rather than only today’s policy rate.'],
+              ['22%', 'Real-yield differential', 'Nominal yields less breakeven inflation / inflation swaps. CPI-adjusted real rates are labelled lagging proxies.'],
+              ['18%', 'Macro surprise', 'Actual versus consensus, robustly standardized against the historical surprise distribution.'],
+              ['10%', 'Terms of trade', 'Commodity export/import sensitivity for AUD, NZD, CAD and NOK, with country-specific exposure.'],
+              ['8%', 'Positioning', 'CFTC futures positioning percentile and weekly change; not represented as live OTC order flow.'],
+              ['8%', 'Risk sentiment', 'Volatility, equities and credit conditions, using pair-specific risk betas.'],
+              ['6%', 'Funding stress', 'Cross-currency basis and funding pressure, only where licensed source coverage is available.'],
+            ].map(([weight, title, detail]) => (
+              <article key={title} className="rounded-lg border border-white/[0.07] bg-black/20 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <strong className="text-xs text-slate-100">{title}</strong>
+                  <span className="font-mono text-xs text-cyan-200">{weight}</span>
+                </div>
+                <p className="mt-2 text-[10px] leading-5 text-slate-500">{detail}</p>
+                <p className="mt-2 font-mono text-[9px] text-amber-200">LIVE FACTOR: NOT CONNECTED / NOT SCORED</p>
+              </article>
+            ))}
+          </div>
+          <div className="mt-4 rounded-lg border border-amber-300/15 bg-amber-300/[0.04] p-3">
+            <p className="font-mono text-[9px] tracking-widest text-amber-200">SIGNAL GOVERNANCE</p>
+            <p className="mt-1 text-[10px] leading-5 text-slate-300">A directional bias is not a setup. A setup requires sufficient macro evidence coverage, agreement between independent drivers, verified closed-bar structure, acceptable spread-to-ATR cost and no extreme-volatility lockout. Missing or contradictory evidence returns NO SETUP.</p>
+          </div>
+          <p className="mt-3 text-[10px] leading-5 text-slate-500">Gold uses a separate model: real yields, USD, official-sector demand, ETF flows and hedging demand. DXY is not counted twice as an independent USD factor alongside EURUSD-related inputs.</p>
+        </section>
       </div>
     </div>
   );
