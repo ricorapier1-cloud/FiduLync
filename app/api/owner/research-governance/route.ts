@@ -157,6 +157,78 @@ export async function GET(request: Request) {
       ? accountCurrencyExposure!.reduce((sum, item) => sum + Number(item.net_account_currency ?? 0), 0) : null;
     const onePercentParallelShock = conversionComplete && accountCurrencyExposure
       ? accountCurrencyExposure.reduce((sum, item) => sum + Math.abs(Number(item.net_account_currency ?? 0)) * 0.01, 0) : null;
+    const candleQuery = latestManifest ? supabase.from('mt5_market_candles')
+      .select('symbol,bar_time,close,broker,server')
+      .eq('installation_id', latestManifest.installation_id)
+      .eq('timeframe', 'H1').eq('is_closed', true)
+      .order('bar_time', { ascending: false }).limit(2_000) : null;
+    let candleRows = candleQuery ? await candleQuery : { data: [], error: null };
+    if (candleRows.error) throw candleRows.error;
+    if (account?.broker) candleRows = { ...candleRows, data: (candleRows.data ?? []).filter((row) => row.broker === account.broker) };
+    if (account?.server) candleRows = { ...candleRows, data: (candleRows.data ?? []).filter((row) => row.server === account.server) };
+    const closeSeries = new Map<string, Map<string, number>>();
+    for (const row of candleRows.data ?? []) {
+      const symbol = String(row.symbol ?? '').toUpperCase();
+      const pair = symbol.match(/^([A-Z]{6})/)?.[1];
+      const close = Number(row.close);
+      const time = String(row.bar_time);
+      if (!pair || !Number.isFinite(Date.parse(time)) || !Number.isFinite(close) || close <= 0) continue;
+      const series = closeSeries.get(pair) ?? new Map<string, number>();
+      if (!series.has(time)) series.set(time, close);
+      closeSeries.set(pair, series);
+    }
+    const returns = new Map<string, Map<string, number>>();
+    for (const [pair, series] of closeSeries) {
+      const ordered = [...series.entries()].sort((a, b) => Date.parse(a[0]) - Date.parse(b[0]));
+      const values = new Map<string, number>();
+      for (let index = 1; index < ordered.length; index += 1) {
+        const previous = ordered[index - 1][1], current = ordered[index][1];
+        if (previous > 0 && current > 0) values.set(ordered[index][0], Math.log(current / previous));
+      }
+      returns.set(pair, values);
+    }
+    const correlationPairs: Array<{ symbol_a: string; symbol_b: string; correlation: number; overlapping_returns: number }> = [];
+    const symbols = [...returns.keys()].sort();
+    for (let left = 0; left < symbols.length; left += 1) {
+      for (let right = left + 1; right < symbols.length; right += 1) {
+        const a = returns.get(symbols[left])!, b = returns.get(symbols[right])!;
+        const common = [...a.keys()].filter((time) => b.has(time));
+        if (common.length < 30) continue;
+        const av = common.map((time) => a.get(time)!);
+        const bv = common.map((time) => b.get(time)!);
+        const meanA = av.reduce((sum, value) => sum + value, 0) / av.length;
+        const meanB = bv.reduce((sum, value) => sum + value, 0) / bv.length;
+        const covariance = av.reduce((sum, value, index) => sum + (value - meanA) * (bv[index] - meanB), 0);
+        const varianceA = av.reduce((sum, value) => sum + (value - meanA) ** 2, 0);
+        const varianceB = bv.reduce((sum, value) => sum + (value - meanB) ** 2, 0);
+        const denominator = Math.sqrt(varianceA * varianceB);
+        if (denominator > 0) correlationPairs.push({
+          symbol_a: symbols[left], symbol_b: symbols[right],
+          correlation: Number((covariance / denominator).toFixed(4)),
+          overlapping_returns: common.length,
+        });
+      }
+    }
+    const adjacency = new Map<string, Set<string>>();
+    for (const pair of correlationPairs.filter((item) => Math.abs(item.correlation) >= 0.75)) {
+      const a = adjacency.get(pair.symbol_a) ?? new Set<string>();
+      a.add(pair.symbol_b); adjacency.set(pair.symbol_a, a);
+      const b = adjacency.get(pair.symbol_b) ?? new Set<string>();
+      b.add(pair.symbol_a); adjacency.set(pair.symbol_b, b);
+    }
+    const correlationClusters: string[][] = [];
+    const visitedSymbols = new Set<string>();
+    for (const symbol of adjacency.keys()) {
+      if (visitedSymbols.has(symbol)) continue;
+      const cluster: string[] = [], stack = [symbol];
+      while (stack.length) {
+        const current = stack.pop()!;
+        if (visitedSymbols.has(current)) continue;
+        visitedSymbols.add(current); cluster.push(current);
+        for (const next of adjacency.get(current) ?? []) if (!visitedSymbols.has(next)) stack.push(next);
+      }
+      if (cluster.length > 1) correlationClusters.push(cluster.sort());
+    }
     const modelRows = models.data ?? [];
 
     return NextResponse.json({
@@ -178,7 +250,7 @@ export async function GET(request: Request) {
         evidence_verified: false,
         status: executionRows.length ? 'EVIDENCE_CAPTURED_PENDING_REVIEW' : 'AWAITING_MT5_FILLS',
       },
-      positions: {
+      correlation: {\n        timeframe: 'H1',\n        minimum_overlapping_returns: 30,\n        cluster_threshold_absolute_correlation: 0.75,\n        pairs: correlationPairs.sort((a, b) => Math.abs(b.correlation) - Math.abs(a.correlation)),\n        clusters: correlationClusters,\n        status: correlationPairs.length ? 'BROKER_CANDLE_CORRELATION_AVAILABLE' : 'AWAITING_ALIGNED_H1_CANDLES',\n      },\n      positions: {
         snapshot_id: completePositionSnapshot ? latestManifest.snapshot_id : null,
         captured_at: completePositionSnapshot ? latestManifest.captured_at : null,
         expected_positions: latestManifest ? expectedPositions : null,
@@ -209,7 +281,7 @@ export async function GET(request: Request) {
         status: !completePositionSnapshot ? 'AWAITING_COMPLETE_MT5_POSITION_SNAPSHOT'
           : positionFresh ? 'SNAPSHOT_CAPTURED' : 'STALE_POSITION_SNAPSHOT',
       },
-      execution_enabled: false,
+      execution_enabled: false,\n      portfolio_stress: {\n        one_percent_parallel_currency_shock_account_currency: onePercentParallelShock,\n        interpretation: 'Absolute net currency exposure proxy; not a full nonlinear portfolio VaR or broker stop-risk calculation.',\n        correlation_clusters: correlationClusters,\n        status: conversionComplete ? 'PARTIAL_LINEAR_SCENARIO_ONLY' : 'UNAVAILABLE_MISSING_CONVERSIONS',\n      },
       note: 'Evidence capture does not equal independent validation. This endpoint cannot approve a model or enable broker execution.',
     }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
   } catch (error) {
