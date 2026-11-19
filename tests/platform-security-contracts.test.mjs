@@ -56,6 +56,15 @@ test('Paystack entitlement minting verifies provider-side payment and server pri
   assert.match(source, /payment_reference/);
 });
 
+test('demo licences are returned only after a represented active row is persisted', async () => {
+  const admin = await read('lib/supabaseAdmin.ts');
+  const demo = await read('app/api/v1/provision-demo-license/route.ts');
+  assert.match(admin, /resolution=merge-duplicates,return=representation/);
+  assert.match(demo, /Array\.isArray\(persisted\)/);
+  assert.match(demo, /row\.license_key === licenseKey/);
+  assert.match(demo, /row\.status\.toLowerCase\(\) === 'active'/);
+});
+
 test('database enforces global MT5 seat uniqueness across LIVE and DEMO types', async () => {
   const migration = await read('supabase/migrations/20261119130000_global_mt5_seat_login_uniqueness.sql');
   assert.match(migration, /CREATE UNIQUE INDEX IF NOT EXISTS ea_license_seats_mt5_login_global_uidx/);
