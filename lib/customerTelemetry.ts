@@ -39,18 +39,22 @@ async function supabaseWrite(table: string, query: string, body: Record<string, 
 export async function validateCustomerLicense(mt5Account: number, licenseKey: string): Promise<boolean> {
   if (!Number.isSafeInteger(mt5Account) || mt5Account <= 0 || !licenseKey.trim()) return false;
   const query = new URLSearchParams({
-    select: 'license_key,mt5_account,status,expires_at',
+    select: 'license_key,mt5_account,status,expires_at,grace_until',
     mt5_account: `eq.${mt5Account}`,
     license_key: `eq.${licenseKey.trim()}`,
-    status: 'eq.active',
+    status: 'in.(active,past_due)',
     limit: '1',
   });
-  const rows = await supabaseRows<{ license_key: string; mt5_account: number | string; status: string; expires_at: string | null }>('licenses', query.toString());
+  const rows = await supabaseRows<{ license_key: string; mt5_account: number | string; status: string; expires_at: string | null; grace_until: string | null }>('licenses', query.toString());
   if (rows.length !== 1) return false;
   const row = rows[0];
+  const now = Date.now();
+  const graceUntil = row.grace_until ? Date.parse(row.grace_until) : 0;
+  const inGrace = Number.isFinite(graceUntil) && graceUntil > now;
+  const active = row.status === 'active' || (row.status === 'past_due' && inGrace);
+  const unexpired = !row.expires_at || Date.parse(row.expires_at) > now || inGrace;
   return Number(row.mt5_account) === mt5Account && row.license_key === licenseKey.trim()
-    && row.status === 'active'
-    && (!row.expires_at || Date.parse(row.expires_at) > Date.now());
+    && active && unexpired;
 }
 
 export type CustomerHeartbeat = {
