@@ -13,6 +13,8 @@ const aiBrief = read('../lib/aiBrief.ts');
 const storeTerminal = read('../app/components/StoreTerminal.tsx');
 const storePage = read('../app/store/page.tsx');
 const envExample = read('../.env.example');
+const historicalBackfill = read('../scripts/mt5_historical_backfill.py');
+const publicHistoricalBackfill = read('../public/downloads/FiduLync_MT5_Historical_Backfill.py');
 const readme = read('../README.md');
 const artifactUi = read('../app/owner/OwnerArtifactRelease.tsx');
 const uploadUrlApi = read('../app/api/owner/artifacts/upload-url/route.ts');
@@ -106,6 +108,17 @@ test('private EA lab uses owner MT5 publisher and supervisor components only', (
   assert.doesNotMatch(storeTerminal, /MacroLyncBridge|Paystack|Checkout|Eridam_Nexus|Velocity_Vault|MacroLync_G10|ALGO_PRIVATE_API_KEY/);
   assert.match(storeTerminal, /atr_sl_pips === null \? 'Unavailable'/);
   assert.match(storeTerminal, /atr_tp_pips === null \? 'Unavailable'/);
+});
+
+test('historical MT5 backfill imports only real closed broker bars and never trades', () => {
+  assert.equal(historicalBackfill, publicHistoricalBackfill);
+  assert.match(historicalBackfill, /MT5_BACKFILL_START.*1996-01-01/);
+  assert.match(historicalBackfill, /copy_rates_range/);
+  assert.match(historicalBackfill, /bar_epoch \+ seconds > now_epoch/);
+  assert.match(historicalBackfill, /BATCH_SIZE = .*1000/);
+  assert.match(historicalBackfill, /FIDULYNC_PUBLISHER_TOKEN/);
+  assert.match(historicalBackfill, /is_closed/);
+  assert.doesNotMatch(historicalBackfill, /order_send|order_send_async|TRADE_ACTION/);
 });
 
 test('private EA artifact upload uses owner-only signed Storage URLs and audited registration', () => {
