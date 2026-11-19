@@ -31,7 +31,7 @@ Preserve the existing private owner email/password login, Supabase data, audit h
 - **Frankfurter:** public reference exchange rates only; they are daily/reference observations, not real-time executable prices.
 - **CFTC:** use official public COT reports; retain report date and source attribution. COT is weekly positioning context, not intraday flow.
 - **Central banks / official statistical agencies:** prefer direct official sources for policy rates, CPI/HICP, GDP, employment, yields and releases. Preserve source URL, observation date and retrieval time.
-- **BLS / BEA:** use official APIs with the required attribution and retrieval-date notes when their adapters are enabled.
+- **BLS / BEA:** direct adapters are not yet active in this build; applicable US series are currently sourced through FRED. Any future direct adapters must use official APIs and preserve actual observation dates and attribution.
 - **Finnhub / Twelve Data / Alpha Vantage / FMP / FairEconomy / other vendors:** enable only when the specific personal subscription or free tier permits this app's internal display, programmatic access, caching and requested asset class. A present API key is not proof of entitlement.
 - Never turn daily reference rates, stale caches, historical bars or unverified values into live prices. Every dataset must expose provider, source timestamp, retrieval timestamp, age, timeframe, broker (when applicable) and degraded/unavailable state.
 
@@ -39,11 +39,11 @@ Preserve the existing private owner email/password login, Supabase data, audit h
 
 | Variable | Purpose |
 |---|---|
+| `PERSONAL_QUANT_EDITION` | Must be `true`; disables customer/commercial routes |
 | `NEXT_PUBLIC_SUPABASE_URL` | Public Supabase URL |
 | `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` | Server-side Supabase access |
 | `OWNER_EMAIL` | Exact single-owner identity |
 | `CRON_SECRET` | Authenticates scheduled macro refresh |
-| `ALGOLYNC_PRIVATE_KEY` | Legacy private supervisor API integration, if still used |
 | `FRED_API_KEY` | Personal official macro research |
 | `GEMINI_API_KEY` | Optional commentary only; never execution authority |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Shared cache, if enabled |
@@ -84,6 +84,8 @@ The web app can prepare and validate the server-side components, but it cannot c
 - Use walk-forward, Monte Carlo, parameter stability, spread/slippage/commission stress and regime-conditioned analysis.
 - Report expectancy, profit factor, max drawdown, recovery factor, exposure, turnover, trade count, confidence intervals and risk-of-ruin assumptions.
 - Do not label confluence scores as calibrated probabilities without calibration evidence.
+- Ghost Protocol is a deterministic 0–1 quality score with a 0.65 threshold. It requires fresh quotes and candles from the same MT5 installation, a maximum 2-second quote age, and acceptable structure, ATR stability, spread and spread/ATR conditions. It is not a win probability.
+- For long-range analysis, use the separate read-only historical backfill utility with MT5_BACKFILL_START=1996-01-01. The actual date coverage is broker-dependent; never synthesize missing bars.
 - Record all abstentions and blockers. Missing, stale or contradictory data must produce DEGRADED/ABSTAIN.
 
 ## Current operational gates
