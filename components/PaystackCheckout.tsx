@@ -17,9 +17,10 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
   // Account Binding Tab state
   const [licenseKeyInput, setLicenseKeyInput] = useState('');
   const [accountToBind, setAccountToBind] = useState('');
+  const [previousAccountToReplace, setPreviousAccountToReplace] = useState('');
   const [accountTypeToBind, setAccountTypeToBind] = useState<'LIVE' | 'DEMO'>('LIVE');
   const [brokerServerInput, setBrokerServerInput] = useState('');
-  const [boundAccountsList, setBoundAccountsList] = useState<Array<{ account_number: string | number; account_type: 'LIVE' | 'DEMO' }>>([]);
+  const [boundAccountsList, setBoundAccountsList] = useState<Array<{ account_number: string | number; account_type: 'LIVE' | 'DEMO'; broker_server?: string | null; rebind_available_at?: string | null }>>([]);
   const [availableSlots, setAvailableSlots] = useState<{ live: number; demo: number }>({ live: 1, demo: 2 });
   const [loadingBinding, setLoadingBinding] = useState(false);
 
@@ -127,6 +128,7 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
           license_key: licenseKeyInput.trim().toUpperCase(),
           account_number: Number(accountToBind),
           account_type: accountTypeToBind,
+          previous_account_number: previousAccountToReplace.trim() ? Number(previousAccountToReplace) : undefined,
           broker_server: brokerServerInput.trim() || undefined,
         }),
       });
@@ -135,6 +137,7 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
       if (data.success) {
         setSuccessMsg(data.message);
         setAccountToBind('');
+        setPreviousAccountToReplace('');
         await handleQueryBoundAccounts(licenseKeyInput);
       } else {
         setErrorMsg(data.error || 'Binding error');
@@ -410,7 +413,7 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
                       </span>
                     </div>
                     <span className="text-[10px] text-slate-500">
-                      Cooldown: 72h protection active
+                      {acc.rebind_available_at ? `Rebind available: ${new Date(acc.rebind_available_at).toLocaleString()}` : 'Rebind time unavailable'}
                     </span>
                   </div>
                 ))}
@@ -449,6 +452,19 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
                   className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-emerald-500 focus:outline-none"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] text-slate-400 uppercase mb-1">Existing account to replace (optional)</label>
+              <input
+                type="number"
+                min="1"
+                value={previousAccountToReplace}
+                onChange={(e) => setPreviousAccountToReplace(e.target.value)}
+                placeholder="Only when a 72-hour rebind is due"
+                className="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-emerald-500 focus:outline-none"
+              />
+              <p className="mt-1 text-[10px] leading-4 text-slate-500">Leave blank to consume a free seat. To replace an existing account, enter its current login; the server checks the original binding and 72-hour cooldown atomically.</p>
             </div>
 
             <div>
