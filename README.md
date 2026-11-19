@@ -72,7 +72,7 @@ Use a long, unique random value for `ALGOLYNC_PRIVATE_KEY` (or the accepted lega
 
 ## Paystack webhook contract
 
-Configure Paystack to send events to `https://fidulync.vercel.app/api/paystack/webhook`. The endpoint supports timestamped `Paystack-Signature` verification with `PAYSTACK_WEBHOOK_SECRET` and the legacy `x-paystack-signature` fallback with `PAYSTACK_SECRET_KEY`. It persists an idempotency record before processing, supports initial charge provisioning, subscription association, invoice failure/grace, invoice renewal and subscription disable events, and leaves failed events retryable. Do not enable live processing until the Paystack dashboard signing secret and merchant approval are confirmed.
+Configure Paystack to send events to `https://fidulync.vercel.app/api/paystack/webhook`. The endpoint supports timestamped `Paystack-Signature` verification with `PAYSTACK_WEBHOOK_SECRET` and the legacy `x-paystack-signature` fallback with `PAYSTACK_SECRET_KEY`. It persists an idempotency record before processing, supports initial charge provisioning, subscription association, invoice failure/grace, invoice renewal, non-renewal and subscription disable events, and leaves failed events retryable. Do not enable live processing until the Paystack dashboard signing secret and merchant approval are confirmed.
 
 ## Signal engine and API
 
