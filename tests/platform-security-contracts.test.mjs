@@ -25,7 +25,7 @@ test('critical public licensing endpoints use distributed fail-closed rate limit
     const source = await read(path);
     assert.match(source, /enforceDistributedRateLimit/, path);
     assert.match(source, /rate\.unavailable/, path);
-    assert.match(source, /status:\s*503/, path);
+    assert.match(source, /rate\.unavailable[\s\S]{0,400}\b503\b/, path);
   }
 });
 
