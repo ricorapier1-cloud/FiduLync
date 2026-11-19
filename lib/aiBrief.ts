@@ -41,7 +41,11 @@ async function generateGeminiBrief(
 ): Promise<MacroBrief> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   const fallback = ruleBasedBrief(snapshot);
-  if (!apiKey) return fallback;
+  // FRED terms permit personal research but prohibit use of FRED content in AI/ML development or training.
+  // Keep any snapshot containing FRED observations in deterministic local analysis; never transmit it to Gemini.
+  const containsFredObservations = snapshot.currencies.some((currency) =>
+    currency.policyRateProvider === 'fred' || currency.inflationProvider === 'fred');
+  if (!apiKey || containsFredObservations) return fallback;
 
   const inputs = {
     rateDifferentials: snapshot.currencies.map((currency) => ({
