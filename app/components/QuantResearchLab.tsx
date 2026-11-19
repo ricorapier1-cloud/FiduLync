@@ -127,7 +127,7 @@ export default function QuantResearchLab() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href="/risk" className="inline-flex h-10 items-center gap-2 rounded-lg border border-white/10 px-3 text-xs text-slate-300 hover:border-emerald-300/30"><BrandGlyph name="gauge" size={14} /> Risk planner</Link>
-            <Link href="/fleet" className="inline-flex h-10 items-center gap-2 rounded-lg border border-white/10 px-3 text-xs text-slate-300 hover:border-emerald-300/30"><BrandGlyph name="chart" size={14} /> Private EA Fleet</Link>
+            <Link href="/owner" className="inline-flex h-10 items-center gap-2 rounded-lg border border-white/10 px-3 text-xs text-slate-300 hover:border-emerald-300/30"><BrandGlyph name="chart" size={14} /> Private EA Fleet</Link>
           </div>
         </header>
 
