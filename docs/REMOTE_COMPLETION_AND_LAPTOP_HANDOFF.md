@@ -158,6 +158,18 @@ Do not merge or promote the Personal Quant branch until all of these are true:
 - Unused-index advisor notices are not grounds for deleting indexes in a database that has not yet received representative production traffic. The duplicate `escrows.slug` index is legacy and separate from Personal Quant; retain the unique constraint and review any redundant index removal as a separately tested migration.
 - The Personal Quant Supabase data tables contain no broker-terminal evidence until the Windows publisher connects.
 
+## 11. Additional Vercel secret-visibility remediation
+
+The current Vercel environment metadata flags the legacy `ALGOLYNC_LEASE_SIGNING_SECRET` as a readable secret in its production and preview/development scopes. This is separate from the Personal Quant publisher token, but it protects the legacy AlgoLync licence lease flow and should not remain readable by project members who do not need it.
+
+Before the next production release:
+1. In Vercel Project → Settings → Environment Variables, change the variable to Secret visibility in every scope where it is used.
+2. Coordinate any value rotation with the legacy licence verification service and active EA clients; do not rotate blindly because existing signed leases may stop validating.
+3. Verify lease issuance and verification in a controlled test before promoting.
+4. Never paste or export the value into chat, source control, build logs or screenshots.
+
+The connected Vercel API can inspect environment-variable metadata but does not provide a safe value-preserving visibility-only update in this workflow. This dashboard step therefore remains an explicit operator task.
+
 ## 12. Completion definition
 
 Remote code is ready for terminal validation when the current-head CI and preview are green, the Auth and data-license gates are closed, and the Windows compiler script passes. The system is operationally ready for live trading only after independent model review, demo execution-quality evidence, broker-specific risk validation and a separate explicit release approval. A green website build alone never grants trading authority.
