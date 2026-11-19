@@ -258,6 +258,9 @@ export async function getReserveBankOfAustraliaPolicyRate(): Promise<OfficialPol
 }
 
 export async function getSwissNationalBankPolicyRate(): Promise<OfficialPolicyObservation> {
+  if (process.env.SNB_COMMERCIAL_USE_APPROVED !== 'true') {
+    throw new Error('SNB data portal terms require verified commercial-use permission before application ingestion.');
+  }
   const sourceUrl = 'https://data.snb.ch/api/cube/snboffzisa/data/csv/en';
   const response = await fetch(sourceUrl, { cache: 'no-store', headers: { Accept: 'text/csv' }, signal: AbortSignal.timeout(8_000) });
   if (!response.ok) throw new Error(`SNB official-interest-rates cube returned ${response.status}.`);
