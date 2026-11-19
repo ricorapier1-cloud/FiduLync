@@ -12,6 +12,8 @@ function hashCode(requestId: string, code: string, pepper: string) {
 }
 
 export async function POST(request: Request) {
+  return NextResponse.json({ error: 'Commercial licence transfers are retired in Personal Quant Edition.' }, { status: 410, headers: { 'Cache-Control': 'no-store' } });
+
   const pepper = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
   if (!isSupabaseConfigured() || !pepper) {
     return NextResponse.json({ error: 'License transfer is not configured.' }, { status: 503 });
