@@ -6,6 +6,8 @@ import { supabaseRead } from '@/lib/supabaseAdmin';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
+  return NextResponse.json({ error: 'Customer portals are retired in Personal Quant Edition.' }, { status: 410, headers: { 'Cache-Control': 'no-store' } });
+
   if (!checkRateLimit(getClientIp(request), 20, 60_000)) {
     return NextResponse.json({ error: 'Too many dashboard requests. Please wait.' }, { status: 429 });
   }
