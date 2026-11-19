@@ -158,8 +158,9 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
       && now - Date.parse(snapshot.asOf) >= 0
       && now - Date.parse(snapshot.asOf) <= 24 * 60 * 60_000)
   );
-  const providerPolicyInputs = currencies.filter((currency) => currency.code !== 'XAU'
-    && currency.policyRateSource === 'provider' && currency.inflationSource === 'provider').length;
+  const verifiedMacroCurrencies = currencies.filter((currency) => currency.code !== 'XAU'
+    && currency.policyRateSource === 'provider' && currency.inflationSource === 'provider');
+  const providerPolicyInputs = verifiedMacroCurrencies.length;
   const activePair = pairs.find((item) => item.symbol === pair) ?? pairs[0];
   const activePairRegions = new Set([activePair.base, activePair.quote]
     .map((currency) => regionByCurrency[currency])
@@ -179,8 +180,8 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
     && quoteCurrency.policyRateSource === 'provider' && quoteCurrency.inflationSource === 'provider'
     ? Math.round(((baseCurrency.policyRate - baseCurrency.inflation) - (quoteCurrency.policyRate - quoteCurrency.inflation)) * 100)
     : null;
-  const policySpread = currencies.length > 1
-    ? Math.max(...currencies.map((currency) => currency.policyRate)) - Math.min(...currencies.map((currency) => currency.policyRate))
+  const policySpread = verifiedMacroCurrencies.length > 1
+    ? Math.max(...verifiedMacroCurrencies.map((currency) => currency.policyRate)) - Math.min(...verifiedMacroCurrencies.map((currency) => currency.policyRate))
     : null;
 
   useEffect(() => {
