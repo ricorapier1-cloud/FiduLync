@@ -34,7 +34,6 @@ const macroLinks = [
   { href: '/research', label: 'Quant Lab', icon: 'chart' },
   { href: '/store', label: 'AlgoLync Store', icon: 'chart' },
   { href: '/analytics', label: 'Performance', icon: 'activity' },
-  { href: '/owner', label: 'Owner Console', icon: 'shield' },
 ] as const satisfies readonly { href: string; label: string; icon: BrandGlyphName }[];
 
 export default function PlatformShell({ children }: { children: React.ReactNode }) {
