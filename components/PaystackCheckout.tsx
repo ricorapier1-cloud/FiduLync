@@ -100,7 +100,7 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
     if (!key.trim()) return;
     setLoadingBinding(true);
     try {
-      const res = await fetch(`/api/v1/bind-account?license_key=${encodeURIComponent(key.trim().toUpperCase())}`);
+      const res = await fetch('/api/v1/bind-account', { headers: { Authorization: 'Bearer ' + key.trim().toUpperCase() }, cache: 'no-store' });
       const data = await res.json();
       if (data.success) {
         setBoundAccountsList(data.bound_accounts || []);
