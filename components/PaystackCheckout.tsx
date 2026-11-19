@@ -195,7 +195,7 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
               tab === 'BUY' ? 'bg-emerald-500 font-bold text-black shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
-            SUBSCRIBE / BUY
+            PLANS / PURCHASE
           </button>
           <button
             type="button"
@@ -283,7 +283,7 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
                     plan === 'LIFETIME' ? 'bg-emerald-500 font-bold text-black' : 'text-slate-400'
                   }`}
                 >
-                  LIFETIME
+                  ONE-TIME
                 </button>
               </div>
             </div>
@@ -318,7 +318,7 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
           {/* Input Fields */}
           <div>
             <label className="block font-mono text-xs text-slate-300 mb-1">
-              Subscriber Email (For License Key &amp; Receipt)
+              Purchaser Email (For License Key &amp; Receipt)
             </label>
             <input
               type="email"
@@ -353,7 +353,7 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
               INCLUDED SEAT ENTITLEMENTS:
             </div>
             <p className="text-[11px] text-slate-300">
-              • <strong>1 Live MT5 Account</strong> + <strong>2 Demo MT5 Accounts</strong> included free with every subscription.
+              • <strong>1 Live MT5 Account</strong> + <strong>2 Demo MT5 Accounts</strong> included with every eligible license.
             </p>
             <p className="text-[11px] text-slate-300">
               • Self-service re-binding with a 72-hour cooldown timer when switching brokers or passing prop challenges.
