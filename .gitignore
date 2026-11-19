@@ -49,3 +49,7 @@ public/workbox-*.js
 
 # Temporary output for deterministic quant-governance tests
 .quant-test/
+
+# MetaEditor build outputs (never commit local EX5 binaries or compiler logs)
+MQL5/**/*.ex5
+MQL5/**/*.log
