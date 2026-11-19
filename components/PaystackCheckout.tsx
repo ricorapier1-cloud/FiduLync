@@ -184,7 +184,7 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
             INSTITUTIONAL LICENSE &amp; ACCOUNT GATE
           </div>
           <h3 className="mt-1 text-xl font-bold tracking-tight text-white">
-            AlgoLync Subscription Portal
+            AlgoLync Licensing & Checkout
           </h3>
         </div>
         <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-black/40 p-1 font-mono text-xs">
