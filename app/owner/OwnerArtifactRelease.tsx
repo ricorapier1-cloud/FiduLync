@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import type { FormEvent } from 'react';
 
 type Artifact = {
   ea_slug: string;
@@ -44,7 +45,7 @@ export default function OwnerArtifactRelease({ accessToken }: { accessToken: str
 
   useEffect(() => { void refresh(); }, [refresh]);
 
-  async function upload(event: React.FormEvent) {
+  async function upload(event: FormEvent) {
     event.preventDefault();
     if (!file) { setError('Select a compiled .ex5 file first.'); return; }
     setLoading(true); setError(''); setNotice('');
