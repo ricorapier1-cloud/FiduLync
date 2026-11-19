@@ -11,6 +11,8 @@ DISTRIBUTION_PAIRS = (
     ("MQL5/Experts/FiduLync_Supervisor_Probe.mq5", "public/downloads/FiduLync_Supervisor_Probe.mq5"),
     ("scripts/mt5_market_publisher.py", "public/downloads/FiduLync_MT5_Market_Publisher.py"),
     ("scripts/mt5_risk_state.py", "public/downloads/mt5_risk_state.py"),
+    ("mql5/MacroLyncLicense.mqh", "public/downloads/MacroLyncLicense.mqh"),
+    ("mql5/MacroLyncLicense.mqh", "public/mql5/MacroLyncLicense.mqh"),
 )
 
 
