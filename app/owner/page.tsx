@@ -17,7 +17,7 @@ const supabase = supabaseUrl && supabaseKey
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
-        flowType: 'implicit',
+        flowType: 'pkce',
       },
     })
   : null;
@@ -26,21 +26,25 @@ type OwnerStatus = { authenticated: boolean; email?: string; role?: string };
 
 function friendlyAuthError(message: string) {
   const value = message.toLowerCase();
-  if (value.includes('rate limit') || value.includes('too many')) return 'Too many code requests. Wait a few minutes before requesting another code.';
-  if (value.includes('smtp') || value.includes('email') || value.includes('sending')) return 'Supabase could not deliver the email. The Auth SMTP provider and email template need to be checked.';
-  if (value.includes('expired') || value.includes('invalid')) return 'That code is invalid or expired. Request a fresh code and use the newest email.';
+  if (value.includes('invalid login credentials')) return 'The email or password is incorrect.';
+  if (value.includes('email not confirmed')) return 'Confirm the owner email address before signing in.';
+  if (value.includes('rate limit') || value.includes('too many')) return 'Too many attempts. Wait a few minutes before trying again.';
+  if (value.includes('password should be') || value.includes('weak password')) return 'Choose a stronger password that meets the password policy.';
   if (value.includes('network') || value.includes('fetch')) return 'The authentication service could not be reached. Check your connection and try again.';
   return message;
 }
 
 export default function OwnerAccessPage() {
-  const [code, setCode] = useState('');
+  const [email, setEmail] = useState(OWNER_EMAIL);
+  const [password, setPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [session, setSession] = useState<Session | null>(null);
+  const [recoverySession, setRecoverySession] = useState<Session | null>(null);
+  const [recoveryMode, setRecoveryMode] = useState(false);
   const [status, setStatus] = useState<OwnerStatus | null>(null);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
-  const [codeRequested, setCodeRequested] = useState(false);
-  const [lastSentAt, setLastSentAt] = useState<string | null>(null);
 
   const verifyOwner = useCallback(async (current: Session) => {
     try {
@@ -53,7 +57,7 @@ export default function OwnerAccessPage() {
         await supabase?.auth.signOut();
         setSession(null);
         setStatus(null);
-        setMessage(result.error || 'The signed-in identity is not authorized for FiduLync owner access.');
+        setMessage(result.error || 'This account is not authorized for FiduLync owner access.');
         return false;
       }
       setSession(current);
@@ -63,7 +67,7 @@ export default function OwnerAccessPage() {
     } catch {
       setSession(null);
       setStatus(null);
-      setMessage('Owner verification is temporarily unavailable. Your code may have been accepted, but access was not granted. Try again.');
+      setMessage('Owner verification is temporarily unavailable. Access was not granted. Please try again.');
       return false;
     }
   }, []);
@@ -73,7 +77,7 @@ export default function OwnerAccessPage() {
     if (!supabase) return;
     void supabase.auth.getSession().then(({ data, error }) => {
       if (!active) return;
-      if (error) setMessage('Could not restore your owner session. Please request a new code.');
+      if (error) setMessage('Could not restore your owner session. Sign in again.');
       if (data.session) void verifyOwner(data.session);
     });
     const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
@@ -81,11 +85,18 @@ export default function OwnerAccessPage() {
       if (event === 'SIGNED_OUT' || !nextSession) {
         setSession(null);
         setStatus(null);
+        setRecoverySession(null);
+        setRecoveryMode(false);
         return;
       }
       if (event === 'TOKEN_REFRESHED') setSession(nextSession);
-      // Supabase auth callbacks must not await Supabase operations. Defer link-based
-      // sign-in verification until after the callback has returned.
+      if (event === 'PASSWORD_RECOVERY') {
+        setRecoverySession(nextSession);
+        setRecoveryMode(true);
+        setSession(null);
+        setStatus(null);
+        setMessage('Choose a new owner-console password to finish account recovery.');
+      }
       if (event === 'SIGNED_IN') {
         queueMicrotask(() => {
           if (active) void verifyOwner(nextSession);
@@ -98,57 +109,90 @@ export default function OwnerAccessPage() {
     };
   }, [verifyOwner]);
 
-  async function sendCode(event: React.FormEvent) {
+  async function signIn(event: React.FormEvent) {
     event.preventDefault();
     if (!supabase) {
-      setMessage('Owner sign-in is not configured for this deployment. The public Supabase URL and publishable key are missing.');
+      setMessage('Owner sign-in is not configured. The public Supabase URL and publishable key are missing.');
+      return;
+    }
+    if (email.trim().toLowerCase() !== OWNER_EMAIL) {
+      setMessage('Only the registered owner email can access this console.');
+      return;
+    }
+    if (!password) {
+      setMessage('Enter your owner password.');
       return;
     }
     setBusy(true);
     setMessage('');
-    setCode('');
     try {
-      const { error } = await supabase.auth.signInWithOtp({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: OWNER_EMAIL,
-        options: {
-          shouldCreateUser: false,
-          // If the Supabase template sends a magic link rather than a numeric OTP,
-          // return to this route so detectSessionInUrl can establish the session.
-          emailRedirectTo: new URL('/owner', window.location.origin).toString(),
-        },
+        password,
       });
       if (error) throw error;
-      setCodeRequested(true);
-      setLastSentAt(new Date().toISOString());
-      setMessage('Code request accepted by Supabase. Check the owner inbox and spam folder. Use the newest code; older codes may be invalidated.');
+      if (!data.session) throw new Error('Authentication did not return a valid session.');
+      const authorized = await verifyOwner(data.session);
+      if (authorized) setPassword('');
     } catch (error) {
-      setCodeRequested(false);
-      setMessage(friendlyAuthError(error instanceof Error ? error.message : 'Unable to request an owner sign-in code.'));
+      setMessage(friendlyAuthError(error instanceof Error ? error.message : 'Unable to sign in.'));
     } finally {
       setBusy(false);
     }
   }
 
-  async function verifyCode(event: React.FormEvent) {
-    event.preventDefault();
-    if (!supabase || !/^\d{6}$/.test(code.trim())) {
-      setMessage('Enter the six-digit code from the latest owner sign-in email.');
+  async function requestPasswordReset() {
+    if (!supabase) {
+      setMessage('Password recovery is not configured for this deployment.');
+      return;
+    }
+    if (email.trim().toLowerCase() !== OWNER_EMAIL) {
+      setMessage('Enter the registered owner email address to recover the owner password.');
       return;
     }
     setBusy(true);
     setMessage('');
     try {
-      const { data, error } = await supabase.auth.verifyOtp({
-        email: OWNER_EMAIL,
-        token: code.trim(),
-        type: 'email',
+      const { error } = await supabase.auth.resetPasswordForEmail(OWNER_EMAIL, {
+        redirectTo: new URL('/owner', window.location.origin).toString(),
       });
       if (error) throw error;
-      if (!data.session) throw new Error('Supabase accepted the code but did not return a session. Check the Auth email template and URL configuration.');
-      const authorized = await verifyOwner(data.session);
-      if (authorized) setCode('');
+      setMessage('If password recovery is enabled, a secure password-reset link will be sent to the registered owner inbox. Use that link only to set a new password; normal sign-in always uses your password.');
     } catch (error) {
-      setMessage(friendlyAuthError(error instanceof Error ? error.message : 'The sign-in code could not be verified.'));
+      setMessage(friendlyAuthError(error instanceof Error ? error.message : 'Unable to request password recovery.'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function updateRecoveredPassword(event: React.FormEvent) {
+    event.preventDefault();
+    if (!supabase || !recoverySession) {
+      setMessage('The password-reset session is missing or expired. Request a new password-reset link.');
+      return;
+    }
+    if (newPassword.length < 12) {
+      setMessage('Use a password with at least 12 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setMessage('The new password and confirmation do not match.');
+      return;
+    }
+    setBusy(true);
+    setMessage('');
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setRecoveryMode(false);
+      setRecoverySession(null);
+      setMessage('Password updated. Your owner session is being verified.');
+      await verifyOwner(recoverySession);
+    } catch (error) {
+      setMessage(friendlyAuthError(error instanceof Error ? error.message : 'Unable to update the password.'));
     } finally {
       setBusy(false);
     }
@@ -158,8 +202,7 @@ export default function OwnerAccessPage() {
     await supabase?.auth.signOut();
     setSession(null);
     setStatus(null);
-    setCode('');
-    setCodeRequested(false);
+    setPassword('');
     setMessage('You have signed out.');
   }
 
@@ -171,31 +214,42 @@ export default function OwnerAccessPage() {
     <main className="mx-auto flex min-h-[75vh] w-full max-w-lg items-center px-5 py-12 text-slate-100">
       <div className="w-full rounded-2xl border border-white/10 bg-[#0c1118] p-6 shadow-2xl sm:p-8">
         <div className="font-mono text-[10px] tracking-[0.2em] text-emerald-300">FIDULYNC / PRIVATE QUANT CONTROL PLANE</div>
-        <h1 className="mt-3 text-2xl font-semibold">Owner sign-in</h1>
-        <p className="mt-3 text-xs leading-6 text-slate-400">Restricted to the pre-registered owner identity. Email verification is followed by a separate server-side owner authorization check.</p>
-        <div className="mt-6 rounded-xl border border-white/[0.08] bg-black/20 p-4">
-          <div className="text-[10px] uppercase tracking-wider text-slate-500">Authorized owner email</div>
-          <div className="mt-2 text-sm font-medium text-slate-100">{OWNER_EMAIL}</div>
-          <div className="mt-1 text-[10px] text-slate-500">Customer support identity remains separate.</div>
-        </div>
-        <form onSubmit={sendCode} className="mt-6 space-y-3">
-          <button type="submit" disabled={busy || !supabase} className="h-11 w-full rounded-lg bg-emerald-300 px-4 text-sm font-semibold text-[#07120d] disabled:opacity-50">
-            {busy ? 'Please wait…' : codeRequested ? 'Send a fresh sign-in code' : 'Email me a sign-in code'}
-          </button>
-        </form>
-        {codeRequested && <form onSubmit={verifyCode} className="mt-5 space-y-3 border-t border-white/[0.08] pt-5">
-          <div className="flex items-center justify-between gap-3">
-            <label className="block text-xs text-slate-400" htmlFor="owner-code">Six-digit email code</label>
-            <span className="text-[10px] text-slate-500">Latest request: {lastSentAt ? new Date(lastSentAt).toLocaleTimeString() : 'just now'}</span>
-          </div>
-          <input id="owner-code" inputMode="numeric" autoComplete="one-time-code" autoFocus maxLength={6} value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" aria-label="Six-digit owner sign-in code" className="h-12 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-center font-mono text-xl tracking-[0.45em] text-white outline-none focus:border-emerald-300/40" />
-          <button type="submit" disabled={busy || code.length !== 6} className="h-11 w-full rounded-lg border border-emerald-300/30 px-4 text-sm font-semibold text-emerald-200 disabled:opacity-50">
-            {busy ? 'Verifying…' : 'Verify code and open console'}
-          </button>
-        </form>}
+        <h1 className="mt-3 text-2xl font-semibold">{recoveryMode ? 'Set a new password' : 'Owner sign-in'}</h1>
+        <p className="mt-3 text-xs leading-6 text-slate-400">
+          {recoveryMode
+            ? 'Create a new password for the registered owner account. Password recovery is separate from normal sign-in.'
+            : 'Sign in with the registered owner email address and password. Access is checked again by the server against the authorized owner identity.'}
+        </p>
+        {recoveryMode ? (
+          <form onSubmit={updateRecoveredPassword} className="mt-6 space-y-3">
+            <label className="block text-xs text-slate-400" htmlFor="owner-new-password">New password</label>
+            <input id="owner-new-password" type="password" autoComplete="new-password" minLength={12} required value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="At least 12 characters" className="h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-sm text-white outline-none focus:border-emerald-300/40" />
+            <label className="block pt-2 text-xs text-slate-400" htmlFor="owner-confirm-password">Confirm new password</label>
+            <input id="owner-confirm-password" type="password" autoComplete="new-password" minLength={12} required value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="Enter the new password again" className="h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-sm text-white outline-none focus:border-emerald-300/40" />
+            <button type="submit" disabled={busy || !recoverySession} className="h-11 w-full rounded-lg bg-emerald-300 px-4 text-sm font-semibold text-[#07120d] disabled:opacity-50">{busy ? 'Updating…' : 'Save new password'}</button>
+          </form>
+        ) : (
+          <>
+            <div className="mt-6 rounded-xl border border-white/[0.08] bg-black/20 p-4">
+              <div className="text-[10px] uppercase tracking-wider text-slate-500">Authorized owner email</div>
+              <div className="mt-2 text-sm font-medium text-slate-100">{OWNER_EMAIL}</div>
+              <div className="mt-1 text-[10px] text-slate-500">Only this pre-registered identity is authorized.</div>
+            </div>
+            <form onSubmit={signIn} className="mt-6 space-y-3">
+              <label className="block text-xs text-slate-400" htmlFor="owner-email">Email address</label>
+              <input id="owner-email" type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} className="h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-sm text-white outline-none focus:border-emerald-300/40" />
+              <label className="block pt-2 text-xs text-slate-400" htmlFor="owner-password">Password</label>
+              <input id="owner-password" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} className="h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-sm text-white outline-none focus:border-emerald-300/40" />
+              <button type="submit" disabled={busy || !supabase} className="h-11 w-full rounded-lg bg-emerald-300 px-4 text-sm font-semibold text-[#07120d] disabled:opacity-50">{busy ? 'Signing in…' : 'Sign in to owner console'}</button>
+            </form>
+            <button type="button" onClick={() => void requestPasswordReset()} disabled={busy || !supabase} className="mt-4 w-full text-center text-xs text-emerald-200 hover:underline disabled:opacity-50">Forgot password?</button>
+          </>
+        )}
         {message && <p role="status" aria-live="polite" className="mt-5 rounded-lg border border-white/10 bg-black/20 p-3 text-xs leading-5 text-slate-300">{message}</p>}
         {!supabase && <p className="mt-4 text-xs text-rose-200">This deployment is missing its public Supabase authentication configuration.</p>}
-        <div className="mt-6 border-t border-white/[0.08] pt-4 text-[10px] leading-5 text-slate-500">If the email contains a secure sign-in link, open it on this device; it returns to this owner page. For numeric codes, the Supabase email template must render {'{{ .Token }}'}. Never share one-time codes or MT5 connector tokens.</div>
+        <div className="mt-6 border-t border-white/[0.08] pt-4 text-[10px] leading-5 text-slate-500">
+          Normal owner access uses email and password only. There is no one-time login code or magic-link login. Never share your owner password or MT5 connector tokens.
+        </div>
       </div>
     </main>
   );
