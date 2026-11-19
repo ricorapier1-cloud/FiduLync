@@ -45,6 +45,7 @@ async function getFinnhubQuotes(apiKey: string): Promise<MarketQuote[]> {
 }
 
 async function getFrankfurterQuotes(): Promise<MarketQuote[]> {
+  if (process.env.FRANKFURTER_COMMERCIAL_USE_APPROVED !== 'true') throw new Error('Frankfurter reference quotes are disabled pending commercial-use approval.');
   const response = await fetch('https://api.frankfurter.app/latest?from=EUR&to=USD,GBP,JPY', {
     cache: 'no-store',
     signal: AbortSignal.timeout(5_000),
@@ -68,6 +69,7 @@ async function getFrankfurterQuotes(): Promise<MarketQuote[]> {
 }
 
 async function getExchangeRateQuotes(): Promise<MarketQuote[]> {
+  if (process.env.EXCHANGERATE_API_COMMERCIAL_USE_APPROVED !== 'true') throw new Error('ExchangeRate-API reference quotes are disabled pending commercial-use approval.');
   const response = await fetch('https://open.er-api.com/v6/latest/USD', {
     cache: 'no-store',
     signal: AbortSignal.timeout(5_000),
@@ -95,6 +97,7 @@ async function getExchangeRateQuotes(): Promise<MarketQuote[]> {
 }
 
 async function getGoldQuote(): Promise<MarketQuote> {
+  if (process.env.GOLD_API_COMMERCIAL_USE_APPROVED !== 'true') throw new Error('Gold-API reference quotes are disabled pending commercial-use approval.');
   const response = await fetch('https://api.gold-api.com/price/XAU', {
     cache: 'no-store',
     signal: AbortSignal.timeout(5_000),
@@ -153,7 +156,7 @@ async function fetchMarketQuotes(): Promise<MarketQuote[]> {
     console.warn('MT5 broker quotes are unavailable:', error);
     return [];
   });
-  const apiKey = process.env.FINNHUB_API_KEY?.trim();
+  const apiKey = process.env.FINNHUB_COMMERCIAL_USE_APPROVED === 'true' ? process.env.FINNHUB_API_KEY?.trim() : undefined;
   let liveQuotes: MarketQuote[] = [];
   if (apiKey) {
     try {
