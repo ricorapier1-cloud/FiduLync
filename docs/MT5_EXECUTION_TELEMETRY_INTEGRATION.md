@@ -38,20 +38,21 @@ In `OnDeinit()`, stop the timer with `EventKillTimer()`.
 
 ## Requested-price and latency evidence
 
-For the best slippage and latency measurements, after an EA's existing `OrderSend()` returns successfully, register its request context using `result.request_id`, the exact request symbol/side/price and the spread observed immediately before sending:
+For the best slippage and latency measurements, after an EA's existing `OrderSend()` returns successfully with a broker order ticket, register its request context using both `result.request_id` and `result.order`, the exact request symbol/side/price and the spread observed immediately before sending. Deal-add transactions are correlated by the broker order ticket because the request/result parameters are not guaranteed to carry the originating request ID on deal events. The context is retained across partial fills and retired when the order enters history:
 
 ```mql5
-if(OrderSend(request, result) && result.retcode == TRADE_RETCODE_DONE)
+if(OrderSend(request, result) && (result.retcode == TRADE_RETCODE_DONE
+   || result.retcode == TRADE_RETCODE_DONE_PARTIAL) && result.order > 0)
 {
    double spreadPoints = (SymbolInfoDouble(request.symbol, SYMBOL_ASK)
                          - SymbolInfoDouble(request.symbol, SYMBOL_BID))
                          / SymbolInfoDouble(request.symbol, SYMBOL_POINT);
-   FiduLyncTelemetry.RegisterOrderRequest(result.request_id, request.symbol,
+   FiduLyncTelemetry.RegisterOrderRequest(result.request_id, result.order, request.symbol,
       (request.type == ORDER_TYPE_BUY ? "BUY" : "SELL"), request.price, spreadPoints);
 }
 ```
 
-Adapt that snippet to the EA's existing order wrapper and preserve its current trade logic. For market execution, capture the requested price before the send; some brokers require a zero request price, in which case requested-price/slippage evidence may remain unavailable. Latency is only measured when the request context can be matched to the resulting transaction.
+Adapt that snippet to the EA's existing order wrapper and preserve its current trade logic. For market execution, capture the requested price before the send; some brokers require a zero request price, in which case requested-price/slippage evidence may remain unavailable while spread and latency can still be measured. Latency is measured from the local send timestamp to the broker-confirmed deal callback; it is not exchange-side network latency.
 
 ## MT5 terminal setup
 
