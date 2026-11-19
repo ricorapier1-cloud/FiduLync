@@ -6,6 +6,7 @@ import { getCurrencyStrengthIndex } from '@/lib/currencyStrength';
 import { getMacroSnapshot } from '@/lib/macroEngine';
 import type { MacroSnapshot } from '@/types/macro';
 import { calculateTechnicalSignal } from '@/lib/technicalEngine';
+import { enforceDistributedRateLimit } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -91,6 +92,9 @@ function frameAnalysis(rows: Candle[], timeframe: string) {
 export async function GET(request: Request) {
   const owner = await requireOwner(request);
   if (!owner) return NextResponse.json({ error: 'Owner authentication required.' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
+  const rate = await enforceDistributedRateLimit(request, 'owner-market-intelligence', 20, 60_000);
+  if (rate.unavailable) return NextResponse.json({ error: 'Market intelligence service is temporarily unavailable.' }, { status: 503 });
+  if (!rate.allowed) return NextResponse.json({ error: 'Market intelligence rate limit exceeded.' }, { status: 429 });
 
   try {
     const supabase = getSupabaseAdmin();
