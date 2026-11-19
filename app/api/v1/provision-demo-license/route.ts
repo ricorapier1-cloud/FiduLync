@@ -54,7 +54,7 @@ export async function POST(req: Request) {
     const licenseKey = \`ALGO-DEMO-\${cleanSlug}-\${randomSuffix}\`;
     const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
 
-    const persisted = await persistLicense({
+    const persisted = await persistLicense<Array<{ license_key: string; email: string; status: string }>>({
       license_key: licenseKey,
       mt5_account: mt5Account,
       email,
@@ -66,7 +66,9 @@ export async function POST(req: Request) {
       included_demo_seats: 2,
       extra_live_seats: 0,
     });
-    if (!persisted) throw new Error('License persistence did not return a database result.');
+    if (!Array.isArray(persisted) || !persisted.some((row) => row.license_key === licenseKey && row.email.toLowerCase() === email && row.status.toLowerCase() === 'active')) {
+      throw new Error('License persistence did not confirm the expected active entitlement.');
+    }
 
     return NextResponse.json({
       success: true,
