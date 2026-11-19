@@ -51,6 +51,7 @@ test('stale macro snapshots are rejected instead of silently reused', () => {
   assert.match(macroEngine, /calendarProvider === 'finnhub'/);
   assert.match(macroEngine, /COT_DATA_PROVIDER_LICENSE_APPROVED === 'true'/);
   assert.match(macroEngine, /FRANKFURTER_COMMERCIAL_USE_APPROVED === 'true'/);
+  assert.match(macroEngine, /SNB_DATA_SOURCE_ENABLED === 'true'/);
 });
 
 test('dashboard never substitutes hardcoded events, policy ranges, or positioning figures', () => {
