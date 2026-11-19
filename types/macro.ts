@@ -10,6 +10,8 @@ export type MacroCurrency = {
   twoYearYieldSource?: 'provider' | 'reference';
   policyRateSource?: 'provider' | 'reference';
   inflationSource?: 'provider' | 'reference';
+  policyRateProvider?: 'fred' | 'alpha-vantage' | 'macro-provider' | 'ecb' | 'bank-of-canada' | 'bank-of-england' | 'bank-of-japan' | 'reserve-bank-of-australia' | 'reserve-bank-of-new-zealand' | 'swiss-national-bank';
+  inflationProvider?: 'fred' | 'alpha-vantage' | 'macro-provider' | 'ecb' | 'bank-of-canada' | 'world-bank';
   policyRateAsOf?: string;
   inflationAsOf?: string;
   policyRateSourceUrl?: string;
@@ -39,7 +41,9 @@ export type MacroSnapshot = {
   asOf: string;
   source: 'fallback' | 'provider' | 'partial';
   cotSource?: 'unavailable' | 'provider';
+  cotProvider?: 'cftc' | 'custom';
   calendarSource?: 'reference' | 'provider';
+  calendarProvider?: 'fair-economy' | 'finnhub' | 'fmp' | 'macro-provider';
   ecbRates?: Record<string, number>;
   currencies: MacroCurrency[];
   cot: CotPosition[];
