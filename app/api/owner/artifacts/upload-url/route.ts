@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     const encodedPath = storagePath.split('/').map(encodeURIComponent).join('/');
     const signed = await fetch(`${supabaseUrl}/storage/v1/object/upload/sign/algolync-artifacts/${encodedPath}`, {
       method: 'POST',
-      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json', 'x-upsert': 'true' },
+      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
       cache: 'no-store',
       signal: AbortSignal.timeout(8_000),
