@@ -5,7 +5,6 @@ import { createClient, type Session } from '@supabase/supabase-js';
 import Link from 'next/link';
 import OwnerOperations from './OwnerOperations';
 
-const OWNER_EMAIL = 'ricorapier1@gmail.com';
 const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
 const supabaseKey = (
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
@@ -36,7 +35,7 @@ function friendlyAuthError(message: string) {
 }
 
 export default function OwnerAccessPage() {
-  const [email, setEmail] = useState(OWNER_EMAIL);
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -116,10 +115,6 @@ export default function OwnerAccessPage() {
       setMessage('Owner sign-in is not configured. The public Supabase URL and publishable key are missing.');
       return;
     }
-    if (email.trim().toLowerCase() !== OWNER_EMAIL) {
-      setMessage('Only the registered owner email can access this console.');
-      return;
-    }
     if (!password) {
       setMessage('Enter your owner password.');
       return;
@@ -128,7 +123,7 @@ export default function OwnerAccessPage() {
     setMessage('');
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: OWNER_EMAIL,
+        email: email.trim().toLowerCase(),
         password,
       });
       if (error) throw error;
@@ -147,14 +142,10 @@ export default function OwnerAccessPage() {
       setMessage('Password recovery is not configured for this deployment.');
       return;
     }
-    if (email.trim().toLowerCase() !== OWNER_EMAIL) {
-      setMessage('Enter the registered owner email address to recover the owner password.');
-      return;
-    }
     setBusy(true);
     setMessage('');
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(OWNER_EMAIL, {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
         redirectTo: new URL('/owner', window.location.origin).toString(),
       });
       if (error) throw error;
@@ -210,7 +201,7 @@ export default function OwnerAccessPage() {
   }
 
   if (status?.authenticated && session) {
-    return <><div className="px-5 pt-4"><Link href="/" className="font-mono text-xs text-emerald-300 hover:underline">← BACK TO TERMINAL</Link></div><OwnerOperations accessToken={session.access_token} email={status.email || OWNER_EMAIL} role={status.role || 'owner'} onSignOut={signOut} /></>;
+    return <><div className="px-5 pt-4"><Link href="/" className="font-mono text-xs text-emerald-300 hover:underline">← BACK TO TERMINAL</Link></div><OwnerOperations accessToken={session.access_token} email={status.email || email} role={status.role || 'owner'} onSignOut={signOut} /></>;
   }
 
   return (
@@ -235,9 +226,9 @@ export default function OwnerAccessPage() {
         ) : (
           <>
             <div className="mt-6 rounded-xl border border-white/[0.08] bg-black/20 p-4">
-              <div className="text-[10px] uppercase tracking-wider text-slate-500">Authorized owner email</div>
-              <div className="mt-2 text-sm font-medium text-slate-100">{OWNER_EMAIL}</div>
-              <div className="mt-1 text-[10px] text-slate-500">Only this pre-registered identity is authorized.</div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-500">Private owner authentication</div>
+              <div className="mt-2 text-sm font-medium text-slate-100">Identity verified server-side</div>
+              <div className="mt-1 text-[10px] text-slate-500">Only the email configured in the server environment is authorized. The registered address is not disclosed on this page.</div>
             </div>
             <form onSubmit={signIn} className="mt-6 space-y-3">
               <label className="block text-xs text-slate-400" htmlFor="owner-email">Email address</label>
