@@ -32,6 +32,7 @@ test('walk-forward validation requires chronological folds and sufficient OOS ev
   assert.equal(result.eligible, true);
   assert.equal(result.aggregateOos.trades, 90);
   assert.equal(evaluateWalkForward(folds.slice(0,2)).eligible, false);
+  assert.equal(evaluateWalkForward(folds.map((fold) => ({ ...fold, trainStart: '2025-01-01' }))).eligible, false);
 });
 
 test('Monte Carlo bootstrap is reproducible and uses actual trade R outcomes', () => {
