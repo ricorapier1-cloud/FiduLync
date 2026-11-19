@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createHash } from 'node:crypto';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
+import { enforceDistributedRateLimit } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -10,6 +11,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export async function POST(request: Request) {
+  const rate = await enforceDistributedRateLimit(request, 'independent-model-review', 10, 60_000);
+  if (rate.unavailable) return NextResponse.json({ error: 'Reviewer security service is unavailable.' }, { status: 503 });
+  if (!rate.allowed) return NextResponse.json({ error: 'Too many review attempts.' }, { status: 429 });
+  if (Number(request.headers.get('content-length') ?? 0) > 32_768) return NextResponse.json({ error: 'Review payload exceeds 32 KB.' }, { status: 413 });
   const authorization = request.headers.get('authorization') ?? '';
   const token = /^Bearer\s+(.+)$/i.exec(authorization)?.[1]?.trim();
   if (!token) return NextResponse.json({ error: 'Reviewer authentication required.' }, { status: 401 });
@@ -22,7 +27,7 @@ export async function POST(request: Request) {
     if (authError || !user || !user.email_confirmed_at || !allowlist.includes(user.id)) {
       return NextResponse.json({ error: 'This verified account is not an authorised independent reviewer.' }, { status: 403 });
     }
-    const body: unknown = await request.json();
+    let body: unknown;\n    try { body = await request.json(); } catch { return NextResponse.json({ error: 'A valid JSON review payload is required.' }, { status: 400 }); }
     if (!isRecord(body)) return NextResponse.json({ error: 'A review payload is required.' }, { status: 400 });
     const modelId = Number(body.model_id);
     const decision = body.decision;
