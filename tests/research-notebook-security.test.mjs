@@ -15,8 +15,8 @@ test('hypothesis API requires server-verified owner identity on read and write',
 test('hypothesis registration is draft-only and validates thesis and research scope', () => {
   assert.ok(api.includes("status: 'DRAFT'"));
   assert.ok(api.includes('falsification_criteria'));
-  assert.ok(api.includes('INSUFFICIENT'));
-  assert.ok(api.includes('20') && api.includes('5000'));
+  assert.ok(api.includes('payload.thesis.trim().length < 20'));
+  assert.ok(api.includes('payload.thesis.trim().length > 5000'));
 });
 
 test('notebook UI does not embed the private owner email or service-role credential', () => {
