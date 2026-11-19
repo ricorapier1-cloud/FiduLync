@@ -11,8 +11,8 @@ const links = [
   { href: '/', label: 'MacroLync', icon: 'shield' },
   { href: '/risk', label: 'Risk Planner', icon: 'gauge' },
   { href: '/research', label: 'Quant Lab', icon: 'chart' },
-  { href: '/store', label: 'AlgoLync Store', icon: 'chart' },
-  { href: '/customer', label: 'Customer Portal', icon: 'mail' },
+  { href: '/store', label: 'EA Lab', icon: 'chart' },
+
   { href: '/analytics', label: 'Performance', icon: 'activity' },
   { href: '/faq', label: 'Help', icon: 'activity' },
   { href: '/terms', label: 'Risk & Data', icon: 'shield-alert' },
@@ -22,7 +22,7 @@ const mobileLinks = [
   { href: '/', label: 'Terminal', icon: 'shield' },
   { href: '/risk', label: 'Risk', icon: 'gauge' },
   { href: '/research', label: 'Quant Lab', icon: 'chart' },
-  { href: '/store', label: 'Store', icon: 'chart' },
+  { href: '/store', label: 'EA Lab', icon: 'chart' },
 ] as const satisfies readonly { href: string; label: string; icon: BrandGlyphName }[];
 
 const macroLinks = [
@@ -32,7 +32,7 @@ const macroLinks = [
   { href: '#positioning', label: 'Positioning', icon: 'radio' },
   { href: '/risk', label: 'Risk planner', icon: 'gauge' },
   { href: '/research', label: 'Quant Lab', icon: 'chart' },
-  { href: '/store', label: 'AlgoLync Store', icon: 'chart' },
+  { href: '/store', label: 'EA Lab', icon: 'chart' },
   { href: '/analytics', label: 'Performance', icon: 'activity' },
 ] as const satisfies readonly { href: string; label: string; icon: BrandGlyphName }[];
 
@@ -76,7 +76,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> 
             </a>
             <Link className="secure-pill" href={isHome ? '/store' : '/' }>
-              <span className="secure-dot" /> {isHome ? 'AlgoLync Store' : 'Macro terminal'}
+              <span className="secure-dot" /> {isHome ? 'EA Lab' : 'Macro terminal'}
             </Link>
             <button
               type="button"
