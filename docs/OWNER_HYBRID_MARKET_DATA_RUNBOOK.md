@@ -1,13 +1,13 @@
 # FiduLync owner and hybrid market-data runbook
 
-## Owner access and complimentary license
+## Private owner access
 
-- Open `/owner` and sign in with the registered owner email address and password.
-- Normal owner sign-in is email/password only. Use the Supabase password-recovery email only if the password must be reset; OTP and magic-link sign-in are not part of the owner login flow.
-- The server verifies the Supabase Auth access token against Auth and requires the exact owner email plus a confirmed email address. Customer support addresses do not satisfy this check.
-- Issue an owner license by entering the MT5 login. The server generates the key using cryptographic randomness, stores it in `public.licenses` with tier `OWNER_LIFETIME`, active status, and a null expiry, and records an audit event.
-- The license is bound to that MT5 login by the existing license validator. Do not expose service-role keys or owner tokens in the browser.
-- The owner audit table is service-role only and has RLS enabled.
+- Open `/owner` and sign in using the registered owner email address and password.
+- Customer registration, checkout, subscription, escrow and customer licence provisioning are outside the Personal Quant Edition.
+- The server verifies the Supabase Auth access token against the exact configured owner email and a confirmed email address.
+- Preserve the existing owner account and password-recovery flow. Do not create public owner registration.
+- Use the owner console to issue and revoke per-terminal MT5 publisher tokens. Tokens are displayed once; only their hashes are stored.
+- Never expose Supabase service-role keys, publisher tokens or owner access tokens in browser code or source control.
 
 ## Hybrid market data
 
@@ -19,7 +19,7 @@
    - JSON body with `quotes[]` and `candles[]`
 3. The ingestion endpoint hashes the token, resolves an active installation, enforces a five-minute timestamp window, stores the nonce to prevent replay, validates quote/OHLC/timeframe values, and upserts into the existing MT5 market tables.
 4. Technical analysis selects closed candles from one active installation only. H1/H4/D1 feeds must be fresh (2h/8h/48h maximum respectively) and have at least 200 candles per timeframe. If MT5 data is incomplete, the existing independent HTTPS candle provider may be used only when it returns fresh data.
-5. Spot quotes prefer fresh MT5 broker quotes. Finnhub, Frankfurter, ExchangeRate-API and Gold-API feeds are disabled until their specific commercial-use approvals are explicitly configured. Approved reference-rate sources remain reference data and must never be represented as real-time executable broker prices.
+5. Spot quotes prefer fresh MT5 broker quotes. Frankfurter is a public daily reference-rate source and may be used for contextual comparison only; it is never an executable quote. Finnhub and Twelve Data may be enabled only when your own personal plan explicitly permits the exact display/use. ExchangeRate-API, Gold-API and custom providers remain opt-in until their personal-use terms are verified. No reference rate may be represented as a live broker quote.
 6. Signals remain fail-closed when required macro/technical data is missing, stale, or incomplete.
 
 ### Windows VPS publisher
@@ -57,13 +57,13 @@ The publisher supports optional canonical symbols `DXY`, `USOIL` and `SPX500` in
 
 ## EA release artifact workflow
 
-The owner console's **Release governance** section now contains the private compiled-artifact workflow:
+The owner console's **Research governance** section is intended to contain the private compiled-artifact workflow:
 
 1. Add the real commercial `.mq5` source to `MQL5/Experts/Release/` on the Windows laptop and compile with `scripts/compile_mt5.ps1 -RequireProductSources`.
 2. Run MetaEditor, Strategy Tester and demo-account compatibility checks. The application cannot perform these terminal-dependent tests.
 3. Upload the resulting `.ex5` through `/owner` → Release governance. The browser calculates SHA-256 and uploads directly to the private `algolync-artifacts` bucket using a short-lived signed upload URL; the binary does not pass through Vercel's serverless request body.
 4. The server verifies the private object exists and atomically registers its hash, size, version and owner audit event. Uploading always resets approval to false.
 5. The owner must explicitly attest to zero MetaEditor errors/warnings and demo validation, provide a reason, then approve the release. Approval and revocation are separately audited.
-6. Checkout, demo-license issuance, paid license provisioning and license validation all fail closed until the artifact is approved and the private object still exists.
+6. The personal MT5 supervisor pipeline does not require customer licences or paid entitlements. A compiled EA artifact remains untrusted until its hash, MetaEditor result and demo-validation evidence are reviewed.
 
 No performance metrics or equity curves are published until independently verified backtest and broker-forward datasets exist. The artifact workflow does not itself certify strategy profitability or independent review.
