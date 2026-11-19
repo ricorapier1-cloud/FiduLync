@@ -15,6 +15,7 @@ export type ProvisionedLicense = {
   tier: string;
   status: string;
   expires_at: string | null;
+  created?: boolean;
 };
 
 export type ProvisionResult = {
@@ -99,6 +100,10 @@ export async function provisionLicenseForReference(referenceInput: string): Prom
     ? payment.metadata as Record<string, unknown> : {};
   const eaSlug = String(meta.ea_slug || slug || 'eridam-nexus-pro');
   const ea = getEaBySlug(eaSlug);
+  if (!ea) throw new Error('Payment metadata references an unknown AlgoLync product.');
+  if (meta.product !== 'ALGOLYNX_VAULT') throw new Error('Payment metadata does not identify an AlgoLync storefront purchase.');
+  if (slug && ea.slug !== slug) throw new Error('Payment product metadata does not match its payment reference.');
+  if (meta.currency !== currency || meta.tier !== plan) throw new Error('Payment plan or currency metadata does not match the reference.');
 
   let expectedAmount = 6500000;
   if (currency === 'NGN') {
@@ -109,12 +114,10 @@ export async function provisionLicenseForReference(referenceInput: string): Prom
     expectedAmount = p * 100;
   }
 
-  // Allow transaction if amount is valid
-  if (payment.amount !== expectedAmount) {
-    // If mismatch, log but allow if greater than minimal threshold to prevent locking paid clients
-    if ((payment.amount as number) < 1000) {
-      throw new Error('Paystack transaction amount is below valid minimum.');
-    }
+  // Never mint an entitlement for a partial, overpaid, underpaid, or tampered checkout.
+  const paidAmount = typeof payment.amount === 'number' ? payment.amount : Number(payment.amount);
+  if (!Number.isSafeInteger(paidAmount) || paidAmount !== expectedAmount) {
+    throw new Error('Verified Paystack amount does not exactly match the server-side product price.');
   }
 
   const email = safeEmail(
@@ -153,8 +156,8 @@ export async function provisionLicenseForReference(referenceInput: string): Prom
 
     return {
       license: activeRecord,
-      created: true,
-      amount: Number(payment.amount),
+      created: activeRecord.created === true,
+      amount: paidAmount,
       currency,
       plan,
     };
