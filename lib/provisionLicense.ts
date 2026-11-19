@@ -1,11 +1,11 @@
 import 'server-only';
 
 import { createHash, randomBytes } from 'node:crypto';
-import { isSupabaseConfigured, supabaseQuery } from '@/lib/supabaseAdmin';
-import { getEaBySlug } from '@/lib/eaCatalog';
+import { isSupabaseConfigured, supabaseQuery, supabaseRead } from '@/lib/supabaseAdmin';
 
 type Plan = 'MONTHLY' | 'LIFETIME';
 type Currency = 'NGN' | 'USD';
+type ProductPricing = { slug: string; name: string; category: string; is_active: boolean; monthly_price_ngn: number | string; monthly_price_usd: number | string; one_time_price_ngn: number | string; one_time_price_usd: number | string };
 
 export type ProvisionedLicense = {
   license_key: string;
@@ -42,10 +42,12 @@ function parseReference(reference: string): { plan: Plan; currency: Currency; sl
   const parts = reference.split('_');
   if (parts.length >= 4 && parts[0] === 'ALGO') {
     if (parts[1] === 'MONTHLY' || parts[1] === 'LIFETIME') {
+      if (parts[2] !== 'NGN' && parts[2] !== 'USD') throw new Error('Unsupported payment currency.');
       return { plan: parts[1] as Plan, currency: parts[2] as Currency };
     }
     // Pattern: ALGO_[SLUG]_[PLAN]_[CURRENCY]_[HEX]
     if (parts[2] === 'MONTHLY' || parts[2] === 'LIFETIME') {
+      if (parts[3] !== 'NGN' && parts[3] !== 'USD') throw new Error('Unsupported payment currency.');
       return { slug: parts[1].toLowerCase(), plan: parts[2] as Plan, currency: parts[3] as Currency };
     }
   }
@@ -96,29 +98,29 @@ export async function provisionLicenseForReference(referenceInput: string): Prom
     throw new Error('Paystack transaction is not successful or does not match currency/reference.');
   }
 
-  // Validate amount against EA catalog if available
+  // Product identity and price are re-read from the authoritative database at payment verification.
   const meta = (payment.metadata && typeof payment.metadata === 'object' && !Array.isArray(payment.metadata))
     ? payment.metadata as Record<string, unknown> : {};
-  const eaSlug = String(meta.ea_slug || slug || 'eridam-nexus-pro');
-  const ea = getEaBySlug(eaSlug);
-  if (!ea) throw new Error('Payment metadata references an unknown AlgoLync product.');
+  const eaSlug = typeof meta.ea_slug === 'string' ? meta.ea_slug.trim().toLowerCase() : '';
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(eaSlug)) throw new Error('Payment metadata has no valid EA product slug.');
   if (meta.product !== 'ALGOLYNX_VAULT') throw new Error('Payment metadata does not identify an AlgoLync storefront purchase.');
-  if (slug && ea.slug !== slug) throw new Error('Payment product metadata does not match its payment reference.');
+  if (slug && eaSlug !== slug) throw new Error('Payment product metadata does not match its payment reference.');
   if (meta.currency !== currency || meta.tier !== plan) throw new Error('Payment plan or currency metadata does not match the reference.');
 
-  let expectedAmount = 6500000;
-  if (currency === 'NGN') {
-    const p = plan === 'MONTHLY' ? (ea?.monthlyPriceNgn ?? 65000) : (ea?.lifetimePriceNgn ?? 250000);
-    expectedAmount = p * 100;
-  } else {
-    const p = plan === 'MONTHLY' ? (ea?.monthlyPriceUsd ?? 49) : (ea?.lifetimePriceUsd ?? 199);
-    expectedAmount = p * 100;
-  }
+  const products = await supabaseRead<ProductPricing[]>('ea_products',
+    `slug=eq.${encodeURIComponent(eaSlug)}&is_active=eq.true&select=slug,name,category,is_active,monthly_price_ngn,monthly_price_usd,one_time_price_ngn,one_time_price_usd`);
+  if (!products) throw new Error('Authoritative product catalogue is unavailable.');
+  const product = products[0];
+  if (!product || !product.is_active || product.category === 'SANDBOX') throw new Error('Payment references a product that is not active for paid licensing.');
 
-  // Never mint an entitlement for a partial, overpaid, underpaid, or tampered checkout.
+  const productPrice = currency === 'NGN'
+    ? Number(plan === 'MONTHLY' ? product.monthly_price_ngn : product.one_time_price_ngn)
+    : Number(plan === 'MONTHLY' ? product.monthly_price_usd : product.one_time_price_usd);
+  const expectedAmount = Math.round(productPrice * 100);
   const paidAmount = typeof payment.amount === 'number' ? payment.amount : Number(payment.amount);
-  if (!Number.isSafeInteger(paidAmount) || paidAmount !== expectedAmount) {
-    throw new Error('Verified Paystack amount does not exactly match the server-side product price.');
+  if (!Number.isSafeInteger(expectedAmount) || expectedAmount <= 0
+    || !Number.isSafeInteger(paidAmount) || paidAmount !== expectedAmount) {
+    throw new Error('Verified Paystack amount does not exactly match the current server-side product price.');
   }
 
   const email = safeEmail(
@@ -138,6 +140,7 @@ export async function provisionLicenseForReference(referenceInput: string): Prom
     tier,
     status: 'ACTIVE',
     expires_at: expiresAt,
+    ea_slug: eaSlug,
   };
 
   try {
@@ -155,7 +158,10 @@ export async function provisionLicenseForReference(referenceInput: string): Prom
       },
     });
 
-    const activeRecord = persisted || candidate;
+    if (!persisted || !persisted.license_key || persisted.payment_reference !== reference) {
+      throw new Error('License provisioning RPC did not confirm a durable license record.');
+    }
+    const activeRecord = persisted;
 
     return {
       license: activeRecord,
