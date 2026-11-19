@@ -17,6 +17,8 @@ function finiteMetric(value: unknown, min: number, max: number): number | null {
 }
 
 export async function POST(request: Request) {
+  return NextResponse.json({ error: 'Commercial licence heartbeats are retired; use the private MT5 publisher gateway.' }, { status: 410, headers: { 'Cache-Control': 'no-store' } });
+
   const rate = await enforceDistributedRateLimit(request, 'license-heartbeat', 120, 60_000);
   if (rate.unavailable) return json({ accepted: false, error: 'Heartbeat service is temporarily unavailable.' }, 503);
   if (!rate.allowed) return json({ accepted: false, error: 'Heartbeat rate limit exceeded.' }, 429);
