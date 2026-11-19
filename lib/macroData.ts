@@ -793,7 +793,7 @@ async function persistMacroSnapshot(snapshot: MacroSnapshot): Promise<void> {
 
 export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
   const persisted = await getPersistedSnapshot();
-  const endpoint = process.env.MACRO_DATA_PROVIDER_LICENSE_APPROVED === 'true' ? process.env.MACRO_DATA_PROVIDER_URL?.trim() : undefined;
+  const endpoint = process.env.MACRO_DATA_PROVIDER_PERSONAL_USE_ENABLED === 'true' ? process.env.MACRO_DATA_PROVIDER_URL?.trim() : undefined;
   if (endpoint) {
     try {
       const providerUrl = new URL(endpoint);
@@ -810,7 +810,7 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
       const parsed = parseProviderSnapshot(await response.json() as unknown);
       if (!parsed) throw new Error('Macro provider payload failed validation.');
       let ecbRates = persisted?.ecbRates;
-      if (process.env.FRANKFURTER_COMMERCIAL_USE_APPROVED === 'true') {
+      {
         try {
           ecbRates = await getFrankfurterRates();
         } catch (error) {
@@ -835,7 +835,7 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
         calendarSource: parsed.catalysts.length > 0 ? 'provider' : 'reference',
         calendarProvider: parsed.catalysts.length > 0 ? 'macro-provider' : undefined,
         asOf: new Date().toISOString(),
-        ...(process.env.FRANKFURTER_COMMERCIAL_USE_APPROVED === 'true' && ecbRates ? { ecbRates } : {}),
+        ...(ecbRates ? { ecbRates } : {}),
       });
       const coreG10 = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'SEK', 'NOK'];
       const completeG10MacroCoverage = coreG10.every((code) => {
