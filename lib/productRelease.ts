@@ -82,9 +82,9 @@ async function checkProductArtifact(eaSlug: string, requireApproval: boolean): P
   if (!artifacts) throw new Error('EA release registry is unavailable.');
   const artifact = artifacts[0];
   if (!artifact || artifact.ea_slug !== eaSlug) return false;
-  if (requireApproval && (artifact.release_approved !== true
-    || typeof artifact.approved_at !== 'string'
-    || !Number.isFinite(Date.parse(artifact.approved_at)))) return false;
+  if (requireApproval && !(artifact.release_approved === true
+    && typeof artifact.approved_at === 'string'
+    && Number.isFinite(Date.parse(artifact.approved_at)))) return false;
   const exists = await verifyStoredObject(artifact);
   if (!exists) return false;
   return requireApproval ? true : verifyStoredObjectHash(artifact);
