@@ -87,3 +87,40 @@ All six new tables have RLS enabled and no grants to `anon` or `authenticated`; 
 8. Confirm new research tables are RLS-enabled and have no browser grants.
 9. Run authenticated preview smoke tests before merging or promoting.
 10. Connect Windows MT5 and validate fresh quote, candle, account, heartbeat and closed-deal telemetry before calling the fleet live.
+
+## 7. FX driver research model (methodology v1)
+
+`lib/forexResearchEngine.ts` adds a pair-relative, evidence-weighted research model. Each factor must already be standardized and signed so positive means support for the base currency against the quote currency. It accepts:
+- **Rate-path repricing** (28%): changes in the expected overnight-indexed-swap / policy path, not merely the current central-bank rate.
+- **Real-yield differential** (22%): nominal yield less market-implied inflation compensation where available; CPI-adjusted proxy is explicitly lower-grade.
+- **Macro surprise** (18%): actual versus consensus, standardized using a rolling robust median/MAD distribution.
+- **Terms of trade** (10%): export/import commodity sensitivity, especially relevant to AUD, NZD, CAD and NOK.
+- **Positioning** (8%): CFTC futures positioning percentile and weekly change; reportable futures positioning is not the entire OTC spot market.
+- **Risk sentiment** (8%): volatility, equity risk and credit conditions, with pair-specific beta rather than a universal USD safe-haven assumption.
+- **Funding stress** (6%): cross-currency basis / funding pressure where a licensed, reliable series is available.
+
+The engine excludes stale, future, unverified and timezone-free inputs. It calculates coverage, directional agreement, dominant factors, exclusions and confidence separately. A setup requires adequate macro coverage, factor agreement, verified closed-bar technical confirmation, aligned direction, and spread/volatility controls. The output is `LONG_BIAS`, `SHORT_BIAS` or `NO_SETUP`; it is not execution authorization.
+
+### Better entry/exit confirmation
+- Daily/weekly structural trend and H4 regime define context; H1 is setup formation; M15/M5 can refine entries only when broker ticks and spread are fresh.
+- Use swing structure / Donchian breakouts, ATR-normalized displacement, pullback depth and close location; avoid naming every wick a liquidity sweep.
+- Use realized volatility, ATR percentile and volatility clustering to size risk and set stop distance. Avoid fixed pip stops across different pairs.
+- Use session/market overlap and event-time windows as liquidity context, not as an unconditional direction signal.
+- Evaluate spread + commission + slippage + swap relative to expected move and ATR; reject setups where friction consumes the expected edge.
+- Track post-release drift/reversal at fixed windows (e.g. 5m, 30m, 2h, 1d) with a benchmark and event-type stratification. This tests whether an event effect exists instead of assuming the headline direction predicts the currency.
+
+### Important data limitations
+- Policy rate minus current CPI is not a true market real yield. Prefer nominal government/OIS yields minus breakeven inflation or inflation swaps; label CPI-adjusted values as a lagged proxy.
+- Rate differentials based on policy rates are less informative than changes in the expected path. Use OIS curves / short-rate futures with timestamps and instrument definitions.
+- COT is weekly, delayed and futures-only. It cannot be treated as live FX order flow.
+- Retail broker ticks show that broker's liquidity/price stream, not consolidated global spot FX volume or institutional order flow.
+- DXY is USD-heavy and overlaps with EURUSD. Avoid circularly counting the same USD factor twice in pair scores.
+- Correlation is not causation. Rolling correlation, cointegration and predictive power require walk-forward tests, structural-break checks and multiple-testing controls.
+- Gold requires a separate driver model: real yields, USD, central-bank demand, ETF flows, official-sector data and risk hedging. Do not model XAU as a normal G10 currency.
+
+## 8. Data and research quality principles
+1. Use ALFRED vintages for historical macro replay whenever available; otherwise tag unrecoverable historical releases as `VINTAGE_UNAVAILABLE` and exclude them from causal backtests.
+2. Preserve raw provider payload hashes, release timestamps, retrieval timestamps, revision IDs and adapter versions.
+3. Use official source releases first (BLS, BEA, FRED/ALFRED, CFTC, central-bank publications); licensed market-data feeds for live OIS, yields, options and institutional positioning.
+4. Provider adapters must have source-specific rate limits, retry/backoff, timeouts, schema versions, freshness policies and health events.
+5. A provider key is not proof of data rights. Enable an adapter only after personal-use terms, attribution and retention rights are confirmed.
