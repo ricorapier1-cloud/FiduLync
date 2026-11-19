@@ -19,7 +19,7 @@ The Personal Quant branch includes:
 - Server-owned risk context, risk decision audit evidence and independent model-review data structures.
 - Execution evidence ingestion with idempotency, event hashing and optional request-price/spread/slippage/latency fields.
 - A compile-only MQL5 fixture that includes both the supervisor and execution telemetry modules.
-- A PowerShell MetaEditor compile script that requires an exact **0 errors, 0 warnings** result and generated EX5 output for each fixture.
+- A PowerShell MetaEditor compile script that requires an exact **0 errors, 0 warnings** result and generated EX5 output for both fixtures and any real product sources placed under `MQL5/Experts/Release/`.
 - An owner-triggered GitHub Actions workflow for a dedicated Windows runner labelled `mt5`. It does not run on pull requests and does not execute on ordinary GitHub-hosted runners.
 
 ## 3. Laptop prerequisites
@@ -140,8 +140,8 @@ If you configure the runner:
 ## 10. Production release gates
 
 Do not merge or promote the Personal Quant branch until all of these are true:
-- Current branch-head CI passes.
-- A Vercel preview for the exact current commit is READY and authenticated runtime smoke tests pass.
+- The latest current-head CI passes.
+- A Vercel preview for the exact current commit is READY and authenticated runtime smoke tests pass. (The last inspected preview was an older commit; the latest preview attempt was blocked by the Vercel rolling deployment quota.)
 - Supabase Auth email/password sign-in is enabled for the existing owner account; public sign-ups are disabled if not needed; the password-recovery email template and exact `/owner` redirect allowlist are verified; MFA/step-up configuration is reviewed.
 - Leaked-password protection is enabled where the Supabase plan supports it.
 - Market-data provider terms, commercial use, caching, display and derived-data permissions are documented per provider. Keep restricted adapters disabled until written permission exists.
@@ -157,7 +157,7 @@ Do not merge or promote the Personal Quant branch until all of these are true:
 - Supabase custom SMTP, password-recovery email template, `/owner` redirect allowlist and MFA settings require provider-side configuration and an actual password/recovery test. Ordinary owner sign-in is password-only; recovery email is used only when resetting a forgotten password.
 - Vercel's Hobby plan documents a limit of 100 deployments per rolling 24 hours. If the quota is reached, wait for the rolling window to reset; do not repeatedly retry deployments. The currently inspected READY preview is an earlier commit than the current PR head.
 - Unused-index advisor notices are not grounds for deleting indexes in a database that has not yet received representative production traffic. The duplicate `escrows.slug` index is legacy and separate from Personal Quant; retain the unique constraint and review any redundant index removal as a separately tested migration.
-- The Personal Quant Supabase data tables contain no broker-terminal evidence until the Windows publisher connects.
+- The Personal Quant Supabase data tables currently contain no broker-terminal evidence until the Windows publisher connects. The current project has no registered MT5 installation, quote, candle, account snapshot or verified trade row.
 
 ## 11. Additional Vercel secret-visibility remediation
 
@@ -168,3 +168,22 @@ The next production deployment should still verify legacy lease issuance and ver
 ## 12. Completion definition
 
 Remote code is ready for terminal validation when the current-head CI and preview are green, the Auth and data-license gates are closed, and the Windows compiler script passes. The system is operationally ready for live trading only after independent model review, demo execution-quality evidence, broker-specific risk validation and a separate explicit release approval. A green website build alone never grants trading authority.
+
+
+## 13. Compiled EA artifact intake — prepared before the laptop arrives
+
+The app-side release workflow is now built. You should not need another web-app feature build just to upload a compiled EA later.
+
+- Put the actual commercial EA source and its required includes under `MQL5/Experts/Release/` and `MQL5/Include/`.
+- Run `scripts/compile_mt5.ps1 -MetaEditorPath "<actual metaeditor64.exe>" -RequireProductSources`. It compiles all product source files and refuses warnings or errors.
+- Run Strategy Tester and demo-account compatibility tests. The compile script cannot replace these tests.
+- Sign in to `/owner` with email/password → Release governance. Select the product, version and compiled .ex5.
+- The browser calculates SHA-256 and uploads directly to the private Supabase Storage bucket with a short-lived signed upload URL. The app records the hash, size, version and owner audit event. The upload is **not** automatically approved.
+- Tick the release attestation only after the actual build and demo tests pass, provide the evidence/reason, and approve. Revocation is available and audited.
+- Checkout, demo license issuance, paid license provisioning and license validation remain blocked until that artifact is approved and the private object still exists.
+
+The three existing catalogue rows currently have no compiled .ex5 artifact. The performance dashboard no longer publishes illustrative win rates, profit factors, Sharpe ratios, drawdowns or equity curves. No performance figures will appear until verified datasets exist.
+
+## 14. What remains laptop-dependent
+
+The remaining laptop tasks are operational, not another app build: install MT5/MetaEditor, compile the actual product EA source, run Strategy Tester/demo validation, upload and approve the .ex5, log in to the broker's demo terminal, create a publisher installation, and run the Python publisher. The web app, private artifact upload path, release gates and MT5 ingestion APIs are prepared for those steps. A new app-code change is only necessary if a real compiler/runtime test exposes a defect or a new feature is requested.
