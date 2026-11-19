@@ -7,7 +7,7 @@ export default function PersonalQuantGuidePage() {
     <main className="min-h-screen bg-[#080a0f] px-4 py-10 pb-36 text-slate-100">
       <div className="mx-auto max-w-3xl space-y-8">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-5">
-          <Link href="/store" className="text-xs font-mono text-emerald-300 hover:underline">← PERSONAL EA LAB</Link>
+          <Link href="/" className="text-xs font-mono text-emerald-300 hover:underline">← BACK TO TERMINAL</Link>
           <div className="flex gap-2">
             <button type="button" onClick={() => window.print()} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-slate-200 hover:bg-white/5">Print / Save PDF</button>
             <Link href="/risk" className="rounded-lg bg-emerald-300 px-3 py-2 text-xs font-semibold text-[#07120d]">Manual Risk Planner</Link>
@@ -71,7 +71,7 @@ py FiduLync_MT5_Market_Publisher.py`}</code></pre>
             <li><Link href="/" className="text-emerald-300 underline">MacroLync Dashboard</Link> — macro, currency-strength and market research context.</li>
             <li><Link href="/risk" className="text-emerald-300 underline">Manual Risk Planner</Link> — calculate risk and broker-aware position sizing before a discretionary trade.</li>
             <li><Link href="/analytics" className="text-emerald-300 underline">Analytics</Link> — inspect available trade and research records.</li>
-            <li><Link href="/store" className="text-emerald-300 underline">Personal EA Lab</Link> — download free sample EAs and the MT5 bridge/probe source.</li>
+            <li><Link href="/research" className="text-emerald-300 underline">Quant Lab</Link> — download free sample EAs and the MT5 bridge/probe source.</li>
           </ul>
         </section>
 
