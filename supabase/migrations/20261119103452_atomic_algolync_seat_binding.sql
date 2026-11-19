@@ -22,6 +22,10 @@ BEGIN
     IF v_seat.slot_type <> p_account_type THEN RETURN jsonb_build_object('success',false,'reason','This MT5 account is already bound under a different account type.'); END IF;
     RETURN jsonb_build_object('success',true,'already_bound',true,'account_number',p_account_number,'account_type',p_account_type,'rebind_available_at',v_seat.rebind_available_at);
   END IF;
+  IF EXISTS (SELECT 1 FROM public.ea_license_seats WHERE mt5_login = p_account_number) THEN
+    RETURN jsonb_build_object('success', false, 'reason', 'This MT5 account is already assigned to another license or seat.');
+  END IF;
+
   IF p_previous_account_number IS NOT NULL THEN
     SELECT * INTO v_seat FROM public.ea_license_seats WHERE license_key=p_license_key AND ea_slug=v_license.ea_slug
       AND slot_type=p_account_type AND mt5_login=p_previous_account_number FOR UPDATE;
