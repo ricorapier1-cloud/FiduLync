@@ -101,6 +101,8 @@ The CI workflow also validates the Python publisher syntax and MT5 risk telemetr
 - Use walk-forward analysis, Monte Carlo, parameter stability and realistic spread/commission/swap/slippage stress.
 - Report expectancy, profit factor, max drawdown, recovery factor, exposure, turnover, trade count and uncertainty.
 - Do not label confluence scores as calibrated probabilities without calibration evidence.
+- Ghost Protocol is a deterministic 0–1 market-quality gate with a 0.65 minimum. It requires fresh broker quotes and candles from the same MT5 installation, then scores structure, ATR expansion/stability, spread quality and spread-to-ATR shock. It is not a win probability.
+- Default personal risk policy: 1% maximum per-trade risk, 2% portfolio risk, 4% daily drawdown, 8% weekly drawdown, 15% high-water drawdown, 10% maximum margin usage, 30-point maximum spread, 0.12 spread/ATR ceiling, three consecutive losses and 1.5 minimum reward/risk. Execution, model validation and execution-quality switches remain disabled until owner demo validation.
 - Keep grids, martingale, averaging down and unbounded progressive sizing excluded.
 - Enforce SL/TP, margin, spread, slippage, news/weekend, daily/weekly drawdown, equity high-water and loss-streak protections in the EA as well as the supervisory service.
 - Missing or stale data must result in DEGRADED/ABSTAIN, never a guessed signal.
