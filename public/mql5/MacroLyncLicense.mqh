@@ -1,107 +1,37 @@
 //+------------------------------------------------------------------+
-//|                                           MacroLyncLicense.mqh   |
-//|                   Copyright 2026, Algolync Store & MacroLync     |
-//|                         https://fidulync.vercel.app              |
+//|                                         MacroLyncLicense.mqh     |
+//|                   Copyright 2026, MacroLync & Algolync Store     |
 //+------------------------------------------------------------------+
-#ifndef MACRO_LYNC_LICENSE_MQH
-#define MACRO_LYNC_LICENSE_MQH
-
-#property copyright "MacroLync & AlgoLync"
+#property copyright "MacroLync & Algolync Store"
 #property link      "https://fidulync.vercel.app"
-#property version   "1.21"
+#property version   "1.03"
 
-input group "=== AlgoLync Store Licensing ==="
-input string InpLicenseKey = ""; // Enter the license issued after verified purchase
-
-//+------------------------------------------------------------------+
-//| VerifyAlgoLyncLicense                                            |
-//| Validates the license against the current MT5 trading account.   |
-//+------------------------------------------------------------------+
-bool VerifyAlgolyncLicense(string backendEndpoint = "https://fidulync.vercel.app/api/v1/validate-license")
+// Read-only licence validation. No broker orders are submitted here.
+bool VerifyAlgolyncLicense(string licenseKey, long mt5Account)
 {
-   string licenseKey = InpLicenseKey;
-   StringTrimLeft(licenseKey);
-   StringTrimRight(licenseKey);
-   if(licenseKey == "")
-   {
-      Print("[AlgoLync Licensing] Enter your purchased license key.");
-      return false;
-   }
+   if(StringLen(licenseKey) < 16 || mt5Account <= 0)
+      return(false);
 
-   long accountNumber = AccountInfoInteger(ACCOUNT_LOGIN);
-   if(accountNumber <= 0)
-   {
-      Print("[AlgoLync Licensing] MT5 account login is unavailable.");
-      return false;
-   }
-
-   string payload = StringFormat(
-      "{\"license_key\":\"%s\",\"mt5_account\":\"%I64d\"}",
-      licenseKey,
-      accountNumber
+   string endpoint = "https://fidulync.vercel.app/api/v1/validate-license";
+   string headers = "Content-Type: application/json\r\n";
+   ENUM_ACCOUNT_TRADE_MODE tradeMode = (ENUM_ACCOUNT_TRADE_MODE)AccountInfoInteger(ACCOUNT_TRADE_MODE);
+   string accountType = (tradeMode == ACCOUNT_TRADE_MODE_REAL) ? "LIVE" : "DEMO";
+   string postData = StringFormat(
+      "{\"license_key\":\"%s\",\"account_number\":%I64d,\"account_type\":\"%s\"}",
+      licenseKey, mt5Account, accountType
    );
 
-   uchar utf8Data[];
-   int encodedLength = StringToCharArray(payload, utf8Data, 0, WHOLE_ARRAY, CP_UTF8);
-   if(encodedLength <= 1)
-   {
-      Print("[AlgoLync Licensing] Could not encode the verification request.");
-      return false;
-   }
-
-   int payloadLength = encodedLength - 1;
-   char requestData[];
-   if(ArrayResize(requestData, payloadLength) != payloadLength)
-   {
-      Print("[AlgoLync Licensing] Could not allocate the verification request.");
-      return false;
-   }
-   for(int i = 0; i < payloadLength; i++)
-      requestData[i] = (char)utf8Data[i];
-
-   char responseData[];
-   string responseHeaders;
-   string headers = "Content-Type: application/json\r\nAccept: application/json\r\n";
+   char post[], result[];
+   string resultHeaders;
+   StringToCharArray(postData, post, 0, WHOLE_ARRAY, CP_UTF8);
+   if(ArraySize(post) > 0)
+      ArrayResize(post, ArraySize(post) - 1); // Exclude terminal NUL from JSON body.
 
    ResetLastError();
-   int httpStatus = WebRequest("POST", backendEndpoint, headers, 5000, requestData, responseData, responseHeaders);
-   int terminalError = GetLastError();
+   int responseCode = WebRequest("POST", endpoint, headers, 5000, post, result, resultHeaders);
+   if(responseCode != 200)
+      return(false);
 
-   if(httpStatus != 200)
-   {
-      if(terminalError == 4060)
-      {
-         Alert("[AlgoLync Licensing] Allow WebRequest for https://fidulync.vercel.app in MT5 Tools > Options > Expert Advisors.");
-      }
-      PrintFormat("[AlgoLync Licensing] Verification failed. HTTP=%d, MT5 error=%d.", httpStatus, terminalError);
-      return false;
-   }
-
-   int responseLength = ArraySize(responseData);
-   if(responseLength <= 0)
-   {
-      Print("[AlgoLync Licensing] Empty response from the license server.");
-      return false;
-   }
-
-   uchar responseUtf8[];
-   if(ArrayResize(responseUtf8, responseLength) != responseLength)
-      return false;
-   for(int j = 0; j < responseLength; j++)
-      responseUtf8[j] = (uchar)responseData[j];
-
-   string responseText = CharArrayToString(responseUtf8, 0, responseLength, CP_UTF8);
-   StringTrimLeft(responseText);
-   StringTrimRight(responseText);
-
-   if(StringFind(responseText, "\"valid\":true") >= 0)
-   {
-      PrintFormat("[AlgoLync Licensing] License verified for MT5 account %I64d.", accountNumber);
-      return true;
-   }
-
-   Print("[AlgoLync Licensing] License rejected: ", responseText);
-   return false;
+   string responseText = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
+   return(StringFind(responseText, "\"valid\":true") >= 0);
 }
-
-#endif // MACRO_LYNC_LICENSE_MQH
