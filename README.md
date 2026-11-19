@@ -109,6 +109,6 @@ The CI workflow also validates the Python publisher syntax and MT5 risk telemetr
 
 ## Current readiness boundaries
 
-A passing GitHub build verifies code quality, not live-data availability, MQL5 compilation, broker connectivity or strategy profitability. The MT5 installation/quote/candle/heartbeat/trade tables remain empty until the owner runs the publisher from a Windows MT5 terminal. The scheduled hourly macro workflow also requires the GitHub Actions CRON_SECRET to match the Vercel CRON_SECRET. Production promotion requires a preview build of the exact reviewed commit, authenticated owner smoke tests and successful runtime verification.
+A passing GitHub build verifies code quality, not live-data availability, MQL5 compilation, broker connectivity or strategy profitability. The MT5 installation/quote/candle/heartbeat/trade tables remain empty until the owner runs the publisher from a Windows MT5 terminal. Official macro research refreshes on the providers' actual publication cadence, through the Vercel production daily cron and on-demand refresh; a separate GitHub Actions scheduler is intentionally not used. FX tick-level quotes and closed broker candles come from the private MT5 publisher, not the macro cron. Production promotion requires a preview build of the exact reviewed commit, authenticated owner smoke tests and successful runtime verification.
 
 This application is a research and supervisory tool. It does not certify an EA, strategy, broker connection or live-trading system as profitable or safe.
