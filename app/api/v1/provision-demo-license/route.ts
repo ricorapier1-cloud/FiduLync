@@ -51,7 +51,7 @@ export async function POST(req: Request) {
 
     const randomSuffix = randomBytes(16).toString('hex').toUpperCase();
     const cleanSlug = eaSlug.replace(/[^a-z0-9]/g, '').slice(0, 10).toUpperCase();
-    const licenseKey = \`ALGO-DEMO-\${cleanSlug}-\${randomSuffix}\`;
+    const licenseKey = 'ALGO-DEMO-' + cleanSlug + '-' + randomSuffix;
     const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
 
     const persisted = await persistLicense({
