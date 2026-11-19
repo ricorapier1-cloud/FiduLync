@@ -76,7 +76,7 @@ The compile-only fixture is not a trading EA. It makes no network requests and c
 
 After the latest Personal Quant source has a verified deployment containing the account-snapshot and ingestion changes:
 
-1. Sign in to the FiduLync owner console using the authorized owner mailbox.
+1. Sign in to the FiduLync owner console using the registered owner email address and password. The owner page no longer uses OTP or magic-link login. If the owner account does not yet have a password, use **Forgot password?** once to receive a password-recovery link, set a strong password, then use email/password for every normal sign-in.
 2. Create one MT5 publisher installation and copy the one-time token into your password manager. If lost, revoke that installation and create another; do not attempt to recover the token.
 3. Install the Python connector dependency:
 
@@ -142,7 +142,7 @@ If you configure the runner:
 Do not merge or promote the Personal Quant branch until all of these are true:
 - Current branch-head CI passes.
 - A Vercel preview for the exact current commit is READY and authenticated runtime smoke tests pass.
-- Supabase Auth custom SMTP, OTP/magic-link template, exact redirect allowlist and MFA/step-up configuration are verified.
+- Supabase Auth email/password sign-in is enabled for the existing owner account; public sign-ups are disabled if not needed; the password-recovery email template and exact `/owner` redirect allowlist are verified; MFA/step-up configuration is reviewed.
 - Leaked-password protection is enabled where the Supabase plan supports it.
 - Market-data provider terms, commercial use, caching, display and derived-data permissions are documented per provider. Keep restricted adapters disabled until written permission exists.
 - Account-currency conversion and portfolio stress aggregation are validated against broker-native contract metadata.
@@ -154,7 +154,7 @@ Do not merge or promote the Personal Quant branch until all of these are true:
 ## 11. Current external service limitations
 
 - The current Supabase project is reachable and active. Server-only Personal Quant tables have RLS enabled and explicit client-deny policies. The current security advisor still reports leaked-password protection disabled.
-- Supabase custom SMTP, Auth templates, redirect allowlist and MFA settings require provider-side configuration and an actual email/authentication test.
+- Supabase custom SMTP, password-recovery email template, `/owner` redirect allowlist and MFA settings require provider-side configuration and an actual password/recovery test. Ordinary owner sign-in is password-only; recovery email is used only when resetting a forgotten password.
 - Vercel's Hobby plan documents a limit of 100 deployments per rolling 24 hours. If the quota is reached, wait for the rolling window to reset; do not repeatedly retry deployments. The currently inspected READY preview is an earlier commit than the current PR head.
 - Unused-index advisor notices are not grounds for deleting indexes in a database that has not yet received representative production traffic. The duplicate `escrows.slug` index is legacy and separate from Personal Quant; retain the unique constraint and review any redundant index removal as a separately tested migration.
 - The Personal Quant Supabase data tables contain no broker-terminal evidence until the Windows publisher connects.
