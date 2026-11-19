@@ -194,6 +194,23 @@ async function fetchMarketQuotes(): Promise<MarketQuote[]> {
   throw new AggregateError(failures, 'No configured FX quote provider returned usable data.');
 }
 
-export function getMarketQuotes(): Promise<MarketQuote[]> {
-  return getCachedData('market:live-quotes', fetchMarketQuotes, QUOTE_CACHE_TTL_SECONDS);
+export async function getMarketQuotes(): Promise<MarketQuote[]> {
+  const quotes = await getCachedData('market:live-quotes', fetchMarketQuotes, QUOTE_CACHE_TTL_SECONDS);
+  const now = Date.now();
+  return quotes.filter((quote) => {
+    const timestamp = Date.parse(quote.timestamp);
+    const ageMs = now - timestamp;
+    if (!Number.isFinite(timestamp) || ageMs < -5 * 60_000) return false;
+    if (quote.source === 'mt5') return ageMs <= 120_000;
+    if (quote.source === 'finnhub') {
+      return process.env.FINNHUB_COMMERCIAL_USE_APPROVED === 'true' && ageMs <= 120_000;
+    }
+    if (quote.source === 'frankfurter') {
+      return process.env.FRANKFURTER_COMMERCIAL_USE_APPROVED === 'true' && ageMs <= 48 * 60 * 60_000;
+    }
+    if (quote.source === 'exchangerate-api') {
+      return process.env.EXCHANGERATE_API_COMMERCIAL_USE_APPROVED === 'true' && ageMs <= 48 * 60 * 60_000;
+    }
+    return process.env.GOLD_API_COMMERCIAL_USE_APPROVED === 'true' && ageMs <= 48 * 60 * 60_000;
+  });
 }
