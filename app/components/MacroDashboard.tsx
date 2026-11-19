@@ -53,7 +53,7 @@ function formatQuoteAge(timestamp: string, now: number | null) {
 }
 
 function formatCountdown(target: string, now: number) {
-  const seconds = Math.max(0, Math.floor((Date.parse(target) - now) / 1100));
+  const seconds = Math.max(0, Math.floor((Date.parse(target) - now) / 1000));
   const days = Math.floor(seconds / 86_400);
   const hours = Math.floor((seconds % 86_400) / 3_600);
   const minutes = Math.floor((seconds % 3_600) / 60);
@@ -171,9 +171,12 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
   const baseCurrency = currencies.find((currency) => currency.code === activePair.base);
   const quoteCurrency = currencies.find((currency) => currency.code === activePair.quote);
   const policyDifferentialBps = baseCurrency && quoteCurrency
+    && baseCurrency.policyRateSource === 'provider' && quoteCurrency.policyRateSource === 'provider'
     ? Math.round((baseCurrency.policyRate - quoteCurrency.policyRate) * 100)
     : null;
   const realYieldDifferentialBps = baseCurrency && quoteCurrency
+    && baseCurrency.policyRateSource === 'provider' && baseCurrency.inflationSource === 'provider'
+    && quoteCurrency.policyRateSource === 'provider' && quoteCurrency.inflationSource === 'provider'
     ? Math.round(((baseCurrency.policyRate - baseCurrency.inflation) - (quoteCurrency.policyRate - quoteCurrency.inflation)) * 100)
     : null;
   const policySpread = currencies.length > 1
@@ -248,7 +251,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
         <span className="macro-status-right"><span className={`macro-feed-badge${liveQuoteAvailable || liveReferenceAvailable ? ' macro-feed-live' : ''}`}>{liveQuoteAvailable ? 'LIVE FEED' : liveReferenceAvailable ? 'LIVE REFERENCE FEED' : snapshot.source === 'provider' ? 'PROVIDER FEED' : snapshot.source === 'partial' ? 'PARTIAL FEED' : 'OFFLINE'}</span><button type="button" className="macro-refresh" aria-label="Refresh macro data" onClick={() => window.location.reload()}><BrandGlyph name="refresh" size={13} className={refreshing ? 'macro-spin' : ''} /> REFRESH</button><Link href="/store" className="macro-refresh">ALGOLYNC VAULT</Link></span>
       </div>
       <div className="macro-quote-strip" aria-label="Live FX quotes">
-        {quotes.map((quote) => <span key={quote.symbol} className="macro-quote mono"><strong>{quote.symbol}</strong><b>{quote.price.toFixed(quote.symbol.startsWith('XAU') ? 2 : quote.symbol.endsWith('JPY') ? 3 : 5)}</b><small title={`Source: ${quote.source}; timestamp: ${quote.timestamp}`}>{quote.source === 'mt5' ? 'MT5 BROKER' : quote.source === 'finnhub' ? 'FINNHUB' : quote.source === 'frankfurter' ? 'ECB REF' : quote.source === 'gold-api' ? 'GOLD REF' : 'FX REF'} · {formatQuoteAge(quote.timestamp, now)}</small></span>)}
+        {quotes.filter((quote) => now !== null && now - Date.parse(quote.timestamp) >= 0 && now - Date.parse(quote.timestamp) <= 48 * 60 * 60_000).map((quote) => <span key={quote.symbol} className="macro-quote mono"><strong>{quote.symbol}</strong><b>{quote.price.toFixed(quote.symbol.startsWith('XAU') ? 2 : quote.symbol.endsWith('JPY') ? 3 : 5)}</b><small title={`Source: ${quote.source}; timestamp: ${quote.timestamp}`}>{quote.source === 'mt5' ? 'MT5 BROKER' : quote.source === 'finnhub' ? 'FINNHUB' : quote.source === 'frankfurter' ? 'ECB REF' : quote.source === 'gold-api' ? 'GOLD REF' : 'FX REF'} · {formatQuoteAge(quote.timestamp, now)}</small></span>)}
         {Object.entries(snapshot.ecbRates ?? {}).map(([currency, value]) => <span key={`ecb-${currency}`} className="macro-quote mono"><strong>EUR/{currency}</strong><b>{value.toFixed(4)}</b><small>ECB REF</small></span>)}
       </div>
 
@@ -268,7 +271,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
 
       <section className="macro-kpis" aria-label="Macro overview">
         <article className="macro-kpi"><span className="macro-kpi-label">POLICY RANGE <span>G10</span></span><strong className="mono">{policySpread === null ? '—' : formatRate(policySpread)}</strong><small>highest to lowest available policy rate</small></article>
-        <article className="macro-kpi"><span className="macro-kpi-label">POLICY INPUTS <span>G10</span></span><strong className="mono">{String(currencies.length).padStart(2, '0')} <em>/ 11</em></strong><small>{snapshot.source === 'provider' && providerPolicyInputs === 10 ? 'All 10 G10 inputs provider verified' : snapshot.source === 'fallback' ? 'No verified provider observations' : `${providerPolicyInputs}/10 G10 inputs provider verified`}</small></article>
+        <article className="macro-kpi"><span className="macro-kpi-label">POLICY INPUTS <span>G10</span></span><strong className="mono">{String(providerPolicyInputs).padStart(2, '0')} <em>/ 10</em></strong><small>{snapshot.source === 'provider' && providerPolicyInputs === 10 ? 'All 10 G10 inputs provider verified' : snapshot.source === 'fallback' ? 'No verified provider observations' : `${providerPolicyInputs}/10 G10 inputs provider verified`}</small></article>
         <article className="macro-kpi"><span className="macro-kpi-label">NEXT CATALYST <span>HIGH IMPACT</span></span><strong className="mono">{nextHighImpactCatalyst ? <CatalystCountdownDisplay target={nextHighImpactCatalyst.scheduledAt} /> : 'UNAVAILABLE'}</strong><small>{nextHighImpactCatalyst?.title ?? (snapshot.calendarSource === 'provider' ? 'No upcoming high-impact event in provider calendar' : 'No provider-verified calendar data')}</small></article>
         <article className="macro-kpi macro-kpi-source"><span className="macro-kpi-label">DATA PROVENANCE <span>STATUS</span></span><strong className="macro-source-value"><span className={snapshot.source === 'provider' ? 'macro-source-dot macro-source-live' : 'macro-source-dot'} />{snapshot.source === 'provider' ? 'LIVE' : snapshot.source === 'partial' ? 'PARTIAL' : 'OFFLINE'}</strong><small>{refreshing ? 'Checking provider…' : snapshot.source === 'provider' ? 'All 10 G10 inputs provider verified' : snapshot.source === 'partial' ? `${providerPolicyInputs}/10 G10 inputs provider verified` : 'No verified macro inputs available'}</small></article>
       </section>
@@ -307,7 +310,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
             const realRate = currency.policyRate - currency.inflation;
             return <article className="macro-currency-card" key={currency.code}><div className="macro-currency-card-head"><strong className="mono">{currency.code}</strong><span>{currency.stance}</span></div><p>{currency.centralBank}</p><div className="macro-currency-card-stats"><span>POLICY <b className="mono">{formatRate(currency.policyRate)}</b></span><span>{currency.inflationLabel.toUpperCase()} <b className="mono">{formatRate(currency.inflation)}</b></span><span>2Y YIELD <b className="mono">{currency.twoYearYield === undefined ? '—' : formatRate(currency.twoYearYield)}</b></span><span>REAL <b className={`mono ${realRate >= 0 ? 'macro-positive' : 'macro-negative'}`}>{formatRate(realRate)}</b></span></div></article>;
           })}</div>
-          <div className="macro-panel-foot"><span>Real rate = current policy rate − latest available inflation measure.</span><span className="mono">{snapshot.source === 'fallback' ? 'REFERENCE LEVELS / VERIFY BEFORE USE' : 'LIVE INPUTS OVERRIDE REFERENCE LEVELS'}</span></div>
+          <div className="macro-panel-foot"><span>Real rate = current policy rate − latest available inflation measure.</span><span className="mono">{snapshot.source === 'provider' ? 'PROVIDER-VERIFIED OBSERVATIONS' : snapshot.source === 'partial' ? 'PARTIAL PROVIDER OBSERVATIONS' : 'NO VERIFIED POLICY OBSERVATIONS'}</span></div>
         </div>
       </section>
 
@@ -336,7 +339,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
               <div className="macro-event-info"><div><span className="macro-region mono">{catalyst.region}</span><span className={`macro-impact macro-impact-${catalyst.impact.toLowerCase()}`}>{catalyst.impact}</span></div><h3>{catalyst.title}</h3><p>Consensus <b className="mono">{catalyst.consensus}</b><span>Actual <b className="mono">{catalyst.actual ?? 'Pending'}</b></span></p></div>
               <span className="macro-countdown mono">{now ? formatCountdown(catalyst.scheduledAt, now) : 'Syncing'}</span>
             </article>)}
-            <div className="macro-calendar-note"><BrandGlyph name="clock" size={14} /><span>{activeNewsLockout ? 'A high-impact event for this pair is inside the 30-minute pre/post window; the signal API enforces news lockout.' : snapshot.calendarSource === 'provider' ? 'Provider calendar consensus and actuals may be revised; confirm official release details before positioning.' : 'Curated reference schedule only. Listed high-impact events enforce a 30-minute pre/post lockout; verify release details.'}</span></div>
+            <div className="macro-calendar-note"><BrandGlyph name="clock" size={14} /><span>{activeNewsLockout ? 'A high-impact event for this pair is inside the 30-minute pre/post window; the signal API enforces news lockout.' : snapshot.calendarSource === 'provider' ? 'Provider calendar consensus and actuals may be revised; confirm official release details before positioning.' : 'No provider-verified calendar feed is connected. Event-based lockout remains unavailable.'}</span></div>
           </div>
         </section>
       </div>
