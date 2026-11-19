@@ -32,11 +32,11 @@ export default function PlatformFooter() {
                 <BrandGlyph name="shield" size={16} />
               </span>
               <span className="text-base font-semibold tracking-tight text-slate-100">
-                Fidu<span className="text-emerald-400">Lync</span> Personal Quant
+                Fidu<span className="text-emerald-400">Lync</span>
               </span>
             </div>
             <p className="mt-3 text-xs leading-5 text-slate-400">
-              Private quantitative market research, disciplined risk planning and supervisory tooling for personal MT5 trading.
+              MacroLync market intelligence, FiduLync risk governance and AlgoLync MT5 software licensing.
             </p>
           </div>
 
@@ -50,8 +50,14 @@ export default function PlatformFooter() {
               </li>
               <li>
                 <Link href="/store" className="transition hover:text-emerald-300">
-                  Personal EA Lab
+                  AlgoLync Store
                 </Link>
+              </li>
+              <li>
+                <Link href="/research" className="transition hover:text-emerald-300">Quant Research Lab</Link>
+              </li>
+              <li>
+                <Link href="/guide" className="transition hover:text-emerald-300">Getting Started Guide</Link>
               </li>
               <li>
                 <Link href="/faq" className="transition hover:text-emerald-300">
@@ -110,7 +116,7 @@ export default function PlatformFooter() {
             Trading foreign exchange (Forex) and Contracts for Difference (CFDs) on margin carries a high level of risk and may not be suitable for all investors. High leverage can work against you as well as for you. Before deciding to trade foreign exchange or utilize automated Expert Advisors, you should carefully consider your investment objectives, level of experience, and risk appetite. There is a possibility that you could sustain a loss of some or all of your initial capital. Past performance, backtests, or hypothetical results are not indicative of future market outcomes.
           </p>
           <p className="mt-2 text-slate-500">
-            FiduLync Personal Quant provides market research, risk planning and EA supervision tools for personal trading. It is not a broker or investment adviser, does not place orders, and does not guarantee trading results.
+            FiduLync, MacroLync and AlgoLync provide software, market research, risk-planning and MT5 licensing tools. They are not brokers or investment advisers and do not guarantee trading results. EA products can cause substantial losses.
           </p>
         </div>
 
@@ -119,7 +125,7 @@ export default function PlatformFooter() {
           <div className="flex items-center gap-4">
             <Link href="/faq" className="hover:text-slate-300">FAQ</Link>
             <Link href="/terms" className="hover:text-slate-300">Terms of Service</Link>
-            <Link href="/terms#privacy" className="hover:text-slate-300">Privacy Policy</Link>
+            <Link href="/privacy" className="hover:text-slate-300">Privacy Policy</Link>
           </div>
         </div>
       </div>
