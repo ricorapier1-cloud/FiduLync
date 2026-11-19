@@ -210,7 +210,7 @@ export default function QuantResearchLab() {
         {!result && !error && <div className="mt-5 rounded-xl border border-white/[0.08] bg-[#0b121a] p-8 text-center text-sm text-slate-400">{loading ? 'Loading verified research inputs…' : 'Select an instrument and refresh to request research.'}</div>}
 
         <section className="mt-6 rounded-xl border border-white/[0.08] bg-[#0b121a] p-4 text-[11px] leading-5 text-slate-400">
-          <div className="flex items-center gap-2 font-mono text-[9px] tracking-widest text-emerald-300"><BrandGlyph name="shield-check" size={13} /> INSTITUTIONAL DATA-INTEGRITY RULE</div>
+          <div className="flex items-center gap-2 font-mono text-[9px] tracking-widest text-emerald-300"><BrandGlyph name="shield" size={13} /> INSTITUTIONAL DATA-INTEGRITY RULE</div>
           <p className="mt-2">FiduLync is a private research workstation. Reference exchange rates are not executable prices. Technical indicators require real broker candles; fundamental observations retain their source and release dates. No backtest, signal score or AI commentary is a calibrated probability or a promise of profitability. Missing, stale or contradictory data must remain unavailable and produce HOLD / ABSTAIN.</p>
           <p className="mt-2">Research is read-only. No order is sent, modified or closed by this page.</p>
         </section>
