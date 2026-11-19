@@ -302,6 +302,15 @@ export async function GET(request: Request) {
         evidence_verified: false,
         status: executionRows.length ? 'EVIDENCE_CAPTURED_PENDING_REVIEW' : 'AWAITING_MT5_FILLS',
       },
+      cross_asset: {
+        symbols: Object.fromEntries(crossAssetSymbols),
+        timeframe: 'H1',
+        maximum_lead_lag_bars: 2,
+        minimum_overlapping_returns: 30,
+        observations: crossAssetLeadLag.sort((a, b) => Math.abs(b.correlation) - Math.abs(a.correlation)),
+        status: crossAssetLeadLag.length ? 'BROKER_CROSS_ASSET_LEAD_LAG_AVAILABLE' : 'AWAITING_OPTIONAL_DXY_OIL_SPX_FEEDS',
+        note: 'Descriptive H1 correlation only; not a causal lead signal or an execution filter.',
+      },
       correlation: {
         timeframe: 'H1',
         minimum_overlapping_returns: 30,
