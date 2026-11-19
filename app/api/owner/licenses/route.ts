@@ -1,7 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { requireOwner } from '@/lib/ownerAuth';
-import { supabaseInsert, supabaseRead } from '@/lib/supabaseAdmin';
+import { supabaseInsert, supabaseRead, supabaseQuery } from '@/lib/supabaseAdmin';
+import { enforceDistributedRateLimit } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -9,6 +10,9 @@ export const runtime = 'nodejs';
 export async function POST(request: Request) {
   const owner = await requireOwner(request);
   if (!owner) return NextResponse.json({ error: 'Owner authentication required.' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
+  const rate = await enforceDistributedRateLimit(request, 'owner-license-issue', 10, 60_000);
+  if (rate.unavailable) return NextResponse.json({ error: 'Owner licensing service is unavailable.' }, { status: 503 });
+  if (!rate.allowed) return NextResponse.json({ error: 'Owner licensing rate limit exceeded.' }, { status: 429 });
 
   let body: unknown;
   try { body = await request.json(); } catch {
@@ -69,5 +73,48 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Owner lifetime license issuance failed:', error);
     return NextResponse.json({ error: 'License could not be issued. Check the owner database configuration.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+  }
+}
+
+
+type RevokeResult = { success: boolean; already_revoked?: boolean; reason?: string; license_id?: string; status?: string };
+
+export async function DELETE(request: Request) {
+  const owner = await requireOwner(request);
+  if (!owner) return NextResponse.json({ error: 'Owner authentication required.' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
+  const rate = await enforceDistributedRateLimit(request, 'owner-license-revoke', 5, 60_000);
+  if (rate.unavailable) return NextResponse.json({ error: 'License revocation service is unavailable.' }, { status: 503 });
+  if (!rate.allowed) return NextResponse.json({ error: 'Too many revocation attempts.' }, { status: 429 });
+  if (Number(request.headers.get('content-length') ?? 0) > 8192) return NextResponse.json({ error: 'Request body exceeds 8 KB.' }, { status: 413 });
+
+  let raw: unknown;
+  try { raw = await request.json(); } catch {
+    return NextResponse.json({ error: 'A valid JSON request is required.' }, { status: 400 });
+  }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
+  const body = raw as Record<string, unknown>;
+  const licenseId = typeof body.license_id === 'string' ? body.license_id.trim() : '';
+  const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+  if (!/^[0-9a-f-]{36}$/i.test(licenseId)) return NextResponse.json({ error: 'A valid license_id is required.' }, { status: 400 });
+  if (body.confirm !== true) return NextResponse.json({ error: 'Explicit confirmation is required to revoke a license.' }, { status: 400 });
+  if (reason.length < 5 || reason.length > 500) return NextResponse.json({ error: 'Provide a revocation reason between 5 and 500 characters.' }, { status: 400 });
+
+  try {
+    const result = await supabaseQuery<RevokeResult>('rpc/revoke_algolync_license', {
+      method: 'POST',
+      body: { p_license_id: licenseId, p_owner_email: owner.email, p_reason: reason },
+    });
+    if (!result) throw new Error('Revocation RPC returned no result.');
+    if (result.success !== true) return NextResponse.json({ error: result.reason || 'License could not be revoked.' }, { status: 404 });
+    return NextResponse.json({
+      success: true,
+      license_id: result.license_id,
+      status: 'revoked',
+      already_revoked: result.already_revoked === true,
+      message: result.already_revoked ? 'License was already revoked.' : 'License revoked and owner audit event committed.',
+    }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
+  } catch (error) {
+    console.error('Owner license revocation failed:', error instanceof Error ? error.message : String(error));
+    return NextResponse.json({ error: 'License revocation failed. No success was reported.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
   }
 }
