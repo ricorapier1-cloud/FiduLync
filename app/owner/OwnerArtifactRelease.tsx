@@ -16,6 +16,18 @@ type Artifact = {
   updated_at: string;
 };
 
+async function readArtifactRegistry(accessToken: string): Promise<{ artifacts: Artifact[]; products: Product[] }> {
+  const response = await fetch('/api/owner/artifacts', {
+    headers: { Authorization: 'Bearer ' + accessToken },
+    cache: 'no-store',
+  });
+  const payload = await response.json() as { artifacts?: Artifact[]; products?: Product[]; error?: string };
+  if (!response.ok || !Array.isArray(payload.artifacts) || !Array.isArray(payload.products)) {
+    throw new Error(payload.error || 'Artifact registry could not be loaded.');
+  }
+  return { artifacts: payload.artifacts, products: payload.products };
+}
+
 export default function OwnerArtifactRelease({ accessToken }: { accessToken: string }) {
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -30,21 +42,31 @@ export default function OwnerArtifactRelease({ accessToken }: { accessToken: str
 
   const refresh = useCallback(async () => {
     try {
-      const response = await fetch('/api/owner/artifacts', {
-        headers: { Authorization: 'Bearer ' + accessToken },
-        cache: 'no-store',
-      });
-      const payload = await response.json() as { artifacts?: Artifact[]; products?: Product[]; error?: string };
-      if (!response.ok || !Array.isArray(payload.artifacts) || !Array.isArray(payload.products)) throw new Error(payload.error || 'Artifact registry could not be loaded.');
+      const payload = await readArtifactRegistry(accessToken);
       setArtifacts(payload.artifacts);
       setProducts(payload.products);
-      if (payload.products.length > 0) setSlug((current) => payload.products?.some((product) => product.slug === current) ? current : payload.products?.[0]?.slug ?? current);
+      if (payload.products.length > 0) setSlug((current) => payload.products.some((product) => product.slug === current) ? current : payload.products[0].slug);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Artifact registry could not be loaded.');
     }
   }, [accessToken]);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const payload = await readArtifactRegistry(accessToken);
+        if (!active) return;
+        setArtifacts(payload.artifacts);
+        setProducts(payload.products);
+        if (payload.products.length > 0) setSlug((current) => payload.products.some((product) => product.slug === current) ? current : payload.products[0].slug);
+      } catch (caught) {
+        if (active) setError(caught instanceof Error ? caught.message : 'Artifact registry could not be loaded.');
+      }
+    };
+    void load();
+    return () => { active = false; };
+  }, [accessToken]);
 
   async function upload(event: FormEvent) {
     event.preventDefault();
