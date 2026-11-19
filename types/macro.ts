@@ -10,6 +10,10 @@ export type MacroCurrency = {
   twoYearYieldSource?: 'provider' | 'reference';
   policyRateSource?: 'provider' | 'reference';
   inflationSource?: 'provider' | 'reference';
+  policyRateAsOf?: string;
+  inflationAsOf?: string;
+  policyRateSourceUrl?: string;
+  inflationSourceUrl?: string;
   stance: string;
 };
 
