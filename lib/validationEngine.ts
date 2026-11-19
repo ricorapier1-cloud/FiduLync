@@ -88,8 +88,9 @@ export function evaluateWalkForward(folds: WalkForwardFold[]): {
   if (folds.length < 3) blockers.push('WFA_REQUIRES_AT_LEAST_THREE_CHRONOLOGICAL_FOLDS');
   let previousTestEnd = Number.NEGATIVE_INFINITY;
   const reports = folds.map((fold) => {
-    const times = [fold.trainStart, fold.trainEnd, fold.testStart, fold.testEnd].map(Date.parse);
-    const validTimes = times.every(Number.isFinite) && times[0] < times[1] && times[1] <= times[2] && times[2] < times[3];
+    const parsed = [fold.trainStart, fold.trainEnd, fold.testStart, fold.testEnd].map(timestamp);
+    const times = parsed.map((value) => value ?? Number.NaN);
+    const validTimes = parsed.every((value) => value !== null) && times[0] < times[1] && times[1] <= times[2] && times[2] < times[3];
     if (!validTimes || times[2] < previousTestEnd) blockers.push('WFA_FOLD_DATES_OVERLAP_OR_ARE_NOT_CHRONOLOGICAL');
     if (validTimes) previousTestEnd = times[3];
     const inSample = calculateTradeMetrics(fold.inSample);
