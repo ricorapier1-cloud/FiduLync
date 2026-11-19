@@ -138,6 +138,10 @@ export default function OwnerAccessPage() {
   }
 
   async function requestPasswordReset() {
+    if (!email.trim()) {
+      setMessage('Enter the registered owner email address to request password recovery.');
+      return;
+    }
     if (!supabase) {
       setMessage('Password recovery is not configured for this deployment.');
       return;
