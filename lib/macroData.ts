@@ -455,11 +455,12 @@ async function getCftcCot(): Promise<CotPosition[]> {
 }
 
 async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
-  const fredApiKey = process.env.FRED_COMMERCIAL_USE_APPROVED === 'true' ? process.env.FRED_API_KEY?.trim() : undefined;
-  const finnhubApiKey = process.env.FINNHUB_COMMERCIAL_USE_APPROVED === 'true' ? process.env.FINNHUB_API_KEY?.trim() : undefined;
-  const alphaVantageKey = process.env.ALPHA_VANTAGE_COMMERCIAL_USE_APPROVED === 'true' ? process.env.ALPHA_VANTAGE_API_KEY?.trim() : undefined;
-  const fmpKey = process.env.FMP_COMMERCIAL_USE_APPROVED === 'true' ? process.env.FMP_API_KEY?.trim() : undefined;
-  const cotProviderUrl = process.env.COT_DATA_PROVIDER_LICENSE_APPROVED === 'true' ? process.env.COT_DATA_PROVIDER_URL?.trim() : undefined;
+  // FRED permits personal, non-commercial research with attribution; FRED-derived inputs are kept out of external AI prompts.
+  const fredApiKey = process.env.FRED_API_KEY?.trim();
+  const finnhubApiKey = process.env.FINNHUB_PERSONAL_PLAN_ACTIVE === 'true' ? process.env.FINNHUB_API_KEY?.trim() : undefined;
+  const alphaVantageKey = process.env.ALPHA_VANTAGE_PERSONAL_PLAN_ACTIVE === 'true' ? process.env.ALPHA_VANTAGE_API_KEY?.trim() : undefined;
+  const fmpKey = process.env.FMP_PERSONAL_PLAN_ACTIVE === 'true' ? process.env.FMP_API_KEY?.trim() : undefined;
+  const cotProviderUrl = process.env.COT_DATA_PROVIDER_PERSONAL_USE_ENABLED === 'true' ? process.env.COT_DATA_PROVIDER_URL?.trim() : undefined;
   const cotProviderToken = process.env.COT_DATA_PROVIDER_TOKEN?.trim();
 
   // Never mix an old provider observation into a newly refreshed partial snapshot.
@@ -481,8 +482,8 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
     alphaVantageKey ? getAlphaVantageUsdUpdates(alphaVantageKey) : Promise.resolve(null),
     fmpKey ? getFmpCatalysts(fmpKey) : Promise.resolve(null),
     cotProviderUrl ? getCotProvider(cotProviderUrl, cotProviderToken) : getCftcCot(),
-    process.env.FRANKFURTER_COMMERCIAL_USE_APPROVED === 'true' ? getFrankfurterRates() : Promise.resolve(null),
-    process.env.FAIRECONOMY_COMMERCIAL_USE_APPROVED === 'true' ? getFairEconomyCatalysts() : Promise.resolve([]),
+    getFrankfurterRates(),
+    process.env.FAIRECONOMY_PERSONAL_PLAN_ACTIVE === 'true' ? getFairEconomyCatalysts() : Promise.resolve([]),
     getEcbMacroInputs(),
     getBankOfCanadaMacroInputs(),
     getBankOfEnglandPolicyRate(),
@@ -490,7 +491,7 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
     getBankOfJapanPolicyRate(),
     getReserveBankOfAustraliaPolicyRate(),
     getReserveBankOfNewZealandPolicyRate(),
-    process.env.SNB_DATA_SOURCE_ENABLED === 'true' && process.env.SNB_COMMERCIAL_USE_APPROVED === 'true' ? getSwissNationalBankPolicyRate() : Promise.reject(new Error('SNB commercial-use approval is not configured.')),
+    process.env.SNB_DATA_SOURCE_ENABLED === 'true' ? getSwissNationalBankPolicyRate() : Promise.reject(new Error('SNB data source is disabled.')),
   ]);
   let hasLiveData = false;
   if (fredResult.status === 'fulfilled' && isRecord(fredResult.value)) {
