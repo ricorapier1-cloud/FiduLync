@@ -133,7 +133,7 @@ export function assessFxDrivers(
     const observed = epoch(factor.observedAt);
     const released = epoch(factor.releasedAt);
     let reason = '';
-    if (!factor.verified || !factor.source.trim()) reason = 'UNVERIFIED_SOURCE';
+    if (!factor.verified || typeof factor.source !== 'string' || !factor.source.trim() || !(factor.category in WEIGHTS)) reason = 'UNVERIFIED_SOURCE';
     else if (observed === null || released === null) reason = 'TIMEZONE_AWARE_TIMESTAMPS_REQUIRED';
     else if (released > now || observed > now) reason = 'LOOKAHEAD_INPUT';
     else if (observed < released) reason = 'OBSERVATION_PRECEDES_RELEASE';
@@ -159,8 +159,7 @@ export function assessFxDrivers(
   const technicalValues = [technical.trendZ, technical.structureZ];
   const technicalValid = technical.closedBarVerified
     && technicalValues.every((value) => value !== null && Number.isFinite(value))
-    && technical.volatilityPercentile !== null && Number.isFinite(technical.volatilityPercentile)
-    && technical.spreadToAtr !== null && Number.isFinite(technical.spreadToAtr);
+    && technical.volatilityPercentile !== null && Number.isFinite(technical.volatilityPercentile)\n    && technical.volatilityPercentile >= 0 && technical.volatilityPercentile <= 1\n    && technical.spreadToAtr !== null && Number.isFinite(technical.spreadToAtr) && technical.spreadToAtr >= 0;
   const technicalScore = technicalValid
     ? clamp(((technical.trendZ! * 0.55) + (technical.structureZ! * 0.45)) * 20, -100, 100)
     : null;
