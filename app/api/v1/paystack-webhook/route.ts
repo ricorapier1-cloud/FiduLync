@@ -1,8 +1,9 @@
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { provisionLicenseForReference } from '@/lib/provisionLicense';
 import { sendLicenseDeliveryEmail } from '@/lib/transactionalEmail';
 import { isSupabaseConfigured, supabaseQuery, supabaseRead } from '@/lib/supabaseAdmin';
+import { verifyPaystackWebhookSignature } from '@/lib/paystackWebhookSecurity';
 
 export const dynamic = 'force-dynamic';
 type PaystackData = Record<string, unknown>;
@@ -18,33 +19,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 function safeString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : typeof value === 'number' ? String(value) : '';
-}
-function timingMatch(expectedHex: string, suppliedHex: string): boolean {
-  if (!/^[a-f0-9]{128}$/i.test(suppliedHex)) return false;
-  const expected = Buffer.from(expectedHex, 'hex');
-  const supplied = Buffer.from(suppliedHex, 'hex');
-  return expected.length === supplied.length && timingSafeEqual(expected, supplied);
-}
-function verifySignature(rawBody: string, request: Request): boolean {
-  const modernHeader = request.headers.get('paystack-signature') ?? '';
-  const webhookSecret = process.env.PAYSTACK_WEBHOOK_SECRET?.trim() ?? '';
-  if (modernHeader && webhookSecret.startsWith('whsec_')) {
-    const parts = modernHeader.split(',').map((part) => part.trim());
-    const timestampPart = parts.find((part) => part.startsWith('t='));
-    const timestamp = timestampPart ? Number(timestampPart.slice(2)) : NaN;
-    if (!Number.isSafeInteger(timestamp) || Math.abs(Math.floor(Date.now() / 1000) - timestamp) > 300) return false;
-    const signed = timestamp + '.' + rawBody;
-    const signatures = parts.filter((part) => part.startsWith('v1=')).map((part) => part.slice(3).split(':').at(-1) ?? '');
-    return signatures.some((signature) => {
-      const expected = createHmac('sha512', webhookSecret).update(signed).digest('hex');
-      return timingMatch(expected, signature);
-    });
-  }
-  // Backward-compatible Paystack legacy signature while webhook signing-secret rollout is pending.
-  const legacySecret = process.env.PAYSTACK_SECRET_KEY?.trim() ?? '';
-  const legacySignature = request.headers.get('x-paystack-signature') ?? '';
-  if (!legacySecret.startsWith('sk_') || !/^[a-f0-9]{128}$/i.test(legacySignature)) return false;
-  return timingMatch(createHmac('sha512', legacySecret).update(rawBody).digest('hex'), legacySignature);
 }
 function subscriptionCode(data: PaystackData): string {
   const nested = isRecord(data.subscription) ? data.subscription : {};
@@ -161,7 +135,7 @@ export async function POST(request: Request) {
   if (!secret.startsWith('sk_') || (secret.startsWith('sk_live_') && process.env.PAYSTACK_LIVE_ENABLED !== 'true')) {
     return json({ error: 'Payment webhook is not configured for this Paystack environment.' }, 503);
   }
-  if (!verifySignature(rawBody, request)) return json({ error: 'Unauthorized webhook signature.' }, 401);
+  if (!verifyPaystackWebhookSignature(rawBody, request.headers, { legacySecret: secret, webhookSecret: process.env.PAYSTACK_WEBHOOK_SECRET })) return json({ error: 'Unauthorized webhook signature.' }, 401);
 
   let payload: unknown;
   try { payload = JSON.parse(rawBody); } catch { return json({ error: 'Invalid JSON payload.' }, 400); }
