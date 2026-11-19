@@ -465,6 +465,10 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     getBankOfCanadaMacroInputs(),
     getBankOfEnglandPolicyRate(),
     getWorldBankG10Inflation(),
+    getBankOfJapanPolicyRate(),
+    getReserveBankOfAustraliaPolicyRate(),
+    getReserveBankOfNewZealandPolicyRate(),
+    getSwissNationalBankPolicyRate(),
   ]);
   let hasLiveData = false;
   if (fredResult.status === 'fulfilled' && isRecord(fredResult.value)) {
