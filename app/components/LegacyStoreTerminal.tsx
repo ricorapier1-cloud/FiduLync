@@ -226,9 +226,11 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
         <section className="mt-7 rounded-xl border border-white/[0.08] bg-[#0c1016] p-4 sm:p-5" aria-label="Market state">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <div className="font-mono text-[9px] tracking-[0.17em] text-slate-500">LIVE MACRO STRENGTH INDEX</div>
+              <div className="font-mono text-[9px] tracking-[0.17em] text-slate-500">PROVIDER-VERIFIED MACRO STRENGTH</div>
               <div className="mt-3 flex flex-wrap gap-2">
-                {currencyStrength.map(({ currency, score: strength }) => (
+                {currencyStrength.length === 0 ? (
+                  <span className="font-mono text-[10px] text-amber-200">NO VERIFIED MACRO INPUTS AVAILABLE</span>
+                ) : currencyStrength.map(({ currency, score: strength }) => (
                   <span key={currency} className="inline-flex items-center gap-2 rounded-md border border-white/[0.08] px-2.5 py-2 font-mono text-[10px]">
                     <strong className="text-slate-200">{currency}</strong>
                     <span className={strength >= 0 ? 'text-emerald-300' : 'text-rose-300'}>{strength > 0 ? '+' : ''}{strength}</span>
@@ -253,7 +255,7 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
             </div>
             <div className="shrink-0 text-right font-mono text-[9px] text-slate-500">
               <div>{initialFleet.heartbeats.length} RECENT NODES</div>
-              <div>{telemetryError || (initialFleet.configured ? 'SHARED STORE' : 'LOCAL FALLBACK')}</div>
+              <div>{telemetryError || (initialFleet.configured ? 'SHARED STORE' : 'NOT CONFIGURED')}</div>
             </div>
           </div>
         </section>
@@ -286,7 +288,7 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
               <div className="mt-4 rounded-lg border border-white/[0.08] bg-black/20 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="font-mono text-xs text-slate-300">{signal.symbol} · {signal.regime}</div>
-                  <span className={`rounded border px-2 py-1 font-mono text-[9px] ${signal.safe_to_trade ? 'border-emerald-300/20 text-emerald-300' : 'border-amber-300/20 text-amber-300'}`}>{signal.safe_to_trade ? 'TRADE PERMITTED' : 'DEFENSIVE HOLD'}</span>
+                  <span className={`rounded border px-2 py-1 font-mono text-[9px] ${signal.safe_to_trade ? 'border-emerald-300/20 text-emerald-300' : 'border-amber-300/20 text-amber-300'}`}>{signal.safe_to_trade ? 'RISK CHECK PASSED · READ ONLY' : 'DEFENSIVE HOLD'}</span>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3 text-[10px]">
                   <Metric label="BIAS" value={`${signal.bias} · ${signal.confluence_score}`} />
@@ -300,8 +302,8 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
                   <Metric label="CANDLE COVERAGE" value={`H1 ${signal.market_candle_counts.h1} · H4 ${signal.market_candle_counts.h4} · D1 ${signal.market_candle_counts.d1}`} />
                   <Metric label="LATEST CLOSED BAR" value={signal.latest_market_candle_at ? new Date(signal.latest_market_candle_at).toLocaleString() : "Unavailable"} />
                   <Metric label="CORRELATION GROUP" value={signal.correlation_group} />
-                  <Metric label="ATR STOP" value={signal.atr_sl_pips === null ? '425 bps (G8)' : `${signal.atr_sl_pips} pips`} />
-                  <Metric label="ATR TARGET" value={signal.atr_tp_pips === null ? '425 bps (G8)' : `${signal.atr_tp_pips} pips`} />
+                  <Metric label="ATR STOP" value={signal.atr_sl_pips === null ? '—' : `${signal.atr_sl_pips} pips`} />
+                  <Metric label="ATR TARGET" value={signal.atr_tp_pips === null ? '—' : `${signal.atr_tp_pips} pips`} />
                 </div>
                 {!signal.safe_to_trade && <div className="mt-3 rounded border border-amber-300/15 bg-amber-300/5 p-3">
                   <p className="font-mono text-[9px] tracking-wide text-amber-200">EXECUTION BLOCKERS</p>
@@ -347,7 +349,7 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
               <h2 id="expectancy-heading" className="mt-1 text-lg font-semibold">Reported Closed-Trade Ledger (Not Independently Verified)</h2>
             </div>
             <div className="font-mono text-[9px] text-slate-500">
-              {initialTradeExpectancy.configured ? 'REPORTED LEDGER / UPSTASH' : 'LOCAL REPORTING FALLBACK'} · {initialTradeExpectancy.total_trades} CLOSED
+              {initialTradeExpectancy.configured ? 'REPORTED LEDGER / UPSTASH' : 'NO SHARED LEDGER'} · {initialTradeExpectancy.total_trades} CLOSED
             </div>
           </div>
           <div className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-4 sm:p-5">
