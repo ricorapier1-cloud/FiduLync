@@ -50,7 +50,7 @@ export async function validateCustomerLicense(mt5Account: number, licenseKey: st
   const row = rows[0];
   const now = Date.now();
   const graceUntil = row.grace_until ? Date.parse(row.grace_until) : 0;
-  const inGrace = Number.isFinite(graceUntil) && graceUntil > now;
+  const inGrace = row.status === 'past_due' && Number.isFinite(graceUntil) && graceUntil > now;
   const active = row.status === 'active' || (row.status === 'past_due' && inGrace);
   const unexpired = !row.expires_at || Date.parse(row.expires_at) > now || inGrace;
   return Number(row.mt5_account) === mt5Account && row.license_key === licenseKey.trim()
