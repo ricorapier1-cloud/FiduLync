@@ -77,6 +77,19 @@ function timestamp(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function tradesChronologicalWithin(trades: NetTrade[], start: string, end: string): boolean {
+  const startMs = timestamp(start), endMs = timestamp(end);
+  if (startMs === null || endMs === null || !trades.length) return false;
+  let previous = Number.NEGATIVE_INFINITY;
+  for (const trade of trades) {
+    if (!trade.closedAt) return false;
+    const closed = timestamp(trade.closedAt);
+    if (closed === null || closed < startMs || closed >= endMs || closed < previous) return false;
+    previous = closed;
+  }
+  return true;
+}
+
 export function evaluateWalkForward(folds: WalkForwardFold[]): {
   eligible: boolean;
   blockers: string[];
@@ -95,6 +108,8 @@ export function evaluateWalkForward(folds: WalkForwardFold[]): {
     if (validTimes) previousTestEnd = times[3];
     const inSample = calculateTradeMetrics(fold.inSample);
     const outOfSample = calculateTradeMetrics(fold.outOfSample);
+    if (!tradesChronologicalWithin(fold.inSample, fold.trainStart, fold.trainEnd)) blockers.push('WFA_IN_SAMPLE_TRADES_NOT_CHRONOLOGICAL_OR_TIMESTAMPED');
+    if (!tradesChronologicalWithin(fold.outOfSample, fold.testStart, fold.testEnd)) blockers.push('WFA_OOS_TRADES_NOT_CHRONOLOGICAL_OR_TIMESTAMPED');
     if (!inSample || !outOfSample) blockers.push('WFA_FOLD_HAS_INVALID_OR_EMPTY_TRADES');
     if (outOfSample && outOfSample.trades < 30) blockers.push('WFA_FOLD_HAS_FEWER_THAN_THIRTY_OOS_TRADES');
     return {
