@@ -70,6 +70,7 @@ export async function POST(request: Request) {
       retrievedAt: raw.retrieved_at,
       value: raw.value,
       revisionAt: typeof raw.revision_at === 'string' ? raw.revision_at : null,
+      vintageAt: typeof raw.vintage_at === 'string' ? raw.vintage_at : null,
     };
     const pointInTime = validatePointInTimeObservation(observation, payload.as_of);
     if (!pointInTime.valid) {
