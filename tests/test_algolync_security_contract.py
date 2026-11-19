@@ -73,7 +73,7 @@ class PersonalQuantSecurityContractTests(unittest.TestCase):
         self.assertIn("token_hash", source)
         self.assertIn("mt5_market_candles", source)
         self.assertIn("on_conflict=installation_id,symbol,timeframe,bar_time", source)
-        self.assertIn("installation.status", source)
+        self.assertIn("status=eq.active", source)
 
     def test_legacy_shared_secret_macro_signal_is_browser_same_origin_only(self):
         source = self.read("app/api/v1/macro-signal/route.ts")
