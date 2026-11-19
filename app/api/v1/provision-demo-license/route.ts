@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { randomBytes } from 'node:crypto';
 import { isSupabaseConfigured, persistLicense, supabaseRead } from '@/lib/supabaseAdmin';
 import { enforceDistributedRateLimit } from '@/lib/rateLimit';
+import { hasApprovedProductArtifact } from '@/lib/productRelease';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +38,7 @@ export async function POST(req: Request) {
     const products = await supabaseRead<Array<{ slug: string; category: string; is_active: boolean }>>('ea_products', 'slug=eq.' + encodeURIComponent(eaSlug) + '&is_active=eq.true&select=slug,category,is_active');
     if (!products) throw new Error('Product catalogue database unavailable.');
     if (!products[0] || !products[0].is_active || products[0].category === 'SANDBOX') return NextResponse.json({ success: false, error: 'Select an eligible active AlgoLync EA product.' }, { status: 400 });
+    if (!(await hasApprovedProductArtifact(eaSlug))) return NextResponse.json({ success: false, error: 'Demo licensing is disabled until an approved compiled .ex5 release artifact is available.' }, { status: 409 });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
       return NextResponse.json({ success: false, error: 'A valid email address is required.' }, { status: 400 });
     }
