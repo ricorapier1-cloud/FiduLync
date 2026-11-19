@@ -23,7 +23,7 @@ A configured API key is not proof of a current data response or a provider entit
 - Frankfurter provides daily reference exchange rates only; these are never executable or real-time broker quotes.
 - CFTC COT reports are weekly positioning context, not intraday order flow.
 - FRED data may be used for personal, non-commercial research subject to its terms, attribution and any series-level copyright notices. FRED-derived observations are not sent to external AI prompts.
-- BLS, BEA and central-bank data should be taken from official endpoints with required attribution and the actual observation/release date.
+- BLS and BEA are not yet direct live adapters in this build; their US series are currently sourced through FRED where available. Any future direct adapters must use official endpoints, preserve actual observation/release dates and apply required attribution.
 - Finnhub, Twelve Data, Alpha Vantage, FMP, FairEconomy and custom feeds remain disabled unless the owner's personal plan explicitly permits the exact asset class, programmatic access, caching and in-app display.
 - Stale, missing, revised, incomplete or contradictory data must produce an unavailable/degraded state. No reference values, demo values or cached data may be labelled live.
 
