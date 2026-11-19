@@ -44,10 +44,14 @@ export async function GET(request: Request) {
   const auth = await authorize(request);
   if ('response' in auth) return auth.response;
   try {
-    const artifacts = await supabaseRead<ArtifactRecord[]>('ea_product_artifacts',
-      'select=ea_slug,storage_path,sha256,size_bytes,artifact_version,release_approved,approved_at,updated_at&order=updated_at.desc');
-    if (!artifacts) throw new Error('Artifact registry returned no result.');
-    return json({ artifacts });
+    const [artifacts, products] = await Promise.all([
+      supabaseRead<ArtifactRecord[]>('ea_product_artifacts',
+        'select=ea_slug,storage_path,sha256,size_bytes,artifact_version,release_approved,approved_at,updated_at&order=updated_at.desc'),
+      supabaseRead<Array<{ slug: string; name: string }>>('ea_products',
+        'is_active=eq.true&category=neq.SANDBOX&select=slug,name&order=name.asc'),
+    ]);
+    if (!artifacts || !products) throw new Error('Artifact registry or product catalogue returned no result.');
+    return json({ artifacts, products });
   } catch (error) {
     console.error('Owner artifact list failed:', error instanceof Error ? error.message : String(error));
     return json({ error: 'Artifact registry could not be read.' }, 503);
