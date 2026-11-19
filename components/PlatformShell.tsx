@@ -10,8 +10,8 @@ import PlatformFooter from '@/components/PlatformFooter';
 const links = [
   { href: '/', label: 'MacroLync', icon: 'shield' },
   { href: '/risk', label: 'Risk Planner', icon: 'gauge' },
-  { href: '/store', label: 'EA Lab', icon: 'chart' },
-  { href: '/licensing', label: 'Licensing & Store', icon: 'chart' },
+  { href: '/research', label: 'Quant Lab', icon: 'chart' },
+  { href: '/store', label: 'AlgoLync Store', icon: 'chart' },
   { href: '/customer', label: 'Customer Portal', icon: 'mail' },
   { href: '/analytics', label: 'Performance', icon: 'activity' },
   { href: '/faq', label: 'Help', icon: 'activity' },
@@ -25,7 +25,8 @@ const macroLinks = [
   { href: '#catalysts', label: 'Catalysts', icon: 'calendar' },
   { href: '#positioning', label: 'Positioning', icon: 'radio' },
   { href: '/risk', label: 'Risk planner', icon: 'gauge' },
-  { href: '/store', label: 'EA Lab', icon: 'chart' },
+  { href: '/research', label: 'Quant Lab', icon: 'chart' },
+  { href: '/store', label: 'AlgoLync Store', icon: 'chart' },
   { href: '/analytics', label: 'Performance', icon: 'activity' },
   { href: '/owner', label: 'Owner Console', icon: 'shield' },
 ] as const satisfies readonly { href: string; label: string; icon: BrandGlyphName }[];
@@ -69,7 +70,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
             >
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> 
             </a>
-            <Link className="secure-pill" href={isHome ? '/store' : '/'}>
+            <Link className="secure-pill" href={isHome ? '/store' : '/' }>
               <span className="secure-dot" /> {isHome ? 'EA Lab' : 'Macro terminal'}
             </Link>
             <button
