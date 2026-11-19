@@ -21,7 +21,7 @@ In Vercel → Project → Settings → Environment Variables, configure the foll
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (public URL only) |
 | `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` | Server-side Supabase secret/service-role key; never prefix with `NEXT_PUBLIC_` |
-| `PAYSTACK_SECRET_KEY` | Paystack secret key for initialize, verify and webhook signature validation |
+| `PAYSTACK_SECRET_KEY` | Paystack secret key for initialize and transaction verification; legacy webhook signature fallback |\n| `PAYSTACK_WEBHOOK_SECRET` | Preferred timestamped webhook signing secret (`whsec_...`) from Paystack Dashboard; deploy before disabling legacy signatures |\n| `ALGOLYNC_LEASE_SIGNING_SECRET` | Server-only signing key for 24-hour MT5 license leases (already provisioned in Vercel) |
 | `RESEND_API_KEY` | Server-only transactional email API key for license delivery and transfer verification |
 | `LICENSE_FROM_EMAIL` | Verified sender identity/domain configured with the email provider (for example, `AlgoLync <licenses@your-verified-domain>`) |
 | `PAYSTACK_PUBLIC_KEY` and/or `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | Paystack public key if the checkout UI requires it |
@@ -39,10 +39,10 @@ Other configured market-data providers may require `FX_API_KEY`, `FRED_API_KEY`,
 2. Add the live secret key to Vercel Production as `PAYSTACK_SECRET_KEY`. Use the test key only in a non-production environment.
 3. Set `NEXT_PUBLIC_APP_URL=https://fidulync.vercel.app`.
 4. In Paystack Dashboard → Settings → API Keys & Webhooks, set the webhook URL to:
-   `https://fidulync.vercel.app/api/v1/paystack-webhook`
-5. Configure `RESEND_API_KEY` and `LICENSE_FROM_EMAIL` in Vercel Production so license delivery and account-transfer codes can be emailed. Verify the sender domain with the email provider first.
-6. Deploy after changing environment variables.
-7. Test a successful payment, failed payment, duplicate webhook delivery, and a callback retry with a Paystack test account in Preview before enabling live sales.
+   `https://fidulync.vercel.app/api/paystack/webhook`
+5. Configure the Paystack webhook signing secret in Vercel as `PAYSTACK_WEBHOOK_SECRET` when enabled in the Paystack dashboard. Until then, the endpoint retains legacy `x-paystack-signature` verification.\n6. Configure `RESEND_API_KEY` and `LICENSE_FROM_EMAIL` in Vercel Production so license delivery and account-transfer codes can be emailed. Verify the sender domain with the email provider first.
+7. Deploy after changing environment variables.
+8. Test a successful payment, failed payment, duplicate webhook delivery, and a callback retry with a Paystack test account in Preview before enabling live sales.
 
 The database currently stores NGN 65,000 monthly, USD 49 monthly, NGN 250,000 lifetime and USD 199 lifetime for the three active catalogue products. Confirm taxes, refunds and Paystack merchant terms before enabling sales. The checkout API independently verifies server-side prices and refuses checkout until a compiled release artifact is approved.
 
