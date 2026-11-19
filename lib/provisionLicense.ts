@@ -16,6 +16,7 @@ export type ProvisionedLicense = {
   status: string;
   expires_at: string | null;
   created?: boolean;
+  ea_slug?: string;
 };
 
 export type ProvisionResult = {
@@ -140,7 +141,7 @@ export async function provisionLicenseForReference(referenceInput: string): Prom
   };
 
   try {
-    const persisted = await supabaseQuery<ProvisionedLicense>('rpc/provision_algolync_license', {
+    const persisted = await supabaseQuery<ProvisionedLicense>('rpc/provision_algolync_license_v2', {
       method: 'POST',
       body: {
         p_payment_reference: reference,
@@ -149,6 +150,8 @@ export async function provisionLicenseForReference(referenceInput: string): Prom
         p_email: candidate.email,
         p_tier: candidate.tier,
         p_expires_at: candidate.expires_at,
+        p_ea_slug: eaSlug,
+        p_currency: currency,
       },
     });
 
