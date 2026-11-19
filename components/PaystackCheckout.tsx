@@ -14,6 +14,8 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [productReady, setProductReady] = useState(false);
+  const [productReadinessLoading, setProductReadinessLoading] = useState(true);
 
   // Account Binding Tab state
   const [licenseKeyInput, setLicenseKeyInput] = useState('');
@@ -33,7 +35,25 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
   const priceDisplay =
     currency === 'NGN'
       ? `₦${priceNgn.toLocaleString()} ${plan === 'MONTHLY' ? '/ month' : 'One-Time'}`
-      : `$${priceUsd} ${plan === 'MONTHLY' ? '/ month' : 'One-Time'}`;
+      : `${priceUsd} ${plan === 'MONTHLY' ? '/ month' : 'One-Time'}`;
+
+  useEffect(() => {
+    let active = true;
+    setProductReady(false);
+    setProductReadinessLoading(true);
+    fetch(`/api/v1/product-readiness?slug=${encodeURIComponent(selectedSlug)}`, { cache: 'no-store' })
+      .then(async (response) => {
+        const payload = await response.json() as { ready?: unknown };
+        if (active) setProductReady(response.ok && payload.ready === true);
+      })
+      .catch(() => {
+        if (active) setProductReady(false);
+      })
+      .finally(() => {
+        if (active) setProductReadinessLoading(false);
+      });
+    return () => { active = false; };
+  }, [selectedSlug]);
 
   // Check URL callback ref
   useEffect(() => {
@@ -59,6 +79,10 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
+    if (productReadinessLoading || !productReady) {
+      setErrorMsg('This EA cannot be purchased until its approved compiled .ex5 release artifact is available.');
+      return;
+    }
     if (!riskAcknowledged) {
       setErrorMsg('Please acknowledge the trading-risk disclosure and terms before continuing.');
       return;
@@ -192,7 +216,7 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
               tab === 'DOWNLOADS' ? 'bg-emerald-500 font-bold text-black shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
-            ARTIFACTS
+            SOURCE FILES
           </button>
         </div>
       </div>
@@ -345,12 +369,17 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
             <label className="mt-3 flex items-start gap-2 text-xs text-slate-200"><input type="checkbox" checked={riskAcknowledged} onChange={(event) => setRiskAcknowledged(event.target.checked)} required className="mt-0.5" /><span>I have read and acknowledge the trading risks, product terms, licence duration and data-processing notice.</span></label>
           </div>
 
+          {!productReadinessLoading && !productReady && (
+            <div role="status" className="rounded-lg border border-amber-300/20 bg-amber-300/[0.04] p-3 text-[11px] leading-5 text-amber-100/80">
+              Checkout is disabled. This product has no approved compiled .ex5 artifact registered in private release storage. No payment will be accepted until the file, integrity hash and release approval are verified.
+            </div>
+          )}
           <button
             type="submit"
-            disabled={loading || !riskAcknowledged}
+            disabled={loading || !riskAcknowledged || productReadinessLoading || !productReady}
             className="w-full rounded-xl bg-emerald-500 py-3.5 font-mono text-sm font-bold text-black shadow-lg shadow-emerald-500/20 transition-all hover:bg-emerald-400 disabled:opacity-50"
           >
-            {loading ? 'INITIALIZING PAYSTACK CHECKOUT…' : `PROVISION ${currentEa.name.toUpperCase()} • ${priceDisplay}`}
+            {loading ? 'INITIALIZING PAYSTACK CHECKOUT…' : productReadinessLoading ? 'CHECKING RELEASE STATUS…' : !productReady ? 'PAID RELEASE UNAVAILABLE — APPROVED .EX5 REQUIRED' : `PROVISION ${currentEa.name.toUpperCase()} • ${priceDisplay}`}
           </button>
         </form>
       )}
@@ -504,7 +533,7 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
       {tab === 'DOWNLOADS' && (
         <div className="mt-6 space-y-4 font-mono text-xs">
           <p className="text-slate-400 text-xs leading-relaxed">
-            Download your verified MQL5 artifacts and cloud gate include files. Place these inside your MetaTrader 5 directory.
+            These are source fixtures and integration helpers for terminal setup—not approved commercial .ex5 releases. Compiled commercial downloads will appear only after a private artifact is uploaded, hash-checked and release-approved.
           </p>
 
           <div className="space-y-2">
