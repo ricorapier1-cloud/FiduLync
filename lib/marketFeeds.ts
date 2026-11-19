@@ -45,7 +45,7 @@ async function getFinnhubQuotes(apiKey: string): Promise<MarketQuote[]> {
 }
 
 async function getFrankfurterQuotes(): Promise<MarketQuote[]> {
-  if (process.env.FRANKFURTER_COMMERCIAL_USE_APPROVED !== 'true') throw new Error('Frankfurter reference quotes are disabled pending commercial-use approval.');
+  // Frankfurter is a public reference-rate service; these values are never executable quotes.
   const response = await fetch('https://api.frankfurter.app/latest?from=EUR&to=USD,GBP,JPY', {
     cache: 'no-store',
     signal: AbortSignal.timeout(5_000),
@@ -158,10 +158,10 @@ async function fetchMarketQuotes(): Promise<MarketQuote[]> {
     console.warn('MT5 broker quotes are unavailable:', error);
     return [];
   });
-  const finnhubApproved = process.env.FINNHUB_COMMERCIAL_USE_APPROVED === 'true';
-  const apiKey = finnhubApproved ? process.env.FINNHUB_API_KEY?.trim() : undefined;
+  const finnhubPersonalPlanActive = process.env.FINNHUB_PERSONAL_PLAN_ACTIVE === 'true';
+  const apiKey = finnhubPersonalPlanActive ? process.env.FINNHUB_API_KEY?.trim() : undefined;
   let liveQuotes: MarketQuote[] = [];
-  if (finnhubApproved && !apiKey) {
+  if (finnhubPersonalPlanActive && !apiKey) {
     failures.push(new Error('Finnhub is approved but FINNHUB_API_KEY is not configured.'));
   } else if (apiKey) {
     try {
@@ -177,13 +177,11 @@ async function fetchMarketQuotes(): Promise<MarketQuote[]> {
   for (const quote of liveQuotes) if (!bySymbol.has(quote.symbol)) bySymbol.set(quote.symbol, quote);
   if (bySymbol.size === finnhubSymbols.length) return [...bySymbol.values()];
 
-  // Never call a provider whose commercial-use entitlement has not been approved.
+  // Never call an optional provider until its personal-use plan permits this display.
   // An intentionally disabled provider is not an outage and must not create a
   // runtime error on every dashboard request.
   const referenceProviders: Array<() => Promise<MarketQuote[]>> = [];
-  if (process.env.FRANKFURTER_COMMERCIAL_USE_APPROVED === 'true') {
-    referenceProviders.push(getFrankfurterQuotes);
-  }
+  referenceProviders.push(getFrankfurterQuotes);
   if (process.env.EXCHANGERATE_API_COMMERCIAL_USE_APPROVED === 'true') {
     referenceProviders.push(getExchangeRateQuotes);
   }
@@ -224,10 +222,10 @@ export async function getMarketQuotes(): Promise<MarketQuote[]> {
     if (!Number.isFinite(timestamp) || ageMs < -5 * 60_000) return false;
     if (quote.source === 'mt5') return ageMs <= 120_000;
     if (quote.source === 'finnhub') {
-      return process.env.FINNHUB_COMMERCIAL_USE_APPROVED === 'true' && ageMs <= 120_000;
+      return process.env.FINNHUB_PERSONAL_PLAN_ACTIVE === 'true' && ageMs <= 120_000;
     }
     if (quote.source === 'frankfurter') {
-      return process.env.FRANKFURTER_COMMERCIAL_USE_APPROVED === 'true' && ageMs <= 48 * 60 * 60_000;
+      return ageMs <= 48 * 60 * 60_000;
     }
     if (quote.source === 'exchangerate-api') {
       return process.env.EXCHANGERATE_API_COMMERCIAL_USE_APPROVED === 'true' && ageMs <= 48 * 60 * 60_000;
