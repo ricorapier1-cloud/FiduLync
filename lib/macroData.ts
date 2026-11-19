@@ -791,7 +791,6 @@ async function persistMacroSnapshot(snapshot: MacroSnapshot): Promise<void> {
 
 export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
   const persisted = await getPersistedSnapshot();
-  const baseline = mergeWithFallback(persisted ?? getFallbackSnapshot());
   const endpoint = process.env.MACRO_DATA_PROVIDER_LICENSE_APPROVED === 'true' ? process.env.MACRO_DATA_PROVIDER_URL?.trim() : undefined;
   if (endpoint) {
     try {
