@@ -22,6 +22,8 @@ test('point-in-time validation blocks future macro releases and revisions', () =
   };
   assert.deepEqual(validatePointInTimeObservation(base, '2026-11-14T00:00:00Z'), { valid: true, reason: 'POINT_IN_TIME_VALID' });
   assert.equal(validatePointInTimeObservation({ ...base, releasedAt: '2026-11-15T13:30:00Z' }, '2026-11-14T00:00:00Z').reason, 'LOOKAHEAD_RELEASE');
+  assert.equal(validatePointInTimeObservation({ ...base, retrievedAt: '2026-11-12T12:00:00Z' }, '2026-11-14T00:00:00Z').reason, 'RETRIEVED_BEFORE_RELEASE');
+  assert.equal(validatePointInTimeObservation({ ...base, vintageAt: '2026-11-15T00:00:00Z' }, '2026-11-14T00:00:00Z').reason, 'VINTAGE_NOT_YET_KNOWN');
 });
 
 test('feed health fails closed for missing, stale, degraded and open-circuit feeds', () => {
