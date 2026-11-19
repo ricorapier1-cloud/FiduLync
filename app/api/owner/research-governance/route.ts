@@ -170,13 +170,14 @@ export async function GET(request: Request) {
     let candleRows = { data: candlePages.flatMap((page) => page.data ?? []), error: null };
     if (account?.broker) candleRows = { ...candleRows, data: (candleRows.data ?? []).filter((row) => row.broker === account.broker) };
     if (account?.server) candleRows = { ...candleRows, data: (candleRows.data ?? []).filter((row) => row.server === account.server) };
+    const correlationSymbols = new Set(['EURUSD','GBPUSD','USDJPY','USDCHF','USDCAD','AUDUSD','NZDUSD','EURJPY','XAUUSD']);
     const closeSeries = new Map<string, Map<string, number>>();
     for (const row of candleRows.data ?? []) {
       const symbol = String(row.symbol ?? '').toUpperCase();
       const pair = symbol.match(/^([A-Z]{6})/)?.[1];
       const close = Number(row.close);
       const time = String(row.bar_time);
-      if (!pair || pair === 'SPX500' || !Number.isFinite(Date.parse(time)) || !Number.isFinite(close) || close <= 0) continue;
+      if (!pair || !correlationSymbols.has(pair) || !Number.isFinite(Date.parse(time)) || !Number.isFinite(close) || close <= 0) continue;
       const series = closeSeries.get(pair) ?? new Map<string, number>();
       if (!series.has(time)) series.set(time, close);
       closeSeries.set(pair, series);
