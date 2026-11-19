@@ -124,3 +124,27 @@ The engine excludes stale, future, unverified and timezone-free inputs. It calcu
 3. Use official source releases first (BLS, BEA, FRED/ALFRED, CFTC, central-bank publications); licensed market-data feeds for live OIS, yields, options and institutional positioning.
 4. Provider adapters must have source-specific rate limits, retry/backoff, timeouts, schema versions, freshness policies and health events.
 5. A provider key is not proof of data rights. Enable an adapter only after personal-use terms, attribution and retention rights are confirmed.
+
+## 9. Implemented reproducible research and validation utilities
+
+- `app/research/notebook` and `app/api/owner/research-hypotheses` provide an owner-authenticated hypothesis notebook. Records include thesis, null hypothesis, instruments, timeframes, features, parameters and falsification criteria. New records always enter `DRAFT`.
+- `lib/validationEngine.ts` computes net-R expectancy, win rate, profit factor and drawdown; applies independent spread/slippage/commission/swap multipliers; validates chronological walk-forward folds and timestamped trades; and performs seeded bootstrap resampling of actual closed-trade R outcomes.
+- Monte Carlo output is a resampling distribution of supplied closed trades, not a market simulation or strategy backtest. It must only be run on actual broker-verified trade outcomes after costs.
+- WFA requires at least three chronological folds, at least 30 OOS trades per fold, timestamped in-sample and OOS trades within their declared windows, and positive aggregate OOS expectancy. This is an evidence gate, not a universal guarantee of statistical power.
+- Validation utilities are deterministic and tested in the repository; they are not yet connected to a verified historical tick/bar replay or an automated parameter optimizer. A backtest result must not be fabricated from a trade list or from synthetic bars.
+
+## 10. Current execution and provider integration boundary
+
+The existing macro dashboard and market quote layer continue to use approved providers and the user's MT5 publisher. Reference FX rates (e.g. daily ECB/Frankfurter) are context only; they cannot validate an intraday setup or an executable spread. Broker quotes and completed bars are the only price inputs accepted for broker-specific execution-quality checks.
+
+The next required integration step is to add source-specific adapters for:
+- BLS and BEA releases with official release calendars and revision/vintage timestamps;
+- FRED/ALFRED observations requested with historical real-time periods;
+- CFTC TFF currency futures positions with the actual Friday publication timestamp (not Tuesday's position date);
+- Central-bank policy decisions and OIS/short-rate futures term structures;
+- Nominal yields and breakeven inflation / inflation-swap curves;
+- FX forwards, swap points and cross-currency basis;
+- FX options implied volatility, 25-delta risk reversals and butterfly/skew where licensed;
+- VIX/credit/equity and commodity benchmarks for risk and terms-of-trade context.
+
+Each adapter must be source-tested, terms-approved, idempotent, timestamped and monitored. Do not infer a data feed from an environment variable or mark a connector live before the first verified observation is stored.
