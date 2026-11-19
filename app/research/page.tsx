@@ -1,22 +1,11 @@
 import type { Metadata } from 'next';
-import StoreTerminal from '@/app/components/StoreTerminal';
-import { getLiquiditySession } from '@/lib/currencyStrength';
-import { getMacroSnapshot } from '@/lib/macroEngine';
-
-export const dynamic = 'force-dynamic';
+import QuantResearchLab from '@/app/components/QuantResearchLab';
 
 export const metadata: Metadata = {
-  title: 'Personal Quant Research Lab',
-  description: 'Private quantitative research library, live signal diagnostics and the MacroLync MT5 bridge.'
+  title: 'QuantLync Research Lab',
+  description: 'Private multi-timeframe technical and statistical research with verified data provenance and risk diagnostics.',
 };
 
-export default async function PersonalEaLabPage() {
-  const initialSnapshot = await getMacroSnapshot();
-
-  return (
-    <StoreTerminal
-      initialSnapshot={initialSnapshot}
-      session={getLiquiditySession()}
-    />
-  );
+export default function QuantResearchLabPage() {
+  return <QuantResearchLab />;
 }
