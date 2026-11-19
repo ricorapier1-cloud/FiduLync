@@ -15,7 +15,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function authorized(request: Request): boolean {
   const expected = (process.env.CRON_SECRET ?? '').trim();
-  const match = /^Bearer\\s+(.+)$/i.exec(request.headers.get('authorization') ?? '');
+  const match = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '');
   const supplied = match?.[1]?.trim() ?? '';
   if (!expected || !supplied) return false;
   const a = Buffer.from(expected, 'utf8'), b = Buffer.from(supplied, 'utf8');
