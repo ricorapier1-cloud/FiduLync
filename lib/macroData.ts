@@ -488,8 +488,8 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
     finnhubApiKey ? getFinnhubCatalysts(finnhubApiKey) : Promise.resolve(null),
     alphaVantageKey ? getAlphaVantageUsdUpdates(alphaVantageKey) : Promise.resolve(null),
     fmpKey ? getFmpCatalysts(fmpKey) : Promise.resolve(null),
-    cotProviderUrl ? getCotProvider(cotProviderUrl, cotProviderToken) : getCftcCot(),
-    getFrankfurterRates(),
+    cotProviderUrl ? getCotProvider(cotProviderUrl, cotProviderToken) : getCachedData('macro:cftc-cot', getCftcCot, 6 * 60 * 60),
+    getCachedData('macro:frankfurter-reference', getFrankfurterRates, 6 * 60 * 60),
     process.env.FAIRECONOMY_PERSONAL_PLAN_ACTIVE === 'true' ? getFairEconomyCatalysts() : Promise.resolve([]),
     getEcbMacroInputs(),
     getBankOfCanadaMacroInputs(),
@@ -823,7 +823,7 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
       let ecbRates = persisted?.ecbRates;
       {
         try {
-          ecbRates = await getFrankfurterRates();
+          ecbRates = await getCachedData('macro:frankfurter-reference', getFrankfurterRates, 6 * 60 * 60);
         } catch (error) {
           console.warn('ECB benchmark exchange rates are unavailable:', error);
         }
