@@ -62,7 +62,7 @@ Use a long, unique random value for `ALGOLYNC_PRIVATE_KEY` (or the accepted lega
 
 ## Signal engine and API
 
-`GET /api/v1/macro-signal?symbol=EURUSD` returns a flat JSON signal:
+`GET /api/v1/macro-signal?symbol=EURUSD` returns a flat JSON signal. The following is an example response shape, not live market data:
 
 ```json
 {
