@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
+import { isAuthorizedOwnerEmail } from '@/lib/ownerAuth';
 import { enforceDistributedRateLimit } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
-
-const OWNER_EMAIL = 'ricorapier1@gmail.com';
 
 export async function GET(request: Request) {
   const rate = await enforceDistributedRateLimit(request, 'owner-verify', 30, 60_000);
@@ -17,12 +16,12 @@ export async function GET(request: Request) {
 
   try {
     const { data, error } = await getSupabaseAdmin().auth.getUser(token);
-    if (error || !data.user || data.user.email?.toLowerCase() !== OWNER_EMAIL || !data.user.email_confirmed_at) {
+    if (error || !data.user || !isAuthorizedOwnerEmail(data.user.email) || !data.user.email_confirmed_at) {
       return NextResponse.json({ authenticated: false }, { status: 403, headers: { 'Cache-Control': 'no-store' } });
     }
     return NextResponse.json({
       authenticated: true,
-      email: OWNER_EMAIL,
+      email: data.user.email!.trim().toLowerCase(),
       role: 'owner',
       checked_at: new Date().toISOString(),
     }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
