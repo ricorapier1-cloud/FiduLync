@@ -1,65 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { EA_CATALOG, EaProduct } from '@/lib/eaCatalog';
-
-function InteractiveSparkline({ points, color }: { points: number[]; color: 'emerald' | 'cyan' | 'amber' }) {
-  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
-
-  const min = Math.min(...points);
-  const max = Math.max(...points);
-  const range = max - min || 1;
-  const width = 280;
-  const height = 64;
-  const padY = 8;
-
-  const strokeColor =
-    color === 'emerald' ? '#34d399' : color === 'cyan' ? '#38bdf8' : '#fbbf24';
-  const fillColor =
-    color === 'emerald' ? 'rgba(52, 211, 153, 0.12)' : color === 'cyan' ? 'rgba(56, 189, 248, 0.12)' : 'rgba(251, 191, 36, 0.12)';
-
-  const coords = points.map((p, i) => {
-    const x = (i / (points.length - 1)) * width;
-    const y = height - padY - ((p - min) / range) * (height - padY * 2);
-    return { x, y, value: p };
-  });
-
-  const pathD = coords.reduce((acc, c, i) => `${acc} ${i === 0 ? 'M' : 'L'} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`, '');
-  const areaD = `${pathD} L ${width} ${height} L 0 ${height} Z`;
-
-  return (
-    <div className="relative mt-3 rounded-lg border border-white/[0.06] bg-black/40 p-2.5">
-      <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
-        <span className="flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: strokeColor }} />
-          SIMULATED ILLUSTRATION (NOT VERIFIED)
-        </span>
-        <span className="text-slate-300">
-          {hoverIndex !== null ? `Step ${hoverIndex + 1}: ${points[hoverIndex].toFixed(1)} pts` : `+${(((max - min) / min) * 100).toFixed(1)}% Cum.`}
-        </span>
-      </div>
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        className="mt-1.5 w-full overflow-visible"
-        onMouseLeave={() => setHoverIndex(null)}
-      >
-        <path d={areaD} fill={fillColor} />
-        <path d={pathD} fill="none" stroke={strokeColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        {coords.map((c, i) => (
-          <circle
-            key={i}
-            cx={c.x}
-            cy={c.y}
-            r={hoverIndex === i ? 4 : 2}
-            fill={hoverIndex === i ? '#ffffff' : strokeColor}
-            className="cursor-pointer transition-all"
-            onMouseEnter={() => setHoverIndex(i)}
-          />
-        ))}
-      </svg>
-    </div>
-  );
-}
 
 export function QuantStrategyCatalog({ onSelectEa }: { onSelectEa?: (slug: string) => void }) {
   const [demoModalEa, setDemoModalEa] = useState<EaProduct | null>(null);
@@ -67,6 +9,29 @@ export function QuantStrategyCatalog({ onSelectEa }: { onSelectEa?: (slug: strin
   const [loadingDemo, setLoadingDemo] = useState(false);
   const [demoEmail, setDemoEmail] = useState('');
   const [demoError, setDemoError] = useState('');
+  const [releaseReadiness, setReleaseReadiness] = useState<Record<string, boolean>>({});
+  const [readinessLoading, setReadinessLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    const checkReleases = async () => {
+      const entries = await Promise.all(EA_CATALOG.map(async (strategy) => {
+        try {
+          const response = await fetch(`/api/v1/product-readiness?slug=${encodeURIComponent(strategy.slug)}`, { cache: 'no-store' });
+          const payload = await response.json() as { ready?: unknown };
+          return [strategy.slug, response.ok && payload.ready === true] as const;
+        } catch {
+          return [strategy.slug, false] as const;
+        }
+      }));
+      if (active) {
+        setReleaseReadiness(Object.fromEntries(entries));
+        setReadinessLoading(false);
+      }
+    };
+    void checkReleases();
+    return () => { active = false; };
+  }, []);
 
   const openDemoRequest = (ea: EaProduct) => {
     setDemoModalEa(ea);
@@ -112,15 +77,15 @@ export function QuantStrategyCatalog({ onSelectEa }: { onSelectEa?: (slug: strin
             QUANT MARKETPLACE &amp; STRATEGY VAULT
           </div>
           <h2 className="mt-1 text-xl font-bold tracking-tight text-white sm:text-2xl">
-            Algorithmic Trading Systems &amp; Verified MQL5 Artifacts
+            EA Strategy Catalogue &amp; Release Status
           </h2>
           <p className="mt-1 text-xs text-slate-400">
-            AlgoLync products, licensing and research artifacts. Performance figures shown below are illustrative simulations, not verified live customer results.
+            AlgoLync products, licensing and research artifacts. No simulated performance figures are displayed. Release availability is checked against the private approved-artifact registry.
           </p>
         </div>
         <div className="flex items-center gap-2 font-mono text-[11px] text-slate-400">
           <span className="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-emerald-300">
-            MT5 Build 4150+ Ready
+            MT5 Terminal Required
           </span>
           <span className="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-slate-300">
             WebRequest Cloud Gated
@@ -130,6 +95,7 @@ export function QuantStrategyCatalog({ onSelectEa }: { onSelectEa?: (slug: strin
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {EA_CATALOG.map((strategy) => {
+          const releaseReady = releaseReadiness[strategy.slug] === true;
           const badgeStyles =
             strategy.badgeColor === 'emerald'
               ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
@@ -173,25 +139,13 @@ export function QuantStrategyCatalog({ onSelectEa }: { onSelectEa?: (slug: strin
                   <span className="font-bold text-white">{pricingLabel}</span>
                 </div>
 
-                {/* Clearly separated simulated reference metrics; never present as live verified telemetry. */}
-                <div className="mt-3 rounded-lg border border-amber-400/20 bg-amber-400/[0.04] px-3 py-2 text-[9px] font-mono uppercase tracking-wide text-amber-200">SIMULATED / ILLUSTRATIVE METRICS · NOT LIVE VERIFIED TELEMETRY · NO INDEPENDENT PERFORMANCE AUDIT</div>
-                <div className="mt-2 grid grid-cols-2 gap-2 rounded-lg border border-white/[0.05] bg-black/30 p-2.5 font-mono text-[11px]">
-                  <div>
-                    <span className="text-[9px] text-slate-500 uppercase block">Simulated Win Rate</span>
-                    <strong className="text-emerald-400 font-semibold">{strategy.winRate}</strong>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-500 uppercase block">Simulated Profit Factor</span>
-                    <strong className="text-white font-semibold">{strategy.profitFactor}</strong>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-500 uppercase block">Simulated Sharpe</span>
-                    <strong className="text-white font-semibold">{strategy.sharpeRatio}</strong>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-500 uppercase block">Simulated Drawdown</span>
-                    <strong className="text-amber-400 font-semibold">{strategy.maxDrawdown}</strong>
-                  </div>
+                <div className="mt-3 rounded-lg border border-amber-400/20 bg-amber-400/[0.04] px-3 py-3">
+                  <div className="font-mono text-[9px] uppercase tracking-wide text-amber-200">PERFORMANCE EVIDENCE / NOT PUBLISHED</div>
+                  <p className="mt-1 text-[10px] leading-5 text-slate-400">No independently verified backtest or broker-forward dataset is available for this release. No sample returns, equity curves or simulated performance figures are displayed.</p>
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-white/[0.07] bg-black/30 px-3 py-2 font-mono text-[9px]">
+                  <span className="text-slate-500">PRIVATE .EX5 RELEASE STATUS</span>
+                  <span className={readinessLoading ? 'text-amber-200' : releaseReady ? 'text-emerald-300' : 'text-amber-200'}>{readinessLoading ? 'CHECKING' : releaseReady ? 'APPROVED' : 'AWAITING APPROVED BUILD'}</span>
                 </div>
 
                 <div className="mt-3 space-y-1 font-mono text-[10px] text-slate-400">
@@ -205,38 +159,31 @@ export function QuantStrategyCatalog({ onSelectEa }: { onSelectEa?: (slug: strin
                   </div>
                 </div>
 
-                {/* Interactive SVG Sparkline */}
-                <InteractiveSparkline points={strategy.equityCurvePoints} color={strategy.badgeColor} />
-                <p className="mt-1.5 text-[9px] text-slate-500 italic">
-                  * Illustrative sample only. {strategy.provenanceNote} No verified live-account telemetry is currently displayed for this strategy.
-                </p>
+
               </div>
 
               {/* DUAL ACTION BUTTON WORKFLOW */}
               <div className="mt-5 space-y-2 pt-3 border-t border-white/[0.08]">
-                {/* Paid EAs can request a persisted demo entitlement; free sandbox artifacts do not mint licences. */}
-                {strategy.tierCategory !== 'SANDBOX' && <button
-                  type="button"
-                  onClick={() => openDemoRequest(strategy)}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2.5 text-xs font-semibold text-slate-200 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
-                >
-                  <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                  </svg>
-                  Request 14-Day Demo License &amp; Download (.mq5)
-                </button>}
-
-                {/* Button B: Provision Real EA License (Anchored to checkout) */}
-                <a
-                  href="#vault-checkout"
-                  onClick={() => onSelectEa && onSelectEa(strategy.slug)}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-4 py-2.5 text-xs font-bold text-emerald-300 shadow-md shadow-emerald-950/30 transition-all hover:border-emerald-400 hover:bg-emerald-500 hover:text-black"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  {strategy.tierCategory === 'SANDBOX' ? 'Download Free Sandbox Artifact' : `Subscribe Live License (${strategy.name.split(' ')[0]})`}
-                </a>
+                {strategy.tierCategory === 'SANDBOX' ? (
+                  <a href={strategy.demoDownloadUrl} download={strategy.demoFilename} className="flex w-full items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2.5 text-xs font-semibold text-slate-200 hover:bg-white/[0.08]">Download sandbox .mq5 source</a>
+                ) : (
+                  <>
+                    <button type="button" disabled={!releaseReady || readinessLoading} onClick={() => openDemoRequest(strategy)}
+                      className="flex w-full items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2.5 text-xs font-semibold text-slate-200 disabled:cursor-not-allowed disabled:opacity-50">
+                      {readinessLoading ? 'Checking release…' : releaseReady ? 'Request 14-Day Demo License & Source' : 'Demo unavailable — approved .ex5 required'}
+                    </button>
+                    {releaseReady ? (
+                      <a href="#vault-checkout" onClick={() => onSelectEa && onSelectEa(strategy.slug)}
+                        className="flex w-full items-center justify-center rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-4 py-2.5 text-xs font-bold text-emerald-300 hover:bg-emerald-500 hover:text-black">
+                        Subscribe Live License ({strategy.name.split(' ')[0]})
+                      </a>
+                    ) : (
+                      <button type="button" disabled className="flex w-full items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2.5 text-xs font-semibold text-slate-500">
+                        Paid release unavailable — approved .ex5 required
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
             </article>
           );
