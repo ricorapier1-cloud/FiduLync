@@ -362,7 +362,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
       </section>
 
       <footer className="macro-footer">
-        <div><Link className="macro-footer-brand" href="/"><span>Macro<span>Lync</span></span><small>GLOBAL FX INTELLIGENCE</small></Link><p>Independent macro research tooling. Not investment advice.</p></div>
+        <div><Link className="macro-footer-brand" href="/"><span>Macro<span>Lync</span></span><small>GLOBAL FX INTELLIGENCE</small></Link><p>Independent personal research tooling. Not investment advice.</p><p className="mt-2 max-w-2xl text-[10px] leading-5 text-slate-500">This product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis. FRED® data is used for personal, non-commercial research with source attribution.</p></div>
         <div className="macro-footer-actions"><Link href="/store"><BrandGlyph name="trend" size={15} /> Personal EA Lab <BrandGlyph name="arrow-up-right" size={13} /></Link><a href="mailto:fidulync@gmail.com"><BrandGlyph name="mail" size={15} /> fidulync@gmail.com</a></div>
         <span className="macro-footer-legal mono">RESEARCH TOOLING / NOT FINANCIAL ADVICE</span>
       </footer>
