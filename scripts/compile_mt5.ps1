@@ -2,7 +2,10 @@
 param(
     [Parameter(Mandatory = $true)]
     [ValidateNotNullOrEmpty()]
-    [string]$MetaEditorPath
+    [string]$MetaEditorPath,
+
+    [Parameter()]
+    [switch]$RequireProductSources
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,6 +21,22 @@ $sourceFiles = @(
     (Join-Path $includeRoot "Experts\FiduLync_Supervisor_Probe.mq5"),
     (Join-Path $includeRoot "Experts\FiduLync_Integration_Compile_Check.mq5")
 )
+
+# Product EA sources belong here. The folder is intentionally empty until the
+# owner adds the real .mq5 product sources; no placeholder EA is compiled as a release.
+$productSourceRoot = Join-Path $includeRoot "Experts\Release"
+$productSources = @()
+if (Test-Path -LiteralPath $productSourceRoot -PathType Container) {
+    $productSources = @(Get-ChildItem -LiteralPath $productSourceRoot -Filter "*.mq5" -File -Recurse |
+        ForEach-Object { $_.FullName })
+}
+if ($RequireProductSources -and $productSources.Count -eq 0) {
+    throw "No product EA sources found in $productSourceRoot. Add the actual .mq5 release sources before using -RequireProductSources."
+}
+$sourceFiles = @($sourceFiles) + @($productSources)
+if ($productSources.Count -gt 0) {
+    Write-Host "Product EA sources discovered: $($productSources.Count)"
+}
 
 $failures = [System.Collections.Generic.List[string]]::new()
 
@@ -86,5 +105,5 @@ if ($failures.Count -gt 0) {
     exit 1
 }
 
-Write-Host "MQL5 compile gate passed. Generated EX5 files are local build outputs; do not publish them as release-approved trading products without separate review."
+Write-Host "MQL5 compile gate passed. All discovered product sources and compile fixtures reported 0 errors and 0 warnings. EX5 files remain local outputs until uploaded and explicitly approved in the owner release console."
 exit 0
