@@ -80,6 +80,9 @@ export type LicenseRecord = {
   status?: string;
   expires_at?: string | null;
   ea_slug?: string;
+  included_live_seats?: number;
+  included_demo_seats?: number;
+  extra_live_seats?: number;
 };
 
 export async function persistLicense(license: LicenseRecord) {
@@ -94,6 +97,9 @@ export async function persistLicense(license: LicenseRecord) {
       status: license.status || 'active',
       expires_at: license.expires_at ?? null,
       ea_slug: license.ea_slug ?? null,
+      included_live_seats: license.included_live_seats ?? 1,
+      included_demo_seats: license.included_demo_seats ?? 2,
+      extra_live_seats: license.extra_live_seats ?? 0,
       created_at: new Date().toISOString(),
     },
   });
