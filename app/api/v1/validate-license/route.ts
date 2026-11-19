@@ -4,6 +4,20 @@ import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
+interface LicenseRecord {
+  license_key: string;
+  status: string;
+  expires_at?: string | null;
+  max_live_slots?: number | null;
+  max_demo_slots?: number | null;
+  email?: string | null;
+}
+
+interface BoundAccountRecord {
+  account_number: number | string;
+  account_type: 'LIVE' | 'DEMO';
+}
+
 export async function POST(req: Request) {
   const ip = getClientIp(req);
   if (!checkRateLimit(ip, 60)) {
@@ -11,7 +25,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const body = await req.json();
+    const body = await req.json() as Record<string, unknown>;
     const licenseKey = String(body.license_key || '').trim().toUpperCase();
     const accountNumber = Number(body.account_number || body.account || 0);
     const accountType = (body.account_type === 'DEMO' ? 'DEMO' : 'LIVE') as 'LIVE' | 'DEMO';
@@ -47,7 +61,10 @@ export async function POST(req: Request) {
     }
 
     // 2. Query license from Supabase
-    const licenses = await supabaseRead<any[]>('licenses', `license_key=eq.${encodeURIComponent(licenseKey)}&select=license_key,status,expires_at,max_live_slots,max_demo_slots,email`);
+    const licenses = await supabaseRead<LicenseRecord[]>(
+      'licenses',
+      `license_key=eq.${encodeURIComponent(licenseKey)}&select=license_key,status,expires_at,max_live_slots,max_demo_slots,email`
+    );
     if (!licenses || licenses.length === 0) {
       return NextResponse.json({ valid: false, message: 'Invalid license key' }, { status: 404 });
     }
@@ -66,7 +83,7 @@ export async function POST(req: Request) {
 
     // 3. Check bound accounts in license_bound_accounts
     if (accountNumber > 0) {
-      const bound = await supabaseRead<any[]>(
+      const bound = await supabaseRead<BoundAccountRecord[]>(
         'license_bound_accounts',
         `license_key=eq.${encodeURIComponent(licenseKey)}&select=account_number,account_type`
       );
@@ -107,7 +124,8 @@ export async function POST(req: Request) {
       account: accountNumber,
       message: 'License verified. Active cloud telemetry enabled.',
     });
-  } catch (err: any) {
-    return NextResponse.json({ valid: false, message: err.message || 'Validation error' }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Validation error';
+    return NextResponse.json({ valid: false, message }, { status: 500 });
   }
 }

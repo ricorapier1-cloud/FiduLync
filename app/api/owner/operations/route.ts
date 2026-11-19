@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
+import { isAuthorizedOwnerEmail } from '@/lib/ownerAuth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-const OWNER_EMAIL = 'ricorapier1@gmail.com';
 
 export async function GET(request: Request) {
   const authorization = request.headers.get('authorization') || '';
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   try {
     const supabase = getSupabaseAdmin();
     const { data: auth, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !auth.user || auth.user.email?.toLowerCase() !== OWNER_EMAIL) {
+    if (authError || !auth.user || !isAuthorizedOwnerEmail(auth.user.email)) {
       return NextResponse.json({ error: 'Owner access denied.' }, { status: 403 });
     }
 
@@ -49,7 +49,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       generated_at: new Date().toISOString(),
-      owner: { email: OWNER_EMAIL, role: 'owner' },
+      owner: { email: auth.user.email, role: 'owner' },
       market_data: {
         active_installations: activeInstallations.length,
         total_installations: installations?.length ?? 0,

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import BrandGlyph from '@/components/BrandGlyph';
 import { PaystackCheckout } from '@/components/PaystackCheckout';
 import { QuantStrategyCatalog } from '@/components/QuantStrategyCatalog';
@@ -56,10 +57,6 @@ function getBrowserOrigin() {
 
 function getServerOrigin() {
   return '';
-}
-
-function formatCurrency(value: number | null) {
-  return value === null ? '—' : value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function isSignalResult(value: unknown): value is SignalResult {
@@ -194,6 +191,30 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
   return (
     <div className="min-h-screen bg-[#080a0f] text-slate-100">
       <div className="mx-auto w-full max-w-7xl px-5 py-9 sm:px-8 lg:py-12 pb-36 sm:pb-16">
+        {/* Institutional Back Navigation */}
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.1] bg-white/[0.04] px-3.5 py-1.5 text-xs text-slate-300 transition hover:border-emerald-400/40 hover:text-emerald-300"
+          >
+            <span>←</span> Back to Terminal
+          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/account"
+              className="inline-flex items-center gap-1.5 rounded-md border border-cyan-400/20 bg-cyan-400/[0.06] px-3.5 py-1.5 text-xs text-cyan-300 transition hover:border-cyan-400/40"
+            >
+              My License Portal →
+            </Link>
+            <Link
+              href="/guide"
+              className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs text-slate-400 transition hover:text-white"
+            >
+              MT5 Setup Guide
+            </Link>
+          </div>
+        </div>
+
         <div className="flex flex-wrap items-start justify-between gap-5 border-b border-white/[0.08] pb-7">
           <div>
             <div className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-emerald-300">
@@ -548,52 +569,14 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
   );
 }
 
-function StrategyCard({
-  name,
-  version,
-  description,
-  pairs: targetPairs,
-  timeframe,
-  shield,
-  virtualization,
-  drawdown,
-}: {
-  name: string;
-  version: string;
-  description: string;
-  pairs: string;
-  timeframe: string;
-  shield: string;
-  virtualization: string;
-  drawdown: string;
-}) {
-  return (
-    <article className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-5 sm:p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="font-mono text-[9px] tracking-[0.14em] text-emerald-300">PROPRIETARY ALGORITHM</div>
-          <h3 className="mt-2 text-base font-semibold">{name}</h3>
-        </div>
-        <span className="rounded border border-white/[0.08] px-2 py-1 font-mono text-[9px] text-slate-500">{version}</span>
-      </div>
-      <p className="mt-3 text-xs leading-5 text-slate-400">{description}</p>
-      <dl className="mt-5 grid gap-3 border-t border-white/[0.07] pt-4 sm:grid-cols-2">
-        <Spec label="TARGET PAIRS" value={targetPairs} />
-        <Spec label="TIMEFRAME" value={timeframe} />
-        <Spec label="EQUITY SHIELD" value={shield} />
-        <Spec label="GHOST VIRTUALIZATION" value={virtualization} />
-        <Spec label="DRAWDOWN CAP" value={drawdown} />
-      </dl>
-    </article>
-  );
-}
-
-function Spec({ label, value }: { label: string; value: string }) {
-  return <div><dt className="font-mono text-[8px] tracking-wide text-slate-600">{label}</dt><dd className="mt-1 text-[10px] leading-4 text-slate-300">{value}</dd></div>;
-}
 
 function Metric({ label, value }: { label: string; value: string }) {
-  return <div><div className="font-mono text-[8px] text-slate-600">{label}</div><div className="mt-1 text-slate-200">{value}</div></div>;
+  return (
+    <div>
+      <div className="font-mono text-[8px] text-slate-600">{label}</div>
+      <div className="mt-1 text-slate-200">{value}</div>
+    </div>
+  );
 }
 
 function ExpectancyMetric({ label, value }: { label: string; value: string }) {

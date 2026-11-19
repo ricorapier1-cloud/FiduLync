@@ -1,17 +1,17 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
+import { isAuthorizedOwnerEmail } from '@/lib/ownerAuth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-const OWNER_EMAIL = 'ricorapier1@gmail.com';
 
 async function ownerFromRequest(request: Request) {
   const auth = request.headers.get('authorization') || '';
   const accessToken = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
   if (!accessToken) return null;
   const { data, error } = await getSupabaseAdmin().auth.getUser(accessToken);
-  if (error || !data.user || data.user.email?.toLowerCase() !== OWNER_EMAIL) return null;
+  if (error || !data.user || !isAuthorizedOwnerEmail(data.user.email)) return null;
   return data.user;
 }
 
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
   try {
     const supabase = getSupabaseAdmin();
     const { data: authData, error: authError } = await supabase.auth.getUser(accessToken);
-    if (authError || !authData.user || authData.user.email?.toLowerCase() !== OWNER_EMAIL) {
+    if (authError || !authData.user || !isAuthorizedOwnerEmail(authData.user.email)) {
       return NextResponse.json({ error: 'Owner access denied.' }, { status: 403 });
     }
 

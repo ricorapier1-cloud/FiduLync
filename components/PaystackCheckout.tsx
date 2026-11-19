@@ -19,15 +19,22 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
   const [accountToBind, setAccountToBind] = useState('');
   const [accountTypeToBind, setAccountTypeToBind] = useState<'LIVE' | 'DEMO'>('LIVE');
   const [brokerServerInput, setBrokerServerInput] = useState('');
-  const [boundAccountsList, setBoundAccountsList] = useState<any[]>([]);
+  type BoundAccountItem = {
+    account_number: number | string;
+    account_type: 'LIVE' | 'DEMO';
+    broker_server?: string | null;
+    rebind_cooldown_until?: string | null;
+    created_at?: string;
+  };
+  const [boundAccountsList, setBoundAccountsList] = useState<BoundAccountItem[]>([]);
   const [availableSlots, setAvailableSlots] = useState<{ live: number; demo: number }>({ live: 1, demo: 2 });
   const [loadingBinding, setLoadingBinding] = useState(false);
 
-  useEffect(() => {
-    if (selectedEaSlug) {
-      setSelectedSlug(selectedEaSlug);
-    }
-  }, [selectedEaSlug]);
+  const [prevSelectedProp, setPrevSelectedProp] = useState<string>(selectedEaSlug);
+  if (selectedEaSlug !== prevSelectedProp) {
+    setPrevSelectedProp(selectedEaSlug);
+    setSelectedSlug(selectedEaSlug);
+  }
 
   const currentEa: EaProduct = getEaBySlug(selectedSlug) || EA_CATALOG[0];
 
@@ -41,24 +48,38 @@ export function PaystackCheckout({ selectedEaSlug = 'eridam-nexus-pro' }: { sele
 
   // Check URL callback ref
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     const reference = new URLSearchParams(window.location.search).get('ref');
     if (!reference) return;
 
-    setLoading(true);
-    fetch(`/api/v1/verify-payment?reference=${encodeURIComponent(reference)}`, { cache: 'no-store' })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && data.license_key) {
-          setSuccessMsg(`Payment verified! Your License Key: ${data.license_key}. Check below to bind your MT5 accounts.`);
-          setLicenseKeyInput(data.license_key);
-          setTab('BIND');
-          window.history.replaceState({}, '', '/store#vault-checkout');
-        } else {
-          setErrorMsg(data.error || 'Payment verification pending.');
-        }
-      })
-      .catch(() => setErrorMsg('Failed to verify payment reference.'))
-      .finally(() => setLoading(false));
+    let active = true;
+    const timer = setTimeout(() => {
+      setLoading(true);
+      fetch(`/api/v1/verify-payment?reference=${encodeURIComponent(reference)}`, { cache: 'no-store' })
+        .then((res) => res.json())
+        .then((data) => {
+          if (!active) return;
+          if (data.success && data.license_key) {
+            setSuccessMsg(`Payment verified! Your License Key: ${data.license_key}. Check below to bind your MT5 accounts.`);
+            setLicenseKeyInput(data.license_key);
+            setTab('BIND');
+            window.history.replaceState({}, '', '/store#vault-checkout');
+          } else {
+            setErrorMsg(data.error || 'Payment verification pending.');
+          }
+        })
+        .catch(() => {
+          if (active) setErrorMsg('Failed to verify payment reference.');
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    }, 0);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
   }, []);
 
   const handleCheckout = async (e: React.FormEvent) => {

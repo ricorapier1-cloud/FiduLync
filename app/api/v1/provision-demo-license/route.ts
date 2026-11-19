@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const body = await req.json();
+    const body = await req.json() as Record<string, unknown>;
     const eaSlug = String(body.ea_slug || 'generic').trim();
     const email = String(body.email || '').trim().toLowerCase();
     const mt5Account = Number(body.mt5_account) || Math.floor(1000000 + Math.random() * 9000000);
@@ -46,7 +46,8 @@ export async function POST(req: Request) {
       expires_at: expiresAt,
       message: 'Demo license successfully provisioned. 1 Live + 2 Demo accounts entitlement active.',
     });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Failed to provision demo license' }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to provision demo license';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
+import { isAuthorizedOwnerEmail } from '@/lib/ownerAuth';
 
 export const dynamic = 'force-dynamic';
-
-const OWNER_EMAIL = 'ricorapier1@gmail.com';
 
 export async function GET(request: Request) {
   const authorization = request.headers.get('authorization') || '';
@@ -12,12 +11,13 @@ export async function GET(request: Request) {
 
   try {
     const { data, error } = await getSupabaseAdmin().auth.getUser(token);
-    if (error || !data.user || data.user.email?.toLowerCase() !== OWNER_EMAIL) {
+    const userEmail = data?.user?.email?.toLowerCase() || '';
+    if (error || !data.user || !isAuthorizedOwnerEmail(userEmail)) {
       return NextResponse.json({ authenticated: false }, { status: 403 });
     }
     return NextResponse.json({
       authenticated: true,
-      email: OWNER_EMAIL,
+      email: userEmail,
       role: 'owner',
       checked_at: new Date().toISOString(),
     }, { headers: { 'Cache-Control': 'no-store' } });

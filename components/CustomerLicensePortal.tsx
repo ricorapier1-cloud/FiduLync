@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 import { useState } from 'react';
 
 type PortalData = {
@@ -62,6 +64,20 @@ export default function CustomerLicensePortal() {
   const money = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return <div className="mx-auto max-w-5xl px-4 py-10 text-slate-100 sm:px-6">
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <Link
+        href="/"
+        className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.1] bg-white/[0.04] px-3.5 py-1.5 text-xs text-slate-300 transition hover:border-emerald-400/40 hover:text-emerald-300"
+      >
+        <span>←</span> Back to Terminal
+      </Link>
+      <Link
+        href="/store"
+        className="inline-flex items-center gap-1.5 rounded-md border border-emerald-400/20 bg-emerald-400/[0.06] px-3.5 py-1.5 text-xs text-emerald-300 transition hover:border-emerald-400/40"
+      >
+        AlgoLync Store →
+      </Link>
+    </div>
     <div className="mb-8">
       <p className="font-mono text-[10px] tracking-[.2em] text-cyan-300">ALGOLYNX / CUSTOMER ACCESS</p>
       <h1 className="mt-2 text-3xl font-semibold">My License Dashboard</h1>
