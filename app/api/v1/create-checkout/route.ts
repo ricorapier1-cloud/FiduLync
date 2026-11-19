@@ -34,6 +34,8 @@ function json(body: unknown, status = 200) {
 }
 
 export async function POST(req: Request) {
+  if (process.env.PERSONAL_QUANT_EDITION !== 'false') return json({ success: false, error: 'Checkout is not part of Personal Quant Edition.' }, 410);
+
   const rate = await enforceDistributedRateLimit(req, 'create-checkout', 12, 60_000);
   if (rate.unavailable) return json({ success: false, error: 'Checkout security service is unavailable.' }, 503);
   if (!rate.allowed) return json({ success: false, error: 'Too many checkout requests. Please wait.' }, 429);
