@@ -24,7 +24,51 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
       console.warn('Macro snapshot exceeded the 24-hour freshness limit; provider data is marked unavailable.');
       return getFallbackSnapshot();
     }
-    return snapshot;
+
+    const policyProviderApproved = (provider: MacroCurrency['policyRateProvider']) => {
+      if (provider === 'fred') return process.env.FRED_COMMERCIAL_USE_APPROVED === 'true';
+      if (provider === 'alpha-vantage') return process.env.ALPHA_VANTAGE_COMMERCIAL_USE_APPROVED === 'true';
+      if (provider === 'macro-provider') return process.env.MACRO_DATA_PROVIDER_LICENSE_APPROVED === 'true';
+      if (provider === 'swiss-national-bank') return process.env.SNB_COMMERCIAL_USE_APPROVED === 'true';
+      return Boolean(provider);
+    };
+    const inflationProviderApproved = (provider: MacroCurrency['inflationProvider']) => {
+      if (provider === 'fred') return process.env.FRED_COMMERCIAL_USE_APPROVED === 'true';
+      if (provider === 'alpha-vantage') return process.env.ALPHA_VANTAGE_COMMERCIAL_USE_APPROVED === 'true';
+      if (provider === 'macro-provider') return process.env.MACRO_DATA_PROVIDER_LICENSE_APPROVED === 'true';
+      return Boolean(provider);
+    };
+
+    const currencies = snapshot.currencies.filter((currency) =>
+      currency.policyRateSource === 'provider'
+      && currency.inflationSource === 'provider'
+      && policyProviderApproved(currency.policyRateProvider)
+      && inflationProviderApproved(currency.inflationProvider));
+    const coreG10 = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'SEK', 'NOK'];
+    const completeG10 = coreG10.every((code) => currencies.some((currency) => currency.code === code));
+
+    const cotAllowed = snapshot.cotSource === 'provider'
+      && (snapshot.cotProvider === 'cftc'
+        || (snapshot.cotProvider === 'custom' && process.env.COT_DATA_PROVIDER_LICENSE_APPROVED === 'true'));
+    const calendarAllowed = snapshot.calendarSource === 'provider' && (
+      (snapshot.calendarProvider === 'fair-economy' && process.env.FAIRECONOMY_COMMERCIAL_USE_APPROVED === 'true')
+      || (snapshot.calendarProvider === 'finnhub' && process.env.FINNHUB_COMMERCIAL_USE_APPROVED === 'true')
+      || (snapshot.calendarProvider === 'fmp' && process.env.FMP_COMMERCIAL_USE_APPROVED === 'true')
+      || (snapshot.calendarProvider === 'macro-provider' && process.env.MACRO_DATA_PROVIDER_LICENSE_APPROVED === 'true')
+    );
+
+    return {
+      ...snapshot,
+      source: snapshot.source === 'provider' && completeG10 ? 'provider' : 'partial',
+      currencies,
+      cot: cotAllowed ? snapshot.cot : [],
+      cotSource: cotAllowed ? 'provider' : 'unavailable',
+      cotProvider: cotAllowed ? snapshot.cotProvider : undefined,
+      catalysts: calendarAllowed ? snapshot.catalysts : [],
+      calendarSource: calendarAllowed ? 'provider' : 'reference',
+      calendarProvider: calendarAllowed ? snapshot.calendarProvider : undefined,
+      ecbRates: process.env.FRANKFURTER_COMMERCIAL_USE_APPROVED === 'true' ? snapshot.ecbRates : undefined,
+    };
   } catch (error) {
     console.warn('Macro providers and cached snapshots are unavailable; no macro observations will be substituted.', error);
     return getFallbackSnapshot();
