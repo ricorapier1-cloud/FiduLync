@@ -29,10 +29,13 @@ export async function POST(request: Request) {
 
   const contentLength = Number(request.headers.get('content-length') ?? 0);
   if (Number.isFinite(contentLength) && contentLength > 8192) return json({ accepted: false, error: 'Request body exceeds 8 KB.' }, 413);
+  let rawBody: string;
+  try { rawBody = await request.text(); } catch { return json({ accepted: false, error: 'A valid JSON object is required.' }, 400); }
+  if (Buffer.byteLength(rawBody, 'utf8') > 8192) return json({ accepted: false, error: 'Request body exceeds 8 KB.' }, 413);
 
   try {
     let raw: unknown;
-    try { raw = await request.json(); } catch { return json({ accepted: false, error: 'A valid JSON object is required.' }, 400); }
+    try { raw = JSON.parse(rawBody); } catch { return json({ accepted: false, error: 'A valid JSON object is required.' }, 400); }
     if (!isRecord(raw)) return json({ accepted: false, error: 'A valid JSON object is required.' }, 400);
 
     const balance = finiteMetric(raw.balance, -1_000_000_000_000, 1_000_000_000_000);
