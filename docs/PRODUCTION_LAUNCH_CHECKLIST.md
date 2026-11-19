@@ -10,7 +10,7 @@ This runbook is for the project owner. Never commit secret values to GitHub, pas
 - Production remains on `main`; the current Personal Quant feature branch is not yet promoted.
 - Paystack live processing is disabled, and paid checkout remains blocked until merchant activation plus an approved private compiled `.ex5` release artifact.
 - License email delivery and email-verified MT5 account transfers require `RESEND_API_KEY` and a verified `LICENSE_FROM_EMAIL`.
-- MT5 heartbeat and trade ingestion fail closed until the private EA API key is configured.
+- MT5 heartbeat ingestion now accepts only a valid signed 24-hour AlgoLync licence lease and rechecks the licence, product artifact and bound seat. The separate owner MT5 publisher pipeline still requires its installation token.
 - No compiled `.ex5` trading robot is represented as available until it has been built and tested in MetaEditor, uploaded to private Storage, hash metadata registered, and explicitly owner-approved.
 
 ## Required Vercel Production environment variables
@@ -39,7 +39,7 @@ Other configured market-data providers may require `FX_API_KEY`, `FRED_API_KEY`,
 2. Add the live secret key to Vercel Production as `PAYSTACK_SECRET_KEY`. Use the test key only in a non-production environment.
 3. Set `NEXT_PUBLIC_APP_URL=https://fidulync.vercel.app`.
 4. In Paystack Dashboard → Settings → API Keys & Webhooks, set the webhook URL to:
-   `https://fidulync.vercel.app/api/paystack/webhook`
+   `https://fidulync.vercel.app/api/paystack/webhook`\n   Configure the timestamped webhook signing secret as `PAYSTACK_WEBHOOK_SECRET` in Vercel. The legacy `x-paystack-signature` fallback remains enabled only while the secret migration is pending.
 5. Configure the Paystack webhook signing secret in Vercel as `PAYSTACK_WEBHOOK_SECRET` when enabled in the Paystack dashboard. Until then, the endpoint retains legacy `x-paystack-signature` verification.\n6. Configure `RESEND_API_KEY` and `LICENSE_FROM_EMAIL` in Vercel Production so license delivery and account-transfer codes can be emailed. Verify the sender domain with the email provider first.
 7. Deploy after changing environment variables.
 8. Test a successful payment, failed payment, duplicate webhook delivery, and a callback retry with a Paystack test account in Preview before enabling live sales.
