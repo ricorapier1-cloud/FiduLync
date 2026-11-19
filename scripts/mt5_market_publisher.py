@@ -54,7 +54,13 @@ OPTIONAL_SYMBOL_MAP = {
     "USOIL": "USOIL",
     "SPX500": "SPX500",
 }
-SUPPORTED_SYMBOLS = {**DEFAULT_SYMBOL_MAP, **OPTIONAL_SYMBOL_MAP}
+G10_CROSS_SYMBOLS = {
+    "EURGBP", "EURJPY", "EURCHF", "EURCAD", "EURAUD", "EURNZD", "EURSEK", "EURNOK",
+    "GBPJPY", "GBPCHF", "GBPCAD", "GBPAUD", "GBPNZD", "GBPSEK", "GBPNOK",
+    "AUDJPY", "AUDNZD", "AUDCAD", "AUDCHF", "NZDJPY", "NZDCAD", "NZDCHF",
+    "CADJPY", "CADCHF", "CHFJPY", "SEKJPY", "NOKJPY", "USDSEK", "USDNOK",
+}
+SUPPORTED_SYMBOLS = set(DEFAULT_SYMBOL_MAP) | G10_CROSS_SYMBOLS | set(OPTIONAL_SYMBOL_MAP)
 TIMEFRAMES = {
     "H1": mt5.TIMEFRAME_H1,
     "H4": mt5.TIMEFRAME_H4,
@@ -94,9 +100,6 @@ def parse_symbol_map() -> dict[str, str]:
         if canonical not in SUPPORTED_SYMBOLS:
             raise SystemExit(f"Unsupported canonical symbol: {canonical}")
         mapping[canonical] = broker_symbol
-    missing = set(DEFAULT_SYMBOL_MAP) - set(mapping)
-    if missing:
-        raise SystemExit(f"MT5_SYMBOL_MAP is missing: {', '.join(sorted(missing))}")
     return mapping
 
 
