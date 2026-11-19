@@ -7,6 +7,10 @@ on:
   push:
     branches: [feat/personal-quant-edition]
 
+concurrency:
+  group: personal-quant-${{ github.event.pull_request.head.ref || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
