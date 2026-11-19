@@ -305,7 +305,8 @@ export default function StoreTerminal({ initialFleet, telemetryError, initialSna
               <BrandGlyph name="shield-alert" size={14} className="mt-0.5 shrink-0 text-amber-300" />
               <p>Keep all private API credentials in the secure terminal configuration. Never publish service keys or copy private headers into public code.</p>
             </div>
-          </div>/div>
+          </div>
+        </section>
         </section>
 
         <section className="mt-11" aria-labelledby="expectancy-heading">
