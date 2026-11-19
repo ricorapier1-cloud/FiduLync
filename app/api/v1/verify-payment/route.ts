@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { enforceDistributedRateLimit } from '@/lib/rateLimit';
 import { provisionLicenseForReference } from '@/lib/provisionLicense';
 import { sendLicenseDeliveryEmail } from '@/lib/transactionalEmail';
 
@@ -7,9 +7,9 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   const headers = { 'Cache-Control': 'no-store, max-age=0' };
-  if (!checkRateLimit(getClientIp(request), 10, 60_000)) {
-    return NextResponse.json({ success: false, error: 'Too many payment verification attempts.' }, { status: 429, headers });
-  }
+  const rate = await enforceDistributedRateLimit(request, 'verify-payment', 10, 60_000);
+  if (rate.unavailable) return NextResponse.json({ success: false, error: 'Payment verification is temporarily unavailable.' }, { status: 503, headers });
+  if (!rate.allowed) return NextResponse.json({ success: false, error: 'Too many payment verification attempts.' }, { status: 429, headers });
 
   const reference = new URL(request.url).searchParams.get('reference')?.trim() ?? '';
   if (!reference) return NextResponse.json({ success: false, error: 'Payment reference is required.' }, { status: 400, headers });
