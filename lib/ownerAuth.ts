@@ -1,7 +1,7 @@
 import 'server-only';
 
-// One explicitly configured administrator identity. Support/customer mailboxes
-// are never implicitly granted privileged control-plane access.
+// Privileged access belongs to one explicitly configured administrator.
+// Support and customer mailboxes are never implicitly trusted.
 const OWNER_EMAIL = (process.env.OWNER_EMAIL || 'ricorapier1@gmail.com').trim().toLowerCase();
 
 export function isAuthorizedOwnerEmail(email?: string | null): boolean {
@@ -12,7 +12,7 @@ export type VerifiedOwner = { id: string; email: string };
 
 export async function requireOwner(request: Request): Promise<VerifiedOwner | null> {
   const authorization = request.headers.get('authorization') ?? '';
-  const match = /^Bearer\\s+(.+)$/i.exec(authorization);
+  const match = /^Bearer\s+(.+)$/i.exec(authorization);
   const accessToken = match?.[1]?.trim();
   const supabaseUrl = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
   const publishableKey = (
@@ -25,8 +25,8 @@ export async function requireOwner(request: Request): Promise<VerifiedOwner | nu
   if (!accessToken || accessToken.length > 8192 || !supabaseUrl || !publishableKey || !OWNER_EMAIL) return null;
 
   try {
-    const response = await fetch(`${supabaseUrl.replace(/\\/$/, '')}/auth/v1/user`, {
-      headers: { apikey: publishableKey, Authorization: `Bearer ${accessToken}` },
+    const response = await fetch(\${supabaseUrl.replace(/\/$/, '')}/auth/v1/user, {
+      headers: { apikey: publishableKey, Authorization: \`Bearer \${accessToken}\` },
       cache: 'no-store',
       signal: AbortSignal.timeout(5_000),
     });
@@ -40,7 +40,7 @@ export async function requireOwner(request: Request): Promise<VerifiedOwner | nu
     if (!isAuthorizedOwnerEmail(email) || !id || !confirmed) return null;
     return { id, email };
   } catch {
-    // Authentication provider errors are always deny, never fail open.
+    // Auth provider errors are always deny, never fail open.
     return null;
   }
 }
