@@ -39,6 +39,7 @@ export type TechnicalSignal = {
   trend_r_squared: number | null;
   adr20_pips: number | null;
   current_daily_range_adr: number | null;
+  atr_expansion_ratio: number | null;
 };
 
 const LIVE_PRICE_TTL_SECONDS = 60;
@@ -65,6 +66,7 @@ function unavailableSignal(): TechnicalSignal {
     trend_r_squared: null,
     adr20_pips: null,
     current_daily_range_adr: null,
+    atr_expansion_ratio: null,
   };
 }
 
@@ -577,6 +579,7 @@ export function calculateTechnicalSignal(pair: string, h1: Candle[], h4: Candle[
     trend_r_squared: Number(rSquared.toFixed(3)),
     adr20_pips: Number(adrPips!.toFixed(1)),
     current_daily_range_adr: currentDailyRangeAdr === null ? null : Number(currentDailyRangeAdr.toFixed(3)),
+    atr_expansion_ratio: typicalNormalizedAtr > 0 ? Number((currentNormalizedAtr / typicalNormalizedAtr).toFixed(3)) : null,
   };
 }
 
