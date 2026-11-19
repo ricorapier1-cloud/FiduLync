@@ -66,6 +66,7 @@ export async function POST(req: Request) {
     if (!license) return json({ valid: false, message: 'Invalid license key.' }, 404);
     if (String(license.status || '').toLowerCase() !== 'active') return json({ valid: false, message: 'License is not active.' }, 403);
     if (license.expires_at && new Date(license.expires_at).getTime() <= Date.now()) return json({ valid: false, message: 'License has expired.' }, 403);
+    if (license.tier === 'DEMO_14D' && accountType !== 'DEMO') return json({ valid: false, message: 'Demo entitlements cannot be used on live trading accounts.' }, 403);
     if (!license.ea_slug || (requestedEaSlug && requestedEaSlug !== license.ea_slug)) return json({ valid: false, message: 'This license is not entitled to the requested EA product.' }, 403);
 
     const seats = await supabaseRead<SeatRecord[]>('ea_license_seats',
