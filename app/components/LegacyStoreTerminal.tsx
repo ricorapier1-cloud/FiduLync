@@ -129,7 +129,6 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
           license_key: licenseKeyInput.trim(),
           account_number: mt5AccountInput.trim(),
           account_type: mt5AccountType,
-          ea_slug: selectedEaSlug,
         }),
       });
       const data = await res.json();
