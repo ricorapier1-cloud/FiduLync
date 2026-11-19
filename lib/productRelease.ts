@@ -16,22 +16,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-async function verifyStoredObject(artifact: ProductArtifact): Promise<boolean> {
-  if (typeof artifact.storage_path !== 'string'
-    || !artifact.storage_path.trim()
-    || artifact.storage_path.startsWith('/')
-    || artifact.storage_path.split('/').some((segment) => !segment || segment === '.' || segment === '..')
-    || typeof artifact.sha256 !== 'string' || !/^[a-f0-9]{64}$/i.test(artifact.sha256)
-    || !Number.isSafeInteger(Number(artifact.size_bytes)) || Number(artifact.size_bytes) <= 0
-    || typeof artifact.artifact_version !== 'string' || !artifact.artifact_version.trim()) {
-    return false;
-  }
+export async function hasPrivateStorageObject(storagePath: string): Promise<boolean> {
+  if (!storagePath || storagePath.startsWith('/')
+    || storagePath.split('/').some((segment) => !segment || segment === '.' || segment === '..')) return false;
 
   const supabaseUrl = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim().replace(/\/$/, '');
   const serviceKey = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
   if (!supabaseUrl || !serviceKey) throw new Error('Private EA artifact storage is not configured.');
 
-  const encodedPath = artifact.storage_path.split('/').map(encodeURIComponent).join('/');
+  const encodedPath = storagePath.split('/').map(encodeURIComponent).join('/');
   const response = await fetch(`${supabaseUrl}/storage/v1/object/sign/algolync-artifacts/${encodedPath}`, {
     method: 'POST',
     headers: {
@@ -48,6 +41,15 @@ async function verifyStoredObject(artifact: ProductArtifact): Promise<boolean> {
   return isRecord(payload)
     && ((typeof payload.signedURL === 'string' && payload.signedURL.length > 0)
       || (typeof payload.signedUrl === 'string' && payload.signedUrl.length > 0));
+}
+
+async function verifyStoredObject(artifact: ProductArtifact): Promise<boolean> {
+  if (typeof artifact.storage_path !== 'string'
+    || !artifact.storage_path.trim()
+    || typeof artifact.sha256 !== 'string' || !/^[a-f0-9]{64}$/i.test(artifact.sha256)
+    || !Number.isSafeInteger(Number(artifact.size_bytes)) || Number(artifact.size_bytes) <= 0
+    || typeof artifact.artifact_version !== 'string' || !artifact.artifact_version.trim()) return false;
+  return hasPrivateStorageObject(artifact.storage_path);
 }
 
 async function checkProductArtifact(eaSlug: string, requireApproval: boolean): Promise<boolean> {
