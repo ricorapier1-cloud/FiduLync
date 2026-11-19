@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { provisionLicenseForReference } from '@/lib/provisionLicense';
-import { sendLicenseDeliveryEmail } from '@/lib/transactionalEmail';
+import { isTransactionalEmailConfigured, sendLicenseDeliveryEmail } from '@/lib/transactionalEmail';
 import { isSupabaseConfigured, supabaseQuery, supabaseRead } from '@/lib/supabaseAdmin';
 import { verifyPaystackWebhookSignature } from '@/lib/paystackWebhookSecurity';
 
@@ -49,19 +49,19 @@ async function processEvent(eventName: string, data: PaystackData, reference: st
     }
     if (!reference) throw new Error('Successful charge is missing its transaction reference.');
     const result = await provisionLicenseForReference(reference);
-    if (result.created) {
-      const license = result.license;
-      await sendLicenseDeliveryEmail({
+    const license = result.license;
+    if (isTransactionalEmailConfigured()) {
+      const emailSent = await sendLicenseDeliveryEmail({
         email: license.email,
         licenseKey: license.license_key,
         mt5Account: license.mt5_account,
         tier: license.tier,
         expiresAt: license.expires_at,
         reference,
-      }).catch((error: unknown) => {
-        console.error('AlgoLync webhook email delivery failed:', error instanceof Error ? error.message : String(error));
-        return false;
       });
+      if (!emailSent) throw new Error('License delivery email failed; webhook event will remain retryable.');
+    } else {
+      console.warn('AlgoLync license email is not configured; the verified license remains available through payment verification.');
     }
     return;
   }
