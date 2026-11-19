@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireOwner } from '@/lib/ownerAuth';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
+import { getPersonalRiskPolicy } from '@/lib/riskPolicy';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -83,6 +84,80 @@ export async function GET(request: Request) {
       }
     }
     const currencyExposure = [...exposureMap.values()].sort((a, b) => b.gross_units - a.gross_units);
+    const accountResult = latestManifest ? await supabase.from('mt5_account_snapshots')
+      .select('currency,broker,server,captured_at')
+      .eq('installation_id', latestManifest.installation_id)
+      .eq('account_login', latestManifest.account_login)
+      .order('captured_at', { ascending: false }).limit(1).maybeSingle() : { data: null, error: null };
+    if (accountResult.error) throw accountResult.error;
+    const account = accountResult.data;
+    const accountCurrency = typeof account?.currency === 'string' ? account.currency.toUpperCase() : null;
+    const accountAgeSeconds = account?.captured_at
+      ? Math.max(0, Math.round((Date.now() - Date.parse(account.captured_at)) / 1000)) : null;
+    const accountFresh = Boolean(accountCurrency && accountAgeSeconds !== null && accountAgeSeconds <= 15
+      && accountAgeSeconds >= 0 && positionFresh);
+    let quoteQuery = latestManifest ? supabase.from('mt5_market_quotes')
+      .select('symbol,bid,ask,quote_time,broker,server')
+      .eq('installation_id', latestManifest.installation_id)
+      .gte('quote_time', new Date(Date.now() - 5_000).toISOString())
+      .order('quote_time', { ascending: false }).limit(500) : null;
+    if (quoteQuery && account?.broker) quoteQuery = quoteQuery.eq('broker', account.broker);
+    if (quoteQuery && account?.server) quoteQuery = quoteQuery.eq('server', account.server);
+    const quoteResult = quoteQuery ? await quoteQuery : { data: [], error: null };
+    if (quoteResult.error) throw quoteResult.error;
+    const fxEdges = new Map<string, Array<{ to: string; rate: number; symbol: string; quoteAt: string }>>();
+    for (const quote of quoteResult.data ?? []) {
+      const symbol = String(quote.symbol ?? '').toUpperCase();
+      const pairMatch = symbol.match(/^([A-Z]{6})/);
+      const bid = Number(quote.bid), ask = Number(quote.ask);
+      const quoteAt = Date.parse(String(quote.quote_time));
+      if (!pairMatch || !Number.isFinite(bid) || !Number.isFinite(ask) || bid <= 0 || ask < bid
+        || !Number.isFinite(quoteAt) || Date.now() - quoteAt < 0 || Date.now() - quoteAt > 5_000) continue;
+      const pair = pairMatch[1], base = pair.slice(0, 3), quoteCode = pair.slice(3);
+      if (base === quoteCode) continue;
+      const mid = (bid + ask) / 2;
+      const baseEdges = fxEdges.get(base) ?? [];
+      baseEdges.push({ to: quoteCode, rate: mid, symbol, quoteAt: String(quote.quote_time) });
+      fxEdges.set(base, baseEdges);
+      const quoteEdges = fxEdges.get(quoteCode) ?? [];
+      quoteEdges.push({ to: base, rate: 1 / mid, symbol, quoteAt: String(quote.quote_time) });
+      fxEdges.set(quoteCode, quoteEdges);
+    }
+    const convertCurrency = (from: string, to: string): { rate: number; path: string[] } | null => {
+      if (from === to) return { rate: 1, path: [from] };
+      const queue: Array<{ currency: string; rate: number; path: string[] }> = [{ currency: from, rate: 1, path: [from] }];
+      const visited = new Set([from]);
+      while (queue.length) {
+        const current = queue.shift()!;
+        for (const edge of fxEdges.get(current.currency) ?? []) {
+          if (visited.has(edge.to)) continue;
+          const next = { currency: edge.to, rate: current.rate * edge.rate, path: [...current.path, edge.to] };
+          if (edge.to === to) return { rate: next.rate, path: next.path };
+          visited.add(edge.to);
+          queue.push(next);
+        }
+      }
+      return null;
+    };
+    const accountCurrencyExposure = accountFresh && accountCurrency && completePositionSnapshot
+      ? currencyExposure.map((item) => {
+        const conversion = convertCurrency(item.currency, accountCurrency);
+        return {
+          ...item,
+          account_currency: accountCurrency,
+          net_account_currency: conversion ? item.net_units * conversion.rate : null,
+          gross_account_currency: conversion ? item.gross_units * conversion.rate : null,
+          conversion_path: conversion?.path ?? null,
+          conversion_verified: Boolean(conversion),
+        };
+      }) : null;
+    const conversionComplete = Boolean(accountCurrencyExposure?.every((item) => item.conversion_verified));
+    const grossAccountCurrency = conversionComplete
+      ? accountCurrencyExposure!.reduce((sum, item) => sum + Number(item.gross_account_currency ?? 0), 0) : null;
+    const netAccountCurrency = conversionComplete
+      ? accountCurrencyExposure!.reduce((sum, item) => sum + Number(item.net_account_currency ?? 0), 0) : null;
+    const onePercentParallelShock = conversionComplete && accountCurrencyExposure
+      ? accountCurrencyExposure.reduce((sum, item) => sum + Math.abs(Number(item.net_account_currency ?? 0)) * 0.01, 0) : null;
     const modelRows = models.data ?? [];
 
     return NextResponse.json({
@@ -120,6 +195,17 @@ export async function GET(request: Request) {
         floating_profit: completePositionSnapshot ? latestSnapshotRows.reduce((sum, row) => sum + Number(row.profit_account_currency ?? 0), 0) : null,
         currency_exposure_units: completePositionSnapshot ? currencyExposure : null,
         exposure_unresolved_symbols: completePositionSnapshot ? unresolvedExposure : null,
+        account_currency: accountCurrency,
+        account_snapshot_age_seconds: accountAgeSeconds,
+        account_currency_conversion_complete: conversionComplete,
+        account_currency_exposure: accountCurrencyExposure,
+        gross_exposure_account_currency: grossAccountCurrency,
+        net_exposure_account_currency: netAccountCurrency,
+        one_percent_parallel_currency_shock_estimate: onePercentParallelShock,
+        conversion_quote_max_age_seconds: 5,
+        conversion_status: !accountFresh ? 'ACCOUNT_SNAPSHOT_MISSING_OR_STALE'
+          : !completePositionSnapshot ? 'POSITION_SNAPSHOT_INCOMPLETE'
+            : conversionComplete ? 'BROKER_QUOTE_CONVERSION_COMPLETE' : 'MISSING_FX_CROSS_RATES',
         exposure_basis: 'Native currency units derived from broker contract size and entry price; not converted into account-currency risk.',
         status: !completePositionSnapshot ? 'AWAITING_COMPLETE_MT5_POSITION_SNAPSHOT'
           : positionFresh ? 'SNAPSHOT_CAPTURED' : 'STALE_POSITION_SNAPSHOT',
