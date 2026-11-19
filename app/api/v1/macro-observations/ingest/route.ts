@@ -41,7 +41,7 @@ export async function POST(request: Request) {
   }
 
   const asOf = new Date(payload.as_of);
-  if (!Number.isFinite(asOf.getTime()) || !/(Z|[+-]\\d{2}:?\\d{2})$/i.test(payload.as_of)
+  if (!Number.isFinite(asOf.getTime()) || !/(Z|[+-]\d{2}:?\d{2})$/i.test(payload.as_of)
     || asOf.getTime() > Date.now() + 30_000 || asOf.getTime() < Date.now() - 24 * 60 * 60_000) {
     return NextResponse.json({ error: 'as_of must be a recent timezone-aware UTC timestamp.' }, { status: 400 });
   }
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     if (!isRecord(raw) || typeof raw.provider !== 'string' || !PROVIDERS.has(raw.provider.toUpperCase())
       || typeof raw.series_id !== 'string' || raw.series_id.length < 1 || raw.series_id.length > 160
       || typeof raw.region_code !== 'string' || !/^[A-Z0-9_-]{2,12}$/i.test(raw.region_code)
-      || typeof raw.observation_period !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(raw.observation_period)
+      || typeof raw.observation_period !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(raw.observation_period)
       || typeof raw.value !== 'number' || !Number.isFinite(raw.value)
       || typeof raw.observation_at !== 'string' || typeof raw.released_at !== 'string'
       || typeof raw.retrieved_at !== 'string'
@@ -112,7 +112,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       accepted: true,
       submitted: rows.length,
-      stored_or_previously_seen: rows.length,
+      idempotent_by_source_hash: true,
       as_of_utc: asOf.toISOString(),
       received_at_utc: new Date().toISOString(),
       point_in_time_checked: true,
