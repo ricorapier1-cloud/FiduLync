@@ -1,5 +1,8 @@
 # FiduLync Institutional Platform — Refinement & Release Specification
 
+> **Historical specification notice (2026-11-19):** This document records earlier commercial-platform architecture and is retained for audit/history only. It is not the active product scope. FiduLync now operates as a private, personal, non-commercial quantitative research and MT5 supervision workspace. The binding current scope is documented in README.md, docs/PERSONAL_QUANT_EDITION_ARCHITECTURE.md and docs/PRODUCTION_LAUNCH_CHECKLIST.md. Checkout, Paystack, customer licensing, subscriptions, escrow and public marketplace features are retired; do not re-enable them for the personal edition.
+
+
 **Scope:** FiduLync platform, MacroLync market intelligence, AlgoLync EA licensing and owner operations.  
 **Architecture target:** Next.js App Router / React 19 / Tailwind CSS 4, Supabase PostgreSQL/Auth, Vercel, Paystack and MT5/MQL5.  
 **Status:** Implementation candidate on feat/personal-quant-edition; not a production certification.
