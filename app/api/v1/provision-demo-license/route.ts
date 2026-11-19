@@ -15,10 +15,11 @@ export async function POST(req: Request) {
   const rate = await enforceDistributedRateLimit(req, 'provision-demo-license', 5, 60 * 60_000);
   if (rate.unavailable) return NextResponse.json({ success: false, error: 'Demo provisioning is temporarily unavailable.' }, { status: 503 });
   if (!rate.allowed) return NextResponse.json({ success: false, error: 'Demo request limit reached. Try again later.' }, { status: 429 });
+  if (Number(req.headers.get('content-length') ?? 0) > 8192) return NextResponse.json({ success: false, error: 'Request body exceeds 8 KB.' }, { status: 413 });
   if (!isSupabaseConfigured()) return NextResponse.json({ success: false, error: 'License database is not configured.' }, { status: 503 });
 
   try {
-    const raw: unknown = await req.json();
+    let raw: unknown;\n    try { raw = await req.json(); } catch { return NextResponse.json({ success: false, error: 'A valid JSON request is required.' }, { status: 400 }); }
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
       return NextResponse.json({ success: false, error: 'A valid JSON object is required.' }, { status: 400 });
     }
