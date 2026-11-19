@@ -38,6 +38,7 @@ Set server-side values in `.env.local` or the deployment secret manager:
 | `FINNHUB_API_KEY` | Optional FX quotes and economic calendar; not called until commercial-use approval is recorded |
 | `FINNHUB_COMMERCIAL_USE_APPROVED` | Must be `true` only after written permission covers the intended quote/calendar display and caching |
 | `FRANKFURTER_COMMERCIAL_USE_APPROVED` / `EXCHANGERATE_API_COMMERCIAL_USE_APPROVED` / `GOLD_API_COMMERCIAL_USE_APPROVED` | Keep `false` until each reference provider's commercial-use and attribution terms are approved |
+| `ALPHA_VANTAGE_COMMERCIAL_USE_APPROVED` / `FMP_COMMERCIAL_USE_APPROVED` / `FAIRECONOMY_COMMERCIAL_USE_APPROVED` | Keep `false` until the specific provider rights and attribution are documented |
 | `FRED_API_KEY` | Optional; disabled unless separately approved for the intended commercial use and data handling |
 | `FRED_COMMERCIAL_USE_APPROVED` | Must remain `false` unless written permission covers the exact use, display, storage and caching |
 | `BEA_API_KEY` / `BLS_API_KEY` | Diagnostic credentials only; full adapters are not yet integrated |
@@ -53,6 +54,7 @@ Set server-side values in `.env.local` or the deployment secret manager:
 | `MARKET_DATA_PROVIDER_URL` | HTTPS candle endpoint accepting `pair` and `timeframe=H1|H4` |
 | `MARKET_DATA_PROVIDER_TOKEN` | Optional bearer token for the candle provider |
 | `MARKET_DATA_PROVIDER_LICENSE_APPROVED` | Must be `true` only after display, derived-data and redistribution rights are documented |
+| `OWNER_EMAIL` | Exact owner email accepted by the owner-auth guard; owner login itself is email/password only |
 | `NEXT_PUBLIC_APP_URL` | Canonical HTTP(S) origin for metadata and signal bridge display |
 | `CRON_SECRET` | Bearer secret for the scheduled macro snapshot refresh |
 
@@ -81,7 +83,7 @@ Use a long, unique random value for `ALGOLYNC_PRIVATE_KEY` (or the accepted lega
 }
 ```
 
-Send `x-algo-key: <ALGOLYNC_PRIVATE_KEY>` on signal requests. An optional `?key=` query parameter is supported for WebRequest clients; prefer the header to avoid exposing credentials in URLs and access logs. The same-origin `/research` Quant Lab signal preview uses browser same-origin request metadata and never receives the private EA key. `/store` is the canonical AlgoLync storefront; `/licensing` redirects to it. The calendar uses FairEconomy/ForexFactory weekly JSON first, then configured Finnhub or FMP calendars, and finally curated reference events. Every high-impact event mapped to either pair currency blocks signals from 30 minutes before through 30 minutes after its scheduled UTC time. The macro layer contributes 60% of confluence; H1/H4 technical confluence contributes 40%. Signals remain neutral unless both `abs(csi_spread) >= 60` and `abs(confluence_score) >= 45`. `killzone_active` is `LONDON_OPEN`, `NY_OVERLAP`, `ASIAN_RANGE`, or `OFF_SESSION`. `max_risk_pct` and `risk_multiplier` are position-sizing multipliers: 0.50% maximum in trending expansion, 0.25% maximum in mean reversion, and 0% during high-volatility chop, news lockout, or any failed validation gate. Missing or stale technical inputs, a fallback-only macro snapshot, a news lockout, or a high-volatility chop regime disables trading.
+Send `x-algo-key: <ALGOLYNC_PRIVATE_KEY>` on signal requests. An optional `?key=` query parameter is supported for WebRequest clients; prefer the header to avoid exposing credentials in URLs and access logs. The same-origin `/research` Quant Lab signal preview uses browser same-origin request metadata and never receives the private EA key. `/store` is the canonical AlgoLync storefront; `/licensing` redirects to it. The economic calendar is provider-only: FairEconomy is called only with explicit commercial-use approval, then approved Finnhub or FMP calendars may be used. There is no curated or synthetic event fallback. Every provider-verified high-impact event mapped to either pair currency blocks signals from 30 minutes before through 30 minutes after its scheduled UTC time. Macro verification remains false unless the required fresh provider macro, COT and calendar inputs are present. The macro layer contributes 60% of confluence; H1/H4 technical confluence contributes 40%. Signals remain neutral unless both `abs(csi_spread) >= 60` and `abs(confluence_score) >= 45`. `killzone_active` is `LONDON_OPEN`, `NY_OVERLAP`, `ASIAN_RANGE`, or `OFF_SESSION`. `max_risk_pct` and `risk_multiplier` are position-sizing multipliers: 0.50% maximum in trending expansion, 0.25% maximum in mean reversion, and 0% during high-volatility chop, news lockout, or any failed validation gate. Missing or stale technical inputs, a fallback-only macro snapshot, a news lockout, or a high-volatility chop regime disables trading.
 
 Live quotes and technical calculations use a 60-second Upstash TTL. Macro snapshots use a 900-second TTL; signals use a 15-second TTL with cache bypass around news-lockout boundaries.
 
@@ -93,11 +95,11 @@ The shipped `public/mql5/MacroLyncBridge.mqh` has optional trailing `license_key
 
 Download [`public/mql5/MacroLyncBridge.mqh`](./public/mql5/MacroLyncBridge.mqh) from `/store`; the displayed source and clipboard action use that exact file. It has no DLL dependencies, uses `char[]` buffers for `WebRequest()` and UTF-8 conversion buffers for JSON, and defaults signal execution to defensive hold on network errors, timeouts, non-200 or empty responses, malformed responses, or news lockout. `LogClosedTrade(...)` sends a validated close record; call it from the EA's `OnTradeTransaction` handler after the EA has determined the trade's realized USD P&amp;L, R multiple, confluence, regime, and UTC close timestamp. Set `#property strict` in the consuming `.mq5` EA; MQL5 ignores program properties placed in `.mqh` include files. Configure MetaTrader 5 **Tools → Options → Expert Advisors → Allow WebRequest for listed URL** with the deployed HTTPS origin.
 
-## Data providers and deployment
+## Data providers, EA release artifacts and deployment
 
-The macro adapter validates upstream policy rates, inflation, COT positioning, and catalysts; live data can be combined with a persisted Supabase snapshot. Provider outages return an empty, untimestamped unavailable state—not fabricated reference policy levels. Snapshots older than 24 hours are rejected. Third-party quote/reference feeds are disabled until their specific commercial-use approvals are configured; MT5 broker quotes are sourced only after the Windows publisher connects. The CFTC adapter calculates non-commercial net-position percentiles. Candle provider responses must contain at least 200 chronologically valid candles per requested timeframe for EMA alignment and technical calculations.
+The macro adapter validates upstream policy rates, inflation, COT positioning, and catalysts; live data can be combined with a persisted Supabase snapshot. Provider outages return an empty, untimestamped unavailable state—not fabricated reference policy levels. Snapshots older than 24 hours are rejected. Third-party quote/reference feeds are disabled until their specific commercial-use approvals are configured; MT5 broker quotes are sourced only after the Windows publisher connects. The store no longer displays illustrative win rates, Sharpe ratios, profit factors, drawdowns or equity curves. The CFTC adapter calculates non-commercial net-position percentiles. Candle provider responses must contain at least 200 chronologically valid candles per requested timeframe for EMA alignment and technical calculations.
 
-The scheduled `/api/cron/sync-macro` route uses `CRON_SECRET`. Upstash provides shared EA heartbeat telemetry; when not configured, the dashboard reports process-local fallback storage.
+The scheduled `/api/cron/sync-macro` route uses `CRON_SECRET`. Upstash is used for shared transient cache/legacy heartbeat state; process-local fallback is ephemeral and must never be treated as durable verified telemetry. Durable licensed account and closed-trade records are stored in Supabase.
 
 Historical Supabase migrations are retained for auditability. The Personal Quant owner console uses owner-only email-and-password authentication; email is used only for password recovery. Licensed customer heartbeat and closed-trade telemetry are persisted in Supabase and do not fall back to process-local storage. Escrow is excluded from active workflows; historical financial records remain protected for audit and server-side retention. Legacy store, checkout and EA licensing routes remain separate from the personal quant supervisor.
 
@@ -118,3 +120,10 @@ Trading involves substantial risk. Signals are research and execution inputs, no
 ## Institutional hardening standard
 
 See [Institutional Platform Hardening Standard](docs/INSTITUTIONAL_PLATFORM_HARDENING_SPEC.md) for the security, licensing, navigation, disclosure and release gates.
+
+
+## Compiled EA release workflow
+
+The three catalogue products currently have no approved compiled .ex5 release artifact. Paid checkout, demo-license issuance, paid license provisioning and license validation are therefore blocked, even though the catalogue rows remain active. The owner console includes a Release governance uploader: it creates a short-lived signed Supabase Storage upload URL, uploads the .ex5 directly to the private bucket, registers SHA-256/version/size metadata with an audit event, and requires explicit owner approval. Approval re-downloads the private object and verifies its actual bytes against the recorded SHA-256. The workflow does not certify MetaEditor build quality or strategy performance; those still require Windows MetaEditor, Strategy Tester and demo-account validation.
+
+Place actual commercial .mq5 sources under MQL5/Experts/Release/ and run scripts/compile_mt5.ps1 with -RequireProductSources when the laptop is available. No placeholder commercial EA source is included.
