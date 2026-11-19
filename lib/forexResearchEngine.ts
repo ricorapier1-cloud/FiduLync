@@ -159,7 +159,9 @@ export function assessFxDrivers(
   const technicalValues = [technical.trendZ, technical.structureZ];
   const technicalValid = technical.closedBarVerified
     && technicalValues.every((value) => value !== null && Number.isFinite(value))
-    && technical.volatilityPercentile !== null && Number.isFinite(technical.volatilityPercentile)\n    && technical.volatilityPercentile >= 0 && technical.volatilityPercentile <= 1\n    && technical.spreadToAtr !== null && Number.isFinite(technical.spreadToAtr) && technical.spreadToAtr >= 0;
+    && technical.volatilityPercentile !== null && Number.isFinite(technical.volatilityPercentile)
+    && technical.volatilityPercentile >= 0 && technical.volatilityPercentile <= 1
+    && technical.spreadToAtr !== null && Number.isFinite(technical.spreadToAtr) && technical.spreadToAtr >= 0;
   const technicalScore = technicalValid
     ? clamp(((technical.trendZ! * 0.55) + (technical.structureZ! * 0.45)) * 20, -100, 100)
     : null;
