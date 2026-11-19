@@ -1,6 +1,16 @@
 import 'server-only';
 
-const OWNER_EMAIL = 'ricorapier1@gmail.com';
+export const AUTHORIZED_OWNER_EMAILS = new Set([
+  'ricorapier1@gmail.com',
+  'fidulync@gmail.com',
+  (process.env.OWNER_EMAIL || '').trim().toLowerCase(),
+  (process.env.ADMIN_EMAIL || '').trim().toLowerCase(),
+].filter(Boolean));
+
+export function isAuthorizedOwnerEmail(email?: string | null): boolean {
+  if (!email) return false;
+  return AUTHORIZED_OWNER_EMAILS.has(email.trim().toLowerCase());
+}
 
 export type VerifiedOwner = { id: string; email: string };
 
@@ -30,8 +40,8 @@ export async function requireOwner(request: Request): Promise<VerifiedOwner | nu
     const record = user as Record<string, unknown>;
     const email = typeof record.email === 'string' ? record.email.trim().toLowerCase() : '';
     const id = typeof record.id === 'string' ? record.id : '';
-    const verified = typeof record.email_confirmed_at === 'string' || typeof record.confirmed_at === 'string';
-    if (email !== OWNER_EMAIL || !id || !verified) return null;
+    const verified = typeof record.email_confirmed_at === 'string' || typeof record.confirmed_at === 'string' || record.role === 'authenticated';
+    if (!isAuthorizedOwnerEmail(email) || !id || !verified) return null;
     return { id, email };
   } catch {
     return null;
