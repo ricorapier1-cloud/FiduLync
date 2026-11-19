@@ -25,6 +25,16 @@ Do not change these flags to true just to force an approval. They require indepe
 6. Do not attach the probe until a Vercel deployment containing the latest supervisor, ingestion, and risk-streak changes has been created and verified. The existing production deployment has not been updated. The last READY preview is an earlier branch commit; newer source changes are not yet deployed because Vercel is currently returning a build-rate-limit status. When a new verified deployment is available, set `InpFiduLyncBaseUrl` to that exact deployment URL. If the broker uses suffixes, set `InpCanonicalSymbol` to the matching canonical publisher symbol (for example, `EURUSD` for chart symbol `EURUSD.a`). Compile the probe in MetaEditor. In MT5, open Tools → Options → Expert Advisors and add `https://fidulync.vercel.app` to the allowed WebRequest URLs.
 7. Attach the probe to a demo-account chart. Enter the installation ID and publisher token in its inputs. Review the Experts log and confirm that unavailable/stale data produces a non-approval decision.
 
+## Automated local compile preparation
+
+The repository now includes `MQL5/Experts/FiduLync_Integration_Compile_Check.mq5` and `scripts/compile_mt5.ps1`. From the repository root on Windows, run:
+
+```powershell
+.\scripts\compile_mt5.ps1 -MetaEditorPath "C:\Path\To\metaeditor64.exe"
+```
+
+The script compiles both the no-trade supervisor probe and a compile-only fixture that includes both MQL5 modules. It requires MetaEditor's log to report zero errors and zero warnings and verifies that each EX5 output exists. Full laptop steps are in [`REMOTE_COMPLETION_AND_LAPTOP_HANDOFF.md`](./REMOTE_COMPLETION_AND_LAPTOP_HANDOFF.md).
+
 ## Operational and validation limitations
 
 - The account-risk anchor starts from the first trusted snapshot received after this migration. It is not a reconstruction of earlier historical drawdown.
