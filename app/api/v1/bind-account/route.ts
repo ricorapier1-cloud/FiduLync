@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic';
 type LicenseRecord = {
   license_key: string;
   status: string | null;
+  tier: string | null;
   expires_at: string | null;
   ea_slug: string | null;
   included_live_seats: number | null;
@@ -41,7 +42,7 @@ function validLicenseKey(value: string): boolean {
 
 async function readLicense(licenseKey: string): Promise<LicenseRecord | null> {
   const rows = await supabaseRead<LicenseRecord[]>('licenses',
-    `license_key=eq.${encodeURIComponent(licenseKey)}&select=license_key,status,expires_at,ea_slug,included_live_seats,included_demo_seats,extra_live_seats`);
+    `license_key=eq.${encodeURIComponent(licenseKey)}&select=license_key,status,tier,expires_at,ea_slug,included_live_seats,included_demo_seats,extra_live_seats`);
   if (!rows) throw new Error('License database unavailable.');
   return rows[0] ?? null;
 }
@@ -121,6 +122,7 @@ export async function POST(req: Request) {
     if (String(license.status || '').toLowerCase() !== 'active'
       || (license.expires_at && new Date(license.expires_at).getTime() <= Date.now())
       || !license.ea_slug) return json({ success: false, error: 'License is inactive, expired, or missing product entitlement.' }, 403);
+    if (license.tier === 'DEMO_14D' && accountType !== 'DEMO') return json({ success: false, error: 'Demo entitlements cannot be bound to live accounts.' }, 403);
 
     const result = await supabaseQuery<BindResult>('rpc/bind_algolync_seat', {
       method: 'POST',
