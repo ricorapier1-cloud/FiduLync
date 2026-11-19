@@ -1,41 +1,60 @@
 import { NextResponse } from 'next/server';
-import crypto from 'node:crypto';
+import { randomBytes, randomInt } from 'node:crypto';
 import { isSupabaseConfigured, persistLicense } from '@/lib/supabaseAdmin';
-import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { enforceDistributedRateLimit } from '@/lib/rateLimit';
+import { getEaBySlug } from '@/lib/eaCatalog';
 
 export const dynamic = 'force-dynamic';
 
+type DemoRequest = {
+  ea_slug?: unknown;
+  email?: unknown;
+  mt5_account?: unknown;
+};
+
 export async function POST(req: Request) {
-  const ip = getClientIp(req);
-  if (!checkRateLimit(ip, 20)) {
-    return NextResponse.json({ error: 'Too many requests. Please try again later.' }, { status: 429 });
-  }
+  const rate = await enforceDistributedRateLimit(req, 'provision-demo-license', 5, 60 * 60_000);
+  if (rate.unavailable) return NextResponse.json({ success: false, error: 'Demo provisioning is temporarily unavailable.' }, { status: 503 });
+  if (!rate.allowed) return NextResponse.json({ success: false, error: 'Demo request limit reached. Try again later.' }, { status: 429 });
+  if (!isSupabaseConfigured()) return NextResponse.json({ success: false, error: 'License database is not configured.' }, { status: 503 });
 
   try {
-    const body = await req.json();
-    const eaSlug = String(body.ea_slug || 'generic').trim();
-    const email = String(body.email || '').trim().toLowerCase();
-    const mt5Account = Number(body.mt5_account) || Math.floor(1000000 + Math.random() * 9000000);
-
-    if (!email) {
-      return NextResponse.json({ error: 'Valid email address is required to provision demo license.' }, { status: 400 });
+    const raw: unknown = await req.json();
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return NextResponse.json({ success: false, error: 'A valid JSON object is required.' }, { status: 400 });
+    }
+    const body = raw as DemoRequest;
+    const eaSlug = typeof body.ea_slug === 'string' ? body.ea_slug.trim().toLowerCase() : 'eridam-nexus-pro';
+    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+    const ea = getEaBySlug(eaSlug);
+    if (!ea || ea.tierCategory === 'SANDBOX') return NextResponse.json({ success: false, error: 'Select an eligible AlgoLync EA product.' }, { status: 400 });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+      return NextResponse.json({ success: false, error: 'A valid email address is required.' }, { status: 400 });
     }
 
-    const randomSuffix = crypto.randomBytes(3).toString('hex').toUpperCase();
-    const cleanSlug = eaSlug.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase();
+    const accountRaw = body.mt5_account;
+    const mt5Account = accountRaw === undefined || accountRaw === null || accountRaw === ''
+      ? null : typeof accountRaw === 'number' ? accountRaw
+      : typeof accountRaw === 'string' && /^\d{1,20}$/.test(accountRaw) ? Number(accountRaw) : NaN;
+    if (mt5Account !== null && (!Number.isSafeInteger(mt5Account) || mt5Account <= 0)) {
+      return NextResponse.json({ success: false, error: 'mt5_account must be a valid positive integer when supplied.' }, { status: 400 });
+    }
+
+    const randomSuffix = randomBytes(8).toString('hex').toUpperCase();
+    const cleanSlug = eaSlug.replace(/[^a-z0-9]/g, '').slice(0, 10).toUpperCase();
     const licenseKey = `ALGO-DEMO-${cleanSlug}-${randomSuffix}`;
-    const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(); // 14-day demo
+    const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
 
-    if (isSupabaseConfigured()) {
-      await persistLicense({
-        license_key: licenseKey,
-        mt5_account: mt5Account,
-        email,
-        tier: 'DEMO_14D',
-        status: 'ACTIVE',
-        expires_at: expiresAt,
-      });
-    }
+    const persisted = await persistLicense({
+      license_key: licenseKey,
+      mt5_account: mt5Account,
+      email,
+      tier: 'DEMO_14D',
+      status: 'active',
+      expires_at: expiresAt,
+      ea_slug: eaSlug,
+    });
+    if (!persisted) throw new Error('License persistence did not return a database result.');
 
     return NextResponse.json({
       success: true,
@@ -44,9 +63,12 @@ export async function POST(req: Request) {
       account_type: 'DEMO',
       mt5_account: mt5Account,
       expires_at: expiresAt,
-      message: 'Demo license successfully provisioned. 1 Live + 2 Demo accounts entitlement active.',
-    });
-  } catch (err: unknown) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : 'Failed to provision demo license' }, { status: 500 });
+      included_live_seats: 1,
+      included_demo_seats: 2,
+      message: '14-day demo entitlement provisioned and persisted.',
+    }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
+  } catch (error) {
+    console.error('Demo license provisioning failed:', error instanceof Error ? error.message : String(error));
+    return NextResponse.json({ success: false, error: 'Demo license could not be provisioned. Retry shortly.' }, { status: 503 });
   }
 }
