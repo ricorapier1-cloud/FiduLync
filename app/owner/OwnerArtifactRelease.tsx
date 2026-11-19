@@ -65,24 +65,28 @@ export default function OwnerArtifactRelease({ accessToken }: { accessToken: str
         body: JSON.stringify(metadata),
         cache: 'no-store',
       });
-      const signedPayload = await signedResponse.json() as { upload_url?: string; error?: string };
-      if (!signedResponse.ok || !signedPayload.upload_url) throw new Error(signedPayload.error || 'A private upload URL could not be created.');
-      const uploaded = await fetch(signedPayload.upload_url, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/octet-stream' },
-        body: file,
-        cache: 'no-store',
-      });
-      if (!uploaded.ok && uploaded.status !== 400 && uploaded.status !== 409) throw new Error('Supabase Storage rejected the .ex5 upload. If this exact SHA-256 was uploaded earlier, registration will verify the existing object next.');
+      const signedPayload = await signedResponse.json() as { upload_url?: string; already_exists?: boolean; error?: string };
+      if (!signedResponse.ok && signedPayload.already_exists !== true) throw new Error(signedPayload.error || 'A private upload URL could not be created.');
+      if (signedPayload.upload_url) {
+        const uploaded = await fetch(signedPayload.upload_url, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: file,
+          cache: 'no-store',
+        });
+        if (!uploaded.ok && uploaded.status !== 400 && uploaded.status !== 409) throw new Error('Supabase Storage rejected the .ex5 upload.');
+      } else if (signedPayload.already_exists !== true) {
+        throw new Error('Supabase did not return a valid signed upload or existing-object status.');
+      }
       const response = await fetch('/api/owner/artifacts/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + accessToken },
         body: JSON.stringify(metadata),
         cache: 'no-store',
       });
-      const payload = await response.json() as { uploaded?: boolean; sha256?: string; error?: string };
+      const payload = await response.json() as { uploaded?: boolean; sha256?: string; release_approved?: boolean; error?: string };
       if (!response.ok || payload.uploaded !== true) throw new Error(payload.error || 'Artifact registration failed.');
-      setNotice('Private artifact uploaded. SHA-256: ' + sha256 + '. It is NOT approved for sale yet.');
+      setNotice(payload.release_approved === true ? 'The identical artifact is already registered and remains approved. SHA-256: ' + sha256 : 'Private artifact uploaded. SHA-256: ' + sha256 + '. It is NOT approved for sale yet.');
       setFile(null);
       const picker = document.getElementById('owner-ex5-file') as HTMLInputElement | null;
       if (picker) picker.value = '';
