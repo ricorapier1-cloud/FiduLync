@@ -10,7 +10,7 @@ const links = [
   { href: '/', label: 'MacroLync', icon: 'shield' },
   { href: '/risk', label: 'Risk Planner', icon: 'gauge' },
   { href: '/research', label: 'Quant Lab', icon: 'chart' },
-  { href: '/store', label: 'EA Lab', icon: 'chart' },
+  { href: '/fleet', label: 'EA Fleet', icon: 'chart' },
 
   { href: '/analytics', label: 'Performance', icon: 'activity' },
   { href: '/faq', label: 'Help', icon: 'activity' },
@@ -21,7 +21,7 @@ const mobileLinks = [
   { href: '/', label: 'Terminal', icon: 'shield' },
   { href: '/risk', label: 'Risk', icon: 'gauge' },
   { href: '/research', label: 'Quant Lab', icon: 'chart' },
-  { href: '/store', label: 'EA Lab', icon: 'chart' },
+  { href: '/fleet', label: 'EA Fleet', icon: 'chart' },
 ] as const satisfies readonly { href: string; label: string; icon: BrandGlyphName }[];
 
 const macroLinks = [
@@ -31,7 +31,7 @@ const macroLinks = [
   { href: '#positioning', label: 'Positioning', icon: 'radio' },
   { href: '/risk', label: 'Risk planner', icon: 'gauge' },
   { href: '/research', label: 'Quant Lab', icon: 'chart' },
-  { href: '/store', label: 'EA Lab', icon: 'chart' },
+  { href: '/fleet', label: 'EA Fleet', icon: 'chart' },
   { href: '/analytics', label: 'Performance', icon: 'activity' },
 ] as const satisfies readonly { href: string; label: string; icon: BrandGlyphName }[];
 
@@ -66,8 +66,8 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
           </nav>
 
           <div className="topbar-actions">
-            <Link className="secure-pill" href={isHome ? '/store' : '/' }>
-              <span className="secure-dot" /> {isHome ? 'EA Lab' : 'Macro terminal'}
+            <Link className="secure-pill" href={isHome ? '/fleet' : '/' }>
+              <span className="secure-dot" /> {isHome ? 'EA Fleet' : 'Macro terminal'}
             </Link>
             <button
               type="button"
