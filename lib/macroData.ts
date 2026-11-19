@@ -24,26 +24,15 @@ export const EMPTY_SNAPSHOT: MacroSnapshot = {
 };
 
 export function getFallbackSnapshot(): MacroSnapshot {
+  // An unavailable provider must never be replaced with invented or stale levels.
+  // Empty observations and an empty timestamp force downstream consumers to abstain.
   return {
-    asOf: new Date().toISOString(),
+    asOf: '',
     source: 'fallback',
     cotSource: 'unavailable',
     calendarSource: 'reference',
-    currencies: [
-      { code: 'USD', centralBank: 'Federal Reserve', policyRate: 3.75, inflation: 2.8, twoYearYield: 4, twoYearYieldSource: 'reference', inflationLabel: 'Core PCE', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Restrictive' },
-      { code: 'EUR', centralBank: 'European Central Bank', policyRate: 2.15, inflation: 2.1, inflationLabel: 'HICP', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Neutral' },
-      { code: 'GBP', centralBank: 'Bank of England', policyRate: 4, inflation: 2.8, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Cautious' },
-      { code: 'JPY', centralBank: 'Bank of Japan', policyRate: 0.5, inflation: 3, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Normalising' },
-      { code: 'AUD', centralBank: 'Reserve Bank of Australia', policyRate: 3.6, inflation: 3.4, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Restrictive' },
-      { code: 'CHF', centralBank: 'Swiss National Bank', policyRate: 0, inflation: 0.2, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Accommodative' },
-      { code: 'CAD', centralBank: 'Bank of Canada', policyRate: 2.25, inflation: 2.4, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Neutral' },
-      { code: 'NZD', centralBank: 'Reserve Bank of New Zealand', policyRate: 2.5, inflation: 2.7, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Neutral' },
-      { code: 'SEK', centralBank: 'Sveriges Riksbank', policyRate: 1.75, inflation: 1.8, inflationLabel: 'CPIF', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Neutral' },
-      { code: 'NOK', centralBank: 'Norges Bank', policyRate: 4, inflation: 2.4, inflationLabel: 'CPI-ATE', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Restrictive' },
-      { code: 'XAU', centralBank: 'Global Reserve Asset', policyRate: 0.0, inflation: 0.0, twoYearYield: 0.0, twoYearYieldSource: 'reference', inflationLabel: 'Real Yield Proxy', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Sovereign Hedge' },
-    ],
+    currencies: [],
     cot: [],
-    // No fabricated or stale economic events in reference/offline mode.
     catalysts: [],
   };
 }
