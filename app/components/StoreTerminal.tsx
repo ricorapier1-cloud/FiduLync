@@ -120,7 +120,7 @@ export default function StoreTerminal({ initialSnapshot, session }: StoreTermina
             </div>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Private EA research &amp; supervision</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-              Research signal diagnostics, personal EA source files, MT5 data publishing and risk supervision. The central app never places broker orders.
+              Research signal diagnostics, personal EA source files, MT5 data publishing and risk supervision. The app does not place broker orders.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
