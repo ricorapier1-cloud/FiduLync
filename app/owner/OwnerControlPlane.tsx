@@ -27,6 +27,7 @@ export default function OwnerControlPlane({accessToken}:Props) {
  const [error,setError]=useState('');
  const [query,setQuery]=useState('');
  const [copied,setCopied]=useState('');
+ const [revokingId,setRevokingId]=useState<string|null>(null);
  const refresh=useCallback(async()=>{
   setLoading(true); setError('');
   try {
@@ -47,6 +48,25 @@ export default function OwnerControlPlane({accessToken}:Props) {
  async function copy(value:string) {
   try { await navigator.clipboard.writeText(value); setCopied(value); }
   catch { setError('Clipboard access was blocked by this browser.'); }
+ }
+ async function revokeLicense(license: License) {
+  const reason = window.prompt('Enter the reason for revoking this licence (5–500 characters):');
+  if (!reason || reason.trim().length < 5) return;
+  if (!window.confirm('Permanently revoke this licence now? This action is audited and the customer terminal will fail validation.')) return;
+  setRevokingId(license.id); setError('');
+  try {
+   const response = await fetch('/api/owner/licenses', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + accessToken },
+    body: JSON.stringify({ license_id: license.id, reason: reason.trim(), confirm: true }),
+   });
+   const result = await response.json() as { error?: string; message?: string };
+   if (!response.ok) throw new Error(result.error || 'Licence revocation failed.');
+   setCopied('');
+   await refresh();
+  } catch (err) {
+   setError(err instanceof Error ? err.message : 'Licence revocation failed.');
+  } finally { setRevokingId(null); }
  }
  return <section className="mb-6 rounded-2xl border border-emerald-300/20 bg-[#080e15] p-4 sm:p-6">
   <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -69,8 +89,8 @@ export default function OwnerControlPlane({accessToken}:Props) {
   </div>}
   {snapshot&&section==='Customers & licenses'&&<div className="mt-5">
    <div className="mb-3 flex flex-col gap-2 sm:flex-row"><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search email, license, MT5 login or payment reference" className="min-h-10 flex-1 rounded-lg border border-white/10 bg-black/20 px-3 text-xs text-white outline-none focus:border-emerald-300/40"/><span className="self-center text-[10px] text-slate-500">{filtered.length} records shown · maximum 100</span></div>
-   <div className="overflow-x-auto rounded-xl border border-white/[0.08]"><table className="w-full min-w-[820px] text-left text-[11px]"><thead className="bg-white/[0.04] text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="p-3">Customer / key</th><th className="p-3">Plan</th><th className="p-3">MT5 login</th><th className="p-3">Status</th><th className="p-3">Payment reference</th><th className="p-3">Expiry</th></tr></thead><tbody>{filtered.map(x=><tr key={x.id} className="border-t border-white/[0.06]"><td className="p-3"><div className="text-slate-200">{x.email}</div><button onClick={()=>void copy(x.license_key)} className="mt-1 font-mono text-[10px] text-emerald-200 hover:underline">{x.license_key} · {copied===x.license_key?'Copied':'Copy key'}</button></td><td className="p-3 text-slate-300">{x.tier}</td><td className="p-3 text-slate-300">{x.mt5_account??'Unbound'}</td><td className="p-3"><State value={x.status}/></td><td className="p-3 font-mono text-slate-400">{x.payment_reference??'—'}</td><td className="p-3 text-slate-400">{x.expires_at?new Date(x.expires_at).toLocaleDateString():'Lifetime / none'}</td></tr>)}</tbody></table></div>
-   <p className="mt-3 text-[10px] leading-5 text-slate-500">Customer/license administration is intentionally read-only here. Revoke, refund, transfer and entitlement edits require a separate audited, confirmation-based workflow; no silent mutations are exposed.</p>
+   <div className="overflow-x-auto rounded-xl border border-white/[0.08]"><table className="w-full min-w-[820px] text-left text-[11px]"><thead className="bg-white/[0.04] text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="p-3">Customer / key</th><th className="p-3">Plan</th><th className="p-3">MT5 login</th><th className="p-3">Status</th><th className="p-3">Payment reference</th><th className="p-3">Expiry</th><th className="p-3">Admin action</th></tr></thead><tbody>{filtered.map(x=><tr key={x.id} className="border-t border-white/[0.06]"><td className="p-3"><div className="text-slate-200">{x.email}</div><button onClick={()=>void copy(x.license_key)} className="mt-1 font-mono text-[10px] text-emerald-200 hover:underline">{x.license_key} · {copied===x.license_key?'Copied':'Copy key'}</button></td><td className="p-3 text-slate-300">{x.tier}</td><td className="p-3 text-slate-300">{x.mt5_account??'Unbound'}</td><td className="p-3"><State value={x.status}/></td><td className="p-3 font-mono text-slate-400">{x.payment_reference??'—'}</td><td className="p-3 text-slate-400">{x.expires_at?new Date(x.expires_at).toLocaleDateString():'Lifetime / none'}</td><td className="p-3">{x.status.toLowerCase()==='active'?<button type="button" onClick={()=>void revokeLicense(x)} disabled={revokingId===x.id} className="rounded-md border border-rose-300/20 px-2.5 py-1.5 text-[10px] text-rose-200 hover:bg-rose-300/10 disabled:opacity-50">{revokingId===x.id?'Revoking…':'Revoke licence'}</button>:<span className="text-[10px] text-slate-500">No action</span>}</td></tr>)}</tbody></table></div>
+   <p className="mt-3 text-[10px] leading-5 text-slate-500">Licence revocation is available only to the verified owner, requires a reason and explicit confirmation, and is committed with an owner-audit event in one database transaction. Refunds, disputes, transfers and entitlement edits remain separate workflows.</p>
   </div>}
   {snapshot&&section==='Payments'&&<div className="mt-5 space-y-3">
    <Metric label="Provisioned paid licenses" value={snapshot.metrics.paid_entitlements} detail="Each row has a payment reference stored on the license record"/>
