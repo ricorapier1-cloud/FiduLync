@@ -8,6 +8,7 @@ const macroEngine = read('../lib/macroEngine.ts');
 const currencyStrength = read('../lib/currencyStrength.ts');
 const dashboard = read('../app/components/MacroDashboard.tsx');
 const marketFeeds = read('../lib/marketFeeds.ts');
+const technicalEngine = read('../lib/technicalEngine.ts');
 const productRelease = read('../lib/productRelease.ts');
 const checkout = read('../app/api/v1/create-checkout/route.ts');
 const licenseValidation = read('../app/api/v1/validate-license/route.ts');
@@ -110,4 +111,11 @@ test('owner release approval is distinct from upload and laptop compile is prepa
   assert.match(compileScript, /Experts\\Release/);
   assert.match(productReadiness, /enforceDistributedRateLimit/);
   assert.match(readme, /There is no curated or synthetic event fallback/);
+});
+
+test('cached technical candles are rechecked against provider entitlements and bar freshness', () => {
+  assert.match(technicalEngine, /cached\.source === 'configured_provider'.*MARKET_DATA_PROVIDER_LICENSE_APPROVED/);
+  assert.match(technicalEngine, /cached\.source === 'twelve_data'.*TWELVE_DATA_COMMERCIAL_USE_APPROVED/);
+  assert.match(technicalEngine, /closedCandles\.length < 200/);
+  assert.match(technicalEngine, /cached\.source === 'mt5' \|\| candle\.timestamp \+ barSeconds <= nowSeconds/);
 });
