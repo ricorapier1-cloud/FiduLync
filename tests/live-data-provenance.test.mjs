@@ -22,6 +22,8 @@ const artifactUi = read('../app/owner/OwnerArtifactRelease.tsx');
 const compileScript = read('../scripts/compile_mt5.ps1');
 const productReadiness = read('../app/api/v1/product-readiness/route.ts');
 const readme = read('../README.md');
+const artifactMigration = read('../supabase/migrations/20261119133005_ea_artifact_audit_action_types.sql');
+const idempotentArtifactMigration = read('../supabase/migrations/20261119134000_idempotent_ea_artifact_registration.sql');
 
 test('provider outage returns an empty, untimestamped macro fallback', () => {
   const fallback = macroData.match(/export function getFallbackSnapshot\(\): MacroSnapshot \{[\s\S]*?\n\}/)?.[0];
@@ -60,6 +62,8 @@ test('third-party quote feeds require explicit commercial-use approval', () => {
 
 test('paid and demo licensing require a verified private compiled release artifact', () => {
   assert.match(productRelease, /release_approved === true/);
+  assert.match(productRelease, /verifyStoredObjectHash/);
+  assert.match(productRelease, /createHash\('sha256'\)/);
   assert.match(productRelease, /sha256/);
   assert.match(productRelease, /storage\/v1\/object\/sign\/algolync-artifacts/);
   assert.match(checkout, /hasApprovedProductArtifact\(eaSlug\)/);
@@ -81,9 +85,12 @@ test('private EA artifact upload uses owner-only signed Storage URLs and audited
   assert.match(uploadUrlApi, /requireOwner/);
   assert.match(registerApi, /hasPrivateStorageObject/);
   assert.match(registerApi, /record_ea_product_artifact_upload/);
+  assert.match(idempotentArtifactMigration, /release_approved = CASE/);
+  assert.match(artifactMigration, /EA_ARTIFACT_RELEASE_APPROVED/);
   assert.match(artifactUi, /crypto\.subtle\.digest\('SHA-256'/);
   assert.match(artifactUi, /api\/owner\/artifacts\/upload-url/);
   assert.match(artifactUi, /api\/owner\/artifacts\/register/);
+  assert.match(artifactUi, /signedPayload\.already_exists/);
 });
 
 test('owner release approval is distinct from upload and laptop compile is prepared', () => {
