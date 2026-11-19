@@ -126,15 +126,22 @@ export async function GET(request: Request) {
       const quoteCode = pair.slice(3);
       const base = rawMacro.currencies.find((currency) => currency.code === baseCode);
       const quote = rawMacro.currencies.find((currency) => currency.code === quoteCode);
-      const requiresTimestampedPolicy = (currency: NonNullable<typeof quote>) =>
-        !['JPY', 'AUD', 'NZD', 'CHF'].includes(currency.code)
-        || (Boolean(currency.policyRateAsOf) && Number.isFinite(Date.parse(currency.policyRateAsOf!))
-          && Date.now() - Date.parse(currency.policyRateAsOf!) >= -5 * 60_000
-          && Date.now() - Date.parse(currency.policyRateAsOf!) <= 180 * 24 * 60 * 60_000);
+      const requiresTimestampedPolicy = (currency: NonNullable<typeof quote>) => {
+        if (!['JPY', 'AUD', 'NZD', 'CHF'].includes(currency.code)) return true;
+        const observed = currency.policyRateAsOf ? Date.parse(currency.policyRateAsOf) : Number.NaN;
+        const age = Date.now() - observed;
+        return Number.isFinite(observed) && age >= -5 * 60_000 && age <= 180 * 24 * 60 * 60_000;
+      };
+      const requiresFreshInflation = (currency: NonNullable<typeof quote>) => {
+        if (!['JPY', 'AUD', 'NZD', 'CHF'].includes(currency.code)) return true;
+        const observed = currency.inflationAsOf ? Date.parse(currency.inflationAsOf) : Number.NaN;
+        const age = Date.now() - observed;
+        return Number.isFinite(observed) && age >= -5 * 60_000 && age <= 900 * 24 * 60 * 60_000;
+      };
       const policyVerified = Boolean(quote && quote.policyRateSource === 'provider' && quote.inflationSource === 'provider'
-        && requiresTimestampedPolicy(quote)
+        && requiresTimestampedPolicy(quote) && requiresFreshInflation(quote)
         && (pair === 'XAUUSD' || (base && base.policyRateSource === 'provider' && base.inflationSource === 'provider'
-          && requiresTimestampedPolicy(base))));
+          && requiresTimestampedPolicy(base) && requiresFreshInflation(base))));
       const hasComparableYields = base?.twoYearYield !== undefined && quote?.twoYearYield !== undefined;
       const yieldVerified = !hasComparableYields
         || (base?.twoYearYieldSource === 'provider' && quote?.twoYearYieldSource === 'provider');
@@ -150,6 +157,7 @@ export async function GET(request: Request) {
         ...(!macroFresh || rawMacro.source === 'fallback' ? ['MACRO_SNAPSHOT_NOT_FRESH_OR_PROVIDER'] : []),
         ...(!policyVerified ? ['PAIR_POLICY_OR_INFLATION_INPUTS_UNVERIFIED'] : []),
         ...([base, quote].some((currency) => Boolean(currency && ['JPY','AUD','NZD','CHF'].includes(currency.code) && !requiresTimestampedPolicy(currency))) ? ['OFFICIAL_POLICY_OBSERVATION_MISSING_OR_STALE'] : []),
+        ...([base, quote].some((currency) => Boolean(currency && ['JPY','AUD','NZD','CHF'].includes(currency.code) && !requiresFreshInflation(currency))) ? ['INFLATION_OBSERVATION_MISSING_OR_STALE'] : []),
         ...(!yieldVerified ? ['COMPARABLE_TWO_YEAR_YIELDS_UNVERIFIED'] : []),
         ...(!cotFresh ? ['RELEVANT_COT_POSITIONING_MISSING_OR_STALE'] : []),
         ...(!calendarVerified ? ['ECONOMIC_CALENDAR_NOT_PROVIDER_VERIFIED'] : []),
