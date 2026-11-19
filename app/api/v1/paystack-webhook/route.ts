@@ -109,7 +109,7 @@ async function processEvent(eventName: string, data: PaystackData, reference: st
       ? new Date(nextPayment).toISOString()
       : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
     const updated = await patchSubscription(code, {
-      status: 'ACTIVE',
+      status: 'active',
       grace_until: null,
       expires_at: periodEnd,
       period_ends_at: periodEnd,
@@ -130,7 +130,7 @@ async function processEvent(eventName: string, data: PaystackData, reference: st
   if (eventName === 'subscription.disable') {
     const code = subscriptionCode(data);
     if (!code) throw new Error('Disabled subscription event is missing its subscription code.');
-    const updated = await patchSubscription(code, { status: 'INACTIVE', grace_until: null });
+    const updated = await patchSubscription(code, { status: 'inactive', grace_until: null });
     if (!updated) throw new Error('No AlgoLync licence is associated with the disabled subscription.');
   }
 }
