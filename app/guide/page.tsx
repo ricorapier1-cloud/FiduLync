@@ -4,7 +4,7 @@ import Link from 'next/link';
 
 export default function PersonalQuantGuidePage() {
   return (
-    <main className="min-h-screen bg-[#080a0f] px-4 py-10 pb-36 text-slate-100">
+    <main className="min-h-screen bg-[#080a0f] px-4 py-10 pb-44 text-slate-100">
       <div className="mx-auto max-w-3xl space-y-8">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-5">
           <Link href="/" className="text-xs font-mono text-emerald-300 hover:underline">← BACK TO TERMINAL</Link>
