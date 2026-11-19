@@ -46,7 +46,7 @@ export default function PlatformFooter() {
               <li><Link href="/owner" className="transition hover:text-emerald-300">Owner Console / MT5 gateway</Link></li>
               <li><Link href="/faq" className="transition hover:text-emerald-300">Personal Quant help</Link></li>
               <li><Link href="/terms" className="transition hover:text-emerald-300">Data provenance & risk policy</Link></li>
-              <li><a href="/mql5/MacroLyncBridge.mqh" download className="inline-flex items-center gap-1.5 transition hover:text-emerald-300"><BrandGlyph name="arrow-down" size={13} /> MacroLyncBridge.mqh</a></li>
+              <li><a href="/downloads/QuantSupervisor.mqh" download className="inline-flex items-center gap-1.5 transition hover:text-emerald-300"><BrandGlyph name="arrow-down" size={13} /> QuantSupervisor.mqh</a></li>
             </ul>
           </div>
         </div>
