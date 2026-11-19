@@ -75,3 +75,10 @@ Before every release:
 ## Accuracy and integrity
 
 Provider terms do not guarantee data accuracy. Every observation must carry source, retrieval time, observation/release time, units, frequency, freshness, revision status and validation status. Missing, stale, revised, contradictory or malformed observations must be flagged and excluded from execution decisions. Never replace missing live observations with reference values while labelling the result live.
+
+
+## Central-bank adapter commercial-use gates
+
+The SNB data portal states that reuse of its data is permitted for non-commercial purposes compatible with its purpose. FiduLync must not ingest SNB observations for commercial use until the applicable commercial permission is verified. The CHF adapter therefore remains disabled unless `SNB_COMMERCIAL_USE_APPROVED=true` is configured after documented permission. It fails closed by leaving CHF policy-rate provenance unverified. Do not set this variable merely to bypass the guard.
+
+RBA, BOJ and RBNZ observations are fetched from their official public statistical interfaces with source links retained in the macro snapshot. Verify each provider's current reuse terms before commercial distribution, and keep any provider-specific opt-in gate in place where required.
