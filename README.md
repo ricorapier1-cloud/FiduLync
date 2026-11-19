@@ -1,6 +1,17 @@
-# MacroLync Institutional Terminal
+# FiduLync — Personal Quant Edition
 
-MacroLync is a single-operator quantitative FX and macro terminal. AlgoLync is its proprietary strategy vault and MT5 VPS telemetry monitor. The browser has no account or subscription flow; MT5/EA API requests use a private `x-algo-key` header.
+FiduLync is a private, single-operator quantitative research, portfolio-risk governance and MetaTrader 5 EA-supervision platform. MacroLync provides macro and market research; AlgoLync remains the separate legacy EA product and licensing surface.
+
+## Personal Quant Edition: operating boundary
+
+- The owner workspace is authenticated; there is no public customer registration or subscription requirement for the personal quant workflow.
+- The EA supervisor is read-only. It returns `APPROVE`, `REDUCE`, `REJECT` or `ABSTAIN` and risk ceilings; it never places, modifies or closes broker orders.
+- Server-side execution remains disabled until the independent model, execution-quality, demo and release gates are separately satisfied.
+- MT5 market data is tied to one installation, broker, server and symbol series. Closed candles are used for research; quotes and publisher telemetry have separate freshness targets.
+- Escrow is excluded from active Personal Quant workflows. Existing store, checkout and customer EA licensing routes remain separate and must not be treated as Personal Quant execution authorization.
+- Quantitative outputs are research diagnostics, not predictions or guarantees of profitability.
+
+MT5 market-data and supervisor API requests use installation-scoped publisher tokens. Legacy AlgoLync API routes may still use the private `x-algo-key` header; do not reuse that secret as an MT5 publisher token.
 
 ## Local development
 
@@ -80,7 +91,7 @@ The macro adapter validates upstream policy rates, inflation, COT positioning, a
 
 The scheduled `/api/cron/sync-macro` route uses `CRON_SECRET`. Upstash provides shared EA heartbeat telemetry; when not configured, the dashboard reports process-local fallback storage.
 
-Historical Supabase migrations are retained for auditability. The application does not expose escrow, billing or user-authentication routes. The escrow retirement migration removes empty escrow-only tables and revokes all client access to populated historical escrow/transaction records; those records are retained for audit and server-side retention only.
+Historical Supabase migrations are retained for auditability. The Personal Quant owner console uses owner-only passwordless authentication. Escrow is excluded from active workflows; historical financial records remain protected for audit and server-side retention. Legacy store, checkout and EA licensing routes remain separate from the personal quant supervisor.
 
 ## Verification
 
