@@ -76,6 +76,10 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
+function isNumericRecord(value: unknown): value is Record<string, number> {
+  return isRecord(value) && Object.values(value).every(isFiniteNumber);
+}
+
 function isCurrency(value: unknown): value is MacroCurrency {
   return isRecord(value)
     && typeof value.code === 'string'
@@ -538,7 +542,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
   if (finnhubResult.status === 'rejected') {
     console.warn('Finnhub economic calendar unavailable; checking configured calendar adapters:', finnhubResult.reason);
   }
-  if (frankfurterResult.status === 'fulfilled' && isRecord(frankfurterResult.value)) {
+  if (frankfurterResult.status === 'fulfilled' && isNumericRecord(frankfurterResult.value)) {
     snapshot.ecbRates = frankfurterResult.value;
     hasLiveData = true;
   } else if (frankfurterResult.status === 'rejected') {
