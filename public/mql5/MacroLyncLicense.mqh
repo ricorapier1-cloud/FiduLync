@@ -84,6 +84,39 @@ bool GetAlgolyncLicenseLease(string licenseKey, long mt5Account, string eaSlug,
    return(true);
 }
 
+
+bool SendAlgolyncLicenseHeartbeat(string leaseToken, string eaSlug, long mt5Account,
+                                  double balance, double equity, double drawdownPct,
+                                  double floatingPnl, int openPositions, int pingMs)
+{
+   if(StringLen(leaseToken) < 40 || StringLen(eaSlug) < 3 || mt5Account <= 0 ||
+      balance < -1000000000000.0 || balance > 1000000000000.0 ||
+      equity < -1000000000000.0 || equity > 1000000000000.0 ||
+      drawdownPct < 0.0 || drawdownPct > 1000.0 ||
+      floatingPnl < -1000000000000.0 || floatingPnl > 1000000000000.0 ||
+      openPositions < 0 || openPositions > 5000 || pingMs < 0 || pingMs > 120000)
+      return(false);
+
+   string body = StringFormat(
+      "{\"balance\":%s,\"equity\":%s,\"drawdown_pct\":%s,\"floating_pnl\":%s,\"open_positions\":%d,\"vps_ping_ms\":%d,\"ea_name\":\"%s\"}",
+      DoubleToString(balance, 2), DoubleToString(equity, 2),
+      DoubleToString(drawdownPct, 4), DoubleToString(floatingPnl, 2),
+      openPositions, pingMs, eaSlug
+   );
+   string headers = "Content-Type: application/json\\r\\nAuthorization: Bearer " + leaseToken + "\\r\\n";
+   char post[], result[];
+   string responseHeaders;
+   int copied = StringToCharArray(body, post, 0, WHOLE_ARRAY, CP_UTF8);
+   if(copied <= 1) return(false);
+   ArrayResize(post, copied - 1);
+   ResetLastError();
+   int status = WebRequest("POST", "https://fidulync.vercel.app/api/v1/license/heartbeat",
+                           headers, 8000, post, result, responseHeaders);
+   if(status != 200) return(false);
+   string response = CharArrayToString(result, 0, WHOLE_ARRAY, CP_UTF8);
+   return(StringFind(response, "\"accepted\":true") >= 0);
+}
+
 // Preferred overload for EAs that know their immutable product slug.
 bool VerifyAlgolyncLicense(string licenseKey, long mt5Account, string eaSlug)
 {
