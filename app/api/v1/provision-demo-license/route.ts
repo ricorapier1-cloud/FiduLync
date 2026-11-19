@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { randomBytes } from 'node:crypto';
-import { isSupabaseConfigured, persistLicense } from '@/lib/supabaseAdmin';
+import { isSupabaseConfigured, persistLicense, supabaseRead } from '@/lib/supabaseAdmin';
 import { enforceDistributedRateLimit } from '@/lib/rateLimit';
-import { getEaBySlug } from '@/lib/eaCatalog';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,8 +25,10 @@ export async function POST(req: Request) {
     const body = raw as DemoRequest;
     const eaSlug = typeof body.ea_slug === 'string' ? body.ea_slug.trim().toLowerCase() : 'eridam-nexus-pro';
     const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
-    const ea = getEaBySlug(eaSlug);
-    if (!ea || ea.tierCategory === 'SANDBOX') return NextResponse.json({ success: false, error: 'Select an eligible AlgoLync EA product.' }, { status: 400 });
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(eaSlug)) return NextResponse.json({ success: false, error: 'Invalid AlgoLync product selection.' }, { status: 400 });
+    const products = await supabaseRead<Array<{ slug: string; category: string; is_active: boolean }>>('ea_products', `slug=eq.${encodeURIComponent(eaSlug)}&is_active=eq.true&select=slug,category,is_active`);
+    if (!products) throw new Error('Product catalogue database unavailable.');
+    if (!products[0] || !products[0].is_active || products[0].category === 'SANDBOX') return NextResponse.json({ success: false, error: 'Select an eligible active AlgoLync EA product.' }, { status: 400 });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
       return NextResponse.json({ success: false, error: 'A valid email address is required.' }, { status: 400 });
     }
