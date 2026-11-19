@@ -94,11 +94,12 @@ export async function getMacroSignal(symbol: string, now = Date.now(), installat
     const brokerQuote = marketQuotes.find((quote) => quote.symbol === normalizedSymbol);
     const quoteTimestamp = brokerQuote ? Date.parse(brokerQuote.timestamp) : Number.NaN;
     const quoteAgeMs = now - quoteTimestamp;
+    const personalRiskPolicy = getPersonalRiskPolicy();
     const brokerQuoteFresh = Boolean(installationId) && technical.data_source === 'mt5'
       && brokerQuote !== undefined
       && brokerQuote.source === 'mt5'
       && Number.isFinite(quoteTimestamp)
-      && quoteAgeMs >= -5 * 60_000 && quoteAgeMs <= 120_000
+      && quoteAgeMs >= -5_000 && quoteAgeMs <= personalRiskPolicy.maxQuoteAgeMs
       && typeof brokerQuote.bid === 'number' && typeof brokerQuote.ask === 'number'
       && brokerQuote.bid > 0 && brokerQuote.ask >= brokerQuote.bid
       && typeof brokerQuote.spread_points === 'number' && brokerQuote.spread_points >= 0
@@ -118,7 +119,6 @@ export async function getMacroSignal(symbol: string, now = Date.now(), installat
     const trendStructureStrength = [ker, adx, rSquared, hurst].every(Number.isFinite)
       ? clamp01(ker * 0.30 + clamp01(adx / 40) * 0.25 + clamp01(rSquared) * 0.25 + clamp01(Math.abs(hurst - 0.5) / 0.25) * 0.20)
       : Number.NaN;
-    const personalRiskPolicy = getPersonalRiskPolicy();
     const ghost = calculateGhostProtocol({
       quoteFresh: brokerQuoteFresh,
       trendStructureStrength,
