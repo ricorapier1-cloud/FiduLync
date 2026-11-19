@@ -157,13 +157,17 @@ export async function GET(request: Request) {
       ? accountCurrencyExposure!.reduce((sum, item) => sum + Number(item.net_account_currency ?? 0), 0) : null;
     const onePercentParallelShock = conversionComplete && accountCurrencyExposure
       ? accountCurrencyExposure.reduce((sum, item) => sum + Math.abs(Number(item.net_account_currency ?? 0)) * 0.01, 0) : null;
-    const candleQuery = latestManifest ? supabase.from('mt5_market_candles')
+    const fetchCandlePage = (from: number, to: number) => supabase.from('mt5_market_candles')
       .select('symbol,bar_time,close,broker,server')
-      .eq('installation_id', latestManifest.installation_id)
+      .eq('installation_id', latestManifest!.installation_id)
       .eq('timeframe', 'H1').eq('is_closed', true)
-      .order('bar_time', { ascending: false }).limit(3_000) : null;
-    let candleRows = candleQuery ? await candleQuery : { data: [], error: null };
-    if (candleRows.error) throw candleRows.error;
+      .order('bar_time', { ascending: false }).range(from, to);
+    const candlePages = latestManifest ? await Promise.all([
+      fetchCandlePage(0, 999), fetchCandlePage(1000, 1999), fetchCandlePage(2000, 2999),
+    ]) : [];
+    const candleError = candlePages.find((page) => page.error)?.error;
+    if (candleError) throw candleError;
+    let candleRows = { data: candlePages.flatMap((page) => page.data ?? []), error: null };
     if (account?.broker) candleRows = { ...candleRows, data: (candleRows.data ?? []).filter((row) => row.broker === account.broker) };
     if (account?.server) candleRows = { ...candleRows, data: (candleRows.data ?? []).filter((row) => row.server === account.server) };
     const closeSeries = new Map<string, Map<string, number>>();
