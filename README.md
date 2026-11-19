@@ -38,7 +38,7 @@ Set server-side values in `.env.local` or the deployment secret manager:
 | `FINNHUB_API_KEY` | Optional FX quotes and economic calendar; not called until commercial-use approval is recorded |
 | `FINNHUB_COMMERCIAL_USE_APPROVED` | Must be `true` only after written permission covers the intended quote/calendar display and caching |
 | `FRANKFURTER_COMMERCIAL_USE_APPROVED` / `EXCHANGERATE_API_COMMERCIAL_USE_APPROVED` / `GOLD_API_COMMERCIAL_USE_APPROVED` | Keep `false` until each reference provider's commercial-use and attribution terms are approved |
-| `ALPHA_VANTAGE_COMMERCIAL_USE_APPROVED` / `FMP_COMMERCIAL_USE_APPROVED` / `FAIRECONOMY_COMMERCIAL_USE_APPROVED` | Keep `false` until the specific provider rights and attribution are documented |
+| `ALPHA_VANTAGE_COMMERCIAL_USE_APPROVED` / `FMP_COMMERCIAL_USE_APPROVED` / `FAIRECONOMY_COMMERCIAL_USE_APPROVED` / `SNB_COMMERCIAL_USE_APPROVED` | Keep `false` until the specific provider rights and attribution are documented |
 | `FRED_API_KEY` | Optional; disabled unless separately approved for the intended commercial use and data handling |
 | `FRED_COMMERCIAL_USE_APPROVED` | Must remain `false` unless written permission covers the exact use, display, storage and caching |
 | `BEA_API_KEY` / `BLS_API_KEY` | Diagnostic credentials only; full adapters are not yet integrated |
