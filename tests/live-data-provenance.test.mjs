@@ -131,7 +131,7 @@ test('live MT5 publisher supports partial G10 maps and preserves broker executio
   assert.match(publisher, /G10_CROSS_SYMBOLS = \{base \+ quote/);
   assert.doesNotMatch(publisher, /missing = set\(DEFAULT_SYMBOL_MAP\)/);
   assert.match(marketFeeds, /spread_points/);
-  assert.match(marketFeeds, /brokerQuote/);
+  assert.match(marketFeeds, /broker: row\.broker/);
   assert.match(marketFeeds, /\^\[A-Z\]\{6\}\$/);
   assert.match(macroTypes, /symbol: string/);
 });
