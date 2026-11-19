@@ -6,6 +6,10 @@ import {
   getBankOfEnglandPolicyRate,
   getEcbMacroInputs,
   getWorldBankG10Inflation,
+  getBankOfJapanPolicyRate,
+  getReserveBankOfAustraliaPolicyRate,
+  getReserveBankOfNewZealandPolicyRate,
+  getSwissNationalBankPolicyRate,
 } from '@/lib/internationalMacro';
 import { getCachedData } from '@/lib/redisCache';
 
