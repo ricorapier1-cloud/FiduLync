@@ -7,6 +7,8 @@ const macroData = read('../lib/macroData.ts');
 const macroEngine = read('../lib/macroEngine.ts');
 const dashboard = read('../app/components/MacroDashboard.tsx');
 const marketFeeds = read('../lib/marketFeeds.ts');
+const publisher = read('../scripts/mt5_market_publisher.py');
+const macroTypes = read('../types/macro.ts');
 const technicalEngine = read('../lib/technicalEngine.ts');
 const quantRisk = read('../lib/quantRisk.ts');
 const signalEngine = read('../lib/signalEngine.ts');
@@ -123,6 +125,15 @@ test('private EA lab uses owner MT5 publisher and supervisor components only', (
   assert.doesNotMatch(storeTerminal, /MacroLyncBridge|Paystack|Checkout|Eridam_Nexus|Velocity_Vault|MacroLync_G10|ALGO_PRIVATE_API_KEY/);
   assert.match(storeTerminal, /atr_sl_pips === null \? 'Unavailable'/);
   assert.match(storeTerminal, /atr_tp_pips === null \? 'Unavailable'/);
+});
+
+test('live MT5 publisher supports partial G10 maps and preserves broker execution metadata', () => {
+  assert.match(publisher, /G10_CROSS_SYMBOLS = \{base \+ quote/);
+  assert.doesNotMatch(publisher, /missing = set\(DEFAULT_SYMBOL_MAP\)/);
+  assert.match(marketFeeds, /spread_points/);
+  assert.match(marketFeeds, /brokerQuote/);
+  assert.match(marketFeeds, /\^\[A-Z\]\{6\}\$/);
+  assert.match(macroTypes, /symbol: string/);
 });
 
 test('historical MT5 backfill imports only real closed broker bars and never trades', () => {
