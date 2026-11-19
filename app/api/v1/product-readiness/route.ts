@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isSupabaseConfigured, supabaseRead } from '@/lib/supabaseAdmin';
+import { enforceDistributedRateLimit } from '@/lib/rateLimit';
 import { hasApprovedProductArtifact } from '@/lib/productRelease';
 
 export const dynamic = 'force-dynamic';
@@ -7,6 +8,9 @@ export const dynamic = 'force-dynamic';
 type ProductRecord = { slug: string; category: string; is_active: boolean };
 
 export async function GET(request: Request) {
+  const rate = await enforceDistributedRateLimit(request, 'product-release-readiness', 60, 60_000);
+  if (rate.unavailable) return NextResponse.json({ ready: false, error: 'Product release status is temporarily unavailable.' }, { status: 503, headers: { 'Cache-Control': 'no-store, max-age=0' } });
+  if (!rate.allowed) return NextResponse.json({ ready: false, error: 'Product release status rate limit exceeded.' }, { status: 429, headers: { 'Cache-Control': 'no-store, max-age=0' } });
   const slug = new URL(request.url).searchParams.get('slug')?.trim().toLowerCase() ?? '';
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
     return NextResponse.json({ ready: false, error: 'A valid product slug is required.' }, {
