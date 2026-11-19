@@ -33,7 +33,9 @@ Set server-side values in `.env.local` or the deployment secret manager:
 | `UPSTASH_REDIS_REST_TOKEN` | Server-only Upstash REST token |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL for persisted macro snapshots |
 | `SUPABASE_SECRET_KEY` / `SUPABASE_SERVICE_ROLE_KEY` | Server-only Supabase persistence and atomic security RPC access; never expose to a browser |
-| `PAYSTACK_SECRET_KEY` | Server-only Paystack transaction initialization and verification secret; also supports the legacy webhook signature |\n| `PAYSTACK_WEBHOOK_SECRET` | Preferred timestamped Paystack webhook signing secret from the Paystack dashboard (keep private); legacy signature remains supported during migration |\n| `ALGOLYNC_LEASE_SIGNING_SECRET` | Server-only high-entropy HS256 key used to sign 24-hour MT5 licence heartbeat leases |
+| `PAYSTACK_SECRET_KEY` | Server-only Paystack transaction initialization and verification secret; also supports the legacy webhook signature |
+| `PAYSTACK_WEBHOOK_SECRET` | Preferred timestamped Paystack webhook signing secret from the Paystack dashboard (keep private); legacy signature remains supported during migration |
+| `ALGOLYNC_LEASE_SIGNING_SECRET` | Server-only high-entropy HS256 key used to sign 24-hour MT5 licence heartbeat leases |
 | `PAYSTACK_LIVE_ENABLED` | Must remain `false` until merchant compliance, live checkout and refund/cancellation disclosures are approved |
 | `FINNHUB_API_KEY` | Optional FX quotes and economic calendar; not called until commercial-use approval is recorded |
 | `FINNHUB_COMMERCIAL_USE_APPROVED` | Must be `true` only after written permission covers the intended quote/calendar display and caching |
