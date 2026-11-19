@@ -8,18 +8,18 @@ import { getTradeExpectancy } from '@/lib/tradeLedger';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'AlgoLync Store & EA Release Monitor',
-  description: 'AlgoLync strategy catalogue, read-only EA telemetry, release verification and the MacroLync MT5 signal bridge. Paid licensing opens only after approved compiled EA artifacts are available.',
+  title: 'Personal EA Lab & MT5 Research Monitor',
+  description: 'Private EA telemetry, research signal diagnostics, release evidence and the MacroLync MT5 bridge for the owner’s personal use.',
 };
 
-export default async function AlgoLyncStorePage() {
+export default async function PersonalEaLabPage() {
   let fleet = { configured: false, heartbeats: [] as Awaited<ReturnType<typeof getHeartbeatFleet>>['heartbeats'] };
   let telemetryError = '';
   try {
     fleet = await getHeartbeatFleet();
   } catch (error) {
-    console.error('Unable to load EA fleet telemetry for the AlgoLync vault:', error);
-    telemetryError = 'Upstash telemetry is temporarily unavailable.';
+    console.error('Unable to load private EA telemetry:', error);
+    telemetryError = 'EA telemetry cache is temporarily unavailable.';
   }
 
   const initialSnapshot = await getMacroSnapshot();
