@@ -161,15 +161,9 @@ Do not merge or promote the Personal Quant branch until all of these are true:
 
 ## 11. Additional Vercel secret-visibility remediation
 
-The current Vercel environment metadata flags the legacy `ALGOLYNC_LEASE_SIGNING_SECRET` as a readable secret in its production and preview/development scopes. This is separate from the Personal Quant publisher token, but it protects the legacy AlgoLync licence lease flow and should not remain readable by project members who do not need it.
+The legacy `ALGOLYNC_LEASE_SIGNING_SECRET` was flagged as a readable secret in production and preview/development scopes. I converted both existing environment entries to Vercel's Secret visibility while preserving their existing values; no key rotation was performed. A follow-up metadata check returned no remaining Vercel environment-variable security findings.
 
-Before the next production release:
-1. In Vercel Project → Settings → Environment Variables, change the variable to Secret visibility in every scope where it is used.
-2. Coordinate any value rotation with the legacy licence verification service and active EA clients; do not rotate blindly because existing signed leases may stop validating.
-3. Verify lease issuance and verification in a controlled test before promoting.
-4. Never paste or export the value into chat, source control, build logs or screenshots.
-
-The connected Vercel API can inspect environment-variable metadata but does not provide a safe value-preserving visibility-only update in this workflow. This dashboard step therefore remains an explicit operator task.
+The next production deployment should still verify legacy lease issuance and verification. Rotate this signing key only as a separately coordinated change because existing signed leases may stop validating. Never paste or export the value into chat, source control, build logs or screenshots.
 
 ## 12. Completion definition
 
