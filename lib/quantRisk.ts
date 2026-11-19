@@ -58,6 +58,8 @@ export type GhostProtocolInput = {
   atrExpansionRatio: number;
   spreadPoints: number;
   spreadAtrRatio: number;
+  maxSpreadPoints?: number;
+  maxSpreadAtrRatio?: number;
 };
 
 export type GhostProtocolResult = {
@@ -74,9 +76,11 @@ export function calculateGhostProtocol(input: GhostProtocolInput): GhostProtocol
   if (!input.quoteFresh) {
     return { score: null, allowed: false, blockers: ['GHOST_BROKER_QUOTE_UNAVAILABLE'] };
   }
+  const maxSpreadPoints = input.maxSpreadPoints ?? 30;
+  const maxSpreadAtrRatio = input.maxSpreadAtrRatio ?? 0.12;
   const values = [
     input.trendStructureStrength, input.atrExpansionRatio,
-    input.spreadPoints, input.spreadAtrRatio,
+    input.spreadPoints, input.spreadAtrRatio, maxSpreadPoints, maxSpreadAtrRatio,
   ];
   if (!values.every(Number.isFinite)
     || input.atrExpansionRatio <= 0
@@ -88,8 +92,8 @@ export function calculateGhostProtocol(input: GhostProtocolInput): GhostProtocol
   const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
   const structure = clamp01(input.trendStructureStrength);
   const volatilityStability = clamp01(1 - Math.abs(input.atrExpansionRatio - 1) / 1.5);
-  const spreadQuality = clamp01(1 - input.spreadPoints / 30);
-  const spreadShockStability = clamp01(1 - input.spreadAtrRatio / 0.12);
+  const spreadQuality = clamp01(1 - input.spreadPoints / maxSpreadPoints);
+  const spreadShockStability = clamp01(1 - input.spreadAtrRatio / maxSpreadAtrRatio);
   const atrExpansionStability = clamp01(1 - Math.max(0, input.atrExpansionRatio - 1) / 1.5);
   const score = Number((
     structure * 0.25
