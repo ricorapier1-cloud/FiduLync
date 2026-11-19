@@ -41,7 +41,8 @@ export async function POST(request: Request) {
     const floatingPnl = finiteMetric(raw.floating_pnl, -1_000_000_000_000, 1_000_000_000_000);
     const openPositions = finiteMetric(raw.open_positions, 0, 5000);
     const ping = finiteMetric(raw.vps_ping_ms, 0, 120_000);
-    if ([balance, equity, drawdown, floatingPnl, openPositions, ping].some((value) => value === null)) {
+    if (balance === null || equity === null || drawdown === null
+      || floatingPnl === null || openPositions === null || ping === null) {
       return json({ accepted: false, error: 'Heartbeat metrics are missing or outside accepted numeric limits.' }, 400);
     }
 
