@@ -29,7 +29,8 @@ export type PointInTimeObservation = {
   releasedAt: string;
   retrievedAt: string;
   value: number;
-  revisionAt?: string | null;\n  vintageAt?: string | null;
+  revisionAt?: string | null;
+  vintageAt?: string | null;
 };
 
 function finiteDate(value: string): number | null {
@@ -51,14 +52,17 @@ export function validatePointInTimeObservation(
   const observationMs = finiteDate(observation.observationAt);
   const releaseMs = finiteDate(observation.releasedAt);
   const retrievedMs = finiteDate(observation.retrievedAt);
-  const revisionMs = observation.revisionAt ? finiteDate(observation.revisionAt) : null;\n  const vintageMs = observation.vintageAt ? finiteDate(observation.vintageAt) : null;
+  const revisionMs = observation.revisionAt ? finiteDate(observation.revisionAt) : null;
+  const vintageMs = observation.vintageAt ? finiteDate(observation.vintageAt) : null;
 
   if (!observation.source.trim() || !observation.seriesId.trim()) return { valid: false, reason: 'SOURCE_OR_SERIES_MISSING' };
   if (![asOfMs, observationMs, releaseMs, retrievedMs].every((v) => v !== null)) return { valid: false, reason: 'TIMESTAMP_MUST_INCLUDE_TIMEZONE' };
   if (!Number.isFinite(observation.value)) return { valid: false, reason: 'NON_FINITE_OBSERVATION' };
   if (releaseMs! > asOfMs!) return { valid: false, reason: 'LOOKAHEAD_RELEASE' };
   if (retrievedMs! > asOfMs!) return { valid: false, reason: 'RETRIEVED_AFTER_AS_OF' };
-  if (observationMs! > releaseMs!) return { valid: false, reason: 'OBSERVATION_AFTER_RELEASE' };\n  if (retrievedMs! < releaseMs!) return { valid: false, reason: 'RETRIEVED_BEFORE_RELEASE' };\n  if (observation.vintageAt && (vintageMs === null || vintageMs > asOfMs!)) return { valid: false, reason: 'VINTAGE_NOT_YET_KNOWN' };
+  if (observationMs! > releaseMs!) return { valid: false, reason: 'OBSERVATION_AFTER_RELEASE' };
+  if (retrievedMs! < releaseMs!) return { valid: false, reason: 'RETRIEVED_BEFORE_RELEASE' };
+  if (observation.vintageAt && (vintageMs === null || vintageMs > asOfMs!)) return { valid: false, reason: 'VINTAGE_NOT_YET_KNOWN' };
   if (observation.revisionAt && (revisionMs === null || revisionMs > asOfMs!)) return { valid: false, reason: 'REVISION_NOT_YET_KNOWN' };
   return { valid: true, reason: 'POINT_IN_TIME_VALID' };
 }
