@@ -13,7 +13,7 @@ function isRecord(value: unknown): value is Record<string, unknown> { return Boo
 function json(body: unknown, status = 200) { return NextResponse.json(body, { status, headers: { 'Cache-Control': 'no-store, max-age=0', Pragma: 'no-cache' } }); }
 function positiveLogin(value: unknown): string {
   const text = typeof value === 'string' ? value.trim() : typeof value === 'number' && Number.isSafeInteger(value) ? String(value) : '';
-  return /^\d{1,19}$/.test(text) && BigInt(text) > 0n ? text : '';
+  return /^\d{1,19}$/.test(text) && BigInt(text) > 0n && BigInt(text) <= 9223372036854775807n ? text : '';
 }
 export async function POST(req: Request) {
   const canonical = new URL(req.url).pathname === '/api/v1/license/verify';
