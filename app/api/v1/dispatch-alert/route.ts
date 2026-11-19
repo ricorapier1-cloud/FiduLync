@@ -7,8 +7,11 @@ export const dynamic = 'force-dynamic';
 function hasValidSecret(request: Request, secret: string) {
   const match = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '');
   const supplied = match?.[1] ?? '';
-  if (!supplied || supplied.length !== secret.length) return false;
-  return timingSafeEqual(Buffer.from(supplied), Buffer.from(secret));
+  if (!supplied) return false;
+  const suppliedBytes = Buffer.from(supplied, 'utf8');
+  const secretBytes = Buffer.from(secret, 'utf8');
+  if (suppliedBytes.length !== secretBytes.length) return false;
+  return timingSafeEqual(suppliedBytes, secretBytes);
 }
 
 export async function POST(req: Request) {
