@@ -99,9 +99,8 @@ function parseCandle(value: unknown): Candle | null {
 
 async function fetchTwelveDataCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promise<Candle[]> {
   const apiKey = process.env.TWELVE_DATA_API_KEY?.trim();
-  // Individual/free plans are not licensed for commercial third-party display.
-  // Enable only after the required business tier, exchange rights and display terms are approved.
-  if (!apiKey || process.env.TWELVE_DATA_COMMERCIAL_USE_APPROVED !== 'true') return [];
+  // Personal display requires an eligible Twelve Data individual plan and any applicable exchange entitlements.
+  if (!apiKey || process.env.TWELVE_DATA_PERSONAL_DISPLAY_PLAN_ACTIVE !== 'true') return [];
 
   const interval = timeframe === 'H1' ? '1h' : timeframe === 'H4' ? '4h' : '1day';
   const symbol = pair === 'XAUUSD' ? 'XAU/USD' : `${pair.slice(0, 3)}/${pair.slice(3)}`;
@@ -154,7 +153,7 @@ async function fetchTwelveDataCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1
 }
 
 async function fetchCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promise<Candle[]> {
-  const endpoint = process.env.MARKET_DATA_PROVIDER_LICENSE_APPROVED === 'true' ? process.env.MARKET_DATA_PROVIDER_URL?.trim() : undefined;
+  const endpoint = process.env.MARKET_DATA_PROVIDER_PERSONAL_USE_ENABLED === 'true' ? process.env.MARKET_DATA_PROVIDER_URL?.trim() : undefined;
   if (!endpoint) return [];
 
   const providerUrl = new URL(endpoint);
@@ -262,10 +261,10 @@ async function getCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1', installat
 
   // Re-apply licensing and freshness gates after cache reads too: cached values must
   // not survive a revoked data entitlement or a stale upstream feed.
-  if (cached.source === 'configured_provider' && process.env.MARKET_DATA_PROVIDER_LICENSE_APPROVED !== 'true') {
+  if (cached.source === 'configured_provider' && process.env.MARKET_DATA_PROVIDER_PERSONAL_USE_ENABLED !== 'true') {
     return { candles: [], source: 'unavailable' };
   }
-  if (cached.source === 'twelve_data' && process.env.TWELVE_DATA_COMMERCIAL_USE_APPROVED !== 'true') {
+  if (cached.source === 'twelve_data' && process.env.TWELVE_DATA_PERSONAL_DISPLAY_PLAN_ACTIVE !== 'true') {
     return { candles: [], source: 'unavailable' };
   }
   const barSeconds = timeframe === 'H1' ? 60 * 60 : timeframe === 'H4' ? 4 * 60 * 60 : 24 * 60 * 60;
