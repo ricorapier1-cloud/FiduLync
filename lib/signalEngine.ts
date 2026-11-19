@@ -252,6 +252,6 @@ export async function getMacroSignal(symbol: string, now = Date.now(), installat
       timestamp_utc: new Date(now).toISOString(),
     };
   };
-  if (nearNewsLockoutTransition(snapshot, now, normalizedSymbol)) return calculateSignal();
-  return getCachedData(`signal:${installationId ?? 'active'}:${normalizedSymbol}`, calculateSignal, 15);
+  if (installationId || nearNewsLockoutTransition(snapshot, now, normalizedSymbol)) return calculateSignal();
+  return getCachedData(`signal:active:${normalizedSymbol}`, calculateSignal, 15);
 }
