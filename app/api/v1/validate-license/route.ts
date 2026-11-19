@@ -23,9 +23,12 @@ export async function POST(req: Request) {
   if (!isSupabaseConfigured()) return json({ valid: false, message: 'License service is not configured.' }, 503);
   const length = Number(req.headers.get('content-length') ?? 0);
   if (Number.isFinite(length) && length > 8192) return json({ valid: false, message: 'Request body exceeds 8 KB.' }, 413);
+  let rawBody: string;
+  try { rawBody = await req.text(); } catch { return json({ valid: false, message: 'A valid JSON object is required.' }, 400); }
+  if (Buffer.byteLength(rawBody, 'utf8') > 8192) return json({ valid: false, message: 'Request body exceeds 8 KB.' }, 413);
   try {
     let raw: unknown;
-    try { raw = await req.json(); } catch { return json({ valid: false, message: 'A valid JSON object is required.' }, 400); }
+    try { raw = JSON.parse(rawBody); } catch { return json({ valid: false, message: 'A valid JSON object is required.' }, 400); }
     if (!isRecord(raw)) return json({ valid: false, message: 'A valid JSON object is required.' }, 400);
     const licenseKey = typeof raw.license_key === 'string' ? raw.license_key.trim().toUpperCase() : '';
     const login = positiveLogin(canonical ? raw.mt5_login : (raw.account_number ?? raw.account));
