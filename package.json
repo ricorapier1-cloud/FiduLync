@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint --max-warnings=0",
-    "test:quant": "tsc lib/quantGovernance.ts lib/modelValidation.ts lib/institutionalGuards.ts --target ES2022 --module commonjs --outDir .quant-test --skipLibCheck --noEmit false && node --test tests/*.test.mjs"
+    "test:quant": "tsc lib/quantGovernance.ts lib/modelValidation.ts lib/institutionalGuards.ts lib/quantPipeline.ts --target ES2022 --module commonjs --outDir .quant-test --skipLibCheck --noEmit false && node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
