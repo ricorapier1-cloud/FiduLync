@@ -193,7 +193,7 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
 
   return (
     <div className="min-h-screen bg-[#080a0f] text-slate-100">
-      <div className="mx-auto w-full max-w-7xl px-5 py-9 sm:px-8 lg:py-12 pb-36 sm:pb-16">
+      <div className="mx-auto w-full max-w-7xl px-5 py-9 sm:px-8 lg:py-12 pb-44 sm:pb-16">
         <div className="flex flex-wrap items-start justify-between gap-5 border-b border-white/[0.08] pb-7">
           <div>
             <Link href="/" className="mb-4 inline-block font-mono text-[10px] tracking-wider text-emerald-300 hover:underline">← BACK TO TERMINAL</Link>
