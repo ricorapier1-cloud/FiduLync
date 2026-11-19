@@ -60,7 +60,8 @@ async function getFrankfurterQuotes(): Promise<MarketQuote[]> {
     || ![usd, gbp, jpy].every((rate) => Number.isFinite(rate) && rate > 0)) {
     throw new Error('Frankfurter did not return the required currency rates.');
   }
-  const timestamp = typeof payload.date === 'string' ? `${payload.date}T16:00:00.000Z` : new Date().toISOString();
+  const timestamp = typeof payload.date === 'string' ? `${payload.date}T00:00:00.000Z` : ''; 
+  if (!timestamp || !Number.isFinite(Date.parse(timestamp))) throw new Error('Frankfurter did not provide a valid reference-rate date.');
   return [
     { symbol: 'EURUSD', price: usd, changePercent: null, timestamp, source: 'frankfurter' },
     { symbol: 'GBPUSD', price: usd / gbp, changePercent: null, timestamp, source: 'frankfurter' },
