@@ -36,6 +36,10 @@ test('provider outage returns an empty, untimestamped macro fallback', () => {
 });
 
 test('only complete provider-sourced policy and inflation observations leave the adapter', () => {
+  assert.match(macroData, /getLiveProviderSnapshot\(\)/);
+  assert.doesNotMatch(macroData, /cachedSnapshot\.currencies/);
+  assert.match(macroData, /policyRateProvider = 'fred'/);
+  assert.match(macroData, /calendarProvider = selectedCalendar\.provider/);
   assert.match(macroData, /snapshot\.currencies = snapshot\.currencies\.filter\(\(currency\) =>\s*currency\.policyRateSource === 'provider' && currency\.inflationSource === 'provider'\)/);
   assert.match(currencyStrength, /item\.policyRateSource === 'provider'/);
   assert.match(currencyStrength, /item\.inflationSource === 'provider'/);
@@ -44,13 +48,18 @@ test('only complete provider-sourced policy and inflation observations leave the
 test('stale macro snapshots are rejected instead of silently reused', () => {
   assert.match(macroEngine, /ageMs > 24 \* 60 \* 60_000/);
   assert.match(macroEngine, /return getFallbackSnapshot\(\)/);
+  assert.match(macroEngine, /calendarProvider === 'finnhub'/);
+  assert.match(macroEngine, /COT_DATA_PROVIDER_LICENSE_APPROVED === 'true'/);
+  assert.match(macroEngine, /FRANKFURTER_COMMERCIAL_USE_APPROVED === 'true'/);
 });
 
 test('dashboard never substitutes hardcoded events, policy ranges, or positioning figures', () => {
   assert.doesNotMatch(dashboard, /US Non-Farm Payrolls|425 bps \(G8\)|Tier-1 Catalyst • 13:30 UTC/);
   assert.match(dashboard, /providerPolicyInputs/);
-  assert.match(dashboard, /NO VERIFIED INPUTS/);
+  assert.match(dashboard, /NO VERIFIED MACRO INPUTS/);
   assert.match(dashboard, /formatQuoteAge\(quote\.timestamp, now\)/);
+  assert.match(dashboard, /SNAPSHOT REFRESHED/);
+  assert.doesNotMatch(dashboard, /'LIVE' : snapshot\.source/);
 });
 
 test('third-party quote feeds require explicit commercial-use approval', () => {
