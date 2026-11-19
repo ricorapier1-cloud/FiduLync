@@ -88,7 +88,7 @@ export type LicenseRecord = {
 export async function persistLicense(license: LicenseRecord) {
   return supabaseQuery('licenses', {
     method: 'POST',
-    prefer: 'resolution=merge-duplicates',
+    prefer: 'resolution=merge-duplicates,return=representation',
     body: {
       license_key: license.license_key,
       mt5_account: license.mt5_account,
