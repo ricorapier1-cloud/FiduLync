@@ -74,11 +74,12 @@ export async function supabaseRead<T = unknown>(
 
 export type LicenseRecord = {
   license_key: string;
-  mt5_account: number;
+  mt5_account: number | null;
   email: string;
   tier?: string;
   status?: string;
   expires_at?: string | null;
+  ea_slug?: string;
 };
 
 export async function persistLicense(license: LicenseRecord) {
@@ -92,6 +93,7 @@ export async function persistLicense(license: LicenseRecord) {
       tier: license.tier || 'INSTITUTIONAL_PRO',
       status: license.status || 'active',
       expires_at: license.expires_at ?? null,
+      ea_slug: license.ea_slug ?? null,
       created_at: new Date().toISOString(),
     },
   });
