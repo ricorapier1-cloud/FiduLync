@@ -23,8 +23,11 @@ export async function POST(request: Request) {
   if (rate.unavailable) return NextResponse.json({ error: 'The security rate-limit service is unavailable.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
   if (!rate.allowed) return NextResponse.json({ error: 'Rate limit exceeded.' }, { status: 429, headers: { 'Cache-Control': 'no-store' } });
 
+  if (Number(request.headers.get('content-length') ?? 0) > 65_536) return NextResponse.json({ error: 'Model submission exceeds 64 KB.' }, { status: 413 });
+
   try {
-    const body: unknown = await request.json();
+    let body: unknown;
+    try { body = await request.json(); } catch { return NextResponse.json({ error: 'A valid JSON model submission is required.' }, { status: 400 }); }
     if (!isRecord(body)) return NextResponse.json({ error: 'A JSON model submission is required.' }, { status: 400 });
     const modelKey = typeof body.model_key === 'string' ? body.model_key.trim() : '';
     const modelVersion = typeof body.model_version === 'string' ? body.model_version.trim() : '';
