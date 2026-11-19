@@ -5,6 +5,8 @@ import { validateCustomerLicense } from '@/lib/customerTelemetry';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
+  return NextResponse.json({ error: 'Customer licence lookup is retired in Personal Quant Edition.' }, { status: 410, headers: { 'Cache-Control': 'no-store' } });
+
   const ip = getClientIp(request);
   if (!checkRateLimit(ip, 15, 60_000)) {
     return NextResponse.json(
