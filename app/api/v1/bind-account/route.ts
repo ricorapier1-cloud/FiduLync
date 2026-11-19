@@ -54,7 +54,7 @@ export async function GET(req: Request) {
   if (!isSupabaseConfigured()) return json({ success: false, error: 'Licensing service is not configured.' }, 503);
 
   const authorization = req.headers.get('authorization') ?? '';
-  const token = /^Bearer\\s+(.+)$/i.exec(authorization)?.[1]?.trim() ?? '';
+  const token = /^Bearer\s+(.+)$/i.exec(authorization)?.[1]?.trim() ?? '';
   const licenseKey = token.toUpperCase();
   if (!validLicenseKey(licenseKey)) return json({ success: false, error: 'A valid license_key is required.' }, 400);
 
