@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { randomBytes, randomInt } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { isSupabaseConfigured, persistLicense } from '@/lib/supabaseAdmin';
 import { enforceDistributedRateLimit } from '@/lib/rateLimit';
 import { getEaBySlug } from '@/lib/eaCatalog';
@@ -53,6 +53,9 @@ export async function POST(req: Request) {
       status: 'active',
       expires_at: expiresAt,
       ea_slug: eaSlug,
+      included_live_seats: 0,
+      included_demo_seats: 2,
+      extra_live_seats: 0,
     });
     if (!persisted) throw new Error('License persistence did not return a database result.');
 
@@ -63,7 +66,7 @@ export async function POST(req: Request) {
       account_type: 'DEMO',
       mt5_account: mt5Account,
       expires_at: expiresAt,
-      included_live_seats: 1,
+      included_live_seats: 0,
       included_demo_seats: 2,
       message: '14-day demo entitlement provisioned and persisted.',
     }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
