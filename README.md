@@ -93,6 +93,10 @@ The scheduled `/api/cron/sync-macro` route uses `CRON_SECRET`. Upstash provides 
 
 Historical Supabase migrations are retained for auditability. The Personal Quant owner console uses owner-only passwordless authentication. Escrow is excluded from active workflows; historical financial records remain protected for audit and server-side retention. Legacy store, checkout and EA licensing routes remain separate from the personal quant supervisor.
 
+## Windows MT5 handoff and compile gate
+
+See [`docs/REMOTE_COMPLETION_AND_LAPTOP_HANDOFF.md`](./docs/REMOTE_COMPLETION_AND_LAPTOP_HANDOFF.md) for the complete laptop setup, publisher connection, MetaEditor zero-warning compile procedure, optional Windows CI runner, and release gates. The compile-only integration fixture and `scripts/compile_mt5.ps1` are prepared; they still require a real Windows MetaEditor run before any MQL5 compile claim can be made.
+
 ## Verification
 
 ```bash
