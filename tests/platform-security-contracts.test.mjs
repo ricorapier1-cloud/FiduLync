@@ -56,6 +56,13 @@ test('Paystack entitlement minting verifies provider-side payment and server pri
   assert.match(source, /payment_reference/);
 });
 
+test('database enforces global MT5 seat uniqueness across LIVE and DEMO types', async () => {
+  const migration = await read('supabase/migrations/20261119130000_global_mt5_seat_login_uniqueness.sql');
+  assert.match(migration, /CREATE UNIQUE INDEX IF NOT EXISTS ea_license_seats_mt5_login_global_uidx/);
+  assert.match(migration, /ON public\.ea_license_seats \(mt5_login\)/);
+  assert.match(migration, /WHERE mt5_login IS NOT NULL/);
+});
+
 test('store separates live verified telemetry from reported user-submitted ledger', async () => {
   const source = await read('app/components/LegacyStoreTerminal.tsx');
   assert.match(source, /No independently verified live-performance dataset/);
