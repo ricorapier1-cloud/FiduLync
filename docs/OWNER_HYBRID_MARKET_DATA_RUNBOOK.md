@@ -47,3 +47,8 @@ No broker master/investor passwords are collected or stored. A Windows MT5 termi
 - Configure Supabase Auth email delivery and allow the production redirect `https://fidulync.vercel.app/owner`.
 - Deploy the application branch and verify owner OTP, owner-only issuance, invalid-email rejection, publisher token creation, replay rejection, quote/candle upsert, and stale-data fail-closed behavior.
 - Do not call the market feed LIVE until a publisher has successfully ingested fresh broker timestamps and diagnostics confirm the feed.
+
+
+## Optional intermarket research feeds
+
+The publisher supports optional canonical symbols `DXY`, `USOIL` and `SPX500` in addition to the core FX/metals universe. Map them to the broker's actual symbol names in `MT5_SYMBOL_MAP`, for example `DXY=USDX,USOIL=WTI,SPX500=US500` while retaining every required core symbol. The broker terminal must expose the mapped symbols and closed H1 history. The owner research-governance panel then calculates descriptive H1 correlations and 0–2 bar lead/lag associations from aligned data. These are research observations only; they are not causal claims and do not alter EA decisions. No intermarket result is shown as available until the broker feed provides enough aligned observations.
