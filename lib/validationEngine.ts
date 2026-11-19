@@ -71,7 +71,7 @@ export type WalkForwardFold = {
   outOfSample: NetTrade[];
 };
 
-export function evaluateWalkForward(folds: WalkForwardFold[]): {
+function timestamp(value: string): number | null {\n  if (typeof value !== 'string' || !/(Z|[+-]\\d{2}:?\\d{2})$/i.test(value)) return null;\n  const parsed = Date.parse(value);\n  return Number.isFinite(parsed) ? parsed : null;\n}\n\nexport function evaluateWalkForward(folds: WalkForwardFold[]): {
   eligible: boolean;
   blockers: string[];
   foldCount: number;
@@ -139,7 +139,7 @@ export function monteCarloBootstrap(
     || !Number.isSafeInteger(iterations) || iterations < 100 || iterations > 100_000
     || !Number.isSafeInteger(horizon) || horizon < 1 || horizon > 100_000
     || !Number.isSafeInteger(seed) || startingEquityR <= 0
-    || ruinDrawdownPct <= 0 || ruinDrawdownPct >= 100) return null;
+    || !Number.isFinite(startingEquityR) || startingEquityR <= 0\n    || !Number.isFinite(ruinDrawdownPct) || ruinDrawdownPct <= 0 || ruinDrawdownPct >= 100) return null;
   const random = mulberry32(seed);
   const endings: number[] = [], drawdowns: number[] = [];
   let ruined = 0;
