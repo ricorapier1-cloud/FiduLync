@@ -124,7 +124,7 @@ button { color: inherit; }
   border-radius: 10px;
   background: var(--surface);
 }
-.page-frame { min-height: calc(100vh - 72px); padding-bottom: 36px; }
+.page-frame { min-height: calc(100vh - 72px); padding-bottom: 96px; }
 .mobile-drawer-backdrop { display: none; }
 .mobile-tabbar { display: none; }
 
