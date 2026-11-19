@@ -33,6 +33,7 @@ struct FLExecutionEvent
 struct FLRequestContext
 {
    ulong request_id;
+   ulong order_ticket;
    string symbol;
    string side;
    double requested_price;
@@ -97,6 +98,13 @@ private:
       return -1;
    }
 
+   int FindOrder(const ulong order_ticket)
+   {
+      for(int i=0;i<m_request_count;i++)
+         if(m_requests[i].order_ticket==order_ticket) return i;
+      return -1;
+   }
+
    void RemoveRequest(const int index)
    {
       if(index<0 || index>=m_request_count) return;
@@ -123,16 +131,19 @@ public:
       m_timeout_ms=(timeout_ms<1000 ? 1000 : timeout_ms);
    }
 
-   // Call immediately after OrderSend returns a successful request_id.
-   void RegisterOrderRequest(const ulong request_id,const string symbol,const string side,
+   // Call immediately after OrderSend succeeds; order_ticket links DEAL_ADD transactions.
+   void RegisterOrderRequest(const ulong request_id,const ulong order_ticket,const string symbol,const string side,
                              const double requested_price,const double spread_points)
    {
-      if(request_id==0 || requested_price<=0.0 || (side!="BUY" && side!="SELL")) return;
-      int existing=FindRequest(request_id);
+      if(order_ticket==0 || requested_price<0.0 || spread_points<0.0 || (side!="BUY" && side!="SELL")) return;
+      int existing=FindOrder(order_ticket);
+      if(existing>=0) RemoveRequest(existing);
+      existing=FindRequest(request_id);
       if(existing>=0) RemoveRequest(existing);
       if(m_request_count>=FL_TELEMETRY_MAX_REQUESTS) RemoveRequest(0);
       FLRequestContext context;
       context.request_id=request_id;
+      context.order_ticket=order_ticket;
       context.symbol=symbol;
       context.side=side;
       context.requested_price=requested_price;
@@ -147,6 +158,13 @@ public:
                                 const MqlTradeRequest &request,
                                 const MqlTradeResult &result)
    {
+      // Keep request context through partial fills; retire it when the broker moves the order to history.
+      if(trans.type==TRADE_TRANSACTION_HISTORY_ADD)
+      {
+         int completedIndex=FindOrder(trans.order);
+         if(completedIndex>=0) RemoveRequest(completedIndex);
+         return;
+      }
       if(trans.type!=TRADE_TRANSACTION_DEAL_ADD || trans.deal==0) return;
       if(!HistoryDealSelect(trans.deal)) return;
       long dealType=HistoryDealGetInteger(trans.deal,DEAL_TYPE);
@@ -178,45 +196,33 @@ public:
       event.has_latency=false;
       event.has_broker_code=(result.retcode>0);
 
-      int contextIndex=FindRequest(result.request_id);
+      int contextIndex=FindOrder(trans.order);
+      if(contextIndex<0 && result.request_id>0) contextIndex=FindRequest(result.request_id);
       if(contextIndex>=0)
       {
          FLRequestContext context=m_requests[contextIndex];
-         if(context.symbol==symbol && context.requested_price>0.0)
+         if(context.symbol==symbol)
          {
-            event.requested_price=context.requested_price;
-            event.has_requested_price=true;
+            if(context.requested_price>0.0)
+            {
+               event.requested_price=context.requested_price;
+               event.has_requested_price=true;
+               double point=SymbolInfoDouble(symbol,SYMBOL_POINT);
+               if(point>0.0)
+               {
+                  double signedSlippage=(fillPrice-context.requested_price)/point;
+                  event.slippage_points=(event.side=="BUY" ? signedSlippage : -signedSlippage);
+                  event.has_slippage=true;
+               }
+            }
             event.spread_points=context.spread_points;
             event.has_spread=true;
-            double point=SymbolInfoDouble(symbol,SYMBOL_POINT);
-            if(point>0.0)
-            {
-               double signedSlippage=(fillPrice-context.requested_price)/point;
-               event.slippage_points=(event.side=="BUY" ? signedSlippage : -signedSlippage);
-               event.has_slippage=true;
-            }
             ulong nowMs=GetTickCount64();
             if(nowMs>=context.sent_tick_ms)
             {
                event.latency_ms=(long)(nowMs-context.sent_tick_ms);
                event.has_latency=true;
             }
-         }
-         RemoveRequest(contextIndex);
-      }
-      else if(request.symbol==symbol && request.price>0.0)
-      {
-         event.requested_price=request.price;
-         event.has_requested_price=true;
-         double point=SymbolInfoDouble(symbol,SYMBOL_POINT);
-         MqlTick tick;
-         if(point>0.0 && SymbolInfoTick(symbol,tick))
-         {
-            event.spread_points=(tick.ask-tick.bid)/point;
-            event.has_spread=true;
-            double signedSlippage=(fillPrice-request.price)/point;
-            event.slippage_points=(event.side=="BUY" ? signedSlippage : -signedSlippage);
-            event.has_slippage=true;
          }
       }
       event.broker_code=result.retcode;
@@ -237,7 +243,7 @@ public:
          if(i>0) json+=",";
          FLExecutionEvent event=m_events[i];
          json+="{\"account_login\":"+IntegerToString((long)AccountInfoInteger(ACCOUNT_LOGIN))+",";
-         json+="{\"event_id\":\""+JsonEscape(event.event_id)+"\",";
+         json+="\"event_id\":\""+JsonEscape(event.event_id)+"\",";
          json+="\"event_type\":\""+event.event_type+"\",";
          json+="\"symbol\":\""+JsonEscape(event.symbol)+"\",";
          json+="\"side\":\""+event.side+"\",";
@@ -248,7 +254,7 @@ public:
          json+="\"spread_points\":"+NumberOrNull(event.spread_points,event.has_spread,3)+",";
          json+="\"slippage_points\":"+NumberOrNull(event.slippage_points,event.has_slippage,3)+",";
          json+="\"latency_ms\":"+IntegerOrNull(event.latency_ms,event.has_latency)+",";
-         json+="\"broker_code\":"+IntegerOrNull(event.broker_code,event.has_broker_code)+"}";
+         json+="\"broker_code\":"+(event.has_broker_code ? "\""+IntegerToString(event.broker_code)+"\"" : "null")+"}";
       }
       json+="]}";
       char data[];
