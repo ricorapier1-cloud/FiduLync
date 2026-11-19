@@ -103,7 +103,7 @@ bool SendAlgolyncLicenseHeartbeat(string leaseToken, string eaSlug, long mt5Acco
       DoubleToString(drawdownPct, 4), DoubleToString(floatingPnl, 2),
       openPositions, pingMs, eaSlug
    );
-   string headers = "Content-Type: application/json\\r\\nAuthorization: Bearer " + leaseToken + "\\r\\n";
+   string headers = "Content-Type: application/json\r\nAuthorization: Bearer " + leaseToken + "\\r\\n";
    char post[], result[];
    string responseHeaders;
    int copied = StringToCharArray(body, post, 0, WHOLE_ARRAY, CP_UTF8);
