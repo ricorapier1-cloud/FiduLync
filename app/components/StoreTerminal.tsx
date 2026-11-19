@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import BrandGlyph from '@/components/BrandGlyph';
 import Link from 'next/link';
@@ -8,7 +8,6 @@ import { getCurrencyStrengthIndex, type getLiquiditySession } from '@/lib/curren
 import type { MacroSnapshot } from '@/types/macro';
 
 type StoreTerminalProps = {
-  bridgeSource: string;
   initialSnapshot: MacroSnapshot;
   session: ReturnType<typeof getLiquiditySession>;
 };
@@ -38,19 +37,6 @@ type SignalResult = {
 
 const symbols = ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'USDCAD', 'AUDUSD', 'NZDUSD', 'EURJPY', 'XAUUSD'];
 
-function subscribeToOrigin(onChange: () => void) {
-  window.addEventListener('popstate', onChange);
-  return () => window.removeEventListener('popstate', onChange);
-}
-
-function getBrowserOrigin() {
-  return window.location.origin;
-}
-
-function getServerOrigin() {
-  return '';
-}
-
 
 function isSignalResult(value: unknown): value is SignalResult {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
@@ -79,14 +65,12 @@ function isSignalResult(value: unknown): value is SignalResult {
     && typeof result.timestamp_utc === 'string';
 }
 
-export default function StoreTerminal({ bridgeSource, initialSnapshot, session }: StoreTerminalProps) {
+export default function StoreTerminal({ initialSnapshot, session }: StoreTerminalProps) {
   const router = useRouter();
   const [symbol, setSymbol] = useState('EURUSD');
-  const endpoint = useSyncExternalStore(subscribeToOrigin, getBrowserOrigin, getServerOrigin);
   const [signal, setSignal] = useState<SignalResult | null>(null);
   const [signalError, setSignalError] = useState('');
   const [testing, setTesting] = useState(false);
-  const [copyState, setCopyState] = useState('');
   const currencyStrength = getCurrencyStrengthIndex(initialSnapshot);
 
   useEffect(() => {
@@ -142,11 +126,11 @@ export default function StoreTerminal({ bridgeSource, initialSnapshot, session }
             <Link href="/" className="mb-4 inline-block font-mono text-[10px] tracking-wider text-emerald-300 hover:underline">← BACK TO TERMINAL</Link>
             <div className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-emerald-300">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399]" />
-              FIDULYNC / PERSONAL QUANT WORKSPACE
+              ALGOLYNC / PERSONAL EA LAB
             </div>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Personal Quant command center</h1>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Private EA research &amp; supervision</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-              Private quantitative research, discretionary risk planning, and authenticated EA supervision. FiduLync does not place broker orders.
+              Research signal diagnostics, personal EA source files, MT5 data publishing and risk supervision. The central app never places broker orders.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
@@ -232,8 +216,8 @@ export default function StoreTerminal({ bridgeSource, initialSnapshot, session }
                   <Metric label="CANDLE COVERAGE" value={`H1 ${signal.market_candle_counts.h1} · H4 ${signal.market_candle_counts.h4} · D1 ${signal.market_candle_counts.d1}`} />
                   <Metric label="LATEST CLOSED BAR" value={signal.latest_market_candle_at ? new Date(signal.latest_market_candle_at).toLocaleString() : "Unavailable"} />
                   <Metric label="CORRELATION GROUP" value={signal.correlation_group} />
-                  <Metric label="ATR STOP" value={signal.atr_sl_pips === null ? '425 bps (G8)' : `${signal.atr_sl_pips} pips`} />
-                  <Metric label="ATR TARGET" value={signal.atr_tp_pips === null ? '425 bps (G8)' : `${signal.atr_tp_pips} pips`} />
+                  <Metric label="ATR STOP" value={signal.atr_sl_pips === null ? 'Unavailable' : `${signal.atr_sl_pips} pips`} />
+                  <Metric label="ATR TARGET" value={signal.atr_tp_pips === null ? 'Unavailable' : `${signal.atr_tp_pips} pips`} />
                 </div>
                 {!signal.safe_to_trade && <div className="mt-3 rounded border border-amber-300/15 bg-amber-300/5 p-3">
                   <p className="font-mono text-[9px] tracking-wide text-amber-200">SUPERVISORY GATE BLOCKERS</p>
@@ -246,25 +230,22 @@ export default function StoreTerminal({ bridgeSource, initialSnapshot, session }
           <div className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-5 sm:p-6">
             <div className="font-mono text-[9px] tracking-[0.17em] text-slate-500">04 / MT5 CONNECTION</div>
             <h2 className="mt-1 text-lg font-semibold">Signal &amp; telemetry bridge</h2>
-            <div className="mt-5 space-y-3 rounded-lg border border-white/[0.07] bg-black/20 p-4 font-mono text-[10px]">
-              <div><span className="text-slate-500">SIGNAL</span><p className="mt-1 break-all text-emerald-200">{endpoint}/api/v1/macro-signal?symbol=EURUSD</p></div>
-              <div><span className="text-slate-500">HEARTBEAT</span><p className="mt-1 break-all text-emerald-200">{endpoint}/api/v1/ea-heartbeat</p></div>
-              <div><span className="text-slate-500">CLOSED-TRADE LEDGER</span><p className="mt-1 break-all text-emerald-200">{endpoint}/api/v1/trade-log</p></div>
-              <div><span className="text-slate-500">REQUIRED HEADER</span><p className="mt-1 text-slate-300">x-algo-key: &lt;ALGO_PRIVATE_API_KEY&gt;</p></div>
+            <div className="mt-5 space-y-3 rounded-lg border border-white/[0.07] bg-black/20 p-4 text-xs leading-5 text-slate-300">
+              <p><strong className="text-white">Research signal:</strong> same-origin read-only diagnostics at <code className="text-emerald-200">/api/v1/macro-signal</code>. Missing or stale data must produce a defensive hold.</p>
+              <p><strong className="text-white">MT5 market data:</strong> register your own terminal in the private Owner Console. Each installation receives a one-time publisher token stored as a hash server-side.</p>
+              <p><strong className="text-white">EA supervision:</strong> authenticated installation context only. The supervisor can approve, reduce, reject or abstain and return a risk ceiling; it cannot send broker orders.</p>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               <a href="/mql5/MacroLyncBridge.mqh" download className="inline-flex h-9 items-center gap-2 rounded-md border border-white/[0.1] px-3 text-[10px] text-slate-300 hover:border-emerald-300/30">
                 <BrandGlyph name="arrow-down" size={13} /> MacroLyncBridge.mqh
               </a>
-              <button type="button" onClick={() => void copyText('MQL5 bridge source', bridgeSource)} className="inline-flex h-9 items-center gap-2 rounded-md border border-white/[0.1] px-3 text-[10px] text-slate-300 hover:border-emerald-300/30">
-                <BrandGlyph name={copyState === 'MQL5 bridge source copied' ? 'check' : 'copy'} size={13} /> Copy bridge source
-              </button>
+              <a href="/downloads/QuantSupervisor.mqh" download className="inline-flex h-9 items-center gap-2 rounded-md border border-white/[0.1] px-3 text-[10px] text-slate-300 hover:border-emerald-300/30">
+                <BrandGlyph name="arrow-down" size={13} /> QuantSupervisor.mqh
+              </a>
+              <Link href="/owner" className="inline-flex h-9 items-center gap-2 rounded-md border border-emerald-300/30 px-3 text-[10px] text-emerald-200 hover:bg-emerald-300/5">
+                <BrandGlyph name="shield" size={13} /> Private Owner Console
+              </Link>
             </div>
-            {copyState && <p className="mt-2 text-[10px] text-emerald-300" role="status">{copyState}</p>}
-            <details className="mt-4 rounded-lg border border-white/[0.07] bg-black/20">
-              <summary className="cursor-pointer px-4 py-3 text-[10px] text-slate-300">View exact downloadable bridge source</summary>
-              <pre className="max-h-96 overflow-auto border-t border-white/[0.07] p-4 text-[10px] leading-5 text-slate-400"><code>{bridgeSource}</code></pre>
-            </details>
             <div className="mt-5 flex items-start gap-2 border-t border-white/[0.07] pt-4 text-[10px] leading-5 text-slate-500">
               <BrandGlyph name="shield-alert" size={14} className="mt-0.5 shrink-0 text-amber-300" />
               <p>Network, timeout, non-200, malformed JSON, or active news lockout returns defensive hold. Keep WebRequest access restricted to this deployed application origin in MT5.</p>
