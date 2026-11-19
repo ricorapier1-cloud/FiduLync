@@ -42,8 +42,8 @@ export async function POST(request: Request) {
 
   const asOf = new Date(payload.as_of);
   if (!Number.isFinite(asOf.getTime()) || !/(Z|[+-]\d{2}:?\d{2})$/i.test(payload.as_of)
-    || asOf.getTime() > Date.now() + 30_000 || asOf.getTime() < Date.now() - 24 * 60 * 60_000) {
-    return NextResponse.json({ error: 'as_of must be a recent timezone-aware UTC timestamp.' }, { status: 400 });
+    || asOf.getTime() > Date.now() + 30_000) {
+    return NextResponse.json({ error: 'as_of must be a timezone-aware UTC timestamp no later than the current time. Historical point-in-time replay is supported.' }, { status: 400 });
   }
 
   const rows: Record<string, unknown>[] = [];
