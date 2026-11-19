@@ -27,7 +27,6 @@ function profitFactor(values: number[]): number {
   return Number((wins / Math.abs(losses)).toFixed(4));
 }
 
-function expectancy(values: number): number;
 function expectancy(values: number[]): number {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 }
