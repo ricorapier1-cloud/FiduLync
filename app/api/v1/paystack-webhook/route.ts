@@ -66,7 +66,13 @@ async function processEvent(eventName: string, data: PaystackData, reference: st
   if (eventName === 'charge.success') {
     // Initial purchases are independently verified against Paystack before provisioning.
     // Recurring subscription charges are settled by invoice.update to avoid double extensions.
-    if (subscriptionCode(data)) return;
+    const code = subscriptionCode(data);
+    if (code) {
+      const linked = await supabaseRead<Array<{ license_key: string }>>('licenses',
+        `paystack_subscription_code=eq.${encodeURIComponent(code)}&select=license_key&limit=1`);
+      if (!linked) throw new Error('Unable to check the subscription-to-licence association.');
+      if (linked.length > 0) return; // Renewal is extended by the corresponding invoice.update event.
+    }
     if (!reference) throw new Error('Successful charge is missing its transaction reference.');
     const result = await provisionLicenseForReference(reference);
     if (result.created) {
@@ -90,8 +96,9 @@ async function processEvent(eventName: string, data: PaystackData, reference: st
     const code = subscriptionCode(data);
     const email = customerEmail(data);
     if (!code || !email) throw new Error('Subscription event is missing its subscription code or customer email.');
+    const recentSince = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
     const candidates = await supabaseRead<LicenseRow[]>('licenses',
-      `email=eq.${encodeURIComponent(email)}&paystack_subscription_code=is.null&status=in.(ACTIVE,active)&select=license_key,email,status,expires_at,created_at&order=created_at.desc&limit=3`);
+      `email=eq.${encodeURIComponent(email)}&created_at=gte.${encodeURIComponent(recentSince)}&paystack_subscription_code=is.null&status=in.(ACTIVE,active)&select=license_key,email,status,expires_at,created_at&order=created_at.desc&limit=3`);
     if (!candidates) throw new Error('Unable to query candidate AlgoLync subscription licences.');
     if (candidates.length !== 1) throw new Error('Subscription could not be matched unambiguously to exactly one active licence. Manual reconciliation is required.');
     const nextPayment = safeString(data.next_payment_date || (isRecord(data.subscription) ? data.subscription.next_payment_date : ''));
