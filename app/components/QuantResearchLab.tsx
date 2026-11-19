@@ -208,6 +208,35 @@ export default function QuantResearchLab() {
           <p className="mt-2">FiduLync is a private research workstation. Reference exchange rates are not executable prices. Technical indicators require real broker candles; fundamental observations retain their source and release dates. No backtest, signal score or AI commentary is a calibrated probability or a promise of profitability. Missing, stale or contradictory data must remain unavailable and produce HOLD / ABSTAIN.</p>
           <p className="mt-2">Research is read-only. No order is sent, modified or closed by this page.</p>
         </section>
+
+        <section className="mt-6 rounded-xl border border-white/[0.08] bg-[#0b121a] p-5" aria-labelledby="seven-stage-heading">
+          <div className="font-mono text-[9px] tracking-[0.18em] text-emerald-300">FIDULYNC / SEVEN-STAGE SYSTEMATIC WORKFLOW</div>
+          <h2 id="seven-stage-heading" className="mt-2 text-xl font-semibold">Research pipeline integrity</h2>
+          <p className="mt-2 max-w-3xl text-xs leading-5 text-slate-400">Each stage reports only its current evidence state. A configured schema or provider key is not evidence that a feed, test, or broker terminal is operational.</p>
+          <ol className="mt-4 grid gap-3 md:grid-cols-2">
+            {[
+              { title: '01 · Macro & broker ingestion', state: verifiedMacro || verifiedTechnical ? 'SOURCE DATA OBSERVED' : 'AWAITING VERIFIED SOURCES', detail: 'Official macro releases and private MT5 broker observations retain provider and source timestamps.' },
+              { title: '02 · Data integrity & timestamps', state: result ? 'RESPONSE VALIDATED' : 'AWAITING RESEARCH REQUEST', detail: 'UTC-aware timestamps, point-in-time release checks, stale-feed gates and circuit-breaker state.' },
+              { title: '03 · Fundamental & technical regimes', state: result?.regime ? result.regime.replaceAll('_', ' ') : 'UNCLASSIFIED', detail: 'Policy divergence and verified technical inputs; missing inputs must remain unclassified.' },
+              { title: '04 · Cross-asset & statistical behaviour', state: 'AWAITING ALIGNED DATA', detail: 'Currency strength, yields, DXY, commodities, COT, correlation and statistically tested spread relationships.' },
+              { title: '05 · Hypothesis research', state: 'RESEARCH REGISTRY READY', detail: 'Owner-only hypothesis, parameter, falsification and reproducible dataset/code fingerprint records.' },
+              { title: '06 · Institutional validation', state: 'VALIDATION EVIDENCE REQUIRED', detail: 'Untouched OOS, walk-forward folds, Monte Carlo, parameter stability and execution-cost stress before review.' },
+              { title: '07 · Private EA fleet & risk', state: 'OWNER AUTHENTICATION REQUIRED', detail: 'Read-only MT5 heartbeat, equity drawdown, high-water mark, latency and closed-trade telemetry.' },
+            ].map((stage) => (
+              <li key={stage.title} className="rounded-lg border border-white/[0.07] bg-black/20 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <strong className="text-xs text-slate-100">{stage.title}</strong>
+                  <span className="font-mono text-[9px] text-amber-200">{stage.state}</span>
+                </div>
+                <p className="mt-2 text-[10px] leading-5 text-slate-500">{stage.detail}</p>
+              </li>
+            ))}
+          </ol>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link href="/owner" className="inline-flex h-9 items-center rounded-lg border border-emerald-300/25 px-3 text-[10px] text-emerald-200 hover:bg-emerald-300/5">Open private EA fleet & risk console</Link>
+            <Link href="/analytics" className="inline-flex h-9 items-center rounded-lg border border-white/10 px-3 text-[10px] text-slate-300 hover:border-emerald-300/20">Open performance research</Link>
+          </div>
+        </section>
       </div>
     </div>
   );
