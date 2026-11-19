@@ -24,7 +24,7 @@ const compileScript = read('../scripts/compile_mt5.ps1');
 const productReadiness = read('../app/api/v1/product-readiness/route.ts');
 const readme = read('../README.md');
 const artifactMigration = read('../supabase/migrations/20261119133005_ea_artifact_audit_action_types.sql');
-const idempotentArtifactMigration = read('../supabase/migrations/20261119134000_idempotent_ea_artifact_registration.sql');
+const idempotentArtifactMigration = read('../supabase/migrations/20261119133834_idempotent_ea_artifact_registration.sql');
 
 test('provider outage returns an empty, untimestamped macro fallback', () => {
   const fallback = macroData.match(/export function getFallbackSnapshot\(\): MacroSnapshot \{[\s\S]*?\n\}/)?.[0];
