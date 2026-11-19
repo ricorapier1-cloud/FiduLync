@@ -6,7 +6,7 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const macroData = read('../lib/macroData.ts');
 const macroEngine = read('../lib/macroEngine.ts');
 const currencyStrength = read('../lib/currencyStrength.ts');
-const dashboard = read('../app/components/MacroDashboard.tsx');
+const dashboard = read('../app/components/MacroDashboard.tsx');\nconst marketFeeds = read('../lib/marketFeeds.ts');
 
 test('provider outage returns an empty, untimestamped macro fallback', () => {
   const fallback = macroData.match(/export function getFallbackSnapshot\(\): MacroSnapshot \{[\s\S]*?\n\}/)?.[0];
@@ -34,4 +34,11 @@ test('dashboard never substitutes hardcoded events, policy ranges, or positionin
   assert.match(dashboard, /providerPolicyInputs/);
   assert.match(dashboard, /NO VERIFIED INPUTS/);
   assert.match(dashboard, /formatQuoteAge\(quote\.timestamp, now\)/);
+});
+
+test('third-party quote feeds require explicit commercial-use approval', () => {
+  assert.match(marketFeeds, /FINNHUB_COMMERCIAL_USE_APPROVED === 'true'/);
+  assert.match(marketFeeds, /FRANKFURTER_COMMERCIAL_USE_APPROVED !== 'true'/);
+  assert.match(marketFeeds, /EXCHANGERATE_API_COMMERCIAL_USE_APPROVED !== 'true'/);
+  assert.match(marketFeeds, /GOLD_API_COMMERCIAL_USE_APPROVED !== 'true'/);
 });
