@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireOwner } from '@/lib/ownerAuth';
+import { enforceDistributedRateLimit } from '@/lib/rateLimit';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
 import { validateModelTrades, type ValidationTrade } from '@/lib/modelValidation';
 
@@ -13,6 +14,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export async function POST(request: Request) {
   const owner = await requireOwner(request);
   if (!owner) return NextResponse.json({ error: 'Owner authentication required.' }, { status: 401 });
+  const rate = await enforceDistributedRateLimit(request, 'owner-research-model-validation', 20, 60_000);
+  if (rate.unavailable) return NextResponse.json({ error: 'The security rate-limit service is unavailable.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+  if (!rate.allowed) return NextResponse.json({ error: 'Rate limit exceeded.' }, { status: 429, headers: { 'Cache-Control': 'no-store' } });
   const contentLength = Number(request.headers.get('content-length') ?? 0);
   if (contentLength > 2_000_000) return NextResponse.json({ error: 'Validation payload exceeds 2 MB.' }, { status: 413 });
   try {
