@@ -37,6 +37,24 @@ export function getFallbackSnapshot(): MacroSnapshot {
   };
 }
 
+// Structural rows let independent provider adapters populate a currency even when
+// no previous snapshot exists. These zero values are internal sentinels only and
+// are filtered out before any snapshot leaves this module.
+function getProviderCurrencySeed(): MacroCurrency[] {
+  const authorities = [
+    ['USD', 'Federal Reserve'], ['EUR', 'European Central Bank'],
+    ['GBP', 'Bank of England'], ['JPY', 'Bank of Japan'],
+    ['CHF', 'Swiss National Bank'], ['CAD', 'Bank of Canada'],
+    ['AUD', 'Reserve Bank of Australia'], ['NZD', 'Reserve Bank of New Zealand'],
+    ['SEK', 'Sveriges Riksbank'], ['NOK', 'Norges Bank'],
+  ] as const;
+  return authorities.map(([code, centralBank]) => ({
+    code, centralBank, policyRate: 0, inflation: 0,
+    inflationLabel: 'Not yet verified', policyRateSource: 'reference',
+    inflationSource: 'reference', stance: 'Not yet verified',
+  }));
+}
+
 function mergeWithFallback(snapshot: MacroSnapshot): MacroSnapshot {
   const fallback = getFallbackSnapshot();
   const currencies = new Map(fallback.currencies.map((currency) => [currency.code, currency]));
@@ -438,9 +456,11 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
   const cotProviderUrl = process.env.COT_DATA_PROVIDER_LICENSE_APPROVED === 'true' ? process.env.COT_DATA_PROVIDER_URL?.trim() : undefined;
   const cotProviderToken = process.env.COT_DATA_PROVIDER_TOKEN?.trim();
 
+  const seededCurrencies = new Map(getProviderCurrencySeed().map((currency) => [currency.code, currency]));
+  for (const currency of cachedSnapshot.currencies) seededCurrencies.set(currency.code, { ...currency });
   const snapshot: MacroSnapshot = {
     ...cachedSnapshot,
-    currencies: cachedSnapshot.currencies.map((currency) => ({ ...currency })),
+    currencies: [...seededCurrencies.values()],
     cot: cachedSnapshot.cot.map((position) => ({ ...position })),
     catalysts: cachedSnapshot.catalysts.map((catalyst) => ({ ...catalyst })),
     asOf: new Date().toISOString(),
@@ -670,6 +690,10 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
   } else if (cotResult.status === 'rejected') {
     console.error('COT provider unavailable; retaining cached positioning:', cotResult.reason);
   }
+  // Never return structural seed values or mixed reference/provider rows as live inputs.
+  snapshot.currencies = snapshot.currencies.filter((currency) =>
+    currency.policyRateSource === 'provider' && currency.inflationSource === 'provider');
+
   if (hasLiveData) {
     const coreG10 = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'SEK', 'NOK'];
     const completeG10MacroCoverage = coreG10.every((code) => {
