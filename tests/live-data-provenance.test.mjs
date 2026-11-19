@@ -83,6 +83,9 @@ test('Ghost Protocol requires a fresh MT5 quote and enforces the 0.65 quality th
   assert.match(quantRisk, /score >= GHOST_PROTOCOL_THRESHOLD/);
   assert.match(signalEngine, /technical\.data_source === 'mt5'/);
   assert.match(signalEngine, /brokerQuote\.source === 'mt5'/);
+  assert.match(signalEngine, /getMarketQuotes\(installationId\)/);
+  assert.match(marketFeeds, /query\.set\('installation_id', `eq\.\$\{installationId\}`\)/);
+  assert.match(marketFeeds, /if \(installationId\) return mt5Quotes/);
   assert.match(signalEngine, /quoteAgeMs <= 120_000/);
   assert.match(signalEngine, /safeToTrade = riskBudget\.approved && ghost\.allowed/);
   assert.match(signalEngine, /ghost_score: ghost\.score/);
