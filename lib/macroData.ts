@@ -78,6 +78,10 @@ function isCurrency(value: unknown): value is MacroCurrency {
     && (value.twoYearYieldSource === undefined || value.twoYearYieldSource === 'provider' || value.twoYearYieldSource === 'reference')
     && (value.policyRateSource === undefined || value.policyRateSource === 'provider' || value.policyRateSource === 'reference')
     && (value.inflationSource === undefined || value.inflationSource === 'provider' || value.inflationSource === 'reference')
+    && (value.policyRateAsOf === undefined || (typeof value.policyRateAsOf === 'string' && Number.isFinite(Date.parse(value.policyRateAsOf))))
+    && (value.inflationAsOf === undefined || (typeof value.inflationAsOf === 'string' && Number.isFinite(Date.parse(value.inflationAsOf))))
+    && (value.policyRateSourceUrl === undefined || (typeof value.policyRateSourceUrl === 'string' && value.policyRateSourceUrl.startsWith('https://')))
+    && (value.inflationSourceUrl === undefined || (typeof value.inflationSourceUrl === 'string' && value.inflationSourceUrl.startsWith('https://')))
     && typeof value.stance === 'string';
 }
 
