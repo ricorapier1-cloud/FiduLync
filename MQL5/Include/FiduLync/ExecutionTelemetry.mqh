@@ -2,8 +2,8 @@
 #define FIDULYNC_EXECUTION_TELEMETRY_MQH
 
 // FiduLync MT5 execution telemetry bridge.
-// Call FiduLyncCaptureTradeTransaction() from the EA's existing OnTradeTransaction.
-// Call FiduLyncFlushExecutionTelemetry() from a throttled OnTimer (recommended: 5 seconds).
+// Call CFiduLyncExecutionTelemetry::CaptureTradeTransaction() from the EA's existing OnTradeTransaction.
+// Call CFiduLyncExecutionTelemetry::Flush() from a throttled OnTimer (recommended: 5 seconds).
 // This module records evidence only; it never sends, modifies or closes orders.
 
 #define FL_TELEMETRY_MAX_PENDING 100
@@ -85,8 +85,11 @@ private:
 
    string UtcIso(const datetime value)
    {
+      // Deal timestamps use broker-server time. Normalize before appending the UTC suffix.
+      long serverOffset=(long)TimeCurrent()-(long)TimeGMT();
+      datetime utcValue=(datetime)((long)value-serverOffset);
       MqlDateTime utc;
-      TimeToStruct(value,utc);
+      TimeToStruct(utcValue,utc);
       return StringFormat("%04d-%02d-%02dT%02d:%02d:%02dZ",
                           utc.year,utc.mon,utc.day,utc.hour,utc.min,utc.sec);
    }
@@ -133,7 +136,7 @@ public:
 
    // Call immediately after OrderSend succeeds; order_ticket links DEAL_ADD transactions.
    void RegisterOrderRequest(const ulong request_id,const ulong order_ticket,const string symbol,const string side,
-                             const double requested_price,const double spread_points)
+                             const double requested_price,const double spread_points,const ulong sent_tick_ms)
    {
       if(order_ticket==0 || requested_price<0.0 || spread_points<0.0 || (side!="BUY" && side!="SELL")) return;
       int existing=FindOrder(order_ticket);
@@ -148,7 +151,7 @@ public:
       context.side=side;
       context.requested_price=requested_price;
       context.spread_points=MathMax(0.0,spread_points);
-      context.sent_tick_ms=GetTickCount64();
+      context.sent_tick_ms=(sent_tick_ms>0 ? sent_tick_ms : GetTickCount64());
       m_requests[m_request_count]=context;
       m_request_count++;
    }
