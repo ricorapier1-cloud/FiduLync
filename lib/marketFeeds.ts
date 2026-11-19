@@ -152,16 +152,22 @@ async function getMt5Quotes(): Promise<MarketQuote[]> {
 }
 
 async function fetchMarketQuotes(): Promise<MarketQuote[]> {
+  const failures: unknown[] = [];
   const mt5Quotes = await getMt5Quotes().catch((error) => {
+    failures.push(error);
     console.warn('MT5 broker quotes are unavailable:', error);
     return [];
   });
-  const apiKey = process.env.FINNHUB_COMMERCIAL_USE_APPROVED === 'true' ? process.env.FINNHUB_API_KEY?.trim() : undefined;
+  const finnhubApproved = process.env.FINNHUB_COMMERCIAL_USE_APPROVED === 'true';
+  const apiKey = finnhubApproved ? process.env.FINNHUB_API_KEY?.trim() : undefined;
   let liveQuotes: MarketQuote[] = [];
-  if (apiKey) {
+  if (finnhubApproved && !apiKey) {
+    failures.push(new Error('Finnhub is approved but FINNHUB_API_KEY is not configured.'));
+  } else if (apiKey) {
     try {
       liveQuotes = await getFinnhubQuotes(apiKey);
     } catch (error) {
+      failures.push(error);
       console.warn('Finnhub live FX quotes are unavailable:', error);
     }
   }
@@ -170,28 +176,43 @@ async function fetchMarketQuotes(): Promise<MarketQuote[]> {
   for (const quote of mt5Quotes) bySymbol.set(quote.symbol, quote);
   for (const quote of liveQuotes) if (!bySymbol.has(quote.symbol)) bySymbol.set(quote.symbol, quote);
   if (bySymbol.size === finnhubSymbols.length) return [...bySymbol.values()];
-  const failures: unknown[] = [];
-  for (const provider of [getFrankfurterQuotes, getExchangeRateQuotes]) {
+
+  // Never call a provider whose commercial-use entitlement has not been approved.
+  // An intentionally disabled provider is not an outage and must not create a
+  // runtime error on every dashboard request.
+  const referenceProviders: Array<() => Promise<MarketQuote[]>> = [];
+  if (process.env.FRANKFURTER_COMMERCIAL_USE_APPROVED === 'true') {
+    referenceProviders.push(getFrankfurterQuotes);
+  }
+  if (process.env.EXCHANGERATE_API_COMMERCIAL_USE_APPROVED === 'true') {
+    referenceProviders.push(getExchangeRateQuotes);
+  }
+  for (const provider of referenceProviders) {
     try {
       for (const quote of await provider()) {
         if (!bySymbol.has(quote.symbol)) bySymbol.set(quote.symbol, quote);
       }
     } catch (error) {
       failures.push(error);
-      console.warn('An FX reference quote provider is unavailable:', error);
+      console.warn('An approved FX reference quote provider is unavailable:', error);
     }
     if (bySymbol.size >= 3 && liveQuotes.length === 0) break;
   }
-  if (!bySymbol.has('XAUUSD')) {
+
+  if (!bySymbol.has('XAUUSD') && process.env.GOLD_API_COMMERCIAL_USE_APPROVED === 'true') {
     try {
       bySymbol.set('XAUUSD', await getGoldQuote());
     } catch (error) {
       failures.push(error);
-      console.warn('Gold reference quote provider is unavailable:', error);
+      console.warn('Approved gold reference quote provider is unavailable:', error);
     }
   }
   if (bySymbol.size) return [...bySymbol.values()];
-  throw new AggregateError(failures, 'No configured FX quote provider returned usable data.');
+
+  // A completely unconfigured feed is an honest offline state, not an exception.
+  // Keep real upstream failures visible when at least one provider was attempted.
+  if (failures.length === 0) return [];
+  throw new AggregateError(failures, 'Configured market quote providers returned no usable data.');
 }
 
 export async function getMarketQuotes(): Promise<MarketQuote[]> {
