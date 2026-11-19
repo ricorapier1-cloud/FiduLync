@@ -134,6 +134,14 @@ export default function StoreTerminal({ initialFleet, telemetryError, initialSna
     return () => window.clearInterval(timer);
   }, [router]);
 
+  async function copyText(label: string, value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch (error) {
+      console.error(`Unable to copy ${label.toLowerCase()}:`, error);
+    }
+  }
+
   async function testSignal() {
     setTesting(true);
     setSignal(null);
@@ -306,7 +314,6 @@ export default function StoreTerminal({ initialFleet, telemetryError, initialSna
               <p>Keep all private API credentials in the secure terminal configuration. Never publish service keys or copy private headers into public code.</p>
             </div>
           </div>
-        </section>
         </section>
 
         <section className="mt-11" aria-labelledby="expectancy-heading">
