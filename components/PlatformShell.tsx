@@ -78,7 +78,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> 
             </a>
             <Link className="secure-pill" href={isHome ? '/store' : '/' }>
-              <span className="secure-dot" /> {isHome ? 'EA Lab' : 'Macro terminal'}
+              <span className="secure-dot" /> {isHome ? 'AlgoLync Store' : 'Macro terminal'}
             </Link>
             <button
               type="button"
@@ -101,7 +101,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
             onClick={(event) => event.stopPropagation()}
           >
             <div className="drawer-heading">
-              <span className="eyebrow">{isHome ? 'MACROLYNC' : 'PERSONAL EA LAB'}</span>
+              <span className="eyebrow">{isHome ? 'MACROLYNC' : 'FIDULYNC NAVIGATION'}</span>
               <button
                 type="button"
                 className="icon-button"
