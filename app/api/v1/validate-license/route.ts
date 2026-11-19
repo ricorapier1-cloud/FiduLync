@@ -16,6 +16,8 @@ function positiveLogin(value: unknown): string {
   return /^\d{1,19}$/.test(text) && BigInt(text) > 0n && BigInt(text) <= 9223372036854775807n ? text : '';
 }
 export async function POST(req: Request) {
+  if (process.env.PERSONAL_QUANT_EDITION !== 'false') return json({ valid: false, message: 'Customer product licensing is retired; use the private MT5 publisher and owner supervisor connection.' }, 410);
+
   const canonical = new URL(req.url).pathname === '/api/v1/license/verify';
   const rate = await enforceDistributedRateLimit(req, 'validate-license', 60, 60_000);
   if (rate.unavailable) return json({ valid: false, message: 'License validation is temporarily unavailable. Retry shortly.' }, 503);
