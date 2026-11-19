@@ -145,7 +145,7 @@ async function processEvent(eventName: string, data: PaystackData, reference: st
 export async function POST(request: Request) {
   if (!isSupabaseConfigured()) return json({ error: 'Payment webhook database is not configured.' }, 503);
   const rawBody = await request.text();
-  if (rawBody.length > 256_000) return json({ error: 'Webhook payload exceeds 256 KB.' }, 413);
+  if (Buffer.byteLength(rawBody, 'utf8') > 256_000) return json({ error: 'Webhook payload exceeds 256 KB.' }, 413);
   const secret = process.env.PAYSTACK_SECRET_KEY?.trim() ?? '';
   if (!secret.startsWith('sk_') || (secret.startsWith('sk_live_') && process.env.PAYSTACK_LIVE_ENABLED !== 'true')) {
     return json({ error: 'Payment webhook is not configured for this Paystack environment.' }, 503);
