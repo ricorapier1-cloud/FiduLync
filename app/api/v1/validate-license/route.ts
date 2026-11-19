@@ -6,7 +6,7 @@ import { hasApprovedProductArtifact } from '@/lib/productRelease';
 import { createLicenseLease } from '@/lib/licenseLease';
 
 export const dynamic = 'force-dynamic';
-type LicenseRecord = { license_key: string; status: string | null; tier: string | null; expires_at: string | null; grace_until: string | null; email: string; ea_slug: string | null };
+type LicenseRecord = { id: string; license_key: string; status: string | null; tier: string | null; expires_at: string | null; grace_until: string | null; email: string; ea_slug: string | null };
 type SeatRecord = { slot_type: 'LIVE' | 'DEMO'; slot_number: number; mt5_login: number | string | null; broker_server: string | null; rebind_available_at: string | null };
 type BindResult = { success: boolean; already_bound?: boolean; reason?: string; rebind_available_at?: string };
 function isRecord(value: unknown): value is Record<string, unknown> { return Boolean(value && typeof value === 'object' && !Array.isArray(value)); }
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     if (broker && broker.length > 128) return json({ valid: false, message: 'broker_server is too long.' }, 400);
     if ((canonical || slug) && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return json({ valid: false, message: 'A valid ea_slug is required.' }, 400);
 
-    const licenses = await supabaseRead<LicenseRecord[]>('licenses', `license_key=eq.${encodeURIComponent(licenseKey)}&select=license_key,status,tier,expires_at,grace_until,email,ea_slug&limit=1`);
+    const licenses = await supabaseRead<LicenseRecord[]>('licenses', `license_key=eq.${encodeURIComponent(licenseKey)}&select=id,license_key,status,tier,expires_at,grace_until,email,ea_slug&limit=1`);
     if (!licenses) throw new Error('License database returned no result.');
     const license = licenses[0];
     if (!license) return json({ valid: false, message: 'Invalid license key.' }, 404);
@@ -67,7 +67,7 @@ export async function POST(req: Request) {
       if (!bound || bound.success !== true) return json({ valid: false, message: bound?.reason || 'The account could not be assigned to an available license seat.' }, 403);
     }
     const licenseHash = createHash('sha256').update(licenseKey).digest('hex');
-    const lease = createLicenseLease({ sub: licenseHash, license_hash: licenseHash, mt5_login: login, account_mode: mode, ea_slug: license.ea_slug });
+    const lease = createLicenseLease({ sub: license.id, license_hash: licenseHash, mt5_login: login, account_mode: mode, ea_slug: license.ea_slug });
     return json({
       valid: true, license_type: license.tier || 'ALGOLYNC_ACTIVE', mt5_login: login, account_mode: mode,
       account: login, account_type: mode, ea_slug: license.ea_slug, lease_token: lease.token,
