@@ -1,6 +1,6 @@
-# FiduLync — Personal Quant Edition
+# FiduLync — Institutional Fintech & Quant Platform
 
-FiduLync is a private, single-operator quantitative research, portfolio-risk governance and MetaTrader 5 EA-supervision platform. MacroLync provides macro and market research; AlgoLync remains the separate legacy EA product and licensing surface.
+FiduLync unifies MacroLync market intelligence, an owner-only Personal Quant risk and MT5 supervision workspace, and the separate AlgoLync Expert Advisor storefront/licensing service. These products share infrastructure but retain distinct permissions, payment entitlements and execution boundaries.
 
 ## Personal Quant Edition: operating boundary
 
@@ -8,10 +8,14 @@ FiduLync is a private, single-operator quantitative research, portfolio-risk gov
 - The EA supervisor is read-only. It returns `APPROVE`, `REDUCE`, `REJECT` or `ABSTAIN` and risk ceilings; it never places, modifies or closes broker orders.
 - Server-side execution remains disabled until the independent model, execution-quality, demo and release gates are separately satisfied.
 - MT5 market data is tied to one installation, broker, server and symbol series. Closed candles are used for research; quotes and publisher telemetry have separate freshness targets.
-- Escrow is excluded from active Personal Quant workflows. Existing store, checkout and customer EA licensing routes remain separate and must not be treated as Personal Quant execution authorization.
+- Escrow is excluded from active Personal Quant workflows. AlgoLync storefront checkout and customer EA licensing remain a separate commercial product boundary and never grant owner-console or Personal Quant execution privileges.
 - Quantitative outputs are research diagnostics, not predictions or guarantees of profitability.
 
 MT5 market-data and supervisor API requests use installation-scoped publisher tokens. Legacy AlgoLync API routes may still use the private `x-algo-key` header; do not reuse that secret as an MT5 publisher token.
+
+## Institutional refinement specification
+
+See [FiduLync Institutional Refinement & Release Specification](docs/FIDULYNC_INSTITUTIONAL_REFINEMENT_SPEC.md) for API security, durable rate limiting, Paystack verification, seat binding, owner administration, mobile UX, evidence labels and release gates. The storefront uses database-authoritative pricing, server-side licence provisioning and an audited 72-hour seat-rebinding policy. Monthly licences last 30 days and require a new verified payment to renew; one-time licences are non-recurring.
 
 ## Local development
 
@@ -28,7 +32,9 @@ Set server-side values in `.env.local` or the deployment secret manager:
 | `UPSTASH_REDIS_REST_URL` | Upstash REST endpoint for shared caching, EA heartbeat state, and closed-trade history; in-process fallback is used if unavailable |
 | `UPSTASH_REDIS_REST_TOKEN` | Server-only Upstash REST token |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL for persisted macro snapshots |
-| `SUPABASE_SERVICE_ROLE_KEY` | Optional server-only Supabase persistence access; never expose to a browser |
+| `SUPABASE_SECRET_KEY` / `SUPABASE_SERVICE_ROLE_KEY` | Server-only Supabase persistence and atomic security RPC access; never expose to a browser |
+| `PAYSTACK_SECRET_KEY` | Server-only Paystack transaction initialization and verification secret |
+| `PAYSTACK_LIVE_ENABLED` | Must remain `false` until merchant compliance, live checkout and refund/cancellation disclosures are approved |
 | `FINNHUB_API_KEY` | Optional FX quotes and economic calendar |
 | `FRED_API_KEY` | Optional; disabled unless separately approved for the intended commercial use and data handling |
 | `FRED_COMMERCIAL_USE_APPROVED` | Must remain `false` unless written permission covers the exact use, display, storage and caching |
@@ -73,7 +79,7 @@ Use a long, unique random value for `ALGOLYNC_PRIVATE_KEY` (or the accepted lega
 }
 ```
 
-Send `x-algo-key: <ALGOLYNC_PRIVATE_KEY>` on signal requests. An optional `?key=` query parameter is supported for WebRequest clients; prefer the header to avoid exposing credentials in URLs and access logs. The same-origin `/store` signal preview uses browser same-origin request metadata and never receives the private EA key. The calendar uses FairEconomy/ForexFactory weekly JSON first, then configured Finnhub or FMP calendars, and finally curated reference events. Every high-impact event mapped to either pair currency blocks signals from 30 minutes before through 30 minutes after its scheduled UTC time. The macro layer contributes 60% of confluence; H1/H4 technical confluence contributes 40%. Signals remain neutral unless both `abs(csi_spread) >= 60` and `abs(confluence_score) >= 45`. `killzone_active` is `LONDON_OPEN`, `NY_OVERLAP`, `ASIAN_RANGE`, or `OFF_SESSION`. `max_risk_pct` and `risk_multiplier` are position-sizing multipliers: 0.50% maximum in trending expansion, 0.25% maximum in mean reversion, and 0% during high-volatility chop, news lockout, or any failed validation gate. Missing or stale technical inputs, a fallback-only macro snapshot, a news lockout, or a high-volatility chop regime disables trading.
+Send `x-algo-key: <ALGOLYNC_PRIVATE_KEY>` on signal requests. An optional `?key=` query parameter is supported for WebRequest clients; prefer the header to avoid exposing credentials in URLs and access logs. The same-origin `/research` Quant Lab signal preview uses browser same-origin request metadata and never receives the private EA key. `/store` is the canonical AlgoLync storefront; `/licensing` redirects to it. The calendar uses FairEconomy/ForexFactory weekly JSON first, then configured Finnhub or FMP calendars, and finally curated reference events. Every high-impact event mapped to either pair currency blocks signals from 30 minutes before through 30 minutes after its scheduled UTC time. The macro layer contributes 60% of confluence; H1/H4 technical confluence contributes 40%. Signals remain neutral unless both `abs(csi_spread) >= 60` and `abs(confluence_score) >= 45`. `killzone_active` is `LONDON_OPEN`, `NY_OVERLAP`, `ASIAN_RANGE`, or `OFF_SESSION`. `max_risk_pct` and `risk_multiplier` are position-sizing multipliers: 0.50% maximum in trending expansion, 0.25% maximum in mean reversion, and 0% during high-volatility chop, news lockout, or any failed validation gate. Missing or stale technical inputs, a fallback-only macro snapshot, a news lockout, or a high-volatility chop regime disables trading.
 
 Live quotes and technical calculations use a 60-second Upstash TTL. Macro snapshots use a 900-second TTL; signals use a 15-second TTL with cache bypass around news-lockout boundaries.
 
