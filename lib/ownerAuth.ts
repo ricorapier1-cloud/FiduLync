@@ -25,8 +25,8 @@ export async function requireOwner(request: Request): Promise<VerifiedOwner | nu
   if (!accessToken || accessToken.length > 8192 || !supabaseUrl || !publishableKey || !OWNER_EMAIL) return null;
 
   try {
-    const response = await fetch(\${supabaseUrl.replace(/\/$/, '')}/auth/v1/user, {
-      headers: { apikey: publishableKey, Authorization: \`Bearer \${accessToken}\` },
+    const response = await fetch(supabaseUrl.replace(/\/$/, '') + '/auth/v1/user', {
+      headers: { apikey: publishableKey, Authorization: 'Bearer ' + accessToken },
       cache: 'no-store',
       signal: AbortSignal.timeout(5_000),
     });
