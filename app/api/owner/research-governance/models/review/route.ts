@@ -27,7 +27,8 @@ export async function POST(request: Request) {
     if (authError || !user || !user.email_confirmed_at || !allowlist.includes(user.id)) {
       return NextResponse.json({ error: 'This verified account is not an authorised independent reviewer.' }, { status: 403 });
     }
-    let body: unknown;\n    try { body = await request.json(); } catch { return NextResponse.json({ error: 'A valid JSON review payload is required.' }, { status: 400 }); }
+    let body: unknown;
+    try { body = await request.json(); } catch { return NextResponse.json({ error: 'A valid JSON review payload is required.' }, { status: 400 }); }
     if (!isRecord(body)) return NextResponse.json({ error: 'A review payload is required.' }, { status: 400 });
     const modelId = Number(body.model_id);
     const decision = body.decision;
