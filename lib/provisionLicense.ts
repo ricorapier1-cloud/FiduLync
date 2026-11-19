@@ -2,6 +2,7 @@ import 'server-only';
 
 import { createHash, randomBytes } from 'node:crypto';
 import { isSupabaseConfigured, supabaseQuery, supabaseRead } from '@/lib/supabaseAdmin';
+import { hasApprovedProductArtifact } from '@/lib/productRelease';
 
 type Plan = 'MONTHLY' | 'LIFETIME';
 type Currency = 'NGN' | 'USD';
@@ -112,6 +113,7 @@ export async function provisionLicenseForReference(referenceInput: string): Prom
   if (!products) throw new Error('Authoritative product catalogue is unavailable.');
   const product = products[0];
   if (!product || !product.is_active || product.category === 'SANDBOX') throw new Error('Payment references a product that is not active for paid licensing.');
+  if (!(await hasApprovedProductArtifact(eaSlug))) throw new Error('Paid license provisioning is blocked until an approved compiled .ex5 artifact is available.');
 
   const productPrice = currency === 'NGN'
     ? Number(plan === 'MONTHLY' ? product.monthly_price_ngn : product.one_time_price_ngn)
