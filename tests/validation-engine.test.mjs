@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import { calculateTradeMetrics, applyExecutionCostStress, evaluateWalkForward, monteCarloBootstrap } from '../.quant-test/validationEngine.js';
 
 const trades = Array.from({ length: 40 }, (_, i) => ({ netR: i % 4 === 0 ? -0.5 : 0.4 }));
-const thirtyWins = Array.from({ length: 30 }, () => ({ netR: 0.2 }));
+const tradesBetween = (start, end) => {
+  const from = Date.parse(start), to = Date.parse(end);
+  return Array.from({ length: 30 }, (_, i) => ({ netR: 0.2, closedAt: new Date(from + ((to - from) * (i + 1)) / 31).toISOString() }));
+};
 
 test('trade metrics compute expectancy, profit factor and drawdown', () => {
   const result = calculateTradeMetrics(trades);
@@ -24,9 +27,9 @@ test('execution stress deducts spread, slippage, commission and swap independent
 
 test('walk-forward validation requires chronological folds and sufficient OOS evidence', () => {
   const folds = [
-    { trainStart:'2025-01-01T00:00:00Z', trainEnd:'2025-02-01T00:00:00Z', testStart:'2025-02-01T00:00:00Z', testEnd:'2025-03-01T00:00:00Z', inSample:thirtyWins, outOfSample:thirtyWins },
-    { trainStart:'2025-02-01T00:00:00Z', trainEnd:'2025-03-01T00:00:00Z', testStart:'2025-03-01T00:00:00Z', testEnd:'2025-04-01T00:00:00Z', inSample:thirtyWins, outOfSample:thirtyWins },
-    { trainStart:'2025-03-01T00:00:00Z', trainEnd:'2025-04-01T00:00:00Z', testStart:'2025-04-01T00:00:00Z', testEnd:'2025-05-01T00:00:00Z', inSample:thirtyWins, outOfSample:thirtyWins },
+    { trainStart:'2025-01-01T00:00:00Z', trainEnd:'2025-02-01T00:00:00Z', testStart:'2025-02-01T00:00:00Z', testEnd:'2025-03-01T00:00:00Z', inSample:tradesBetween('2025-01-01T00:00:00Z','2025-02-01T00:00:00Z'), outOfSample:tradesBetween('2025-02-01T00:00:00Z','2025-03-01T00:00:00Z') },
+    { trainStart:'2025-02-01T00:00:00Z', trainEnd:'2025-03-01T00:00:00Z', testStart:'2025-03-01T00:00:00Z', testEnd:'2025-04-01T00:00:00Z', inSample:tradesBetween('2025-02-01T00:00:00Z','2025-03-01T00:00:00Z'), outOfSample:tradesBetween('2025-03-01T00:00:00Z','2025-04-01T00:00:00Z') },
+    { trainStart:'2025-03-01T00:00:00Z', trainEnd:'2025-04-01T00:00:00Z', testStart:'2025-04-01T00:00:00Z', testEnd:'2025-05-01T00:00:00Z', inSample:tradesBetween('2025-03-01T00:00:00Z','2025-04-01T00:00:00Z'), outOfSample:tradesBetween('2025-04-01T00:00:00Z','2025-05-01T00:00:00Z') },
   ];
   const result = evaluateWalkForward(folds);
   assert.equal(result.eligible, true);
