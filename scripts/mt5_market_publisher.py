@@ -7,6 +7,7 @@ It reads public market data only; it does not place trades or collect broker pas
 Install:
     py -m pip install MetaTrader5
 Run:
+    set FIDULYNC_INGEST_URL=https://fidulync.vercel.app/api/v1/market-data/ingest
     set FIDULYNC_PUBLISHER_TOKEN=flmt5_...
     set MT5_SYMBOL_MAP=EURUSD=EURUSD,GBPUSD=GBPUSD,USDJPY=USDJPY,XAUUSD=XAUUSD
     py scripts/mt5_market_publisher.py
