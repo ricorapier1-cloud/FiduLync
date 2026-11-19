@@ -18,7 +18,8 @@ export function verifyPaystackWebhookSignature(
 ): boolean {
   const modernHeader = headers.get('paystack-signature') ?? '';
   const webhookSecret = secrets.webhookSecret?.trim() ?? '';
-  if (modernHeader && webhookSecret.startsWith('whsec_')) {
+  if (modernHeader && webhookSecret) {
+    if (!webhookSecret.startsWith('whsec_')) return false;
     const parts = modernHeader.split(',').map((part) => part.trim());
     const timestampPart = parts.find((part) => part.startsWith('t='));
     const timestamp = timestampPart ? Number(timestampPart.slice(2)) : NaN;
