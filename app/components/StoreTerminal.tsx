@@ -135,11 +135,11 @@ export default function StoreTerminal({ initialSnapshot, session }: StoreTermina
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
             <a
-              href="/mql5/MacroLyncBridge.mqh"
+              href="/downloads/QuantSupervisor.mqh"
               download
               className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-emerald-300/30 bg-emerald-300/[0.1] px-3.5 text-xs font-medium text-emerald-100 transition hover:bg-emerald-300/[0.16]"
             >
-              <BrandGlyph name="arrow-down" size={15} /> Research Bridge (.mqh)
+              <BrandGlyph name="arrow-down" size={15} /> Quant Supervisor (.mqh)
             </a>
             
           </div>
@@ -169,14 +169,14 @@ export default function StoreTerminal({ initialSnapshot, session }: StoreTermina
         <section className="mt-11" aria-labelledby="personal-library-heading">
           <div className="mb-4">
             <div className="font-mono text-[9px] tracking-[0.17em] text-emerald-400">02 / PERSONAL EA LIBRARY</div>
-            <h2 id="personal-library-heading" className="mt-1 text-lg font-semibold">Research and demo EA files</h2>
-            <p className="mt-2 max-w-3xl text-xs leading-5 text-slate-400">Free sample source files for later MetaEditor compilation and Strategy Tester work. They are research fixtures, not verified profitable systems or production-ready live robots.</p>
+            <h2 id="personal-library-heading" className="mt-1 text-lg font-semibold">Private MT5 integration toolkit</h2>
+            <p className="mt-2 max-w-3xl text-xs leading-5 text-slate-400">Original integration components for your own EAs, broker data and fail-closed risk supervision.</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <a href="/downloads/Eridam_Nexus_Adaptive_Demo.mq5" download className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-4 transition hover:border-emerald-400/30"><strong className="text-sm text-white">Eridam Nexus Adaptive — Demo</strong><span className="mt-2 block text-[11px] leading-5 text-slate-400">Multi-regime volatility sample for EURUSD, GBPUSD and XAUUSD.</span><span className="mt-3 block font-mono text-[10px] text-emerald-300">DOWNLOAD .MQ5</span></a>
-            <a href="/downloads/Velocity_Vault_Momentum_Demo.mq5" download className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-4 transition hover:border-emerald-400/30"><strong className="text-sm text-white">Velocity Vault Momentum — Demo</strong><span className="mt-2 block text-[11px] leading-5 text-slate-400">Session-expansion momentum sample for controlled testing.</span><span className="mt-3 block font-mono text-[10px] text-emerald-300">DOWNLOAD .MQ5</span></a>
-            <a href="/downloads/MacroLync_G10_Breakout_Test.mq5" download className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-4 transition hover:border-emerald-400/30"><strong className="text-sm text-white">MacroLync G10 ATR Breakout — Test</strong><span className="mt-2 block text-[11px] leading-5 text-slate-400">Source fixture for MetaEditor compilation and Strategy Tester checks.</span><span className="mt-3 block font-mono text-[10px] text-emerald-300">DOWNLOAD .MQ5</span></a>
-            <a href="/mql5/MacroLyncBridge.mqh" download className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-4 transition hover:border-emerald-400/30"><strong className="text-sm text-white">MacroLync MT5 Bridge</strong><span className="mt-2 block text-[11px] leading-5 text-slate-400">MQL5 include for the existing FiduLync telemetry and research bridge.</span><span className="mt-3 block font-mono text-[10px] text-emerald-300">DOWNLOAD .MQH</span></a>
+
+
+
+
             <a href="/downloads/QuantSupervisor.mqh" download className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-4 transition hover:border-emerald-400/30"><strong className="text-sm text-white">FiduLync Quant Supervisor</strong><span className="mt-2 block text-[11px] leading-5 text-slate-400">Fail-closed MQL5 client for authenticated risk decisions. No order execution.</span><span className="mt-3 block font-mono text-[10px] text-emerald-300">DOWNLOAD .MQH</span></a>
             <a href="/downloads/FiduLync_Supervisor_Probe.mq5" download className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-4 transition hover:border-emerald-400/30"><strong className="text-sm text-white">Supervisor Connectivity Probe</strong><span className="mt-2 block text-[11px] leading-5 text-slate-400">No-trade demo EA to test the authenticated supervisor after deployment.</span><span className="mt-3 block font-mono text-[10px] text-emerald-300">DOWNLOAD .MQ5</span></a>
             <a href="/downloads/FiduLync_MT5_Market_Publisher.py" download className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-4 transition hover:border-emerald-400/30"><strong className="text-sm text-white">MT5 Market Data Publisher</strong><span className="mt-2 block text-[11px] leading-5 text-slate-400">Python connector for broker quotes, closed candles, account telemetry and risk metadata.</span><span className="mt-3 block font-mono text-[10px] text-emerald-300">DOWNLOAD .PY</span></a>
@@ -229,16 +229,13 @@ export default function StoreTerminal({ initialSnapshot, session }: StoreTermina
 
           <div className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-5 sm:p-6">
             <div className="font-mono text-[9px] tracking-[0.17em] text-slate-500">04 / MT5 CONNECTION</div>
-            <h2 className="mt-1 text-lg font-semibold">Signal &amp; telemetry bridge</h2>
+            <h2 className="mt-1 text-lg font-semibold">MT5 data &amp; risk supervision</h2>
             <div className="mt-5 space-y-3 rounded-lg border border-white/[0.07] bg-black/20 p-4 text-xs leading-5 text-slate-300">
               <p><strong className="text-white">Research signal:</strong> same-origin read-only diagnostics at <code className="text-emerald-200">/api/v1/macro-signal</code>. Missing or stale data must produce a defensive hold.</p>
               <p><strong className="text-white">MT5 market data:</strong> register your own terminal in the private Owner Console. Each installation receives a one-time publisher token stored as a hash server-side.</p>
               <p><strong className="text-white">EA supervision:</strong> authenticated installation context only. The supervisor can approve, reduce, reject or abstain and return a risk ceiling; it cannot send broker orders.</p>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
-              <a href="/mql5/MacroLyncBridge.mqh" download className="inline-flex h-9 items-center gap-2 rounded-md border border-white/[0.1] px-3 text-[10px] text-slate-300 hover:border-emerald-300/30">
-                <BrandGlyph name="arrow-down" size={13} /> MacroLyncBridge.mqh
-              </a>
               <a href="/downloads/QuantSupervisor.mqh" download className="inline-flex h-9 items-center gap-2 rounded-md border border-white/[0.1] px-3 text-[10px] text-slate-300 hover:border-emerald-300/30">
                 <BrandGlyph name="arrow-down" size={13} /> QuantSupervisor.mqh
               </a>
@@ -262,7 +259,7 @@ export default function StoreTerminal({ initialSnapshot, session }: StoreTermina
             <li className="rounded-lg border border-white/[0.06] bg-black/20 p-3"><strong className="text-white">3. Register the terminal</strong><br />Use the private owner console to register the terminal and its installation credential. Never share broker passwords.</li>
             <li className="rounded-lg border border-white/[0.06] bg-black/20 p-3"><strong className="text-white">4. Start in shadow/demo mode</strong><br />Verify quotes, closed candles, broker symbol specifications and EA telemetry before considering any live use.</li>
           </ol>
-          <p className="mt-4 text-[11px] leading-5 text-amber-200/80">No personal EA execution approval is enabled by this page. Keep broker-side stop-loss protection and the EA&apos;s local risk controls active.</p>
+          <p className="mt-4 text-[11px] leading-5 text-amber-200/80">No order is placed by this page. The supervisor is an advisory gate only; your EA must enforce local SL/TP, margin, spread, slippage and equity protections.</p>
         </section>
 
                 <div className="mt-8 flex items-center gap-2 border-t border-white/[0.07] pt-5 text-[10px] leading-5 text-slate-600">
