@@ -35,8 +35,8 @@ Set server-side values in `.env.local` or the deployment secret manager:
 | `SUPABASE_SECRET_KEY` / `SUPABASE_SERVICE_ROLE_KEY` | Server-only Supabase persistence and atomic security RPC access; never expose to a browser |
 | `PAYSTACK_SECRET_KEY` | Server-only Paystack transaction initialization and verification secret |
 | `PAYSTACK_LIVE_ENABLED` | Must remain `false` until merchant compliance, live checkout and refund/cancellation disclosures are approved |
-| `FINNHUB_API_KEY` | Optional FX quotes and economic calendar |
-| `FRED_API_KEY` | Optional; disabled unless separately approved for the intended commercial use and data handling |
+| `FINNHUB_API_KEY` | Optional FX quotes and economic calendar; not called until commercial-use approval is recorded |
+| `FINNHUB_COMMERCIAL_USE_APPROVED` | Must be `true` only after written permission covers the intended quote/calendar display and caching |\n| `FRANKFURTER_COMMERCIAL_USE_APPROVED` / `EXCHANGERATE_API_COMMERCIAL_USE_APPROVED` / `GOLD_API_COMMERCIAL_USE_APPROVED` | Keep `false` until each reference provider's commercial-use and attribution terms are approved |\n| `FRED_API_KEY` | Optional; disabled unless separately approved for the intended commercial use and data handling |
 | `FRED_COMMERCIAL_USE_APPROVED` | Must remain `false` unless written permission covers the exact use, display, storage and caching |
 | `BEA_API_KEY` / `BLS_API_KEY` | Diagnostic credentials only; full adapters are not yet integrated |
 | `TWELVE_DATA_API_KEY` | Historical candle fallback; disabled for customer-facing use until commercial and exchange rights are approved |
@@ -93,7 +93,7 @@ Download [`public/mql5/MacroLyncBridge.mqh`](./public/mql5/MacroLyncBridge.mqh) 
 
 ## Data providers and deployment
 
-The macro adapter validates upstream policy rates, inflation, COT positioning, and catalysts; live data can be combined with a persisted Supabase snapshot. The CFTC adapter calculates non-commercial net-position percentiles. Candle provider responses must contain at least 200 chronologically valid candles per requested timeframe for EMA alignment and technical calculations.
+The macro adapter validates upstream policy rates, inflation, COT positioning, and catalysts; live data can be combined with a persisted Supabase snapshot. Provider outages return an empty, untimestamped unavailable state—not fabricated reference policy levels. Snapshots older than 24 hours are rejected. Third-party quote/reference feeds are disabled until their specific commercial-use approvals are configured; MT5 broker quotes are sourced only after the Windows publisher connects. The CFTC adapter calculates non-commercial net-position percentiles. Candle provider responses must contain at least 200 chronologically valid candles per requested timeframe for EMA alignment and technical calculations.
 
 The scheduled `/api/cron/sync-macro` route uses `CRON_SECRET`. Upstash provides shared EA heartbeat telemetry; when not configured, the dashboard reports process-local fallback storage.
 
