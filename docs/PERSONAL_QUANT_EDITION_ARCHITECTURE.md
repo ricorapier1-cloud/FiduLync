@@ -7,6 +7,14 @@
 **Trading modes:** Discretionary analysis and automated MT5 EAs  
 **EA authority:** Supervisor only — approve, reject, abstain and recommend a risk ceiling; never place broker orders on behalf of the EA.
 
+## 0. Binding product-scope clarification — 2026-11-19
+
+This personal, non-commercial scope supersedes all legacy commercial/marketplace implementation notes elsewhere in this historical audit document. FiduLync is operated only by the configured owner. No customer registration, checkout, Paystack, subscriptions, escrow, public EA catalogue, customer licence issuance, customer account portal or commercial support workflow belongs in the active navigation or runtime.
+
+Preserve the private email/password owner login, MacroLync research, QuantLync technical/statistical analysis, RiskLync controls, AlgoLync EA supervision, the MT5 publisher gateway, source provenance, historical data, audit history and all useful owner diagnostics. Do not delete historical financial/audit rows. Retired commercial endpoints should be disabled or return a clear gone/not-supported response, not silently provision entitlements.
+
+Provider permissions are personal-use-specific. Public official sources and Frankfurter reference rates can be used only within their terms and attribution requirements. Finnhub, Twelve Data, Alpha Vantage, FMP, FairEconomy and custom providers require an eligible personal plan/entitlement for the exact display, caching and programmatic use. FRED data must carry the required attribution and is not transmitted to external AI prompts. Frankfurter is reference data, never a real-time broker quote.
+
 ## 1. Product contract
 
 FiduLync Personal Quant Edition is a private, single-operator quantitative research, risk-governance and MT5 EA-supervision system. It is not a customer SaaS, EA marketplace, subscription business, escrow service, broker, copy-trading service or managed-account service.
