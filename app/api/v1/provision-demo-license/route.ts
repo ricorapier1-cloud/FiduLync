@@ -40,7 +40,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'mt5_account must be a valid positive integer when supplied.' }, { status: 400 });
     }
 
-    const randomSuffix = randomBytes(8).toString('hex').toUpperCase();
+    const randomSuffix = randomBytes(16).toString('hex').toUpperCase();
     const cleanSlug = eaSlug.replace(/[^a-z0-9]/g, '').slice(0, 10).toUpperCase();
     const licenseKey = `ALGO-DEMO-${cleanSlug}-${randomSuffix}`;
     const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
