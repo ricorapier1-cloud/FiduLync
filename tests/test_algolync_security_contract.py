@@ -83,6 +83,48 @@ class AlgoLyncSecurityContractTests(unittest.TestCase):
         self.assertIn("72-hour cooldown", terms)
         self.assertIn("high level of risk", terms)
 
+
+    def test_privileged_owner_mutations_are_authenticated_and_audited(self):
+        owner_routes = (
+            "app/api/owner/licenses/route.ts",
+            "app/api/owner/mt5-installations/route.ts",
+            "app/api/owner/control-plane/route.ts",
+            "app/api/owner/operations/route.ts",
+            "app/api/owner/market-intelligence/route.ts",
+            "app/api/owner/diagnostics/route.ts",
+            "app/api/mt5/installations/route.ts",
+        )
+        for route in owner_routes:
+            with self.subTest(route=route):
+                self.assertIn("requireOwner", self.read(route))
+        revoke = self.read("app/api/owner/licenses/route.ts")
+        self.assertIn("export async function DELETE", revoke)
+        self.assertIn("rpc/revoke_algolync_license", revoke)
+        control = self.read("app/owner/OwnerControlPlane.tsx")
+        self.assertIn("Revoke licence", control)
+        diagnostics = self.read("app/api/owner/diagnostics/route.ts")
+        self.assertNotIn("x-algo-key", diagnostics)
+
+    def test_secondary_pages_have_explicit_terminal_navigation(self):
+        pages = (
+            "app/store/page.tsx",
+            "app/account/page.tsx",
+            "app/owner/page.tsx",
+            "app/privacy/page.tsx",
+            "app/terms/page.tsx",
+            "app/faq/page.tsx",
+            "app/guide/page.tsx",
+        )
+        for page in pages:
+            with self.subTest(page=page):
+                source = self.read(page)
+                if page == "app/store/page.tsx":
+                    source += self.read("app/components/LegacyStoreTerminal.tsx")
+                self.assertIn("BACK TO TERMINAL", source)
+        shell = self.read("components/PlatformShell.tsx")
+        self.assertIn("const mobileLinks = [", shell)
+        self.assertIn("AlgoLync Store", shell)
+
     def test_mql5_client_sends_actual_account_mode(self):
         source = self.read("mql5/MacroLyncLicense.mqh")
         self.assertIn("ACCOUNT_TRADE_MODE", source)
