@@ -87,7 +87,7 @@ async function checkProductArtifact(eaSlug: string, requireApproval: boolean): P
     || !Number.isFinite(Date.parse(artifact.approved_at)))) return false;
   const exists = await verifyStoredObject(artifact);
   if (!exists) return false;
-  return requireApproval ? verifyStoredObjectHash(artifact) : true;
+  return requireApproval ? true : verifyStoredObjectHash(artifact);
 }
 
 /** Confirms that the registered private .ex5 object still exists and has integrity metadata. */
