@@ -32,7 +32,7 @@ function InteractiveSparkline({ points, color }: { points: number[]; color: 'eme
       <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
         <span className="flex items-center gap-1.5">
           <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: strokeColor }} />
-          HISTORICAL EXPECTANCY (EQUITY CURVE)
+          SIMULATED ILLUSTRATION (NOT VERIFIED)
         </span>
         <span className="text-slate-300">
           {hoverIndex !== null ? `Step ${hoverIndex + 1}: ${points[hoverIndex].toFixed(1)} pts` : `+${(((max - min) / min) * 100).toFixed(1)}% Cum.`}
@@ -65,26 +65,39 @@ export function QuantStrategyCatalog({ onSelectEa }: { onSelectEa?: (slug: strin
   const [demoModalEa, setDemoModalEa] = useState<EaProduct | null>(null);
   const [generatedDemoKey, setGeneratedDemoKey] = useState<string | null>(null);
   const [loadingDemo, setLoadingDemo] = useState(false);
+  const [demoEmail, setDemoEmail] = useState('');
+  const [demoError, setDemoError] = useState('');
+
+  const openDemoRequest = (ea: EaProduct) => {
+    setDemoModalEa(ea);
+    setGeneratedDemoKey(null);
+    setDemoEmail('');
+    setDemoError('');
+  };
 
   const handleGenerateDemo = async (ea: EaProduct) => {
-    setDemoModalEa(ea);
+    if (!demoEmail.trim()) {
+      setDemoError('Enter an email address to issue your demo entitlement.');
+      return;
+    }
     setLoadingDemo(true);
     setGeneratedDemoKey(null);
+    setDemoError('');
 
     try {
       const res = await fetch('/api/v1/provision-demo-license', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ea_slug: ea.slug }),
+        body: JSON.stringify({ ea_slug: ea.slug, email: demoEmail.trim() }),
       });
       const data = await res.json();
       if (data.success && data.license_key) {
         setGeneratedDemoKey(data.license_key);
       } else {
-        setGeneratedDemoKey(`ALGO-DEMO-${ea.slug.split('-')[0].toUpperCase()}-PREVIEW`);
+        setDemoError(typeof data.error === 'string' ? data.error : 'Demo provisioning was not completed. No license key was issued.');
       }
-    } catch {
-      setGeneratedDemoKey(`ALGO-DEMO-${ea.slug.split('-')[0].toUpperCase()}-OFFLINE`);
+    } catch { 
+      setDemoError('Demo provisioning service could not be reached. No license key was issued.');
     } finally {
       setLoadingDemo(false);
     }
@@ -102,7 +115,7 @@ export function QuantStrategyCatalog({ onSelectEa }: { onSelectEa?: (slug: strin
             Algorithmic Trading Systems &amp; Verified MQL5 Artifacts
           </h2>
           <p className="mt-1 text-xs text-slate-400">
-            Download open-source demo EAs for chart testing, or provision institutional cloud-authenticated licenses for live accounts.
+            AlgoLync products, licensing and research artifacts. Performance figures shown below are illustrative simulations, not verified live customer results.
           </p>
         </div>
         <div className="flex items-center gap-2 font-mono text-[11px] text-slate-400">
@@ -160,22 +173,23 @@ export function QuantStrategyCatalog({ onSelectEa }: { onSelectEa?: (slug: strin
                   <span className="font-bold text-white">{pricingLabel}</span>
                 </div>
 
-                {/* Telemetry and Stats Grid */}
-                <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg border border-white/[0.05] bg-black/30 p-2.5 font-mono text-[11px]">
+                {/* Clearly separated simulated reference metrics; never present as live verified telemetry. */}
+                <div className="mt-3 rounded-lg border border-amber-400/20 bg-amber-400/[0.04] px-3 py-2 text-[9px] font-mono uppercase tracking-wide text-amber-200">SIMULATED / ILLUSTRATIVE METRICS · NOT LIVE VERIFIED TELEMETRY · NO INDEPENDENT PERFORMANCE AUDIT</div>
+                <div className="mt-2 grid grid-cols-2 gap-2 rounded-lg border border-white/[0.05] bg-black/30 p-2.5 font-mono text-[11px]">
                   <div>
-                    <span className="text-[9px] text-slate-500 uppercase block">Win Rate</span>
+                    <span className="text-[9px] text-slate-500 uppercase block">Simulated Win Rate</span>
                     <strong className="text-emerald-400 font-semibold">{strategy.winRate}</strong>
                   </div>
                   <div>
-                    <span className="text-[9px] text-slate-500 uppercase block">Profit Factor</span>
+                    <span className="text-[9px] text-slate-500 uppercase block">Simulated Profit Factor</span>
                     <strong className="text-white font-semibold">{strategy.profitFactor}</strong>
                   </div>
                   <div>
-                    <span className="text-[9px] text-slate-500 uppercase block">Sharpe Ratio</span>
+                    <span className="text-[9px] text-slate-500 uppercase block">Simulated Sharpe</span>
                     <strong className="text-white font-semibold">{strategy.sharpeRatio}</strong>
                   </div>
                   <div>
-                    <span className="text-[9px] text-slate-500 uppercase block">Max Drawdown</span>
+                    <span className="text-[9px] text-slate-500 uppercase block">Simulated Drawdown</span>
                     <strong className="text-amber-400 font-semibold">{strategy.maxDrawdown}</strong>
                   </div>
                 </div>
@@ -194,7 +208,7 @@ export function QuantStrategyCatalog({ onSelectEa }: { onSelectEa?: (slug: strin
                 {/* Interactive SVG Sparkline */}
                 <InteractiveSparkline points={strategy.equityCurvePoints} color={strategy.badgeColor} />
                 <p className="mt-1.5 text-[9px] text-slate-500 italic">
-                  * {strategy.provenanceNote}
+                  * Illustrative sample only. {strategy.provenanceNote} No verified live-account telemetry is currently displayed for this strategy.
                 </p>
               </div>
 
@@ -203,7 +217,7 @@ export function QuantStrategyCatalog({ onSelectEa }: { onSelectEa?: (slug: strin
                 {/* Button A: Instant 1-Click Demo Key & Download */}
                 <button
                   type="button"
-                  onClick={() => handleGenerateDemo(strategy)}
+                  onClick={() => openDemoRequest(strategy)}
                   className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2.5 text-xs font-semibold text-slate-200 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
                 >
                   <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -237,7 +251,7 @@ export function QuantStrategyCatalog({ onSelectEa }: { onSelectEa?: (slug: strin
               <div className="flex items-center gap-2">
                 <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
                 <h3 className="font-mono text-sm font-bold text-emerald-400 uppercase tracking-wider">
-                  Instant Demo License Provisioned
+                  Request a 14-Day Demo License
                 </h3>
               </div>
               <button
@@ -259,17 +273,18 @@ export function QuantStrategyCatalog({ onSelectEa }: { onSelectEa?: (slug: strin
                 <span className="text-[10px] text-emerald-400/80 uppercase block mb-1">
                   14-Day Sandbox Demo License Key
                 </span>
+                <label htmlFor="demo-license-email" className="mb-1 block text-[10px] text-slate-400">EMAIL FOR DEMO LICENSE</label>
+                <input id="demo-license-email" type="email" value={demoEmail} onChange={(event) => setDemoEmail(event.target.value)} placeholder="you@example.com" className="mb-3 w-full rounded-lg border border-white/10 bg-black/60 px-3 py-2 text-xs text-white" />
                 {loadingDemo ? (
-                  <div className="py-2 text-xs text-emerald-300/60 animate-pulse">
-                    Generating cryptographic sandbox entitlement…
-                  </div>
+                  <div className="py-2 text-xs text-emerald-300/60 animate-pulse">Persisting demo entitlement…</div>
+                ) : generatedDemoKey ? (
+                  <code className="block select-all text-sm font-bold text-emerald-400">{generatedDemoKey}</code>
                 ) : (
-                  <code className="block select-all text-sm font-bold text-emerald-400">
-                    {generatedDemoKey}
-                  </code>
+                  <button type="button" onClick={() => void handleGenerateDemo(demoModalEa)} className="w-full rounded-lg bg-emerald-500 px-3 py-2 text-xs font-bold text-black disabled:opacity-50" disabled={!demoEmail.trim()}>Generate demo license</button>
                 )}
+                {demoError && <p role="alert" className="mt-2 text-[10px] leading-4 text-rose-300">{demoError}</p>}
                 <span className="mt-1 block text-[9px] text-slate-500">
-                  * Bound exclusively to MT5 Demo accounts (`ACCOUNT_TRADE_MODE_DEMO`). Real accounts blocked.
+                  * 14-day demo entitlement only. Server validation blocks live accounts.
                 </span>
               </div>
 
