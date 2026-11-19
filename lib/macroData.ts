@@ -88,7 +88,9 @@ function isCurrency(value: unknown): value is MacroCurrency {
     && isFiniteNumber(value.inflation)
     && typeof value.inflationLabel === 'string'
     && (value.corePce === undefined || isFiniteNumber(value.corePce))
+    && (value.corePceAsOf === undefined || (typeof value.corePceAsOf === 'string' && Number.isFinite(Date.parse(value.corePceAsOf))))
     && (value.cpi === undefined || isFiniteNumber(value.cpi))
+    && (value.cpiAsOf === undefined || (typeof value.cpiAsOf === 'string' && Number.isFinite(Date.parse(value.cpiAsOf))))
     && (value.twoYearYield === undefined || isFiniteNumber(value.twoYearYield))
     && (value.twoYearYieldAsOf === undefined || (typeof value.twoYearYieldAsOf === 'string' && Number.isFinite(Date.parse(value.twoYearYieldAsOf))))
     && (value.twoYearYieldSource === undefined || value.twoYearYieldSource === 'provider' || value.twoYearYieldSource === 'reference')
@@ -530,6 +532,7 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
         usd.inflation = fredResult.value.corePce;
         usd.inflationLabel = 'Core PCE';
         usd.corePce = fredResult.value.corePce;
+        usd.corePceAsOf = fredResult.value.corePceAsOf;
         usd.inflationSource = 'provider';
         usd.inflationProvider = 'fred';
         usd.inflationAsOf = fredResult.value.corePceAsOf;
@@ -537,8 +540,7 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
       }
       if (isFiniteNumber(fredResult.value.cpi)) {
         usd.cpi = fredResult.value.cpi;
-        usd.inflationSource = 'provider';
-        usd.inflationAsOf = fredResult.value.cpiAsOf;
+        usd.cpiAsOf = fredResult.value.cpiAsOf;
         hasLiveData = true;
       }
       if (isFiniteNumber(fredResult.value.twoYearYield)) {
@@ -551,6 +553,7 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
         usd.inflation = fredResult.value.cpi;
         usd.inflationLabel = 'CPI';
         usd.inflationSource = 'provider';
+        usd.inflationAsOf = fredResult.value.cpiAsOf;
       }
     }
   } else if (fredResult.status === 'rejected') {
