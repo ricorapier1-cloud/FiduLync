@@ -161,7 +161,7 @@ export async function GET(request: Request) {
       .select('symbol,bar_time,close,broker,server')
       .eq('installation_id', latestManifest.installation_id)
       .eq('timeframe', 'H1').eq('is_closed', true)
-      .order('bar_time', { ascending: false }).limit(2_000) : null;
+      .order('bar_time', { ascending: false }).limit(3_000) : null;
     let candleRows = candleQuery ? await candleQuery : { data: [], error: null };
     if (candleRows.error) throw candleRows.error;
     if (account?.broker) candleRows = { ...candleRows, data: (candleRows.data ?? []).filter((row) => row.broker === account.broker) };
@@ -172,7 +172,7 @@ export async function GET(request: Request) {
       const pair = symbol.match(/^([A-Z]{6})/)?.[1];
       const close = Number(row.close);
       const time = String(row.bar_time);
-      if (!pair || !Number.isFinite(Date.parse(time)) || !Number.isFinite(close) || close <= 0) continue;
+      if (!pair || pair === 'SPX500' || !Number.isFinite(Date.parse(time)) || !Number.isFinite(close) || close <= 0) continue;
       const series = closeSeries.get(pair) ?? new Map<string, number>();
       if (!series.has(time)) series.set(time, close);
       closeSeries.set(pair, series);
@@ -228,6 +228,58 @@ export async function GET(request: Request) {
         for (const next of adjacency.get(current) ?? []) if (!visitedSymbols.has(next)) stack.push(next);
       }
       if (cluster.length > 1) correlationClusters.push(cluster.sort());
+    }
+    const crossAssetSymbols = new Map<string, string>();
+    const crossAssetCloses = new Map<string, Map<string, number>>();
+    for (const row of candleRows.data ?? []) {
+      const symbol = String(row.symbol ?? '').toUpperCase();
+      const asset = /^(DXY)/.test(symbol) ? 'DXY'
+        : /^(USOIL|WTI|XTIUSD)/.test(symbol) ? 'OIL'
+          : /^(SPX500|US500|SPX)/.test(symbol) ? 'SPX' : null;
+      const close = Number(row.close), time = String(row.bar_time);
+      if (!asset || !Number.isFinite(close) || close <= 0 || !Number.isFinite(Date.parse(time))) continue;
+      if (!crossAssetSymbols.has(asset)) crossAssetSymbols.set(asset, symbol);
+      const series = crossAssetCloses.get(asset) ?? new Map<string, number>();
+      if (!series.has(time)) series.set(time, close);
+      crossAssetCloses.set(asset, series);
+    }
+    const crossAssetReturns = new Map<string, Map<string, number>>();
+    for (const [asset, series] of crossAssetCloses) {
+      const ordered = [...series.entries()].sort((a, b) => Date.parse(a[0]) - Date.parse(b[0]));
+      const values = new Map<string, number>();
+      for (let index = 1; index < ordered.length; index += 1) {
+        if (ordered[index - 1][1] > 0 && ordered[index][1] > 0) {
+          values.set(ordered[index][0], Math.log(ordered[index][1] / ordered[index - 1][1]));
+        }
+      }
+      crossAssetReturns.set(asset, values);
+    }
+    const crossAssetLeadLag: Array<{ symbol: string; asset: string; lead_asset_bars: number; correlation: number; overlapping_returns: number }> = [];
+    for (const [pair, pairReturns] of returns) {
+      if (!/^[A-Z]{6}$/.test(pair)) continue;
+      for (const [asset, assetReturns] of crossAssetReturns) {
+        const alignedTimes = [...pairReturns.keys()].filter((time) => assetReturns.has(time)).sort((a, b) => Date.parse(a) - Date.parse(b));
+        for (let lag = 0; lag <= 2; lag += 1) {
+          const samples: Array<[number, number]> = [];
+          for (let index = lag; index < alignedTimes.length; index += 1) {
+            const pairValue = pairReturns.get(alignedTimes[index]);
+            const assetValue = assetReturns.get(alignedTimes[index - lag]);
+            if (pairValue !== undefined && assetValue !== undefined) samples.push([pairValue, assetValue]);
+          }
+          if (samples.length < 30) continue;
+          const meanPair = samples.reduce((sum, item) => sum + item[0], 0) / samples.length;
+          const meanAsset = samples.reduce((sum, item) => sum + item[1], 0) / samples.length;
+          const covariance = samples.reduce((sum, item) => sum + (item[0] - meanPair) * (item[1] - meanAsset), 0);
+          const variancePair = samples.reduce((sum, item) => sum + (item[0] - meanPair) ** 2, 0);
+          const varianceAsset = samples.reduce((sum, item) => sum + (item[1] - meanAsset) ** 2, 0);
+          const denominator = Math.sqrt(variancePair * varianceAsset);
+          if (denominator > 0) crossAssetLeadLag.push({
+            symbol: pair, asset, lead_asset_bars: lag,
+            correlation: Number((covariance / denominator).toFixed(4)),
+            overlapping_returns: samples.length,
+          });
+        }
+      }
     }
     const modelRows = models.data ?? [];
 
