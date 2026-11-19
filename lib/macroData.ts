@@ -525,35 +525,35 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
         usd.policyRate = fredResult.value.policyRate;
         usd.policyRateSource = 'provider';
         usd.policyRateProvider = 'fred';
-        usd.policyRateAsOf = fredResult.value.policyRateAsOf;
+        usd.policyRateAsOf = typeof fredResult.value.policyRateAsOf === 'string' ? fredResult.value.policyRateAsOf : undefined;
         hasLiveData = true;
       }
       if (isFiniteNumber(fredResult.value.corePce)) {
         usd.inflation = fredResult.value.corePce;
         usd.inflationLabel = 'Core PCE';
         usd.corePce = fredResult.value.corePce;
-        usd.corePceAsOf = fredResult.value.corePceAsOf;
+        usd.corePceAsOf = typeof fredResult.value.corePceAsOf === 'string' ? fredResult.value.corePceAsOf : undefined;
         usd.inflationSource = 'provider';
         usd.inflationProvider = 'fred';
-        usd.inflationAsOf = fredResult.value.corePceAsOf;
+        usd.inflationAsOf = typeof fredResult.value.corePceAsOf === 'string' ? fredResult.value.corePceAsOf : undefined;
         hasLiveData = true;
       }
       if (isFiniteNumber(fredResult.value.cpi)) {
         usd.cpi = fredResult.value.cpi;
-        usd.cpiAsOf = fredResult.value.cpiAsOf;
+        usd.cpiAsOf = typeof fredResult.value.cpiAsOf === 'string' ? fredResult.value.cpiAsOf : undefined;
         hasLiveData = true;
       }
       if (isFiniteNumber(fredResult.value.twoYearYield)) {
         usd.twoYearYield = fredResult.value.twoYearYield;
         usd.twoYearYieldSource = 'provider';
-        usd.twoYearYieldAsOf = fredResult.value.twoYearYieldAsOf;
+        usd.twoYearYieldAsOf = typeof fredResult.value.twoYearYieldAsOf === 'string' ? fredResult.value.twoYearYieldAsOf : undefined;
         hasLiveData = true;
       }
       if (!isFiniteNumber(fredResult.value.corePce) && isFiniteNumber(fredResult.value.cpi)) {
         usd.inflation = fredResult.value.cpi;
         usd.inflationLabel = 'CPI';
         usd.inflationSource = 'provider';
-        usd.inflationAsOf = fredResult.value.cpiAsOf;
+        usd.inflationAsOf = typeof fredResult.value.cpiAsOf === 'string' ? fredResult.value.cpiAsOf : undefined;
       }
     }
   } else if (fredResult.status === 'rejected') {
