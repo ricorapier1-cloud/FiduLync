@@ -92,9 +92,9 @@ The web app can prepare and validate the server-side components, but it cannot c
 
 - GitHub CI passes on the exact proposed commit.
 - Vercel preview build succeeds and protected owner routes pass authenticated smoke tests.
+- Vercel's daily production cron returns an authenticated, truthful success/degraded status; manual on-demand refresh remains available. Macro cadence follows official release schedules, while market tick/candle data comes from MT5.
 - Production deployment commit matches the reviewed Git commit.
 - Supabase RLS and security advisors have no unresolved critical exposure.
-- Scheduled macro refresh authenticates and returns a truthful success/degraded response.
 - At least one approved personal-use macro source is returning timestamped observations.
 - MT5 publisher sends fresh broker quotes and closed candles; installation heartbeat is current.
 - MQL5 compilation, Strategy Tester and demo forward test pass before any live execution.
