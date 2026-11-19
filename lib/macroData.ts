@@ -761,7 +761,9 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
           ? 'provider'
           : 'fallback',
       cotSource: data.payload.cotSource === 'provider' ? 'provider' : 'unavailable',
+      cotProvider: data.payload.cotProvider === 'cftc' || data.payload.cotProvider === 'custom' ? data.payload.cotProvider : undefined,
       calendarSource: data.payload.calendarSource === 'provider' ? 'provider' : 'reference',
+      calendarProvider: ['fair-economy', 'finnhub', 'fmp', 'macro-provider'].includes(String(data.payload.calendarProvider)) ? data.payload.calendarProvider as MacroSnapshot['calendarProvider'] : undefined,
       asOf: data.refreshed_at,
       ...(ecbRates && Object.keys(ecbRates).length > 0 ? { ecbRates } : {}),
     };
@@ -815,23 +817,24 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
         }
       }
       const providerSnapshot = mergeWithFallback({
-        ...baseline,
+        ...getFallbackSnapshot(),
         ...parsed,
-        currencies: [
-          ...baseline.currencies,
-          ...parsed.currencies.map((currency) => ({
-            ...currency,
-            policyRateSource: 'provider' as const,
-            inflationSource: 'provider' as const,
-          })),
-        ],
-        cot: parsed.cot.length > 0 ? parsed.cot : baseline.cot,
-        catalysts: parsed.catalysts.length > 0 ? parsed.catalysts : baseline.catalysts,
+        currencies: parsed.currencies.map((currency) => ({
+          ...currency,
+          policyRateSource: 'provider' as const,
+          inflationSource: 'provider' as const,
+          policyRateProvider: 'macro-provider' as const,
+          inflationProvider: 'macro-provider' as const,
+        })),
+        cot: parsed.cot,
+        catalysts: parsed.catalysts,
         source: 'partial',
-        cotSource: parsed.cot.length > 0 ? 'provider' : (baseline.cotSource ?? 'unavailable'),
+        cotSource: parsed.cot.length > 0 ? 'provider' : 'unavailable',
+        cotProvider: parsed.cot.length > 0 ? 'custom' : undefined,
         calendarSource: parsed.catalysts.length > 0 ? 'provider' : 'reference',
+        calendarProvider: parsed.catalysts.length > 0 ? 'macro-provider' : undefined,
         asOf: new Date().toISOString(),
-        ...(ecbRates ? { ecbRates } : {}),
+        ...(process.env.FRANKFURTER_COMMERCIAL_USE_APPROVED === 'true' && ecbRates ? { ecbRates } : {}),
       });
       const coreG10 = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'SEK', 'NOK'];
       const completeG10MacroCoverage = coreG10.every((code) => {
@@ -847,7 +850,7 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
   }
 
   try {
-    const liveSnapshot = await getLiveProviderSnapshot(baseline);
+    const liveSnapshot = await getLiveProviderSnapshot();
     if (liveSnapshot) {
       const merged = mergeWithFallback(liveSnapshot);
       await persistMacroSnapshot(merged);
