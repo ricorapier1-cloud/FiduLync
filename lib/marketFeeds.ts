@@ -125,12 +125,16 @@ type StoredMt5Quote = {
   ask: number;
   quote_time: string;
   received_at: string;
+  spread_points: number | null;
+  point: number | null;
+  broker: string | null;
+  server: string | null;
   installation: { status: string } | { status: string }[];
 };
 
 async function getMt5Quotes(): Promise<MarketQuote[]> {
   const query = new URLSearchParams({
-    select: 'symbol,bid,ask,quote_time,received_at,installation:mt5_installations!inner(status)',
+    select: 'symbol,bid,ask,quote_time,received_at,spread_points,point,broker,server,installation:mt5_installations!inner(status)',
     'installation.status': 'eq.active',
     order: 'quote_time.desc',
     limit: '100',
@@ -149,6 +153,12 @@ async function getMt5Quotes(): Promise<MarketQuote[]> {
     changePercent: null,
     timestamp: new Date(row.quote_time).toISOString(),
     source: 'mt5' as const,
+    bid: Number(row.bid),
+    ask: Number(row.ask),
+    spread_points: typeof row.spread_points === 'number' ? row.spread_points : null,
+    point: typeof row.point === 'number' ? row.point : null,
+    broker: row.broker ?? undefined,
+    server: row.server ?? undefined,
   }));
 }
 
