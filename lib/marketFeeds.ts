@@ -132,13 +132,14 @@ type StoredMt5Quote = {
   installation: { status: string } | { status: string }[];
 };
 
-async function getMt5Quotes(): Promise<MarketQuote[]> {
+async function getMt5Quotes(installationId?: string): Promise<MarketQuote[]> {
   const query = new URLSearchParams({
     select: 'symbol,bid,ask,quote_time,received_at,spread_points,point,broker,server,installation:mt5_installations!inner(status)',
     'installation.status': 'eq.active',
     order: 'quote_time.desc',
     limit: '100',
   });
+  if (installationId) query.set('installation_id', `eq.${installationId}`);
   const rows = await supabaseRead<StoredMt5Quote[]>('mt5_market_quotes', query.toString());
   if (!rows?.length) return [];
   const latestBySymbol = new Map<string, StoredMt5Quote>();
@@ -162,13 +163,15 @@ async function getMt5Quotes(): Promise<MarketQuote[]> {
   }));
 }
 
-async function fetchMarketQuotes(): Promise<MarketQuote[]> {
+async function fetchMarketQuotes(installationId?: string): Promise<MarketQuote[]> {
   const failures: unknown[] = [];
-  const mt5Quotes = await getMt5Quotes().catch((error) => {
+  const mt5Quotes = await getMt5Quotes(installationId).catch((error) => {
     failures.push(error);
     console.warn('MT5 broker quotes are unavailable:', error);
     return [];
   });
+  if (installationId) return mt5Quotes;
+
   const finnhubPersonalPlanActive = process.env.FINNHUB_PERSONAL_PLAN_ACTIVE === 'true';
   const apiKey = finnhubPersonalPlanActive ? process.env.FINNHUB_API_KEY?.trim() : undefined;
   let liveQuotes: MarketQuote[] = [];
@@ -224,8 +227,9 @@ async function fetchMarketQuotes(): Promise<MarketQuote[]> {
   throw new AggregateError(failures, 'Configured market quote providers returned no usable data.');
 }
 
-export async function getMarketQuotes(): Promise<MarketQuote[]> {
-  const quotes = await getCachedData('market:live-quotes', fetchMarketQuotes, QUOTE_CACHE_TTL_SECONDS);
+export async function getMarketQuotes(installationId?: string): Promise<MarketQuote[]> {
+  const cacheKey = `market:live-quotes:${installationId ?? 'active'}`;
+  const quotes = await getCachedData(cacheKey, () => fetchMarketQuotes(installationId), QUOTE_CACHE_TTL_SECONDS);
   const now = Date.now();
   return quotes.filter((quote) => {
     const timestamp = Date.parse(quote.timestamp);
