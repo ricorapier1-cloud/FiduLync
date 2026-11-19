@@ -53,7 +53,9 @@ export async function GET(req: Request) {
   if (!rate.allowed) return json({ success: false, error: 'Rate limit exceeded.' }, 429);
   if (!isSupabaseConfigured()) return json({ success: false, error: 'Licensing service is not configured.' }, 503);
 
-  const licenseKey = new URL(req.url).searchParams.get('license_key')?.trim().toUpperCase() ?? '';
+  const authorization = req.headers.get('authorization') ?? '';
+  const token = /^Bearer\\s+(.+)$/i.exec(authorization)?.[1]?.trim() ?? '';
+  const licenseKey = token.toUpperCase();
   if (!validLicenseKey(licenseKey)) return json({ success: false, error: 'A valid license_key is required.' }, 400);
 
   try {
