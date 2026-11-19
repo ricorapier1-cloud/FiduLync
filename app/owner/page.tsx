@@ -190,7 +190,9 @@ export default function OwnerAccessPage() {
       setRecoveryMode(false);
       setRecoverySession(null);
       setMessage('Password updated. Your owner session is being verified.');
-      await verifyOwner(recoverySession);
+      const { data: refreshed } = await supabase.auth.getSession();
+      if (!refreshed.session) throw new Error('Password updated, but the owner session could not be restored. Sign in with the new password.');
+      await verifyOwner(refreshed.session);
     } catch (error) {
       setMessage(friendlyAuthError(error instanceof Error ? error.message : 'Unable to update the password.'));
     } finally {
