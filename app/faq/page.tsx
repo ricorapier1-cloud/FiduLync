@@ -25,7 +25,7 @@ const questions = [
   },
   {
     q: 'How do I connect MetaTrader 5?',
-    a: 'When you have access to a Windows MT5 terminal, compile the EA in MetaEditor, install the required MQL5 include, allow https://fidulync.vercel.app under Tools → Options → Expert Advisors → Allow WebRequest, and register the terminal through the restricted Owner Console. Start with shadow or demo testing.',
+    a: 'When you have access to a Windows MT5 terminal, compile your own EA in MetaEditor, install QuantSupervisor.mqh, allow https://fidulync.vercel.app under Tools → Options → Expert Advisors → Allow WebRequest, and register the terminal through the private Owner Console to obtain its one-time publisher token. Start with shadow or demo testing.',
   },
   {
     q: 'Why does Performance Lab show no win rate or profit factor?',
