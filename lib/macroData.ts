@@ -606,13 +606,16 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     currency.policyRateSourceUrl = item.result.value.sourceUrl;
     hasLiveData = true;
   }
-\n  if (worldBankResult.status === 'fulfilled') {
+
+  if (worldBankResult.status === 'fulfilled') {
     for (const observation of worldBankResult.value) {
       const currency = snapshot.currencies.find((item) => item.code === observation.currency);
       if (!currency || currency.inflationSource === 'provider') continue;
       currency.inflation = observation.inflation;
       currency.inflationLabel = `CPI (annual, ${observation.year})`;
       currency.inflationSource = 'provider';
+      currency.inflationAsOf = observation.year;
+      currency.inflationSourceUrl = `https://api.worldbank.org/v2/country/${({ GBP: 'GBR', JPY: 'JPN', CHF: 'CHE', AUD: 'AUS', NZD: 'NZL', SEK: 'SWE', NOK: 'NOR' } as Record<string, string>)[observation.currency]}/indicator/FP.CPI.TOTL.ZG`;
       hasLiveData = true;
     }
   } else {
