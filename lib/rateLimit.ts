@@ -16,7 +16,8 @@ export function getClientIp(req: Request): string {
   // Vercel terminates the public connection and supplies x-real-ip.
   // Do not trust arbitrary client-provided X-Forwarded-For values.
   const value = req.headers.get('x-real-ip')?.trim();
-  if (!value || value.length > 64 || value.includes(',') || !/^[0-9a-fA-F:.]+$/.test(value)) return '';
+  if (!value) return process.env.NODE_ENV === 'production' ? '' : '127.0.0.1';
+  if (value.length > 64 || value.includes(',') || !/^[0-9a-fA-F:.]+$/.test(value)) return '';
   return value;
 }
 
