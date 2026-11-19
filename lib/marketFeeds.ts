@@ -143,7 +143,7 @@ async function getMt5Quotes(): Promise<MarketQuote[]> {
   if (!rows?.length) return [];
   const latestBySymbol = new Map<string, StoredMt5Quote>();
   for (const row of rows) {
-    if (!['EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD'].includes(row.symbol)) continue;
+    if (!/^[A-Z]{6}$/.test(row.symbol) && !['XAUUSD', 'XAGUSD', 'DXY', 'USOIL', 'SPX500'].includes(row.symbol)) continue;
     if (Date.now() - Date.parse(row.quote_time) > 120_000) continue;
     if (!latestBySymbol.has(row.symbol)) latestBySymbol.set(row.symbol, row);
   }
@@ -186,7 +186,7 @@ async function fetchMarketQuotes(): Promise<MarketQuote[]> {
   const bySymbol = new Map<MarketQuote['symbol'], MarketQuote>();
   for (const quote of mt5Quotes) bySymbol.set(quote.symbol, quote);
   for (const quote of liveQuotes) if (!bySymbol.has(quote.symbol)) bySymbol.set(quote.symbol, quote);
-  if (bySymbol.size === finnhubSymbols.length) return [...bySymbol.values()];
+  if (bySymbol.size >= finnhubSymbols.length) return [...bySymbol.values()];
 
   // Never call an optional provider until its personal-use plan permits this display.
   // An intentionally disabled provider is not an outage and must not create a
