@@ -5,7 +5,6 @@ import { readFileSync } from 'node:fs';
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const macroData = read('../lib/macroData.ts');
 const macroEngine = read('../lib/macroEngine.ts');
-const currencyStrength = read('../lib/currencyStrength.ts');
 const dashboard = read('../app/components/MacroDashboard.tsx');
 const marketFeeds = read('../lib/marketFeeds.ts');
 const technicalEngine = read('../lib/technicalEngine.ts');
