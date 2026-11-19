@@ -25,12 +25,10 @@ export default function OwnerArtifactRelease({ accessToken }: { accessToken: str
   const [reason, setReason] = useState('');
   const [confirmed, setConfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
   const refresh = useCallback(async () => {
-    setRefreshing(true);
     try {
       const response = await fetch('/api/owner/artifacts', {
         headers: { Authorization: 'Bearer ' + accessToken },
@@ -43,8 +41,6 @@ export default function OwnerArtifactRelease({ accessToken }: { accessToken: str
       if (payload.products.length > 0) setSlug((current) => payload.products?.some((product) => product.slug === current) ? current : payload.products?.[0]?.slug ?? current);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Artifact registry could not be loaded.');
-    } finally {
-      setRefreshing(false);
     }
   }, [accessToken]);
 
@@ -135,7 +131,7 @@ export default function OwnerArtifactRelease({ accessToken }: { accessToken: str
           <div className="text-xs font-semibold text-slate-200">Private compiled EA releases</div>
           <p className="mt-1 text-[10px] leading-5 text-slate-500">Upload only a MetaEditor-compiled .ex5 file. Your browser calculates SHA-256, then uploads directly to private Supabase Storage using a short-lived signed URL; the server registers the object and leaves release approval off by default.</p>
         </div>
-        <button type="button" onClick={() => void refresh()} disabled={refreshing} className="rounded-lg border border-white/10 px-3 py-2 text-[10px] text-slate-300 disabled:opacity-50">{refreshing ? 'Refreshing…' : 'Refresh artifacts'}</button>
+        <button type="button" onClick={() => void refresh()} disabled={loading} className="rounded-lg border border-white/10 px-3 py-2 text-[10px] text-slate-300 disabled:opacity-50">Refresh artifacts</button>
       </div>
 
       <form onSubmit={upload} className="grid gap-3 sm:grid-cols-2">
