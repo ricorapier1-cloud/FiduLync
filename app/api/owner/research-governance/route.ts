@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireOwner } from '@/lib/ownerAuth';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
-import { getPersonalRiskPolicy } from '@/lib/riskPolicy';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
