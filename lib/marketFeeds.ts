@@ -69,7 +69,7 @@ async function getFrankfurterQuotes(): Promise<MarketQuote[]> {
 }
 
 async function getExchangeRateQuotes(): Promise<MarketQuote[]> {
-  if (process.env.EXCHANGERATE_API_COMMERCIAL_USE_APPROVED !== 'true') throw new Error('ExchangeRate-API reference quotes are disabled pending commercial-use approval.');
+  if (process.env.EXCHANGERATE_API_PERSONAL_USE_ENABLED !== 'true') throw new Error('ExchangeRate-API reference quotes are disabled pending personal-use permission.');
   const response = await fetch('https://open.er-api.com/v6/latest/USD', {
     cache: 'no-store',
     signal: AbortSignal.timeout(5_000),
@@ -97,7 +97,7 @@ async function getExchangeRateQuotes(): Promise<MarketQuote[]> {
 }
 
 async function getGoldQuote(): Promise<MarketQuote> {
-  if (process.env.GOLD_API_COMMERCIAL_USE_APPROVED !== 'true') throw new Error('Gold-API reference quotes are disabled pending commercial-use approval.');
+  if (process.env.GOLD_API_PERSONAL_USE_ENABLED !== 'true') throw new Error('Gold-API reference quotes are disabled pending personal-use permission.');
   const response = await fetch('https://api.gold-api.com/price/XAU', {
     cache: 'no-store',
     signal: AbortSignal.timeout(5_000),
@@ -182,7 +182,7 @@ async function fetchMarketQuotes(): Promise<MarketQuote[]> {
   // runtime error on every dashboard request.
   const referenceProviders: Array<() => Promise<MarketQuote[]>> = [];
   referenceProviders.push(getFrankfurterQuotes);
-  if (process.env.EXCHANGERATE_API_COMMERCIAL_USE_APPROVED === 'true') {
+  if (process.env.EXCHANGERATE_API_PERSONAL_USE_ENABLED === 'true') {
     referenceProviders.push(getExchangeRateQuotes);
   }
   for (const provider of referenceProviders) {
@@ -197,7 +197,7 @@ async function fetchMarketQuotes(): Promise<MarketQuote[]> {
     if (bySymbol.size >= 3 && liveQuotes.length === 0) break;
   }
 
-  if (!bySymbol.has('XAUUSD') && process.env.GOLD_API_COMMERCIAL_USE_APPROVED === 'true') {
+  if (!bySymbol.has('XAUUSD') && process.env.GOLD_API_PERSONAL_USE_ENABLED === 'true') {
     try {
       bySymbol.set('XAUUSD', await getGoldQuote());
     } catch (error) {
@@ -228,8 +228,8 @@ export async function getMarketQuotes(): Promise<MarketQuote[]> {
       return ageMs <= 48 * 60 * 60_000;
     }
     if (quote.source === 'exchangerate-api') {
-      return process.env.EXCHANGERATE_API_COMMERCIAL_USE_APPROVED === 'true' && ageMs <= 48 * 60 * 60_000;
+      return process.env.EXCHANGERATE_API_PERSONAL_USE_ENABLED === 'true' && ageMs <= 48 * 60 * 60_000;
     }
-    return process.env.GOLD_API_COMMERCIAL_USE_APPROVED === 'true' && ageMs <= 48 * 60 * 60_000;
+    return process.env.GOLD_API_PERSONAL_USE_ENABLED === 'true' && ageMs <= 48 * 60 * 60_000;
   });
 }
