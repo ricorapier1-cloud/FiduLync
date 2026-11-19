@@ -11,6 +11,10 @@ type DemoRequest = {
   mt5_account?: unknown;
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
 export async function POST(req: Request) {
   const rate = await enforceDistributedRateLimit(req, 'provision-demo-license', 5, 60 * 60_000);
   if (rate.unavailable) return NextResponse.json({ success: false, error: 'Demo provisioning is temporarily unavailable.' }, { status: 503 });
@@ -19,15 +23,18 @@ export async function POST(req: Request) {
   if (!isSupabaseConfigured()) return NextResponse.json({ success: false, error: 'License database is not configured.' }, { status: 503 });
 
   try {
-    let raw: unknown;\n    try { raw = await req.json(); } catch { return NextResponse.json({ success: false, error: 'A valid JSON request is required.' }, { status: 400 }); }
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-      return NextResponse.json({ success: false, error: 'A valid JSON object is required.' }, { status: 400 });
+    let raw: unknown;
+    try {
+      raw = await req.json();
+    } catch {
+      return NextResponse.json({ success: false, error: 'A valid JSON request is required.' }, { status: 400 });
     }
+    if (!isRecord(raw)) return NextResponse.json({ success: false, error: 'A valid JSON object is required.' }, { status: 400 });
     const body = raw as DemoRequest;
     const eaSlug = typeof body.ea_slug === 'string' ? body.ea_slug.trim().toLowerCase() : 'eridam-nexus-pro';
     const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(eaSlug)) return NextResponse.json({ success: false, error: 'Invalid AlgoLync product selection.' }, { status: 400 });
-    const products = await supabaseRead<Array<{ slug: string; category: string; is_active: boolean }>>('ea_products', `slug=eq.${encodeURIComponent(eaSlug)}&is_active=eq.true&select=slug,category,is_active`);
+    const products = await supabaseRead<Array<{ slug: string; category: string; is_active: boolean }>>('ea_products', \`slug=eq.\${encodeURIComponent(eaSlug)}&is_active=eq.true&select=slug,category,is_active\`);
     if (!products) throw new Error('Product catalogue database unavailable.');
     if (!products[0] || !products[0].is_active || products[0].category === 'SANDBOX') return NextResponse.json({ success: false, error: 'Select an eligible active AlgoLync EA product.' }, { status: 400 });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
@@ -44,7 +51,7 @@ export async function POST(req: Request) {
 
     const randomSuffix = randomBytes(16).toString('hex').toUpperCase();
     const cleanSlug = eaSlug.replace(/[^a-z0-9]/g, '').slice(0, 10).toUpperCase();
-    const licenseKey = `ALGO-DEMO-${cleanSlug}-${randomSuffix}`;
+    const licenseKey = \`ALGO-DEMO-\${cleanSlug}-\${randomSuffix}\`;
     const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
 
     const persisted = await persistLicense({
