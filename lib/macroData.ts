@@ -490,7 +490,7 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
     getBankOfJapanPolicyRate(),
     getReserveBankOfAustraliaPolicyRate(),
     getReserveBankOfNewZealandPolicyRate(),
-    process.env.SNB_COMMERCIAL_USE_APPROVED === 'true' ? getSwissNationalBankPolicyRate() : Promise.reject(new Error('SNB commercial-use approval is not configured.')),
+    process.env.SNB_DATA_SOURCE_ENABLED === 'true' && process.env.SNB_COMMERCIAL_USE_APPROVED === 'true' ? getSwissNationalBankPolicyRate() : Promise.reject(new Error('SNB commercial-use approval is not configured.')),
   ]);
   let hasLiveData = false;
   if (fredResult.status === 'fulfilled' && isRecord(fredResult.value)) {
