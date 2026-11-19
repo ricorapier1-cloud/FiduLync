@@ -5,7 +5,9 @@ export type MacroCurrency = {
   inflation: number;
   inflationLabel: string;
   corePce?: number;
+  corePceAsOf?: string;
   cpi?: number;
+  cpiAsOf?: string;
   twoYearYield?: number;
   twoYearYieldAsOf?: string;
   twoYearYieldSource?: 'provider' | 'reference';
