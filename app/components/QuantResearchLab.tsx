@@ -235,6 +235,7 @@ export default function QuantResearchLab() {
           <div className="mt-4 flex flex-wrap gap-2">
             <Link href="/owner" className="inline-flex h-9 items-center rounded-lg border border-emerald-300/25 px-3 text-[10px] text-emerald-200 hover:bg-emerald-300/5">Open private EA fleet & risk console</Link>
             <Link href="/analytics" className="inline-flex h-9 items-center rounded-lg border border-white/10 px-3 text-[10px] text-slate-300 hover:border-emerald-300/20">Open performance research</Link>
+            <Link href="/research/notebook" className="inline-flex h-9 items-center rounded-lg border border-cyan-300/25 px-3 text-[10px] text-cyan-200 hover:bg-cyan-300/5">Open hypothesis notebook</Link>
           </div>
         </section>
 
