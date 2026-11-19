@@ -8,6 +8,13 @@ const macroEngine = read('../lib/macroEngine.ts');
 const currencyStrength = read('../lib/currencyStrength.ts');
 const dashboard = read('../app/components/MacroDashboard.tsx');
 const marketFeeds = read('../lib/marketFeeds.ts');
+const productRelease = read('../lib/productRelease.ts');
+const checkout = read('../app/api/v1/create-checkout/route.ts');
+const licenseValidation = read('../app/api/v1/validate-license/route.ts');
+const paidProvisioning = read('../lib/provisionLicense.ts');
+const demoProvisioning = read('../app/api/v1/provision-demo-license/route.ts');
+const productCatalog = read('../lib/eaCatalog.ts');
+const catalogUi = read('../components/QuantStrategyCatalog.tsx');
 
 test('provider outage returns an empty, untimestamped macro fallback', () => {
   const fallback = macroData.match(/export function getFallbackSnapshot\(\): MacroSnapshot \{[\s\S]*?\n\}/)?.[0];
@@ -42,4 +49,20 @@ test('third-party quote feeds require explicit commercial-use approval', () => {
   assert.match(marketFeeds, /FRANKFURTER_COMMERCIAL_USE_APPROVED !== 'true'/);
   assert.match(marketFeeds, /EXCHANGERATE_API_COMMERCIAL_USE_APPROVED !== 'true'/);
   assert.match(marketFeeds, /GOLD_API_COMMERCIAL_USE_APPROVED !== 'true'/);
+});
+
+test('paid and demo licensing require a verified private compiled release artifact', () => {
+  assert.match(productRelease, /release_approved === true/);
+  assert.match(productRelease, /sha256/);
+  assert.match(productRelease, /storage\/v1\/object\/sign\/algolync-artifacts/);
+  assert.match(checkout, /hasApprovedProductArtifact\(eaSlug\)/);
+  assert.match(licenseValidation, /hasApprovedProductArtifact\(license\.ea_slug\)/);
+  assert.match(paidProvisioning, /hasApprovedProductArtifact\(eaSlug\)/);
+  assert.match(demoProvisioning, /hasApprovedProductArtifact\(eaSlug\)/);
+});
+
+test('catalogue does not ship illustrative performance metrics or equity curves', () => {
+  assert.doesNotMatch(productCatalog, /winRate|profitFactor|sharpeRatio|maxDrawdown|equityCurvePoints/);
+  assert.doesNotMatch(catalogUi, /InteractiveSparkline|strategy\.winRate|strategy\.profitFactor|SIMULATED ILLUSTRATION/);
+  assert.match(catalogUi, /AWAITING APPROVED BUILD/);
 });
