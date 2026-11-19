@@ -42,8 +42,16 @@ export async function POST(request: Request) {
   if (rate.unavailable) return NextResponse.json({ error: 'Research notebook is temporarily unavailable.' }, { status: 503 });
   if (!rate.allowed) return NextResponse.json({ error: 'Research notebook rate limit exceeded.' }, { status: 429 });
 
+  const contentLength = Number(request.headers.get('content-length') ?? 0);
+  if (Number.isFinite(contentLength) && contentLength > 64 * 1024) {
+    return NextResponse.json({ error: 'Hypothesis payload exceeds the 64 KB limit.' }, { status: 413 });
+  }
   let payload: unknown;
-  try { payload = await request.json(); } catch {
+  try {
+    const body = await request.text();
+    if (body.length > 64 * 1024) return NextResponse.json({ error: 'Hypothesis payload exceeds the 64 KB limit.' }, { status: 413 });
+    payload = JSON.parse(body);
+  } catch {
     return NextResponse.json({ error: 'A valid JSON body is required.' }, { status: 400 });
   }
   if (!isRecord(payload) || typeof payload.title !== 'string' || payload.title.trim().length < 3
