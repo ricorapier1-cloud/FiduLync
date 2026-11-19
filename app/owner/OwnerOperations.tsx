@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import OwnerControlPlane from './OwnerControlPlane';
 import OwnerTradingDesk from './OwnerTradingDesk';
 import OwnerResearchGovernance from './OwnerResearchGovernance';
 
@@ -36,18 +35,17 @@ type Overview = {
   database: { reachable: boolean; installation_records: number };
   governance: { audit_log: string; multi_role_access: string; step_up_authentication: string; model_validation_registry: string; portfolio_risk_telemetry: string };
 };
-type ModuleId = 'overview' | 'trading' | 'market' | 'risk' | 'research' | 'governance' | 'security' | 'reliability' | 'platform';
+type ModuleId = 'overview' | 'trading' | 'market' | 'risk' | 'research' | 'governance' | 'security' | 'reliability';
 
 const modules: { id: ModuleId; label: string; short: string; description: string }[] = [
   { id: 'overview', label: 'Command overview', short: 'Overview', description: 'Operational posture and critical exceptions' },
   { id: 'trading', label: 'Quantitative trading desk', short: 'Trading desk', description: 'Pair intelligence, multi-timeframe technicals and macro context' },
-  { id: 'governance', label: 'Platform governance', short: 'Governance', description: 'Identity, privileged access and platform policy' },
+  { id: 'governance', label: 'Research governance', short: 'Governance', description: 'Identity, privileged access and platform policy' },
   { id: 'market', label: 'Market data operations', short: 'Market data', description: 'Broker connectors, freshness and feed integrity' },
   { id: 'research', label: 'Quant research oversight', short: 'Quant research', description: 'Model provenance, validation and release controls' },
   { id: 'risk', label: 'Risk control centre', short: 'Risk controls', description: 'Risk policy, exposure visibility and fail-safe controls' },
   { id: 'security', label: 'Security and audit', short: 'Security', description: 'Authentication, credential lifecycle and accountability' },
   { id: 'reliability', label: 'System reliability', short: 'Reliability', description: 'Service health, data pipeline and release readiness' },
-  { id: 'platform', label: 'Platform administration', short: 'Platform admin', description: 'Store, customers, licensing, payments and provider administration' },
 ];
 
 function formatTime(value: string | null | undefined) {
@@ -165,14 +163,13 @@ export default function OwnerOperations({ accessToken, email, role, onSignOut }:
 
         {active === 'trading' && <OwnerTradingDesk accessToken={accessToken} />}
 
-        {active === 'platform' && <OwnerControlPlane accessToken={accessToken} />}
 
         {active === 'governance' && <Panel title="Platform governance" subtitle="Least-privilege administration. Privileged roles are not fabricated before their authorization controls exist.">
           <ReadinessRow label="Primary owner" value="Verified" note={email + ' is the sole configured owner identity.'} tone="good" />
           <ReadinessRow label="Support contact" value="Separate" note="fidulync@gmail.com remains the separate technical support address." tone="good" />
           <ReadinessRow label="Role-based access control" value="Owner-only" note="Quant researcher, risk officer, operations and auditor roles are future roles; no extra accounts are implicitly trusted." />
           <ReadinessRow label="Public owner registration" value="Not exposed" note="Owner verification is performed server-side against the configured owner email." tone="good" />
-          <ReadinessRow label="Public / owner access boundary" value="Required boundary" note="This console must not expose customer credentials or bypass customer-level entitlements." tone="good" />
+          <ReadinessRow label="Public / owner access boundary" value="Required boundary" note="This console must not expose customer credentials or bypass owner-only MT5 connector authorization." tone="good" />
         </Panel>}
 
         {active === 'market' && <div className="space-y-5">
