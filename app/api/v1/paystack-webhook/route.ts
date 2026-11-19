@@ -70,6 +70,13 @@ async function processEvent(eventName: string, data: PaystackData, reference: st
     const code = subscriptionCode(data);
     const email = customerEmail(data);
     if (!code || !email) throw new Error('Subscription event is missing its subscription code or customer email.');
+    const existingLink = await supabaseRead<Array<{ license_key: string; email: string }>>('licenses',
+      `paystack_subscription_code=eq.${encodeURIComponent(code)}&select=license_key,email&limit=1`);
+    if (!existingLink) throw new Error('Unable to check the existing subscription-to-licence association.');
+    if (existingLink.length > 0) {
+      if (existingLink[0].email.toLowerCase() !== email) throw new Error('Paystack subscription code is already associated with a different customer email.');
+      return; // Idempotent retry after licence association but before event-ledger acknowledgement.
+    }
     const recentSince = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
     const candidates = await supabaseRead<LicenseRow[]>('licenses',
       `email=eq.${encodeURIComponent(email)}&created_at=gte.${encodeURIComponent(recentSince)}&paystack_subscription_code=is.null&status=in.(ACTIVE,active)&select=license_key,email,status,expires_at,created_at&order=created_at.desc&limit=3`);
