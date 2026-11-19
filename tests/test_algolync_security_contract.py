@@ -84,6 +84,16 @@ class AlgoLyncSecurityContractTests(unittest.TestCase):
         self.assertIn("high level of risk", terms)
 
 
+
+    def test_owner_login_is_password_only_with_recovery_only_email(self):
+        for path in ("app/owner/page.tsx", "components/OwnerConsole.tsx"):
+            with self.subTest(path=path):
+                source = self.read(path)
+                self.assertIn("signInWithPassword", source)
+                self.assertIn("resetPasswordForEmail", source)
+                self.assertNotIn("signInWithOtp", source)
+                self.assertNotIn("verifyOtp", source)
+
     def test_privileged_owner_mutations_are_authenticated_and_audited(self):
         owner_routes = (
             "app/api/owner/licenses/route.ts",
