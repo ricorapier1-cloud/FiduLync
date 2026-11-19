@@ -544,10 +544,6 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
   );
 }
 
-function Spec({ label, value }: { label: string; value: string }) {
-  return <div><dt className="font-mono text-[8px] tracking-wide text-slate-600">{label}</dt><dd className="mt-1 text-[10px] leading-4 text-slate-300">{value}</dd></div>;
-}
-
 function Metric({ label, value }: { label: string; value: string }) {
   return <div><div className="font-mono text-[8px] text-slate-600">{label}</div><div className="mt-1 text-slate-200">{value}</div></div>;
 }
