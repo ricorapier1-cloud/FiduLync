@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { randomBytes } from 'node:crypto';
-import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { enforceDistributedRateLimit } from '@/lib/rateLimit';
+import { isSupabaseConfigured } from '@/lib/supabaseAdmin';
 import { getEaBySlug } from '@/lib/eaCatalog';
 
 export const dynamic = 'force-dynamic';
@@ -9,9 +10,10 @@ type PlanTier = 'MONTHLY' | 'LIFETIME';
 type CurrencyCode = 'NGN' | 'USD';
 
 export async function POST(req: Request) {
-  if (!checkRateLimit(getClientIp(req), 20, 60_000)) {
-    return NextResponse.json({ success: false, error: 'Too many checkout requests. Please wait.' }, { status: 429 });
-  }
+  const rate = await enforceDistributedRateLimit(req, 'create-checkout', 12, 60_000);
+  if (rate.unavailable) return NextResponse.json({ success: false, error: 'Checkout security service is unavailable.' }, { status: 503 });
+  if (!rate.allowed) return NextResponse.json({ success: false, error: 'Too many checkout requests. Please wait.' }, { status: 429 });
+  if (!isSupabaseConfigured()) return NextResponse.json({ success: false, error: 'License database is not configured. Checkout is temporarily disabled.' }, { status: 503 });
 
   try {
     const body = await req.json();
@@ -20,6 +22,7 @@ export async function POST(req: Request) {
     const plan: PlanTier = body?.plan === 'LIFETIME' ? 'LIFETIME' : 'MONTHLY';
     const eaSlug = String(body?.ea_slug || 'eridam-nexus-pro').trim();
     const ea = getEaBySlug(eaSlug);
+    if (!ea || ea.tierCategory === 'SANDBOX') return NextResponse.json({ success: false, error: 'Select an active paid AlgoLync EA product.' }, { status: 400 });
 
     const rawAccount = body?.mt5_account;
     const mt5Account = rawAccount === undefined || rawAccount === null || rawAccount === ''
@@ -36,10 +39,10 @@ export async function POST(req: Request) {
     let amountInMinorUnits = 6500000; // default ₦65,000 NGN
 
     if (currency === 'NGN') {
-      const priceNgn = plan === 'MONTHLY' ? (ea?.monthlyPriceNgn ?? 65000) : (ea?.lifetimePriceNgn ?? 250000);
+      const priceNgn = plan === 'MONTHLY' ? ea.monthlyPriceNgn : ea.lifetimePriceNgn;
       amountInMinorUnits = priceNgn * 100;
     } else {
-      const priceUsd = plan === 'MONTHLY' ? (ea?.monthlyPriceUsd ?? 49) : (ea?.lifetimePriceUsd ?? 199);
+      const priceUsd = plan === 'MONTHLY' ? ea.monthlyPriceUsd : ea.lifetimePriceUsd;
       amountInMinorUnits = priceUsd * 100;
     }
 
@@ -70,7 +73,7 @@ export async function POST(req: Request) {
         metadata: {
           product: 'ALGOLYNX_VAULT',
           ea_slug: eaSlug,
-          ea_name: ea ? ea.name : 'AlgoLync Strategy',
+          ea_name: ea.name,
           mt5_account: mt5Account,
           currency,
           tier: plan,
@@ -98,7 +101,7 @@ export async function POST(req: Request) {
       mode: 'paystack_redirect',
       authorization_url: data.authorization_url,
       reference,
-      ea_name: ea ? ea.name : 'AlgoLync Strategy',
+      ea_name: ea.name,
       amount_minor: amountInMinorUnits,
       currency,
       message: 'Complete payment using Paystack. 1 Live + 2 Demo MT5 accounts included free.',
