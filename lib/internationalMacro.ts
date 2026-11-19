@@ -172,7 +172,7 @@ export type OfficialPolicyObservation = { value: number; asOf: string; sourceUrl
 
 function cleanHtmlText(value: string) {
   return value.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
-    .replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/\\s+/g, ' ').trim();
+    .replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim();
 }
 
 function findDateValuePairs(payload: unknown): Observation[] {
@@ -216,8 +216,8 @@ export async function getReserveBankOfNewZealandPolicyRate(): Promise<OfficialPo
   const response = await fetch(sourceUrl, { cache: 'no-store', headers: { Accept: 'text/html' }, signal: AbortSignal.timeout(8_000) });
   if (!response.ok) throw new Error(`RBNZ OCR series returned ${response.status}.`);
   const html = await response.text();
-  const rows = [...html.matchAll(/<tr\\b[^>]*>([\\s\\S]*?)<\\/tr>/gi)].map((match) =>
-    [...match[1].matchAll(/<t[dh]\\b[^>]*>([\\s\\S]*?)<\\/t[dh]>/gi)].map((cell) => cleanHtmlText(cell[1])));
+  const rows = [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)].map((match) =>
+    [...match[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((cell) => cleanHtmlText(cell[1])));
   const headerIndex = rows.findIndex((row) => row.some((cell) => /Official Cash Rate.*OCR/i.test(cell)));
   if (headerIndex < 0) throw new Error('RBNZ OCR column was not found in the official table.');
   const header = rows[headerIndex];
@@ -238,8 +238,8 @@ export async function getReserveBankOfAustraliaPolicyRate(): Promise<OfficialPol
   const response = await fetch(sourceUrl, { cache: 'no-store', headers: { Accept: 'text/html' }, signal: AbortSignal.timeout(8_000) });
   if (!response.ok) throw new Error(`RBA cash-rate target page returned ${response.status}.`);
   const html = await response.text();
-  const rows = [...html.matchAll(/<tr\\b[^>]*>([\\s\\S]*?)<\\/tr>/gi)].map((match) =>
-    [...match[1].matchAll(/<t[dh]\\b[^>]*>([\\s\\S]*?)<\\/t[dh]>/gi)].map((cell) => cleanHtmlText(cell[1])));
+  const rows = [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)].map((match) =>
+    [...match[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((cell) => cleanHtmlText(cell[1])));
   const headerIndex = rows.findIndex((row) => row.some((cell) => /Effective Date/i.test(cell))
     && row.some((cell) => /Cash rate target/i.test(cell)));
   if (headerIndex < 0) throw new Error('RBA cash-rate decision table header was not found.');
@@ -262,7 +262,7 @@ export async function getSwissNationalBankPolicyRate(): Promise<OfficialPolicyOb
   const response = await fetch(sourceUrl, { cache: 'no-store', headers: { Accept: 'text/csv' }, signal: AbortSignal.timeout(8_000) });
   if (!response.ok) throw new Error(`SNB official-interest-rates cube returned ${response.status}.`);
   const csv = await response.text();
-  const rows = csv.split(/\\r?\\n/).filter(Boolean);
+  const rows = csv.split(/\r?\n/).filter(Boolean);
   const parsed = rows.map(parseCsvRow);
   const header = parsed[0] ?? [];
   const dateIndex = header.findIndex((cell) => /date|period/i.test(cell));
