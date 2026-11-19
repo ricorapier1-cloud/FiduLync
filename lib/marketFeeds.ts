@@ -228,8 +228,10 @@ async function fetchMarketQuotes(installationId?: string): Promise<MarketQuote[]
 }
 
 export async function getMarketQuotes(installationId?: string): Promise<MarketQuote[]> {
-  const cacheKey = `market:live-quotes:${installationId ?? 'active'}`;
-  const quotes = await getCachedData(cacheKey, () => fetchMarketQuotes(installationId), QUOTE_CACHE_TTL_SECONDS);
+  // Execution-quality quotes must bypass shared cache so the 2-second policy is meaningful.
+  const quotes = installationId
+    ? await fetchMarketQuotes(installationId)
+    : await getCachedData('market:live-quotes:active', () => fetchMarketQuotes(), QUOTE_CACHE_TTL_SECONDS);
   const now = Date.now();
   return quotes.filter((quote) => {
     const timestamp = Date.parse(quote.timestamp);
