@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isSupabaseConfigured, supabaseRead, supabaseQuery } from '@/lib/supabaseAdmin';
 import { enforceDistributedRateLimit } from '@/lib/rateLimit';
+import { hasApprovedProductArtifact } from '@/lib/productRelease';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,6 +73,7 @@ export async function POST(req: Request) {
     const products = await supabaseRead<Array<{ slug: string; is_active: boolean }>>('ea_products', `slug=eq.${encodeURIComponent(license.ea_slug)}&is_active=eq.true&select=slug,is_active`);
     if (!products) throw new Error('Product entitlement database unavailable.');
     if (!products[0]) return json({ valid: false, message: 'The licensed EA product is no longer active.' }, 403);
+    if (!(await hasApprovedProductArtifact(license.ea_slug))) return json({ valid: false, message: 'The licensed EA release artifact is not approved or available.' }, 403);
 
     const seats = await supabaseRead<SeatRecord[]>('ea_license_seats',
       `license_key=eq.${encodeURIComponent(licenseKey)}&ea_slug=eq.${encodeURIComponent(license.ea_slug)}&select=slot_type,slot_number,mt5_login,broker_server,rebind_available_at`);
