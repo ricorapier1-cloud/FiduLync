@@ -2,7 +2,7 @@ import 'server-only';
 
 // Privileged access belongs to one explicitly configured administrator.
 // Support and customer mailboxes are never implicitly trusted.
-const OWNER_EMAIL = (process.env.OWNER_EMAIL || 'ricorapier1@gmail.com').trim().toLowerCase();
+const OWNER_EMAIL = (process.env.OWNER_EMAIL || '').trim().toLowerCase();
 
 export function isAuthorizedOwnerEmail(email?: string | null): boolean {
   return Boolean(email && OWNER_EMAIL && email.trim().toLowerCase() === OWNER_EMAIL);
