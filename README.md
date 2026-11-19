@@ -1,4 +1,10 @@
-# FiduLync — Institutional Fintech & Quant Platform
+# FiduLync Personal Quant Edition
+
+> **Private, single-operator quantitative research workstation.** Personal, non-commercial use only. No customer SaaS, subscriptions, checkout, escrow, EA marketplace, paid licensing or public customer portal.
+
+FiduLync combines MacroLync fundamental research, QuantLync technical/statistical analytics, RiskLync risk governance and AlgoLync private MT5 EA supervision. It supports discretionary analysis and read-only MT5 data publishing; the central app does not place, modify or close broker orders.
+
+The initial research universe is G10 FX and XAUUSD. XAGUSD remains deferred until broker-specific symbol contract and tick-value metadata are validated. All live observations must be provider/broker sourced, timestamped and freshness checked. Daily reference rates are not live executable prices; missing or stale inputs must remain unavailable rather than simulated.
 
 FiduLync unifies MacroLync market intelligence, an owner-only Personal Quant risk and MT5 supervision workspace, and the separate AlgoLync Expert Advisor storefront/licensing service. These products share infrastructure but retain distinct permissions, payment entitlements and execution boundaries.
 
