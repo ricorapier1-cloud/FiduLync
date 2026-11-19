@@ -50,7 +50,7 @@ export async function POST(req: Request) {
     const now = Date.now();
     const expiry = license.expires_at ? Date.parse(license.expires_at) : Number.POSITIVE_INFINITY;
     const grace = license.grace_until ? Date.parse(license.grace_until) : 0;
-    const inGrace = Number.isFinite(grace) && grace > now;
+    const inGrace = status === 'past_due' && Number.isFinite(grace) && grace > now;
     if (status !== 'active' && !(status === 'past_due' && inGrace)) return json({ valid: false, message: 'License is not active.' }, 403);
     if (license.expires_at && !Number.isFinite(expiry)) return json({ valid: false, message: 'License expiry is invalid.' }, 403);
     if (expiry <= now && !inGrace) return json({ valid: false, message: 'License has expired.' }, 403);
