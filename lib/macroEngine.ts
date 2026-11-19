@@ -39,11 +39,25 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
       return Boolean(provider);
     };
 
+    const observationFresh = (asOf: string | undefined, maxAgeDays: number) => {
+      if (!asOf) return false;
+      const observedAt = Date.parse(asOf);
+      const ageMs = Date.now() - observedAt;
+      return Number.isFinite(observedAt) && ageMs >= -5 * 60_000 && ageMs <= maxAgeDays * 24 * 60 * 60_000;
+    };
     const currencies = snapshot.currencies.filter((currency) =>
       currency.policyRateSource === 'provider'
       && currency.inflationSource === 'provider'
       && policyProviderApproved(currency.policyRateProvider)
-      && inflationProviderApproved(currency.inflationProvider));
+      && inflationProviderApproved(currency.inflationProvider)
+      && (currency.policyRateProvider !== 'fred' || observationFresh(currency.policyRateAsOf, 10))
+      && (currency.inflationProvider !== 'fred' || observationFresh(currency.inflationAsOf, 60))
+    ).map((currency) => {
+      if (currency.twoYearYieldSource === 'provider' && !observationFresh(currency.twoYearYieldAsOf, 10)) {
+        return { ...currency, twoYearYield: undefined, twoYearYieldSource: undefined, twoYearYieldAsOf: undefined };
+      }
+      return currency;
+    });
     const coreG10 = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'SEK', 'NOK'];
     const completeG10 = coreG10.every((code) => currencies.some((currency) => currency.code === code));
 
