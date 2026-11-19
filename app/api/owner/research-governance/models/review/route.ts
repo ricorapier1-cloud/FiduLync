@@ -34,6 +34,9 @@ export async function POST(request: Request) {
     const decision = body.decision;
     const notes = typeof body.notes === 'string' ? body.notes.trim() : '';
     const checklist = isRecord(body.checklist) ? body.checklist : {};
+    if (Object.keys(checklist).length > 40 || Object.values(checklist).some((value) => typeof value !== 'boolean')) {
+      return NextResponse.json({ error: 'Review checklist must contain at most 40 boolean fields.' }, { status: 400 });
+    }
     if (!Number.isSafeInteger(modelId) || modelId <= 0
       || !['IN_REVIEW', 'APPROVED', 'REJECTED'].includes(String(decision))
       || notes.length < 20 || notes.length > 5000) {
