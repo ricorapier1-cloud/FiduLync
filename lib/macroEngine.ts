@@ -26,16 +26,16 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
     }
 
     const policyProviderApproved = (provider: MacroCurrency['policyRateProvider']) => {
-      if (provider === 'fred') return process.env.FRED_COMMERCIAL_USE_APPROVED === 'true';
-      if (provider === 'alpha-vantage') return process.env.ALPHA_VANTAGE_COMMERCIAL_USE_APPROVED === 'true';
-      if (provider === 'macro-provider') return process.env.MACRO_DATA_PROVIDER_LICENSE_APPROVED === 'true';
-      if (provider === 'swiss-national-bank') return process.env.SNB_DATA_SOURCE_ENABLED === 'true' && process.env.SNB_COMMERCIAL_USE_APPROVED === 'true';
+      if (provider === 'fred') return true; // Personal FRED research use; attribution is displayed in the dashboard.
+      if (provider === 'alpha-vantage') return process.env.ALPHA_VANTAGE_PERSONAL_PLAN_ACTIVE === 'true';
+      if (provider === 'macro-provider') return process.env.MACRO_DATA_PROVIDER_PERSONAL_USE_ENABLED === 'true';
+      if (provider === 'swiss-national-bank') return process.env.SNB_DATA_SOURCE_ENABLED === 'true';
       return Boolean(provider);
     };
     const inflationProviderApproved = (provider: MacroCurrency['inflationProvider']) => {
-      if (provider === 'fred') return process.env.FRED_COMMERCIAL_USE_APPROVED === 'true';
-      if (provider === 'alpha-vantage') return process.env.ALPHA_VANTAGE_COMMERCIAL_USE_APPROVED === 'true';
-      if (provider === 'macro-provider') return process.env.MACRO_DATA_PROVIDER_LICENSE_APPROVED === 'true';
+      if (provider === 'fred') return true;
+      if (provider === 'alpha-vantage') return process.env.ALPHA_VANTAGE_PERSONAL_PLAN_ACTIVE === 'true';
+      if (provider === 'macro-provider') return process.env.MACRO_DATA_PROVIDER_PERSONAL_USE_ENABLED === 'true';
       return Boolean(provider);
     };
 
@@ -49,17 +49,17 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
 
     const cotAllowed = snapshot.cotSource === 'provider'
       && (snapshot.cotProvider === 'cftc'
-        || (snapshot.cotProvider === 'custom' && process.env.COT_DATA_PROVIDER_LICENSE_APPROVED === 'true'));
+        || (snapshot.cotProvider === 'custom' && process.env.COT_DATA_PROVIDER_PERSONAL_USE_ENABLED === 'true'));
     const calendarAllowed = snapshot.calendarSource === 'provider' && (
-      (snapshot.calendarProvider === 'fair-economy' && process.env.FAIRECONOMY_COMMERCIAL_USE_APPROVED === 'true')
-      || (snapshot.calendarProvider === 'finnhub' && process.env.FINNHUB_COMMERCIAL_USE_APPROVED === 'true')
-      || (snapshot.calendarProvider === 'fmp' && process.env.FMP_COMMERCIAL_USE_APPROVED === 'true')
-      || (snapshot.calendarProvider === 'macro-provider' && process.env.MACRO_DATA_PROVIDER_LICENSE_APPROVED === 'true')
+      (snapshot.calendarProvider === 'fair-economy' && process.env.FAIRECONOMY_PERSONAL_PLAN_ACTIVE === 'true')
+      || (snapshot.calendarProvider === 'finnhub' && process.env.FINNHUB_PERSONAL_PLAN_ACTIVE === 'true')
+      || (snapshot.calendarProvider === 'fmp' && process.env.FMP_PERSONAL_PLAN_ACTIVE === 'true')
+      || (snapshot.calendarProvider === 'macro-provider' && process.env.MACRO_DATA_PROVIDER_PERSONAL_USE_ENABLED === 'true')
     );
 
     const cot = cotAllowed ? snapshot.cot : [];
     const catalysts = calendarAllowed ? snapshot.catalysts : [];
-    const ecbRates = process.env.FRANKFURTER_COMMERCIAL_USE_APPROVED === 'true' ? snapshot.ecbRates : undefined;
+    const ecbRates = snapshot.ecbRates;
     const hasVerifiedProviderData = currencies.length > 0 || cot.length > 0 || catalysts.length > 0;
     if (!hasVerifiedProviderData && (!ecbRates || Object.keys(ecbRates).length === 0)) return getFallbackSnapshot();
 
