@@ -240,7 +240,7 @@ type CandleSource = 'mt5' | 'configured_provider' | 'twelve_data' | 'unavailable
 type CandleSeries = { candles: Candle[]; source: CandleSource };
 
 async function getCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1', installationId?: string): Promise<CandleSeries> {
-  return getCachedData(`market:candles:${installationId ?? 'active'}:${pair}:${timeframe}`, async () => {
+  const cached = await getCachedData(`market:candles:${installationId ?? 'active'}:${pair}:${timeframe}`, async () => {
     const mt5Candles = await fetchActiveMt5Candles(pair, timeframe, installationId);
     if (mt5Candles.length >= 200) return { candles: mt5Candles, source: 'mt5' as const };
     // An authenticated supervisor must never fall back to another terminal or provider feed.
@@ -259,6 +259,29 @@ async function getCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1', installat
       ? { candles: twelveData, source: 'twelve_data' as const }
       : { candles: [], source: 'unavailable' as const };
   }, LIVE_PRICE_TTL_SECONDS);
+
+  // Re-apply licensing and freshness gates after cache reads too: cached values must
+  // not survive a revoked data entitlement or a stale upstream feed.
+  if (cached.source === 'configured_provider' && process.env.MARKET_DATA_PROVIDER_LICENSE_APPROVED !== 'true') {
+    return { candles: [], source: 'unavailable' };
+  }
+  if (cached.source === 'twelve_data' && process.env.TWELVE_DATA_COMMERCIAL_USE_APPROVED !== 'true') {
+    return { candles: [], source: 'unavailable' };
+  }
+  const barSeconds = timeframe === 'H1' ? 60 * 60 : timeframe === 'H4' ? 4 * 60 * 60 : 24 * 60 * 60;
+  const nowSeconds = Date.now() / 1000;
+  const maxAgeSeconds = timeframe === 'H1' ? 2 * 60 * 60 : timeframe === 'H4' ? 8 * 60 * 60 : 48 * 60 * 60;
+  const closedCandles = cached.candles
+    .filter((candle) => cached.source === 'mt5' || candle.timestamp + barSeconds <= nowSeconds)
+    .sort((left, right) => left.timestamp - right.timestamp)
+    .slice(-MAX_CANDLES);
+  const latest = closedCandles.at(-1)?.timestamp;
+  if (closedCandles.length < 200 || latest === undefined
+    || nowSeconds - (latest + (cached.source === 'mt5' ? 0 : barSeconds)) > maxAgeSeconds
+    || latest > nowSeconds + 300) {
+    return { candles: [], source: 'unavailable' };
+  }
+  return { candles: closedCandles, source: cached.source };
 }
 
 function ema(values: number[], period: number): number | null {
