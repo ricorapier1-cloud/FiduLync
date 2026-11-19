@@ -41,14 +41,18 @@ In `OnDeinit()`, stop the timer with `EventKillTimer()`.
 For the best slippage and latency measurements, after an EA's existing `OrderSend()` returns successfully with a broker order ticket, register its request context using both `result.request_id` and `result.order`, the exact request symbol/side/price and the spread observed immediately before sending. Deal-add transactions are correlated by the broker order ticket because the request/result parameters are not guaranteed to carry the originating request ID on deal events. The context is retained across partial fills and retired when the order enters history:
 
 ```mql5
+ulong sentTickMs = GetTickCount64();
+double point = SymbolInfoDouble(request.symbol, SYMBOL_POINT);
+double spreadPoints = (point > 0.0)
+   ? (SymbolInfoDouble(request.symbol, SYMBOL_ASK)
+      - SymbolInfoDouble(request.symbol, SYMBOL_BID)) / point
+   : 0.0;
+
 if(OrderSend(request, result) && (result.retcode == TRADE_RETCODE_DONE
    || result.retcode == TRADE_RETCODE_DONE_PARTIAL) && result.order > 0)
 {
-   double spreadPoints = (SymbolInfoDouble(request.symbol, SYMBOL_ASK)
-                         - SymbolInfoDouble(request.symbol, SYMBOL_BID))
-                         / SymbolInfoDouble(request.symbol, SYMBOL_POINT);
    FiduLyncTelemetry.RegisterOrderRequest(result.request_id, result.order, request.symbol,
-      (request.type == ORDER_TYPE_BUY ? "BUY" : "SELL"), request.price, spreadPoints);
+      (request.type == ORDER_TYPE_BUY ? "BUY" : "SELL"), request.price, spreadPoints, sentTickMs);
 }
 ```
 
