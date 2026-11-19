@@ -250,7 +250,15 @@ export async function GET(request: Request) {
         evidence_verified: false,
         status: executionRows.length ? 'EVIDENCE_CAPTURED_PENDING_REVIEW' : 'AWAITING_MT5_FILLS',
       },
-      correlation: {\n        timeframe: 'H1',\n        minimum_overlapping_returns: 30,\n        cluster_threshold_absolute_correlation: 0.75,\n        pairs: correlationPairs.sort((a, b) => Math.abs(b.correlation) - Math.abs(a.correlation)),\n        clusters: correlationClusters,\n        status: correlationPairs.length ? 'BROKER_CANDLE_CORRELATION_AVAILABLE' : 'AWAITING_ALIGNED_H1_CANDLES',\n      },\n      positions: {
+      correlation: {
+        timeframe: 'H1',
+        minimum_overlapping_returns: 30,
+        cluster_threshold_absolute_correlation: 0.75,
+        pairs: correlationPairs.sort((a, b) => Math.abs(b.correlation) - Math.abs(a.correlation)),
+        clusters: correlationClusters,
+        status: correlationPairs.length ? 'BROKER_CANDLE_CORRELATION_AVAILABLE' : 'AWAITING_ALIGNED_H1_CANDLES',
+      },
+      positions: {
         snapshot_id: completePositionSnapshot ? latestManifest.snapshot_id : null,
         captured_at: completePositionSnapshot ? latestManifest.captured_at : null,
         expected_positions: latestManifest ? expectedPositions : null,
@@ -281,7 +289,13 @@ export async function GET(request: Request) {
         status: !completePositionSnapshot ? 'AWAITING_COMPLETE_MT5_POSITION_SNAPSHOT'
           : positionFresh ? 'SNAPSHOT_CAPTURED' : 'STALE_POSITION_SNAPSHOT',
       },
-      execution_enabled: false,\n      portfolio_stress: {\n        one_percent_parallel_currency_shock_account_currency: onePercentParallelShock,\n        interpretation: 'Absolute net currency exposure proxy; not a full nonlinear portfolio VaR or broker stop-risk calculation.',\n        correlation_clusters: correlationClusters,\n        status: conversionComplete ? 'PARTIAL_LINEAR_SCENARIO_ONLY' : 'UNAVAILABLE_MISSING_CONVERSIONS',\n      },
+      execution_enabled: false,
+      portfolio_stress: {
+        one_percent_parallel_currency_shock_account_currency: onePercentParallelShock,
+        interpretation: 'Absolute net currency exposure proxy; not a full nonlinear portfolio VaR or broker stop-risk calculation.',
+        correlation_clusters: correlationClusters,
+        status: conversionComplete ? 'PARTIAL_LINEAR_SCENARIO_ONLY' : 'UNAVAILABLE_MISSING_CONVERSIONS',
+      },
       note: 'Evidence capture does not equal independent validation. This endpoint cannot approve a model or enable broker execution.',
     }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
   } catch (error) {
