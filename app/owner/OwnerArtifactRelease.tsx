@@ -58,7 +58,7 @@ export default function OwnerArtifactRelease({ accessToken }: { accessToken: str
       const bytes = await file.arrayBuffer();
       const digest = await crypto.subtle.digest('SHA-256', bytes);
       const sha256 = Array.from(new Uint8Array(digest)).map((value) => value.toString(16).padStart(2, '0')).join('');
-      const metadata = { ea_slug: slug, artifact_version: version, sha256, size_bytes: file.size };
+      const metadata = { ea_slug: slug, artifact_version: version, sha256, size_bytes: file.size, file_name: file.name };
       const signedResponse = await fetch('/api/owner/artifacts/upload-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + accessToken },
@@ -69,7 +69,7 @@ export default function OwnerArtifactRelease({ accessToken }: { accessToken: str
       if (!signedResponse.ok || !signedPayload.upload_url) throw new Error(signedPayload.error || 'A private upload URL could not be created.');
       const uploaded = await fetch(signedPayload.upload_url, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/octet-stream' },
+        headers: { 'Content-Type': 'application/octet-stream', 'x-upsert': 'true' },
         body: file,
         cache: 'no-store',
       });
