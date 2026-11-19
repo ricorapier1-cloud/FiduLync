@@ -52,7 +52,7 @@ const sections = [
 export default function TermsPage() {
   return (
     <main className="mx-auto min-h-[75vh] w-full max-w-4xl px-5 py-10 pb-44 text-slate-100">
-      <Link href="/" className="font-mono text-xs text-emerald-300 hover:underline">← BACK TO MACROLYNC</Link>
+      <Link href="/" className="font-mono text-xs text-emerald-300 hover:underline">← BACK TO TERMINAL</Link>
       <header className="mb-8 mt-8">
         <p className="font-mono text-[10px] tracking-[0.2em] text-emerald-300">FIDULYNC / PERSONAL QUANT EDITION</p>
         <h1 className="mt-3 text-3xl font-semibold">Personal-use & risk policy</h1>
