@@ -23,3 +23,10 @@ An approval requires every checklist item to be true:
 Every review is recorded in `quant_model_review_events` with a server-computed evidence digest. Database function `review_quant_model` performs the review event insert and registry status update in one transaction. It is executable only by `service_role`.
 
 Approval is a research-governance result only. It does not enable broker execution; execution remains disabled by server policy until separate demo/forward validation and explicit release controls are completed.
+
+
+## Server-side validation calculation
+
+Use `POST /api/owner/research-governance/validate` with the owner bearer token to compute and register a validation package directly from chronological trade-level R data. Each trade requires `trade_id`, `closed_at`, `gross_r` and non-negative `cost_r`. The request also includes model identity/scopes, SHA-256 dataset/code fingerprints and `risk_pct_per_trade` (0.05–5%). The validator accepts 100–5,000 trades, sorts them chronologically, applies a 60/20/20 chronological train/validation/out-of-sample split, calculates five sequential validation windows, performs 1,500 deterministic bootstrap Monte Carlo simulations, and evaluates 1.5x/2x transaction-cost stress. Sharpe is a per-trade unannualized ratio. Profit factor is capped at 99.99 when there are no losing observations and this limitation should be retained in interpretation.
+
+The endpoint stores the computed package as `PENDING`; no metric threshold automatically approves it. The reviewer must independently inspect the underlying source dataset, exact strategy source/code, broker cost assumptions and reproducibility. A summary-only upload or fabricated R series is not sufficient for institutional approval.
