@@ -29,7 +29,7 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
       if (provider === 'fred') return process.env.FRED_COMMERCIAL_USE_APPROVED === 'true';
       if (provider === 'alpha-vantage') return process.env.ALPHA_VANTAGE_COMMERCIAL_USE_APPROVED === 'true';
       if (provider === 'macro-provider') return process.env.MACRO_DATA_PROVIDER_LICENSE_APPROVED === 'true';
-      if (provider === 'swiss-national-bank') return process.env.SNB_COMMERCIAL_USE_APPROVED === 'true';
+      if (provider === 'swiss-national-bank') return process.env.SNB_DATA_SOURCE_ENABLED === 'true' && process.env.SNB_COMMERCIAL_USE_APPROVED === 'true';
       return Boolean(provider);
     };
     const inflationProviderApproved = (provider: MacroCurrency['inflationProvider']) => {
