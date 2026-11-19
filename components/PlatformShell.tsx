@@ -19,6 +19,13 @@ const links = [
   { href: '/owner', label: 'Owner Console', icon: 'shield' },
 ] as const satisfies readonly { href: string; label: string; icon: BrandGlyphName }[];
 
+const mobileLinks = [
+  { href: '/', label: 'Terminal', icon: 'shield' },
+  { href: '/risk', label: 'Risk', icon: 'gauge' },
+  { href: '/research', label: 'Quant Lab', icon: 'chart' },
+  { href: '/store', label: 'Store', icon: 'chart' },
+] as const satisfies readonly { href: string; label: string; icon: BrandGlyphName }[];
+
 const macroLinks = [
   { href: '#matrix', label: 'Macro matrix', icon: 'chart' },
   { href: '#bias', label: 'Pair bias', icon: 'gauge' },
@@ -137,7 +144,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
 
       {!isHome && (
         <nav className="mobile-tabbar" aria-label="Bottom navigation">
-          {links.map(({ href, label, icon }) => (
+          {mobileLinks.map(({ href, label, icon }) => (
             <Link
               key={href}
               href={href}
