@@ -234,24 +234,27 @@ export async function getReserveBankOfNewZealandPolicyRate(): Promise<OfficialPo
 }
 
 export async function getReserveBankOfAustraliaPolicyRate(): Promise<OfficialPolicyObservation> {
-  const sourceUrl = 'https://www.rba.gov.au/statistics/tables/csv/f1-data.csv';
-  const response = await fetch(sourceUrl, { cache: 'no-store', signal: AbortSignal.timeout(8_000) });
-  if (!response.ok) throw new Error(`RBA Statistical Table F1 returned ${response.status}.`);
-  const text = (await response.text()).replace(/^\\uFEFF/, '');
-  const rows = text.split(/\\r?\\n/).filter(Boolean);
-  const candidates = rows.map((line) => line.split(',').map((cell) => cell.replace(/^"|"$/g, '').trim()));
-  const seriesRow = candidates.findIndex((row) => row.some((cell) => /FIRMMCRTD|Cash Rate Target/i.test(cell)));
-  if (seriesRow < 0) throw new Error('RBA F1 CSV did not identify the cash-rate target series.');
-  for (const row of candidates.slice(seriesRow + 1)) {
-    const date = row.find((cell) => /^\\d{1,2}[-/ ]?[A-Za-z]{3}[-/ ]?\\d{4}$|^\\d{4}-\\d{2}-\\d{2}$/.test(cell));
-    const valueCell = [...row].reverse().find((cell) => /^-?\\d+(?:\\.\\d+)?$/.test(cell));
-    const value = Number(valueCell);
-    if (date && Number.isFinite(value)) {
-      const parsedDate = new Date(date);
-      if (Number.isFinite(parsedDate.getTime())) return { value, asOf: parsedDate.toISOString(), sourceUrl };
+  const sourceUrl = 'https://www.rba.gov.au/statistics/cash-rate/';
+  const response = await fetch(sourceUrl, { cache: 'no-store', headers: { Accept: 'text/html' }, signal: AbortSignal.timeout(8_000) });
+  if (!response.ok) throw new Error(`RBA cash-rate target page returned ${response.status}.`);
+  const html = await response.text();
+  const rows = [...html.matchAll(/<tr\\b[^>]*>([\\s\\S]*?)<\\/tr>/gi)].map((match) =>
+    [...match[1].matchAll(/<t[dh]\\b[^>]*>([\\s\\S]*?)<\\/t[dh]>/gi)].map((cell) => cleanHtmlText(cell[1])));
+  const headerIndex = rows.findIndex((row) => row.some((cell) => /Effective Date/i.test(cell))
+    && row.some((cell) => /Cash rate target/i.test(cell)));
+  if (headerIndex < 0) throw new Error('RBA cash-rate decision table header was not found.');
+  const header = rows[headerIndex];
+  const dateIndex = header.findIndex((cell) => /Effective Date/i.test(cell));
+  const rateIndex = header.findIndex((cell) => /Cash rate target/i.test(cell));
+  for (const row of rows.slice(headerIndex + 1)) {
+    const date = row[dateIndex];
+    const value = Number((row[rateIndex] ?? '').replace(/,/g, ''));
+    const parsedDate = date ? new Date(date) : null;
+    if (parsedDate && Number.isFinite(parsedDate.getTime()) && Number.isFinite(value)) {
+      return { value, asOf: parsedDate.toISOString(), sourceUrl };
     }
   }
-  throw new Error('RBA F1 CSV contained no parseable cash-rate target observation.');
+  throw new Error('RBA cash-rate decision table contained no parseable target observation.');
 }
 
 export async function getSwissNationalBankPolicyRate(): Promise<OfficialPolicyObservation> {
