@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import OwnerArtifactRelease from './OwnerArtifactRelease';
 
 type License = { id:string; license_key:string; email:string; mt5_account:number|null; tier:string; status:string; expires_at:string|null; created_at:string; payment_reference:string|null };
 type Provider = { id:string; configured:boolean; approved:boolean; state:string };
@@ -105,7 +106,8 @@ export default function OwnerControlPlane({accessToken}:Props) {
   {snapshot&&section==='Release governance'&&<div className="mt-5 space-y-2">
    <div className="rounded-lg border border-white/[0.07] p-3 text-xs text-slate-300">EA package release registry: <State value={snapshot.capabilities.release_registry}/></div>
    <div className="rounded-lg border border-white/[0.07] p-3 text-xs text-slate-300">Payment reference ledger: <State value={snapshot.capabilities.payment_ledger}/></div>
-   <p className="text-[10px] leading-5 text-slate-500">Compiled EX5 binaries, signed manifests, SHA-256 release hashes, MetaEditor build metadata and Windows terminal compatibility tests cannot be certified until the EA packages are compiled and tested on MT5/Windows.</p>
+   <p className="text-[10px] leading-5 text-slate-500">Upload compiled .ex5 files from the Windows workstation when available. Upload resets approval; the private object, SHA-256 metadata and owner attestation are checked before checkout and terminal validation can unlock. The application cannot certify MetaEditor build quality or trading performance without your actual terminal tests.</p>
+   <OwnerArtifactRelease accessToken={accessToken}/>
   </div>}
   {snapshot&&section==='Security & audit'&&<div className="mt-5 space-y-2">
    <div className="rounded-lg border border-white/[0.07] p-3 text-xs text-slate-300">Privileged mutation audit: <State value={snapshot.capabilities.immutable_audit}/></div>
