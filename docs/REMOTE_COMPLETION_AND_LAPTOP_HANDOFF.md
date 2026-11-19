@@ -135,6 +135,7 @@ If you configure the runner:
 - Use a dedicated Windows account or isolated VM with no personal documents, browser sessions or unrelated credentials.
 - Never run untrusted pull-request code on a self-hosted runner. The workflow is manual-dispatch only and branch-restricted.
 - Keep the runner offline when not compiling; remove it when no longer needed.
+- The workflow cannot run until that runner is registered and online. If its queued job expires before the laptop is ready, push a reviewed MQL5/compile-script change to create a fresh job; the local PowerShell script remains the direct option.
 
 ## 10. Production release gates
 
