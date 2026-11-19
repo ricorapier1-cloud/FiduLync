@@ -63,6 +63,8 @@ export async function POST(request: Request) {
     } catch (auditError) {
       auditLogged = false;
       console.error('Owner license audit insert failed:', auditError);
+      await supabaseQuery('licenses', { method: 'PATCH', query: `id=eq.${rows[0].id}`, body: { status: 'revoked' } });
+      throw new Error('Owner audit event failed; the unlogged complimentary license was disabled.');
     }
     return NextResponse.json({
       success: true,
