@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireOwner } from '@/lib/ownerAuth';
 import { supabaseRead } from '@/lib/supabaseAdmin';
+import { enforceDistributedRateLimit } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -14,6 +15,9 @@ type LicenseRow = {
 export async function GET(request: Request) {
   const owner = await requireOwner(request);
   if (!owner) return NextResponse.json({ error: 'Owner authentication required.' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
+  const rate = await enforceDistributedRateLimit(request, 'owner-control-plane', 30, 60_000);
+  if (rate.unavailable) return NextResponse.json({ error: 'Owner control plane is temporarily unavailable.' }, { status: 503 });
+  if (!rate.allowed) return NextResponse.json({ error: 'Owner control-plane rate limit exceeded.' }, { status: 429 });
 
   try {
     const licenses = await supabaseRead<LicenseRow[]>(
