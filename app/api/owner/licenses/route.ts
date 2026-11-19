@@ -8,6 +8,8 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
+  if (process.env.PERSONAL_QUANT_EDITION !== 'false') return NextResponse.json({ error: 'Customer licence provisioning is retired in Personal Quant Edition.' }, { status: 410, headers: { 'Cache-Control': 'no-store' } });
+
   const owner = await requireOwner(request);
   if (!owner) return NextResponse.json({ error: 'Owner authentication required.' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
   const rate = await enforceDistributedRateLimit(request, 'owner-license-issue', 10, 60_000);
