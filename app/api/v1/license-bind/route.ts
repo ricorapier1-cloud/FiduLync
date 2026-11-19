@@ -11,6 +11,8 @@ function codeHash(requestId: string, code: string, pepper: string) {
 }
 
 export async function POST(request: Request) {
+  return NextResponse.json({ error: 'Commercial licence transfers are retired in Personal Quant Edition.' }, { status: 410, headers: { 'Cache-Control': 'no-store' } });
+
   const rate = await enforceDistributedRateLimit(request, 'license-bind-transfer', 5, 60 * 60_000);
   if (rate.unavailable) return NextResponse.json({ success: false, error: 'License binding security service is unavailable.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
   if (!rate.allowed) return NextResponse.json({ success: false, error: 'Too many binding attempts. Try again later.' }, { status: 429, headers: { 'Cache-Control': 'no-store' } });
