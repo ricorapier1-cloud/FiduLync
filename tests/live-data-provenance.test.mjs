@@ -8,6 +8,7 @@ const macroEngine = read('../lib/macroEngine.ts');
 const dashboard = read('../app/components/MacroDashboard.tsx');
 const marketFeeds = read('../lib/marketFeeds.ts');
 const publisher = read('../scripts/mt5_market_publisher.py');
+const publicPublisher = read('../public/downloads/FiduLync_MT5_Market_Publisher.py');
 const macroTypes = read('../types/macro.ts');
 const technicalEngine = read('../lib/technicalEngine.ts');
 const quantRisk = read('../lib/quantRisk.ts');
@@ -132,6 +133,7 @@ test('private EA lab uses owner MT5 publisher and supervisor components only', (
 });
 
 test('live MT5 publisher supports partial G10 maps and preserves broker execution metadata', () => {
+  assert.equal(publisher, publicPublisher);
   assert.match(publisher, /G10_CROSS_SYMBOLS = \{base \+ quote/);
   assert.doesNotMatch(publisher, /missing = set\(DEFAULT_SYMBOL_MAP\)/);
   assert.match(marketFeeds, /spread_points/);
