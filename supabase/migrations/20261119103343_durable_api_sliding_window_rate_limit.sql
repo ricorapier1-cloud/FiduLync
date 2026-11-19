@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS public.api_rate_limit_events (
 );
 CREATE INDEX IF NOT EXISTS api_rate_limit_events_key_time_idx
   ON public.api_rate_limit_events (key_hash, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS api_rate_limit_events_time_idx ON public.api_rate_limit_events (occurred_at);
 ALTER TABLE public.api_rate_limit_events ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.api_rate_limit_events FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT, DELETE ON public.api_rate_limit_events TO service_role;
