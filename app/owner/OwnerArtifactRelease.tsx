@@ -69,11 +69,11 @@ export default function OwnerArtifactRelease({ accessToken }: { accessToken: str
       if (!signedResponse.ok || !signedPayload.upload_url) throw new Error(signedPayload.error || 'A private upload URL could not be created.');
       const uploaded = await fetch(signedPayload.upload_url, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/octet-stream', 'x-upsert': 'true' },
+        headers: { 'Content-Type': 'application/octet-stream' },
         body: file,
         cache: 'no-store',
       });
-      if (!uploaded.ok) throw new Error('Supabase Storage rejected the .ex5 upload.');
+      if (!uploaded.ok && uploaded.status !== 400 && uploaded.status !== 409) throw new Error('Supabase Storage rejected the .ex5 upload. If this exact SHA-256 was uploaded earlier, registration will verify the existing object next.');
       const response = await fetch('/api/owner/artifacts/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + accessToken },
