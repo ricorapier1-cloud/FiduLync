@@ -94,6 +94,7 @@ export async function POST(req: Request) {
   if (rate.unavailable) return json({ success: false, error: 'Account binding service unavailable.' }, 503);
   if (!rate.allowed) return json({ success: false, error: 'Rate limit exceeded.' }, 429);
   if (!isSupabaseConfigured()) return json({ success: false, error: 'Licensing service is not configured.' }, 503);
+  if (Number(req.headers.get('content-length') ?? 0) > 8192) return json({ success: false, error: 'Request body exceeds 8 KB.' }, 413);
 
   try {
     const raw: unknown = await req.json();
