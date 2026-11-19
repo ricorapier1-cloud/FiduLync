@@ -5,7 +5,9 @@ import { getTechnicalSignal, type MarketRegime } from '@/lib/technicalEngine';
 import { getCurrencyStrengthIndex, getKillzoneActive, getLiquiditySession } from '@/lib/currencyStrength';
 import { getCachedData } from '@/lib/redisCache';
 import type { MacroSnapshot } from '@/types/macro';
-import { deriveRiskBudget } from '@/lib/quantRisk';
+import { calculateGhostProtocol, deriveRiskBudget } from '@/lib/quantRisk';
+import { getPersonalRiskPolicy } from '@/lib/riskPolicy';
+import { getMarketQuotes } from '@/lib/marketFeeds';
 
 const G10 = new Set(['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'SEK', 'NOK']);
 const REGION_BY_CURRENCY: Record<string, string> = {
@@ -37,6 +39,8 @@ export type MacroSignalPayload = {
   correlation_group: 'USD_BLOC' | 'JPY_CROSS' | 'EUR_BLOC' | 'COMMODITY_FX' | 'GOLD_METALS';
   news_lockout: boolean;
   safe_to_trade: boolean;
+  ghost_score: number | null;
+  ghost_allowed: boolean;
   execution_blockers: string[];
   risk_mode: 'DISABLED' | 'PILOT_TREND' | 'PILOT_MEAN_REVERSION';
   market_data_source: 'mt5' | 'configured_provider' | 'twelve_data' | 'unavailable' | 'unknown';
@@ -83,6 +87,47 @@ export async function getMacroSignal(symbol: string, now = Date.now(), installat
   const snapshot = await getMacroSnapshot();
   const calculateSignal = async (): Promise<MacroSignalPayload> => {
     const technical = await getTechnicalSignal(normalizedSymbol, installationId);
+    const marketQuotes = await getMarketQuotes().catch((error) => {
+      console.warn(`Ghost Protocol broker quote check unavailable for ${normalizedSymbol}:`, error);
+      return [];
+    });
+    const brokerQuote = marketQuotes.find((quote) => quote.symbol === normalizedSymbol);
+    const quoteTimestamp = brokerQuote ? Date.parse(brokerQuote.timestamp) : Number.NaN;
+    const quoteAgeMs = now - quoteTimestamp;
+    const brokerQuoteFresh = technical.data_source === 'mt5'
+      && brokerQuote !== undefined
+      && brokerQuote.source === 'mt5'
+      && Number.isFinite(quoteTimestamp)
+      && quoteAgeMs >= -5 * 60_000 && quoteAgeMs <= 120_000
+      && typeof brokerQuote.bid === 'number' && typeof brokerQuote.ask === 'number'
+      && brokerQuote.bid > 0 && brokerQuote.ask >= brokerQuote.bid
+      && typeof brokerQuote.spread_points === 'number' && brokerQuote.spread_points >= 0
+      && typeof brokerQuote.point === 'number' && brokerQuote.point > 0;
+    const pipSize = normalizedSymbol.endsWith('JPY') ? 0.01 : normalizedSymbol.startsWith('XAU') ? 0.1 : 0.0001;
+    const stopMultiplier = technical.regime === 'TRENDING_EXPANSION' ? 1.75 : 1.5;
+    const atrPips = technical.atr_stop_pips !== null ? technical.atr_stop_pips / stopMultiplier : Number.NaN;
+    const spreadPrice = brokerQuoteFresh && brokerQuote
+      ? (brokerQuote.spread_points ?? Number.NaN) * (brokerQuote.point ?? Number.NaN)
+      : Number.NaN;
+    const spreadAtrRatio = atrPips > 0 ? spreadPrice / (atrPips * pipSize) : Number.NaN;
+    const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
+    const ker = technical.kaufman_efficiency_ratio ?? Number.NaN;
+    const adx = technical.adx ?? Number.NaN;
+    const rSquared = technical.trend_r_squared ?? Number.NaN;
+    const hurst = technical.hurst_exponent ?? Number.NaN;
+    const trendStructureStrength = [ker, adx, rSquared, hurst].every(Number.isFinite)
+      ? clamp01(ker * 0.30 + clamp01(adx / 40) * 0.25 + clamp01(rSquared) * 0.25 + clamp01(Math.abs(hurst - 0.5) / 0.25) * 0.20)
+      : Number.NaN;
+    const personalRiskPolicy = getPersonalRiskPolicy();
+    const ghost = calculateGhostProtocol({
+      quoteFresh: brokerQuoteFresh,
+      trendStructureStrength,
+      atrExpansionRatio: technical.atr_expansion_ratio ?? Number.NaN,
+      spreadPoints: brokerQuoteFresh && brokerQuote ? brokerQuote.spread_points ?? Number.NaN : Number.NaN,
+      spreadAtrRatio,
+      maxSpreadPoints: personalRiskPolicy.maxSpreadPoints,
+      maxSpreadAtrRatio: personalRiskPolicy.maxSpreadAtrRatio,
+    });
     const fundamental = getFundamentalSignal(snapshot, normalizedSymbol);
     const baseCurrency = snapshot.currencies.find((currency) => currency.code === normalizedSymbol.slice(0, 3));
     const quoteCurrency = snapshot.currencies.find((currency) => currency.code === normalizedSymbol.slice(3));
@@ -157,18 +202,18 @@ export async function getMacroSignal(symbol: string, now = Date.now(), installat
       regime: technical.regime,
       marketDataVerified: technical.available,
       macroDataVerified,
-      executionQualityVerified: process.env.EXECUTION_QUALITY_VALIDATED === 'true',
+      executionQualityVerified: ghost.allowed && process.env.EXECUTION_QUALITY_VALIDATED === 'true',
       modelValidated: process.env.SIGNAL_MODEL_VALIDATED === 'true',
       executionEnabled: process.env.SIGNAL_EXECUTION_ENABLED === 'true',
       newsLockout,
     });
-    const executionBlockers = [...riskBudget.blockers];
+    const executionBlockers = [...riskBudget.blockers, ...ghost.blockers];
     if (session === 'OFF_HOURS') executionBlockers.push('OUTSIDE_APPROVED_LIQUIDITY_SESSION');
     if (bias === 'NEUTRAL') executionBlockers.push('NO_DIRECTIONAL_CONFLUENCE');
     if (!edgeQualified) executionBlockers.push('CONFLUENCE_BELOW_RESEARCH_THRESHOLD');
     if (!validStops) executionBlockers.push('ATR_STOPS_UNAVAILABLE');
     if (!directionAllowed) executionBlockers.push('DIRECTION_BLOCKED_BY_TECHNICAL_FILTER');
-    const safeToTrade = riskBudget.approved && executionBlockers.length === 0;
+    const safeToTrade = riskBudget.approved && ghost.allowed && executionBlockers.length === 0;
     const maxRiskPct = safeToTrade ? riskBudget.riskPct : 0;
 
     return {
@@ -186,6 +231,8 @@ export async function getMacroSignal(symbol: string, now = Date.now(), installat
       correlation_group: correlationGroup,
       news_lockout: newsLockout,
       safe_to_trade: safeToTrade,
+      ghost_score: ghost.score,
+      ghost_allowed: ghost.allowed,
       execution_blockers: [...new Set(executionBlockers)],
       risk_mode: riskBudget.mode,
       market_data_source: technical.data_source,
