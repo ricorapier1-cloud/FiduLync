@@ -3,6 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import BrandGlyph from '@/components/BrandGlyph';
+import Link from 'next/link';
 import { getCurrencyStrengthIndex, type getLiquiditySession } from '@/lib/currencyStrength';
 import type { MacroSnapshot } from '@/types/macro';
 
@@ -138,6 +139,7 @@ export default function StoreTerminal({ bridgeSource, initialSnapshot, session }
       <div className="mx-auto w-full max-w-7xl px-5 py-9 sm:px-8 lg:py-12 pb-36 sm:pb-16">
         <div className="flex flex-wrap items-start justify-between gap-5 border-b border-white/[0.08] pb-7">
           <div>
+            <Link href="/" className="mb-4 inline-block font-mono text-[10px] tracking-wider text-emerald-300 hover:underline">← BACK TO TERMINAL</Link>
             <div className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-emerald-300">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399]" />
               FIDULYNC / PERSONAL QUANT WORKSPACE
