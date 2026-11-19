@@ -1,5 +1,3 @@
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import type { Metadata } from 'next';
 import LegacyStoreTerminal from '@/app/components/LegacyStoreTerminal';
 import { getHeartbeatFleet } from '@/lib/eaHeartbeat';
@@ -24,7 +22,6 @@ export default async function AlgoLyncStorePage() {
     telemetryError = 'Upstash telemetry is temporarily unavailable.';
   }
 
-  const bridgeSource = await readFile(join(process.cwd(), 'public', 'mql5', 'MacroLyncBridge.mqh'), 'utf8');
   const initialSnapshot = await getMacroSnapshot();
   const initialTradeExpectancy = await getTradeExpectancy();
 
@@ -32,7 +29,6 @@ export default async function AlgoLyncStorePage() {
     <LegacyStoreTerminal
       initialFleet={fleet}
       telemetryError={telemetryError}
-      bridgeSource={bridgeSource}
       initialSnapshot={initialSnapshot}
       initialTradeExpectancy={initialTradeExpectancy}
       session={getLiquiditySession()}
