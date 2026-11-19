@@ -1,84 +1,105 @@
 import { NextResponse } from 'next/server';
 import { randomBytes } from 'node:crypto';
 import { enforceDistributedRateLimit } from '@/lib/rateLimit';
-import { isSupabaseConfigured } from '@/lib/supabaseAdmin';
-import { getEaBySlug } from '@/lib/eaCatalog';
+import { isSupabaseConfigured, supabaseRead } from '@/lib/supabaseAdmin';
 
 export const dynamic = 'force-dynamic';
 
-type PlanTier = 'MONTHLY' | 'LIFETIME';
-type CurrencyCode = 'NGN' | 'USD';
+type CheckoutBody = {
+  email?: unknown;
+  currency?: unknown;
+  plan?: unknown;
+  ea_slug?: unknown;
+  mt5_account?: unknown;
+};
+type ProductRecord = {
+  slug: string;
+  name: string;
+  category: string;
+  is_active: boolean;
+  monthly_price_ngn: number | string;
+  monthly_price_usd: number | string;
+  one_time_price_ngn: number | string;
+  one_time_price_usd: number | string;
+  included_live_seats: number;
+  included_demo_seats: number;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+function json(body: unknown, status = 200) {
+  return NextResponse.json(body, { status, headers: { 'Cache-Control': 'no-store, max-age=0' } });
+}
 
 export async function POST(req: Request) {
   const rate = await enforceDistributedRateLimit(req, 'create-checkout', 12, 60_000);
-  if (rate.unavailable) return NextResponse.json({ success: false, error: 'Checkout security service is unavailable.' }, { status: 503 });
-  if (!rate.allowed) return NextResponse.json({ success: false, error: 'Too many checkout requests. Please wait.' }, { status: 429 });
-  if (!isSupabaseConfigured()) return NextResponse.json({ success: false, error: 'License database is not configured. Checkout is temporarily disabled.' }, { status: 503 });
+  if (rate.unavailable) return json({ success: false, error: 'Checkout security service is unavailable.' }, 503);
+  if (!rate.allowed) return json({ success: false, error: 'Too many checkout requests. Please wait.' }, 429);
+  if (!isSupabaseConfigured()) return json({ success: false, error: 'License database is not configured. Checkout is temporarily disabled.' }, 503);
 
   try {
-    const body = await req.json();
-    const email = String(body?.email || '').trim().toLowerCase();
-    const currency: CurrencyCode = body?.currency === 'USD' ? 'USD' : 'NGN';
-    const plan: PlanTier = body?.plan === 'LIFETIME' ? 'LIFETIME' : 'MONTHLY';
-    const eaSlug = String(body?.ea_slug || 'eridam-nexus-pro').trim();
-    const ea = getEaBySlug(eaSlug);
-    if (!ea || ea.tierCategory === 'SANDBOX') return NextResponse.json({ success: false, error: 'Select an active paid AlgoLync EA product.' }, { status: 400 });
+    const raw: unknown = await req.json();
+    if (!isRecord(raw)) return json({ success: false, error: 'A valid checkout request is required.' }, 400);
+    const body = raw as CheckoutBody;
+    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+    const currency = body.currency === 'USD' ? 'USD' : body.currency === 'NGN' || body.currency === undefined ? 'NGN' : null;
+    const plan = body.plan === 'LIFETIME' ? 'LIFETIME' : body.plan === 'MONTHLY' || body.plan === undefined ? 'MONTHLY' : null;
+    const eaSlug = typeof body.ea_slug === 'string' ? body.ea_slug.trim().toLowerCase() : 'eridam-nexus-pro';
 
-    const rawAccount = body?.mt5_account;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) return json({ success: false, error: 'Enter a valid subscriber email address.' }, 400);
+    if (!currency || !plan) return json({ success: false, error: 'Choose a supported plan and billing currency.' }, 400);
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(eaSlug)) return json({ success: false, error: 'Invalid EA product selection.' }, 400);
+
+    const rawAccount = body.mt5_account;
     const mt5Account = rawAccount === undefined || rawAccount === null || rawAccount === ''
-      ? null : Number(rawAccount);
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return NextResponse.json({ success: false, error: 'Enter a valid subscriber email address.' }, { status: 400 });
-    }
+      ? null : typeof rawAccount === 'number' ? rawAccount
+      : typeof rawAccount === 'string' && /^\d{1,20}$/.test(rawAccount) ? Number(rawAccount) : NaN;
     if (mt5Account !== null && (!Number.isSafeInteger(mt5Account) || mt5Account <= 0)) {
-      return NextResponse.json({ success: false, error: 'If supplied, the MT5 account number must be a valid positive integer.' }, { status: 400 });
+      return json({ success: false, error: 'If supplied, the MT5 account number must be a valid positive integer.' }, 400);
     }
 
-    // Dynamic pricing lookup based on EA catalog
-    let amountInMinorUnits = 6500000; // default ₦65,000 NGN
+    const products = await supabaseRead<ProductRecord[]>('ea_products',
+      `slug=eq.${encodeURIComponent(eaSlug)}&is_active=eq.true&select=slug,name,category,is_active,monthly_price_ngn,monthly_price_usd,one_time_price_ngn,one_time_price_usd,included_live_seats,included_demo_seats`);
+    if (!products) throw new Error('Product catalogue database unavailable.');
+    const product = products[0];
+    if (!product || !product.is_active || product.category === 'SANDBOX') return json({ success: false, error: 'This EA is not currently available for paid licensing.' }, 404);
 
-    if (currency === 'NGN') {
-      const priceNgn = plan === 'MONTHLY' ? ea.monthlyPriceNgn : ea.lifetimePriceNgn;
-      amountInMinorUnits = priceNgn * 100;
-    } else {
-      const priceUsd = plan === 'MONTHLY' ? ea.monthlyPriceUsd : ea.lifetimePriceUsd;
-      amountInMinorUnits = priceUsd * 100;
+    const price = currency === 'NGN'
+      ? Number(plan === 'MONTHLY' ? product.monthly_price_ngn : product.one_time_price_ngn)
+      : Number(plan === 'MONTHLY' ? product.monthly_price_usd : product.one_time_price_usd);
+    const amountInMinorUnits = Math.round(price * 100);
+    if (!Number.isSafeInteger(amountInMinorUnits) || amountInMinorUnits <= 0) {
+      return json({ success: false, error: 'The selected EA plan is not configured for checkout.' }, 503);
     }
 
     const paystackSecret = (process.env.PAYSTACK_SECRET_KEY || '').trim();
-    if (!paystackSecret.startsWith('sk_')) {
-      return NextResponse.json({ success: false, error: 'Online payment is not configured yet. Please try again later.' }, { status: 503 });
-    }
+    if (!paystackSecret.startsWith('sk_')) return json({ success: false, error: 'Online payment is not configured yet. Please try again later.' }, 503);
     if (paystackSecret.startsWith('sk_live_') && process.env.PAYSTACK_LIVE_ENABLED !== 'true') {
-      return NextResponse.json({ success: false, error: 'Live payments are disabled while merchant compliance approval is pending.' }, { status: 503 });
+      return json({ success: false, error: 'Live payments are disabled while merchant compliance approval is pending.' }, 503);
     }
 
-    const shortSlug = eaSlug.split('-')[0].toUpperCase();
-    const reference = `ALGO_${shortSlug}_${plan}_${currency}_${randomBytes(8).toString('hex').toUpperCase()}`;
-    const origin = (process.env.NEXT_PUBLIC_APP_URL || 'https://fidulync.vercel.app').trim().replace(/\/+$/, '');
+    const reference = `ALGO_${eaSlug}_${plan}_${currency}_${randomBytes(12).toString('hex').toUpperCase()}`;
+    const configuredOrigin = (process.env.NEXT_PUBLIC_APP_URL || 'https://fidulync.vercel.app').trim();
+    const parsedOrigin = new URL(configuredOrigin);
+    if (parsedOrigin.protocol !== 'https:' && process.env.NODE_ENV === 'production') throw new Error('Checkout origin must use HTTPS.');
+    const origin = parsedOrigin.origin;
 
     const psRes = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${paystackSecret}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { Authorization: `Bearer ${paystackSecret}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email,
-        amount: amountInMinorUnits,
-        currency,
-        reference,
-        callback_url: `${origin}/store?ref=${reference}&ea=${encodeURIComponent(eaSlug)}`,
+        email, amount: amountInMinorUnits, currency, reference,
+        callback_url: `${origin}/store?ref=${encodeURIComponent(reference)}&ea=${encodeURIComponent(eaSlug)}`,
         metadata: {
           product: 'ALGOLYNX_VAULT',
           ea_slug: eaSlug,
-          ea_name: ea.name,
+          ea_name: product.name,
           mt5_account: mt5Account,
           currency,
           tier: plan,
-          max_live_slots: 1,
-          max_demo_slots: 2,
+          included_live_seats: product.included_live_seats,
+          included_demo_seats: product.included_demo_seats,
         },
       }),
       cache: 'no-store',
@@ -86,28 +107,27 @@ export async function POST(req: Request) {
     });
 
     const psData: unknown = await psRes.json();
-    if (!psRes.ok || !psData || typeof psData !== 'object' || !('status' in psData)
-      || (psData as { status?: unknown }).status !== true
-      || !('data' in psData) || typeof (psData as { data?: unknown }).data !== 'object'
-      || !(psData as { data: Record<string, unknown> }).data.authorization_url) {
-      const message = psData && typeof psData === 'object' && 'message' in psData
-        ? String((psData as { message?: unknown }).message) : 'Paystack checkout initialization failed.';
-      return NextResponse.json({ success: false, error: message }, { status: 502 });
+    if (!psRes.ok || !isRecord(psData) || psData.status !== true || !isRecord(psData.data)
+      || typeof psData.data.authorization_url !== 'string' || typeof psData.data.reference !== 'string'
+      || psData.data.reference !== reference) {
+      const message = isRecord(psData) && typeof psData.message === 'string' ? psData.message : 'Paystack checkout initialization failed.';
+      return json({ success: false, error: message }, 502);
     }
 
-    const data = (psData as { data: Record<string, unknown> }).data;
-    return NextResponse.json({
+    return json({
       success: true,
       mode: 'paystack_redirect',
-      authorization_url: data.authorization_url,
+      authorization_url: psData.data.authorization_url,
       reference,
-      ea_name: ea.name,
+      ea_name: product.name,
       amount_minor: amountInMinorUnits,
       currency,
-      message: 'Complete payment using Paystack. 1 Live + 2 Demo MT5 accounts included free.',
+      included_live_seats: product.included_live_seats,
+      included_demo_seats: product.included_demo_seats,
+      message: 'Complete payment using Paystack. Your included MT5 seats are checked and enforced server-side.',
     });
   } catch (error) {
-    console.error('Paystack checkout initialization failed:', error);
-    return NextResponse.json({ success: false, error: 'Checkout initialization failed. Please retry.' }, { status: 500 });
+    console.error('Paystack checkout initialization failed:', error instanceof Error ? error.message : String(error));
+    return json({ success: false, error: 'Checkout initialization failed. Please retry.' }, 503);
   }
 }
