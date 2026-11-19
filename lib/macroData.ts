@@ -530,6 +530,7 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
       if (isFiniteNumber(fredResult.value.cpi)) {
         usd.cpi = fredResult.value.cpi;
         usd.inflationSource = 'provider';
+        usd.inflationProvider = 'fred';
         hasLiveData = true;
       }
       if (isFiniteNumber(fredResult.value.twoYearYield)) {
