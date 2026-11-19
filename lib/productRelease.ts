@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { createHash } from 'node:crypto';
 import { isSupabaseConfigured, supabaseRead } from '@/lib/supabaseAdmin';
 
 type ProductArtifact = {
@@ -16,9 +17,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export async function hasPrivateStorageObject(storagePath: string): Promise<boolean> {
+async function createPrivateStorageReadUrl(storagePath: string): Promise<string | null> {
   if (!storagePath || storagePath.startsWith('/')
-    || storagePath.split('/').some((segment) => !segment || segment === '.' || segment === '..')) return false;
+    || storagePath.split('/').some((segment) => !segment || segment === '.' || segment === '..')) return null;
 
   const supabaseUrl = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim().replace(/\/$/, '');
   const serviceKey = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
@@ -36,11 +37,32 @@ export async function hasPrivateStorageObject(storagePath: string): Promise<bool
     cache: 'no-store',
     signal: AbortSignal.timeout(5_000),
   });
-  if (!response.ok) return false;
+  if (!response.ok) return null;
   const payload: unknown = await response.json();
-  return isRecord(payload)
-    && ((typeof payload.signedURL === 'string' && payload.signedURL.length > 0)
-      || (typeof payload.signedUrl === 'string' && payload.signedUrl.length > 0));
+  if (!isRecord(payload)) return null;
+  const signedPath = typeof payload.signedURL === 'string' ? payload.signedURL
+    : typeof payload.signedUrl === 'string' ? payload.signedUrl : '';
+  if (!signedPath) return null;
+  return signedPath.startsWith('http') ? signedPath : `${supabaseUrl}/storage/v1${signedPath.startsWith('/') ? signedPath : `/${signedPath}`}`;
+}
+
+export async function hasPrivateStorageObject(storagePath: string): Promise<boolean> {
+  return Boolean(await createPrivateStorageReadUrl(storagePath));
+}
+
+async function verifyStoredObjectHash(artifact: ProductArtifact): Promise<boolean> {
+  const signedUrl = await createPrivateStorageReadUrl(artifact.storage_path);
+  if (!signedUrl) return false;
+  const response = await fetch(signedUrl, {
+    method: 'GET',
+    cache: 'no-store',
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!response.ok) return false;
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (bytes.byteLength !== Number(artifact.size_bytes)) return false;
+  const actualHash = createHash('sha256').update(bytes).digest('hex');
+  return actualHash === artifact.sha256.toLowerCase();
 }
 
 async function verifyStoredObject(artifact: ProductArtifact): Promise<boolean> {
@@ -63,7 +85,9 @@ async function checkProductArtifact(eaSlug: string, requireApproval: boolean): P
   if (requireApproval && (artifact.release_approved !== true
     || typeof artifact.approved_at !== 'string'
     || !Number.isFinite(Date.parse(artifact.approved_at)))) return false;
-  return verifyStoredObject(artifact);
+  const exists = await verifyStoredObject(artifact);
+  if (!exists) return false;
+  return requireApproval ? verifyStoredObjectHash(artifact) : true;
 }
 
 /** Confirms that the registered private .ex5 object still exists and has integrity metadata. */
