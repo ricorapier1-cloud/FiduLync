@@ -26,7 +26,7 @@ test('rate path repricing uses changes, not the absolute policy rate', () => {
 
 test('complete aligned macro and technical evidence may form a research setup', () => {
   const categories = ['RATE_PATH_REPRICING','REAL_YIELD_DIFFERENTIAL','MACRO_SURPRISE','TERMS_OF_TRADE','POSITIONING','RISK_SENTIMENT','FUNDING_STRESS'];
-  const result = assessFxDrivers('EURUSD', categories.map((category) => factor(category)), technical, asOf);
+  const result = assessFxDrivers('EURUSD', categories.map((category) => factor(category, 2.0)), { ...technical, trendZ: 1.5, structureZ: 1.3 }, asOf);
   assert.equal(result.setup, 'LONG_BIAS');
   assert.equal(result.evidenceCoverage, 1);
   assert.ok(result.confidence > 0.9);
