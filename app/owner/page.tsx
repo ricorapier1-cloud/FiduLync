@@ -89,7 +89,12 @@ export default function OwnerAccessPage() {
         setRecoveryMode(false);
         return;
       }
-      if (event === 'TOKEN_REFRESHED') setSession(nextSession);
+      if (event === 'TOKEN_REFRESHED') {
+        setSession(nextSession);
+        queueMicrotask(() => {
+          if (active) void verifyOwner(nextSession);
+        });
+      }
       if (event === 'PASSWORD_RECOVERY') {
         setRecoverySession(nextSession);
         setRecoveryMode(true);
@@ -197,11 +202,19 @@ export default function OwnerAccessPage() {
   }
 
   async function signOut() {
-    await supabase?.auth.signOut();
-    setSession(null);
-    setStatus(null);
-    setPassword('');
-    setMessage('You have signed out.');
+    let cookieCleared = false;
+    try {
+      const response = await fetch('/api/owner/logout', { method: 'POST', credentials: 'same-origin', cache: 'no-store' });
+      cookieCleared = response.ok;
+    } catch {
+      cookieCleared = false;
+    } finally {
+      await supabase?.auth.signOut();
+      setSession(null);
+      setStatus(null);
+      setPassword('');
+      setMessage(cookieCleared ? 'You have signed out.' : 'Your local sign-in has ended, but the secure browser session could not be cleared. Reload and retry sign-out.');
+    }
   }
 
   if (status?.authenticated && session) {
