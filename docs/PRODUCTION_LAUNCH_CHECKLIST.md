@@ -1,78 +1,104 @@
-# FiduLync production launch checklist
+# FiduLync Personal Quant Edition — Operating & Release Checklist
 
-This runbook is for the project owner. Never commit secret values to GitHub, paste them into source files, or expose them in browser code.
+This is a private, single-operator quantitative research and MT5 EA-supervision workspace. It is not a commercial fintech product.
 
-## Current release posture
+## Product scope
 
-- Development branch: `feat/personal-quant-edition`
-- Production branch: `main` (not changed by this work)
-- Public project domain: `https://fidulync.vercel.app`
-- Production remains on `main`; the current Personal Quant feature branch is not yet promoted.
-- Paystack live processing is disabled, and paid checkout remains blocked until merchant activation plus an approved private compiled `.ex5` release artifact.
-- License email delivery and email-verified MT5 account transfers require `RESEND_API_KEY` and a verified `LICENSE_FROM_EMAIL`.
-- MT5 heartbeat ingestion now accepts only a valid signed 24-hour AlgoLync licence lease and rechecks the licence, product artifact and bound seat. The separate owner MT5 publisher pipeline still requires its installation token.
-- No compiled `.ex5` trading robot is represented as available until it has been built and tested in MetaEditor, uploaded to private Storage, hash metadata registered, and explicitly owner-approved.
+- MacroLync: official macroeconomic research, policy rates, inflation, real yields, COT positioning and event-risk context.
+- QuantLync: multi-timeframe technical and statistical analysis, regime classification, market structure, volatility, correlation, currency strength and signal diagnostics.
+- RiskLync: broker-aware position sizing, portfolio exposure, margin checks, drawdown limits, equity high-water protection, loss-streak controls and kill-switch governance.
+- AlgoLync: private MT5 data gateway, EA health monitoring, research signal delivery and approve/reject/abstain/risk-ceiling supervision.
+- Historical research: source-tagged datasets, reproducible backtests, out-of-sample evaluation, walk-forward analysis and Monte Carlo robustness checks.
+- Supported initial universe: G10 FX and XAUUSD. XAGUSD is deferred until broker-specific contract size, tick size, tick value, margin and stop-distance metadata are verified.
 
-## Required Vercel Production environment variables
+## Explicit exclusions
 
-In Vercel → Project → Settings → Environment Variables, configure the following for **Production**. Configure Preview as well when you want to test the same flows on preview deployments.
+No customer registration, checkout, subscriptions, Paystack, escrow, public EA marketplace, paid customer licences, customer support portal, copy trading, pooled funds or broker order execution by the central application.
+
+Preserve the existing private owner email/password login, Supabase data, audit history, MT5 publisher security and useful research components. Do not delete historical financial or audit records merely because commercial workflows are retired.
+
+## Owner access
+
+- Use `/owner` with the existing registered owner email and password.
+- Preserve password recovery and server-side owner verification.
+- Enable Supabase leaked-password protection and configure a verified SMTP sender for account recovery.
+- Keep service-role keys, MT5 publisher tokens and API keys server-side.
+- Issue a separate one-time hashed publisher token for each trusted MT5 terminal; revoke tokens when a terminal is retired.
+
+## Data-provider policy
+
+- **FRED:** permitted for personal, non-commercial research subject to its terms, API key, required attribution and series-level third-party copyright notices. Do not scrape or mirror the service. FRED-derived observations are kept out of external AI prompts.
+- **Frankfurter:** public reference exchange rates only; they are daily/reference observations, not real-time executable prices.
+- **CFTC:** use official public COT reports; retain report date and source attribution. COT is weekly positioning context, not intraday flow.
+- **Central banks / official statistical agencies:** prefer direct official sources for policy rates, CPI/HICP, GDP, employment, yields and releases. Preserve source URL, observation date and retrieval time.
+- **BLS / BEA:** use official APIs with the required attribution and retrieval-date notes when their adapters are enabled.
+- **Finnhub / Twelve Data / Alpha Vantage / FMP / FairEconomy / other vendors:** enable only when the specific personal subscription or free tier permits this app's internal display, programmatic access, caching and requested asset class. A present API key is not proof of entitlement.
+- Never turn daily reference rates, stale caches, historical bars or unverified values into live prices. Every dataset must expose provider, source timestamp, retrieval timestamp, age, timeframe, broker (when applicable) and degraded/unavailable state.
+
+## Required server environment
 
 | Variable | Purpose |
 |---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (public URL only) |
-| `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` | Server-side Supabase secret/service-role key; never prefix with `NEXT_PUBLIC_` |
-| `PAYSTACK_SECRET_KEY` | Paystack secret key for initialize and transaction verification; legacy webhook signature fallback |
-| `PAYSTACK_WEBHOOK_SECRET` | Preferred timestamped webhook signing secret (`whsec_...`) from Paystack Dashboard; deploy before disabling legacy signatures |
-| `ALGOLYNC_LEASE_SIGNING_SECRET` | Server-only signing key for 24-hour MT5 license leases (already provisioned in Vercel) |
-| `RESEND_API_KEY` | Server-only transactional email API key for license delivery and transfer verification |
-| `LICENSE_FROM_EMAIL` | Verified sender identity/domain configured with the email provider (for example, `AlgoLync <licenses@your-verified-domain>`) |
-| `PAYSTACK_PUBLIC_KEY` and/or `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | Paystack public key if the checkout UI requires it |
-| `ALGOLYNC_PRIVATE_KEY` (or legacy `ALGO_PRIVATE_API_KEY`) | Long random secret shared only with trusted EA clients for private heartbeat/trade ingestion |
-| `CRON_SECRET` | Long random secret used to authorize the scheduled macro refresh |
-| `OWNER_EMAIL` | Explicit owner email matching the owner audit policy; no server-side fallback |
-| `NEXT_PUBLIC_APP_URL` | Set to `https://fidulync.vercel.app` |
+| `NEXT_PUBLIC_SUPABASE_URL` | Public Supabase URL |
+| `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` | Server-side Supabase access |
+| `OWNER_EMAIL` | Exact single-owner identity |
+| `CRON_SECRET` | Authenticates scheduled macro refresh |
+| `ALGOLYNC_PRIVATE_KEY` | Legacy private supervisor API integration, if still used |
+| `FRED_API_KEY` | Personal official macro research |
+| `GEMINI_API_KEY` | Optional commentary only; never execution authority |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Shared cache, if enabled |
 
-The server Supabase helper accepts either `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY`, and either `SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_URL`. Do not use a publishable/anon key for server-side writes.
+Optional data-provider flags must remain false until the owner's own personal-use entitlement has been checked:
 
-Other configured market-data providers may require `FX_API_KEY`, `FRED_API_KEY`, `FINNHUB_API_KEY`, or `GEMINI_API_KEY` depending on which provider-backed features are enabled. Keep these server-only.
+- `FINNHUB_PERSONAL_PLAN_ACTIVE`
+- `TWELVE_DATA_PERSONAL_DISPLAY_PLAN_ACTIVE`
+- `ALPHA_VANTAGE_PERSONAL_PLAN_ACTIVE`
+- `FMP_PERSONAL_PLAN_ACTIVE`
+- `FAIRECONOMY_PERSONAL_PLAN_ACTIVE`
+- `MARKET_DATA_PROVIDER_PERSONAL_USE_ENABLED`
+- `MACRO_DATA_PROVIDER_PERSONAL_USE_ENABLED`
+- `COT_DATA_PROVIDER_PERSONAL_USE_ENABLED`
+- `SNB_PERSONAL_USE_ENABLED`
 
-## Paystack setup
+Frankfurter public reference rates do not require a commercial approval flag and are not used as broker prices.
 
-1. Confirm the Paystack account is activated for the currencies and business model being sold.
-2. Add the live secret key to Vercel Production as `PAYSTACK_SECRET_KEY`. Use the test key only in a non-production environment.
-3. Set `NEXT_PUBLIC_APP_URL=https://fidulync.vercel.app`.
-4. In Paystack Dashboard → Settings → API Keys & Webhooks, set the webhook URL to `https://fidulync.vercel.app/api/paystack/webhook`. If Paystack's timestamped webhook signing secret is enabled, add its dashboard-issued `whsec_...` value to Vercel as `PAYSTACK_WEBHOOK_SECRET`. Until then, the endpoint supports legacy `x-paystack-signature` verification.
-5. Configure `RESEND_API_KEY` and `LICENSE_FROM_EMAIL` in Vercel Production so licence delivery and account-transfer codes can be emailed. Verify the sender domain with the email provider first.
-6. Deploy after changing environment variables.
-7. Test a successful payment, failed payment, duplicate webhook delivery, subscription creation, invoice failure, invoice renewal, non-renewal and cancellation using a Paystack test account in Preview before enabling live sales.
+## MT5 connection (Windows terminal required)
 
-## MT5 / EA bridge setup (when a laptop is available)
+1. Install MetaTrader 5 and log in to the intended broker terminal.
+2. In `/owner`, create a uniquely labelled MT5 publisher installation and copy its one-time token.
+3. Configure the publisher on the Windows terminal/VPS using the token in a private environment variable; never commit it.
+4. Map broker-specific symbols, including suffixes, explicitly (for example, `EURUSD.a` or `XAUUSD.a`).
+5. Publish broker bid/ask, closed H1/H4/D1 candles, symbol contract metadata, account equity/margin, open positions and closed-deal history.
+6. Confirm quote freshness, candle completeness, installation identity and server ingestion timestamps in the owner console.
+7. Compile all MQL5 includes/EAs in MetaEditor with zero errors and zero warnings. Run Strategy Tester, then demo forward testing.
+8. Keep EA execution disabled until data, risk, model validation and execution-quality evidence pass independent review.
 
-1. Set the same strong `ALGOLYNC_PRIVATE_KEY` in Vercel and the EA's private request configuration (the legacy `ALGO_PRIVATE_API_KEY` alias is also accepted). Do not hardcode it into a public downloadable source file.
-2. Add the exact verified deployment origin to MT5 Tools → Options → Expert Advisors → Allow WebRequest for listed URL.
-3. Put actual product `.mq5` source files in `MQL5/Experts/Release/`; run `scripts/compile_mt5.ps1 -MetaEditorPath "<actual MetaEditor path>" -RequireProductSources` and resolve all compiler errors and warnings.
-4. Upload the compiled `.ex5` through `/owner` → Release governance, verify the displayed SHA-256, complete demo-account validation, and explicitly approve the artifact before attempting paid or demo license validation.
-5. Verify publisher heartbeat, closed-trade ingestion, customer-specific account history, and stale/offline status.
-6. Run on a demo account before any live trading. No automated profitability or safety guarantee is implied.
+The web app can prepare and validate the server-side components, but it cannot compile MQL5 or verify a live broker terminal without a Windows MT5 environment.
 
-## Release gates
+## Quantitative validation standards
 
-Do not promote the development branch to `main` or switch on live selling until:
-- The latest production build is READY.
-- Required production secrets are configured and confirmed without exposing their values.
-- Paystack test-mode payment and webhook flows pass.
-- License issuance is idempotent and account-bound.
-- Supabase customer data isolation is tested with two different MT5 accounts.
-- Macro data freshness and cron authentication are tested.
-- Public routes, login, store, dashboard, and support journeys have been smoke-tested.
+- Use closed bars only and preserve one source/broker/installation per candle series.
+- Minimum technical history is a data-readiness gate, not evidence of predictive edge.
+- Prevent look-ahead, survivorship, timestamp alignment and revised-data leakage.
+- Separate in-sample, validation and untouched out-of-sample periods.
+- Use walk-forward, Monte Carlo, parameter stability, spread/slippage/commission stress and regime-conditioned analysis.
+- Report expectancy, profit factor, max drawdown, recovery factor, exposure, turnover, trade count, confidence intervals and risk-of-ruin assumptions.
+- Do not label confluence scores as calibrated probabilities without calibration evidence.
+- Record all abstentions and blockers. Missing, stale or contradictory data must produce DEGRADED/ABSTAIN.
 
-## Security notes
+## Current operational gates
 
-- Never put private keys, Supabase secret keys, service-role keys, Paystack secret keys, or cron secrets in client-side variables or Git.
-- Rotate any credential that has been pasted into public source, logs, or chat.
-- Keep the WhatsApp support component and its existing behavior unchanged.
+- GitHub CI passes on the exact proposed commit.
+- Vercel preview build succeeds and protected owner routes pass authenticated smoke tests.
+- Production deployment commit matches the reviewed Git commit.
+- Supabase RLS and security advisors have no unresolved critical exposure.
+- Scheduled macro refresh authenticates and returns a truthful success/degraded response.
+- At least one approved personal-use macro source is returning timestamped observations.
+- MT5 publisher sends fresh broker quotes and closed candles; installation heartbeat is current.
+- MQL5 compilation, Strategy Tester and demo forward test pass before any live execution.
 
+## Safety policy
 
-## EA artifact release workflow
+FiduLync is a research and supervisory tool, not a broker or managed account. It does not place, modify or close broker orders. Keep grids, martingale, averaging down and unbounded progressive sizing excluded. Risk limits, SL/TP checks, spread/slippage/news/weekend guards, margin floors, daily/weekly drawdown limits, high-water equity protection, loss-streak breakers and cooldown/hibernation controls must remain server-enforced or independently enforced in the EA.
 
-The owner console includes direct-to-private-Storage `.ex5` upload, SHA-256 metadata registration, explicit release approval and audited revocation. Binary upload uses a short-lived signed Supabase Storage URL so large files do not pass through the Vercel function body. Uploading does not approve a release. Checkout, demo entitlement creation, paid license provisioning and validation all remain blocked until the artifact is approved and the private object is still present.
+No strategy profitability, win rate, execution quality or safety is certified merely because a build or API check passes.
