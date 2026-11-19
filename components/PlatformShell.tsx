@@ -16,7 +16,6 @@ const links = [
   { href: '/analytics', label: 'Performance', icon: 'activity' },
   { href: '/faq', label: 'Help', icon: 'activity' },
   { href: '/terms', label: 'Risk & Data', icon: 'shield-alert' },
-  { href: '/owner', label: 'Owner Console', icon: 'shield' },
 ] as const satisfies readonly { href: string; label: string; icon: BrandGlyphName }[];
 
 const mobileLinks = [
