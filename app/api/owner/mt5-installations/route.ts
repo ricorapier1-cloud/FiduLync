@@ -53,7 +53,8 @@ export async function POST(request: Request) {
         metadata: { label, broker, server },
       });
     } catch (auditError) {
-      console.error('MT5 installation audit insert failed:', auditError);
+      await supabaseQuery('mt5_installations', { method: 'PATCH', query: `id=eq.${rows[0].id}&user_id=eq.${owner.id}`, body: { status: 'revoked' } });
+      throw new Error('Installation audit failed; the token was revoked and not returned.');
     }
     return NextResponse.json({
       success: true,
@@ -93,7 +94,10 @@ export async function DELETE(request: Request) {
         owner_email: owner.email, action: 'MT5_INSTALLATION_REVOKED', subject_id: id,
         metadata: { revoked_at: new Date().toISOString() },
       });
-    } catch (auditError) { console.error('MT5 revocation audit insert failed:', auditError); }
+    } catch (auditError) {
+      console.error('MT5 revocation audit insert failed:', auditError);
+      return NextResponse.json({ error: 'Installation is revoked, but the audit event failed. Investigate before further administration.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+    }
     return NextResponse.json({ success: true, id, status: 'revoked' }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     console.error('MT5 installation revocation failed:', error);
