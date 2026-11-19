@@ -54,7 +54,7 @@ export async function POST(req: Request) {
     const licenseKey = \`ALGO-DEMO-\${cleanSlug}-\${randomSuffix}\`;
     const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
 
-    const persisted = await persistLicense<Array<{ license_key: string; email: string; status: string }>>({
+    const persisted = await persistLicense({
       license_key: licenseKey,
       mt5_account: mt5Account,
       email,
