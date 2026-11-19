@@ -56,7 +56,7 @@ test('stale macro snapshots are rejected instead of silently reused', () => {
 test('dashboard never substitutes hardcoded events, policy ranges, or positioning figures', () => {
   assert.doesNotMatch(dashboard, /US Non-Farm Payrolls|425 bps \(G8\)|Tier-1 Catalyst • 13:30 UTC/);
   assert.match(dashboard, /providerPolicyInputs/);
-  assert.match(dashboard, /NO VERIFIED MACRO INPUTS/);
+  assert.match(dashboard, /NO VERIFIED DATA/);
   assert.match(dashboard, /formatQuoteAge\(quote\.timestamp, now\)/);
   assert.match(dashboard, /SNAPSHOT REFRESHED/);
   assert.doesNotMatch(dashboard, /'LIVE' : snapshot\.source/);
