@@ -143,6 +143,8 @@ async function processEvent(eventName: string, data: PaystackData, reference: st
 }
 
 export async function POST(request: Request) {
+  return NextResponse.json({ error: 'Payment webhooks are disabled in Personal Quant Edition.' }, { status: 410, headers: { 'Cache-Control': 'no-store' } });
+
   if (!isSupabaseConfigured()) return json({ error: 'Payment webhook database is not configured.' }, 503);
   const rawBody = await request.text();
   if (Buffer.byteLength(rawBody, 'utf8') > 256_000) return json({ error: 'Webhook payload exceeds 256 KB.' }, 413);
