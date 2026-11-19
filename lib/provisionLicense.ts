@@ -133,7 +133,7 @@ export async function provisionLicenseForReference(referenceInput: string): Prom
   const expiresAt = plan === 'LIFETIME' ? null : new Date(Date.now() + 30 * 86_400_000).toISOString();
 
   const candidate: ProvisionedLicense = {
-    license_key: `ALGOLYNX-${plan === 'LIFETIME' ? 'LT' : 'MO'}-${digest}-${randomBytes(4).toString('hex').toUpperCase()}`,
+    license_key: `ALGOLYNX-${plan === 'LIFETIME' ? 'LT' : 'MO'}-${digest}-${randomBytes(16).toString('hex').toUpperCase()}`,
     payment_reference: reference,
     mt5_account: mt5Account,
     email,
