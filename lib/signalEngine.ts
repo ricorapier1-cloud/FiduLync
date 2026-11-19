@@ -87,14 +87,14 @@ export async function getMacroSignal(symbol: string, now = Date.now(), installat
   const snapshot = await getMacroSnapshot();
   const calculateSignal = async (): Promise<MacroSignalPayload> => {
     const technical = await getTechnicalSignal(normalizedSymbol, installationId);
-    const marketQuotes = await getMarketQuotes().catch((error) => {
+    const marketQuotes = await getMarketQuotes(installationId).catch((error) => {
       console.warn(`Ghost Protocol broker quote check unavailable for ${normalizedSymbol}:`, error);
       return [];
     });
     const brokerQuote = marketQuotes.find((quote) => quote.symbol === normalizedSymbol);
     const quoteTimestamp = brokerQuote ? Date.parse(brokerQuote.timestamp) : Number.NaN;
     const quoteAgeMs = now - quoteTimestamp;
-    const brokerQuoteFresh = technical.data_source === 'mt5'
+    const brokerQuoteFresh = Boolean(installationId) && technical.data_source === 'mt5'
       && brokerQuote !== undefined
       && brokerQuote.source === 'mt5'
       && Number.isFinite(quoteTimestamp)
