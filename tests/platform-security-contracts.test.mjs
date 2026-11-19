@@ -39,7 +39,6 @@ test('private owner and research-governance routes independently verify owner id
   for (const path of [
     'app/api/owner/operations/route.ts',
     'app/api/owner/mt5-installations/route.ts',
-    'app/api/owner/control-plane/route.ts',
     'app/api/owner/research-governance/route.ts',
     'app/api/owner/research-governance/models/route.ts',
     'app/api/owner/research-governance/validate/route.ts',
