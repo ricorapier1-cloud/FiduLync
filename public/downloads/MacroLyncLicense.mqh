@@ -66,7 +66,7 @@ bool GetAlgolyncLicenseLease(string licenseKey, long mt5Account, string eaSlug,
    ENUM_ACCOUNT_TRADE_MODE tradeMode = (ENUM_ACCOUNT_TRADE_MODE)AccountInfoInteger(ACCOUNT_TRADE_MODE);
    string accountMode = (tradeMode == ACCOUNT_TRADE_MODE_REAL) ? "LIVE" : "DEMO";
    string body = StringFormat(
-      "{\"license_key\":\"%s\",\"mt5_login\":%I64d,\"account_mode\":\"%s\",\"ea_slug\":\"%s\",\"broker_server\":\"%s\"}",
+      "{\"license_key\":\"%s\",\"mt5_login\":\"%I64d\",\"account_mode\":\"%s\",\"ea_slug\":\"%s\",\"broker_server\":\"%s\"}",
       licenseKey, mt5Account, accountMode, eaSlug, AccountInfoString(ACCOUNT_SERVER)
    );
    string response = "";
