@@ -14,30 +14,38 @@ test('owner authorization is a single configured identity and fails closed', asy
   assert.doesNotMatch(source, /ADMIN_EMAIL/);
 });
 
-test('critical public licensing endpoints use distributed fail-closed rate limiting', async () => {
+test('commercial routes are explicitly retired in the personal edition', async () => {
   for (const path of [
+    'app/api/v1/create-checkout/route.ts',
+    'app/api/v1/customer-portal/route.ts',
     'app/api/v1/validate-license/route.ts',
-    'app/api/v1/bind-account/route.ts',
-    'app/api/v1/provision-demo-license/route.ts',
+    'app/api/v1/license/verify/route.ts',
+    'app/api/v1/license/heartbeat/route.ts',
     'app/api/v1/license-bind/route.ts',
-    'app/api/owner/verify/route.ts',
+    'app/api/v1/license-transfer/route.ts',
+    'app/api/v1/lookup-license/route.ts',
+    'app/api/v1/provision-demo-license/route.ts',
+    'app/api/v1/paystack-webhook/route.ts',
+    'app/api/paystack/webhook/route.ts',
+    'app/api/owner/licenses/route.ts',
   ]) {
     const source = await read(path);
-    assert.match(source, /enforceDistributedRateLimit/, path);
-    assert.match(source, /rate\.unavailable/, path);
-    assert.match(source, /rate\.unavailable[\s\S]{0,400}\b503\b/, path);
+    assert.match(source, /status:\s*410/, path);
+    assert.match(source, /Personal Quant Edition/, path);
   }
 });
 
-test('owner privileged routes independently verify administrator or reviewer identity', async () => {
+test('private owner and research-governance routes independently verify owner identity', async () => {
   for (const path of [
     'app/api/owner/operations/route.ts',
-    'app/api/owner/licenses/route.ts',
     'app/api/owner/mt5-installations/route.ts',
     'app/api/owner/control-plane/route.ts',
     'app/api/owner/research-governance/route.ts',
     'app/api/owner/research-governance/models/route.ts',
     'app/api/owner/research-governance/validate/route.ts',
+    'app/api/owner/artifacts/route.ts',
+    'app/api/owner/artifacts/upload-url/route.ts',
+    'app/api/owner/artifacts/register/route.ts',
   ]) {
     const source = await read(path);
     assert.match(source, /requireOwner\(request\)/, path);
@@ -47,22 +55,11 @@ test('owner privileged routes independently verify administrator or reviewer ide
   assert.match(review, /enforceDistributedRateLimit/);
 });
 
-test('Paystack entitlement minting verifies provider-side payment and server price', async () => {
-  const source = await read('lib/provisionLicense.ts');
-  assert.match(source, /api\.paystack\.co\/transaction\/verify/);
-  assert.match(source, /payment\.status !== 'success'/);
-  assert.match(source, /paidAmount !== expectedAmount/);
-  assert.match(source, /provision_algolync_license_v2/);
-  assert.match(source, /payment_reference/);
-});
-
-test('demo licences are returned only after a represented active row is persisted', async () => {
-  const admin = await read('lib/supabaseAdmin.ts');
-  const demo = await read('app/api/v1/provision-demo-license/route.ts');
-  assert.match(admin, /resolution=merge-duplicates,return=representation/);
-  assert.match(demo, /Array\.isArray\(persisted\)/);
-  assert.match(demo, /row\.license_key === licenseKey/);
-  assert.match(demo, /row\.status\.toLowerCase\(\) === 'active'/);
+test('legacy Paystack provisioning is not reachable through active route handlers', async () => {
+  const checkout = await read('app/api/v1/create-checkout/route.ts');
+  const webhook = await read('app/api/v1/paystack-webhook/route.ts');
+  assert.match(checkout, /status:\s*410/);
+  assert.match(webhook, /status:\s*410/);
 });
 
 test('database enforces global MT5 seat uniqueness across LIVE and DEMO types', async () => {
@@ -72,26 +69,29 @@ test('database enforces global MT5 seat uniqueness across LIVE and DEMO types', 
   assert.match(migration, /WHERE mt5_login IS NOT NULL/);
 });
 
-test('store separates live verified telemetry from reported user-submitted ledger', async () => {
-  const source = await read('app/components/LegacyStoreTerminal.tsx');
-  assert.match(source, /No independently verified live-performance dataset/);
-  assert.match(source, /Not Independently Verified/);
-  assert.match(source, /not labelled broker-verified/);
+test('personal EA Lab separates live research readiness from execution approval', async () => {
+  const source = await read('app/components/StoreTerminal.tsx');
+  assert.match(source, /Research readiness only/);
+  assert.match(source, /The supervisor is an advisory gate only/);
+  assert.match(source, /does not place broker orders/);
+  assert.doesNotMatch(source, /Paystack|Checkout|Customer Portal|license_key/);
 });
 
-test('all required secondary routes provide Back to Terminal navigation', async () => {
-  const routes = [
-    'app/store/page.tsx',
-    'app/account/page.tsx',
-    'app/owner/page.tsx',
-    'app/privacy/page.tsx',
-    'app/terms/page.tsx',
-    'app/faq/page.tsx',
-    'app/guide/page.tsx',
-  ];
-  for (const path of routes) {
-    let source = await read(path);
-    if (path === 'app/store/page.tsx') source += await read('app/components/LegacyStoreTerminal.tsx');
-    assert.match(source, /BACK TO TERMINAL/, path);
+test('retired account and customer pages route to the private owner console', async () => {
+  for (const path of ['app/account/page.tsx', 'app/customer/page.tsx', 'app/licensing/page.tsx']) {
+    const source = await read(path);
+    assert.match(source, /redirect\('\/owner'\)/, path);
+  }
+});
+
+test('active secondary pages retain navigation back to the terminal', async () => {
+  for (const path of ['app/store/page.tsx', 'app/owner/page.tsx', 'app/privacy/page.tsx', 'app/terms/page.tsx', 'app/faq/page.tsx', 'app/guide/page.tsx']) {
+    const source = await read(path);
+    if (path === 'app/store/page.tsx') {
+      const terminal = await read('app/components/StoreTerminal.tsx');
+      assert.match(terminal, /BACK TO TERMINAL/);
+    } else {
+      assert.match(source, /BACK TO TERMINAL|Back to Terminal|Back to terminal/, path);
+    }
   }
 });
