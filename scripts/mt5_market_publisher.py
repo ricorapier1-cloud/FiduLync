@@ -48,6 +48,12 @@ DEFAULT_SYMBOL_MAP = {
     "EURJPY": "EURJPY",
     "XAUUSD": "XAUUSD",
 }
+OPTIONAL_SYMBOL_MAP = {
+    "DXY": "DXY",
+    "USOIL": "USOIL",
+    "SPX500": "SPX500",
+}
+SUPPORTED_SYMBOLS = {**DEFAULT_SYMBOL_MAP, **OPTIONAL_SYMBOL_MAP}
 TIMEFRAMES = {
     "H1": mt5.TIMEFRAME_H1,
     "H4": mt5.TIMEFRAME_H4,
@@ -84,7 +90,7 @@ def parse_symbol_map() -> dict[str, str]:
         broker_symbol = broker_symbol.strip()
         if not separator or not canonical or not broker_symbol:
             raise SystemExit("Invalid MT5_SYMBOL_MAP. Use CANONICAL=BROKER_SYMBOL comma-separated pairs.")
-        if canonical not in DEFAULT_SYMBOL_MAP:
+        if canonical not in SUPPORTED_SYMBOLS:
             raise SystemExit(f"Unsupported canonical symbol: {canonical}")
         mapping[canonical] = broker_symbol
     missing = set(DEFAULT_SYMBOL_MAP) - set(mapping)
