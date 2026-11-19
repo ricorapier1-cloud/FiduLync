@@ -36,7 +36,9 @@ Set server-side values in `.env.local` or the deployment secret manager:
 | `PAYSTACK_SECRET_KEY` | Server-only Paystack transaction initialization and verification secret |
 | `PAYSTACK_LIVE_ENABLED` | Must remain `false` until merchant compliance, live checkout and refund/cancellation disclosures are approved |
 | `FINNHUB_API_KEY` | Optional FX quotes and economic calendar; not called until commercial-use approval is recorded |
-| `FINNHUB_COMMERCIAL_USE_APPROVED` | Must be `true` only after written permission covers the intended quote/calendar display and caching |\n| `FRANKFURTER_COMMERCIAL_USE_APPROVED` / `EXCHANGERATE_API_COMMERCIAL_USE_APPROVED` / `GOLD_API_COMMERCIAL_USE_APPROVED` | Keep `false` until each reference provider's commercial-use and attribution terms are approved |\n| `FRED_API_KEY` | Optional; disabled unless separately approved for the intended commercial use and data handling |
+| `FINNHUB_COMMERCIAL_USE_APPROVED` | Must be `true` only after written permission covers the intended quote/calendar display and caching |
+| `FRANKFURTER_COMMERCIAL_USE_APPROVED` / `EXCHANGERATE_API_COMMERCIAL_USE_APPROVED` / `GOLD_API_COMMERCIAL_USE_APPROVED` | Keep `false` until each reference provider's commercial-use and attribution terms are approved |
+| `FRED_API_KEY` | Optional; disabled unless separately approved for the intended commercial use and data handling |
 | `FRED_COMMERCIAL_USE_APPROVED` | Must remain `false` unless written permission covers the exact use, display, storage and caching |
 | `BEA_API_KEY` / `BLS_API_KEY` | Diagnostic credentials only; full adapters are not yet integrated |
 | `TWELVE_DATA_API_KEY` | Historical candle fallback; disabled for customer-facing use until commercial and exchange rights are approved |
