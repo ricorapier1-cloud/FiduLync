@@ -50,19 +50,34 @@ export default function OwnerArtifactRelease({ accessToken }: { accessToken: str
     if (!file) { setError('Select a compiled .ex5 file first.'); return; }
     setLoading(true); setError(''); setNotice('');
     try {
-      const form = new FormData();
-      form.append('ea_slug', slug);
-      form.append('artifact_version', version);
-      form.append('file', file);
-      const response = await fetch('/api/owner/artifacts', {
+      const bytes = await file.arrayBuffer();
+      const digest = await crypto.subtle.digest('SHA-256', bytes);
+      const sha256 = Array.from(new Uint8Array(digest)).map((value) => value.toString(16).padStart(2, '0')).join('');
+      const metadata = { ea_slug: slug, artifact_version: version, sha256, size_bytes: file.size };
+      const signedResponse = await fetch('/api/owner/artifacts/upload-url', {
         method: 'POST',
-        headers: { Authorization: 'Bearer ' + accessToken },
-        body: form,
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + accessToken },
+        body: JSON.stringify(metadata),
+        cache: 'no-store',
+      });
+      const signedPayload = await signedResponse.json() as { upload_url?: string; error?: string };
+      if (!signedResponse.ok || !signedPayload.upload_url) throw new Error(signedPayload.error || 'A private upload URL could not be created.');
+      const uploaded = await fetch(signedPayload.upload_url, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: file,
+        cache: 'no-store',
+      });
+      if (!uploaded.ok) throw new Error('Supabase Storage rejected the .ex5 upload.');
+      const response = await fetch('/api/owner/artifacts/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + accessToken },
+        body: JSON.stringify(metadata),
         cache: 'no-store',
       });
       const payload = await response.json() as { uploaded?: boolean; sha256?: string; error?: string };
-      if (!response.ok || payload.uploaded !== true) throw new Error(payload.error || 'Artifact upload failed.');
-      setNotice('Private artifact uploaded. SHA-256: ' + (payload.sha256 || 'recorded') + '. It is NOT approved for sale yet.');
+      if (!response.ok || payload.uploaded !== true) throw new Error(payload.error || 'Artifact registration failed.');
+      setNotice('Private artifact uploaded. SHA-256: ' + sha256 + '. It is NOT approved for sale yet.');
       setFile(null);
       const picker = document.getElementById('owner-ex5-file') as HTMLInputElement | null;
       if (picker) picker.value = '';
@@ -109,7 +124,7 @@ export default function OwnerArtifactRelease({ accessToken }: { accessToken: str
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <div className="text-xs font-semibold text-slate-200">Private compiled EA releases</div>
-          <p className="mt-1 text-[10px] leading-5 text-slate-500">Upload only a MetaEditor-compiled .ex5 file. The server calculates SHA-256, stores it in the private bucket and leaves release approval off by default.</p>
+          <p className="mt-1 text-[10px] leading-5 text-slate-500">Upload only a MetaEditor-compiled .ex5 file. Your browser calculates SHA-256, then uploads directly to private Supabase Storage using a short-lived signed URL; the server registers the object and leaves release approval off by default.</p>
         </div>
         <button type="button" onClick={() => void refresh()} disabled={refreshing} className="rounded-lg border border-white/10 px-3 py-2 text-[10px] text-slate-300 disabled:opacity-50">{refreshing ? 'Refreshing…' : 'Refresh artifacts'}</button>
       </div>
