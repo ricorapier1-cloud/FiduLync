@@ -60,6 +60,18 @@ Set server-side values in `.env.local` or the deployment secret manager:
 
 Use a long, unique random value for `ALGOLYNC_PRIVATE_KEY` (or the accepted legacy `ALGO_PRIVATE_API_KEY`) and rotate it in the server secret manager and all EA configurations together. Never commit environment files or embed service-role/provider credentials in an EA.
 
+## AlgoLync signed MT5 licence and heartbeat contract
+
+- `POST /api/v1/license/verify` accepts `license_key`, `mt5_login`, `account_mode`, and `ea_slug`. It validates the active database entitlement, product release approval and MT5 seat binding before returning a signed HS256 JWT lease valid for 24 hours.
+- The signing key is `ALGOLYNC_LEASE_SIGNING_SECRET` and is server-only. Never embed it in an EA or expose it through a `NEXT_PUBLIC_` variable.
+- `POST /api/v1/license/heartbeat` accepts the lease in `Authorization: Bearer <lease_token>`, rechecks current licence status, grace/expiry, product approval and seat binding, then stores the submitted account telemetry in `ea_heartbeats`.
+- The updated `public/mql5/MacroLyncLicense.mqh` exposes `GetAlgolyncLicenseLease(...)`, `VerifyAlgolyncLicense(..., eaSlug)`, and `SendAlgolyncLicenseHeartbeat(...)`. MT5 must allow WebRequest to `https://fidulync.vercel.app`.
+- The legacy `/api/v1/validate-license` endpoint and two-argument MQL5 verifier remain for backward compatibility. New commercial EA integrations should pass the immutable product slug and use the lease/heartbeat functions.
+
+## Paystack webhook contract
+
+Configure Paystack to send events to `https://fidulync.vercel.app/api/paystack/webhook`. The endpoint supports timestamped `Paystack-Signature` verification with `PAYSTACK_WEBHOOK_SECRET` and the legacy `x-paystack-signature` fallback with `PAYSTACK_SECRET_KEY`. It persists an idempotency record before processing, supports initial charge provisioning, subscription association, invoice failure/grace, invoice renewal and subscription disable events, and leaves failed events retryable. Do not enable live processing until the Paystack dashboard signing secret and merchant approval are confirmed.
+
 ## Signal engine and API
 
 `GET /api/v1/macro-signal?symbol=EURUSD` returns a flat JSON signal. The following is an example response shape, not live market data:
