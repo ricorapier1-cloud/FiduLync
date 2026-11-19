@@ -29,7 +29,7 @@ In Vercel → Project → Settings → Environment Variables, configure the foll
 | `PAYSTACK_PUBLIC_KEY` and/or `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | Paystack public key if the checkout UI requires it |
 | `ALGOLYNC_PRIVATE_KEY` (or legacy `ALGO_PRIVATE_API_KEY`) | Long random secret shared only with trusted EA clients for private heartbeat/trade ingestion |
 | `CRON_SECRET` | Long random secret used to authorize the scheduled macro refresh |
-| `NEXT_PUBLIC_APP_URL` | Set to `https://fidulync.vercel.app` |
+| `OWNER_EMAIL` | Explicit owner email matching the owner audit policy; no server-side fallback |\n| `NEXT_PUBLIC_APP_URL` | Set to `https://fidulync.vercel.app` |
 
 The server Supabase helper accepts either `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY`, and either `SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_URL`. Do not use a publishable/anon key for server-side writes.
 
