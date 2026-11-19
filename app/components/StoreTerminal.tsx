@@ -27,6 +27,8 @@ type SignalResult = {
   correlation_group: string;
   news_lockout: boolean;
   safe_to_trade: boolean;
+  ghost_score: number | null;
+  ghost_allowed: boolean;
   execution_blockers: string[];
   risk_mode: 'DISABLED' | 'PILOT_TREND' | 'PILOT_MEAN_REVERSION';
   market_data_source: 'mt5' | 'configured_provider' | 'twelve_data' | 'unavailable' | 'unknown';
@@ -55,6 +57,8 @@ function isSignalResult(value: unknown): value is SignalResult {
     && typeof result.correlation_group === 'string'
     && typeof result.news_lockout === 'boolean'
     && typeof result.safe_to_trade === 'boolean'
+    && (result.ghost_score === null || typeof result.ghost_score === 'number')
+    && typeof result.ghost_allowed === 'boolean'
     && Array.isArray(result.execution_blockers)
     && result.execution_blockers.every((item) => typeof item === 'string')
     && typeof result.risk_mode === 'string'
@@ -203,6 +207,7 @@ export default function StoreTerminal({ initialSnapshot, session }: StoreTermina
                   <Metric label="CSI SPREAD" value={String(signal.csi_spread)} />
                   <Metric label="RISK MULTIPLIER" value={`${signal.risk_multiplier.toFixed(2)}×`} />
                   <Metric label="RISK MODE" value={signal.risk_mode} />
+                  <Metric label="GHOST PROTOCOL" value={signal.ghost_score === null ? 'UNAVAILABLE' : `${signal.ghost_score.toFixed(2)} · ${signal.ghost_allowed ? 'PASS' : 'HOLD'}`} />
                   <Metric label="CANDLE SOURCE" value={signal.market_data_source.toUpperCase()} />
                   <Metric label="CANDLE COVERAGE" value={`H1 ${signal.market_candle_counts.h1} · H4 ${signal.market_candle_counts.h4} · D1 ${signal.market_candle_counts.d1}`} />
                   <Metric label="LATEST CLOSED BAR" value={signal.latest_market_candle_at ? new Date(signal.latest_market_candle_at).toLocaleString() : "Unavailable"} />
