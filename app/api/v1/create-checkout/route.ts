@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { randomBytes } from 'node:crypto';
 import { enforceDistributedRateLimit } from '@/lib/rateLimit';
 import { isSupabaseConfigured, supabaseRead } from '@/lib/supabaseAdmin';
+import { hasApprovedProductArtifact } from '@/lib/productRelease';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,6 +66,7 @@ export async function POST(req: Request) {
     if (!products) throw new Error('Product catalogue database unavailable.');
     const product = products[0];
     if (!product || !product.is_active || product.category === 'SANDBOX') return json({ success: false, error: 'This EA is not currently available for paid licensing.' }, 404);
+    if (!(await hasApprovedProductArtifact(eaSlug))) return json({ success: false, error: 'Paid checkout is disabled until an approved compiled .ex5 release artifact is uploaded and verified.' }, 409);
 
     const price = currency === 'NGN'
       ? Number(plan === 'MONTHLY' ? product.monthly_price_ngn : product.one_time_price_ngn)
