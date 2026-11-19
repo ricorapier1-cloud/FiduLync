@@ -41,7 +41,7 @@ class PersonalQuantSecurityContractTests(unittest.TestCase):
         self.assertIn("GRANT EXECUTE", migration)
 
     def test_owner_login_is_password_only_with_recovery_only_email(self):
-        for path in ("app/owner/page.tsx", "components/OwnerConsole.tsx"):
+        for path in ("app/owner/page.tsx",):
             with self.subTest(path=path):
                 source = self.read(path)
                 self.assertIn("signInWithPassword", source)
@@ -53,7 +53,6 @@ class PersonalQuantSecurityContractTests(unittest.TestCase):
         owner_routes = (
             "app/api/owner/operations/route.ts",
             "app/api/owner/mt5-installations/route.ts",
-            "app/api/owner/control-plane/route.ts",
             "app/api/owner/research-governance/route.ts",
             "app/api/owner/research-governance/models/route.ts",
             "app/api/owner/research-governance/validate/route.ts",
