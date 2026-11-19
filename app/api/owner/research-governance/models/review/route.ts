@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createHash } from 'node:crypto';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
 import { enforceDistributedRateLimit } from '@/lib/rateLimit';
+import { isAuthorizedOwnerEmail } from '@/lib/ownerAuth';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
     const supabase = getSupabaseAdmin();
     const { data: authData, error: authError } = await supabase.auth.getUser(token);
     const user = authData.user;
-    if (authError || !user || !user.email_confirmed_at || !allowlist.includes(user.id)) {
+    if (authError || !user || !user.email_confirmed_at || !allowlist.includes(user.id) || isAuthorizedOwnerEmail(user.email)) {
       return NextResponse.json({ error: 'This verified account is not an authorised independent reviewer.' }, { status: 403 });
     }
     let body: unknown;
