@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireOwner } from '@/lib/ownerAuth';
+import { enforceDistributedRateLimit } from '@/lib/rateLimit';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
 
 export const dynamic = 'force-dynamic';
@@ -8,6 +9,9 @@ export const runtime = 'nodejs';
 export async function GET(request: Request) {
   const owner = await requireOwner(request);
   if (!owner) return NextResponse.json({ error: 'Owner authentication required.' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
+  const rate = await enforceDistributedRateLimit(request, 'owner-research-governance', 20, 60_000);
+  if (rate.unavailable) return NextResponse.json({ error: 'The security rate-limit service is unavailable.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+  if (!rate.allowed) return NextResponse.json({ error: 'Rate limit exceeded.' }, { status: 429, headers: { 'Cache-Control': 'no-store' } });
 
   try {
     const supabase = getSupabaseAdmin();
