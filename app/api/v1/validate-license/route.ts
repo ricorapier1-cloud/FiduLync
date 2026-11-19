@@ -1,127 +1,104 @@
 import { NextResponse } from 'next/server';
-import { isSupabaseConfigured, supabaseRead, supabaseInsert } from '@/lib/supabaseAdmin';
-import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { isSupabaseConfigured, supabaseRead, supabaseQuery } from '@/lib/supabaseAdmin';
+import { enforceDistributedRateLimit } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
 type LicenseRecord = {
   license_key: string;
-  status: string;
+  status: string | null;
   expires_at: string | null;
-  max_live_slots: number | null;
-  max_demo_slots: number | null;
-  email?: string | null;
+  email: string;
+  ea_slug: string | null;
+  included_live_seats: number | null;
+  included_demo_seats: number | null;
+  extra_live_seats: number | null;
+};
+type SeatRecord = {
+  slot_type: 'LIVE' | 'DEMO';
+  slot_number: number;
+  mt5_login: number | null;
+  broker_server: string | null;
+  rebind_available_at: string | null;
+};
+type BindResult = {
+  success: boolean;
+  already_bound?: boolean;
+  reason?: string;
+  rebind_available_at?: string;
 };
 
-type BoundAccountRecord = {
-  account_number: number | string;
-  account_type: 'LIVE' | 'DEMO';
-};
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+function json(body: unknown, status = 200) {
+  return NextResponse.json(body, { status, headers: { 'Cache-Control': 'no-store, max-age=0' } });
+}
 
 export async function POST(req: Request) {
-  const ip = getClientIp(req);
-  if (!checkRateLimit(ip, 60)) {
-    return NextResponse.json({ valid: false, message: 'Rate limit exceeded' }, { status: 429 });
-  }
+  const rate = await enforceDistributedRateLimit(req, 'validate-license', 60, 60_000);
+  if (rate.unavailable) return json({ valid: false, message: 'License validation is temporarily unavailable. Retry shortly.' }, 503);
+  if (!rate.allowed) return json({ valid: false, message: 'Rate limit exceeded.' }, 429);
+  if (!isSupabaseConfigured()) return json({ valid: false, message: 'License service is not configured.' }, 503);
 
   try {
-    const body = await req.json();
-    const licenseKey = String(body.license_key || '').trim().toUpperCase();
-    const accountNumber = Number(body.account_number || body.account || 0);
-    const accountType = (body.account_type === 'DEMO' ? 'DEMO' : 'LIVE') as 'LIVE' | 'DEMO';
-    const brokerServer = body.broker_server ? String(body.broker_server).trim() : null;
+    const raw: unknown = await req.json();
+    if (!isRecord(raw)) return json({ valid: false, message: 'A valid JSON object is required.' }, 400);
+    const licenseKey = typeof raw.license_key === 'string' ? raw.license_key.trim().toUpperCase() : '';
+    const accountRaw = raw.account_number ?? raw.account;
+    const accountNumber = typeof accountRaw === 'number' ? accountRaw
+      : typeof accountRaw === 'string' && /^\d{1,20}$/.test(accountRaw) ? Number(accountRaw) : NaN;
+    const accountType = raw.account_type;
+    const brokerServer = typeof raw.broker_server === 'string' ? raw.broker_server.trim() : null;
+    const requestedEaSlug = typeof raw.ea_slug === 'string' ? raw.ea_slug.trim().toLowerCase() : null;
 
-    if (!licenseKey) {
-      return NextResponse.json({ valid: false, message: 'license_key required' }, { status: 400 });
-    }
+    if (!/^[A-Z0-9][A-Z0-9-]{15,95}$/.test(licenseKey)) return json({ valid: false, message: 'A valid license_key is required.' }, 400);
+    if (!Number.isSafeInteger(accountNumber) || accountNumber <= 0) return json({ valid: false, message: 'A valid positive MT5 account number is required.' }, 400);
+    if (accountType !== 'LIVE' && accountType !== 'DEMO') return json({ valid: false, message: 'account_type must be LIVE or DEMO.' }, 400);
+    if (brokerServer && brokerServer.length > 128) return json({ valid: false, message: 'broker_server is too long.' }, 400);
+    if (requestedEaSlug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(requestedEaSlug)) return json({ valid: false, message: 'Invalid ea_slug.' }, 400);
 
-    // 1. If key has ALGO-DEMO prefix and account is DEMO mode, permit forward-testing
-    if (licenseKey.startsWith('ALGO-DEMO-')) {
-      if (accountType !== 'DEMO') {
-        return NextResponse.json({
-          valid: false,
-          message: 'This demo license key cannot be attached to a real/live trading account. Demo accounts only.',
-        }, { status: 403 });
-      }
-      return NextResponse.json({
-        valid: true,
-        license_type: 'DEMO_TRIAL',
-        account: accountNumber,
-        message: 'Demo entitlement active. 1 Live + 2 Demo accounts included in full subscription.',
-      });
-    }
-
-    if (!isSupabaseConfigured()) {
-      return NextResponse.json({
-        valid: true,
-        license_type: 'LOCAL_DEV',
-        account: accountNumber,
-        message: 'License accepted (Development Mode).',
-      });
-    }
-
-    // 2. Query license from Supabase
-    const licenses = await supabaseRead<LicenseRecord[]>('licenses', `license_key=eq.${encodeURIComponent(licenseKey)}&select=license_key,status,expires_at,max_live_slots,max_demo_slots,email`);
-    if (!licenses || licenses.length === 0) {
-      return NextResponse.json({ valid: false, message: 'Invalid license key' }, { status: 404 });
-    }
-
+    const licenses = await supabaseRead<LicenseRecord[]>('licenses',
+      `license_key=eq.${encodeURIComponent(licenseKey)}&select=license_key,status,expires_at,email,ea_slug,included_live_seats,included_demo_seats,extra_live_seats`);
+    if (!licenses) throw new Error('License database returned no result.');
     const license = licenses[0];
+    if (!license) return json({ valid: false, message: 'Invalid license key.' }, 404);
+    if (String(license.status || '').toLowerCase() !== 'active') return json({ valid: false, message: 'License is not active.' }, 403);
+    if (license.expires_at && new Date(license.expires_at).getTime() <= Date.now()) return json({ valid: false, message: 'License has expired.' }, 403);
+    if (!license.ea_slug || (requestedEaSlug && requestedEaSlug !== license.ea_slug)) return json({ valid: false, message: 'This license is not entitled to the requested EA product.' }, 403);
 
-    // Status check
-    if (license.status !== 'ACTIVE' && license.status !== 'active') {
-      return NextResponse.json({ valid: false, message: `License is ${license.status}` }, { status: 403 });
-    }
+    const seats = await supabaseRead<SeatRecord[]>('ea_license_seats',
+      `license_key=eq.${encodeURIComponent(licenseKey)}&ea_slug=eq.${encodeURIComponent(license.ea_slug)}&select=slot_type,slot_number,mt5_login,broker_server,rebind_available_at`);
+    if (!seats) throw new Error('License seat database returned no result.');
+    const match = seats.find((seat) => Number(seat.mt5_login) === accountNumber);
+    if (match && match.slot_type !== accountType) return json({ valid: false, message: 'The MT5 account is bound under a different account type.' }, 403);
 
-    // Expiry check
-    if (license.expires_at && new Date(license.expires_at).getTime() < Date.now()) {
-      return NextResponse.json({ valid: false, message: 'License has expired' }, { status: 403 });
-    }
-
-    // 3. Check bound accounts in license_bound_accounts
-    if (accountNumber > 0) {
-      const bound = await supabaseRead<BoundAccountRecord[]>(
-        'license_bound_accounts',
-        `license_key=eq.${encodeURIComponent(licenseKey)}&select=account_number,account_type`
-      );
-
-      const accounts = bound || [];
-      const match = accounts.find((a) => Number(a.account_number) === accountNumber);
-
-      if (!match) {
-        // Auto-bind on first attach if slots are available!
-        const liveCount = accounts.filter((a) => a.account_type === 'LIVE').length;
-        const demoCount = accounts.filter((a) => a.account_type === 'DEMO').length;
-        const maxLive = license.max_live_slots ?? 1;
-        const maxDemo = license.max_demo_slots ?? 2;
-
-        const hasSlot = accountType === 'LIVE' ? liveCount < maxLive : demoCount < maxDemo;
-
-        if (hasSlot) {
-          const cooldownDate = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString();
-          await supabaseInsert('license_bound_accounts', {
-            license_key: licenseKey,
-            account_number: accountNumber,
-            account_type: accountType,
-            broker_server: brokerServer,
-            rebind_cooldown_until: cooldownDate,
-          });
-        } else {
-          return NextResponse.json({
-            valid: false,
-            message: `Account #${accountNumber} is not bound to this license and all ${accountType} slots are occupied (${accountType === 'LIVE' ? maxLive : maxDemo} max). Visit https://fidulync.vercel.app/store to manage your bound accounts.`,
-          }, { status: 403 });
-        }
+    if (!match) {
+      const result = await supabaseQuery<BindResult>('rpc/bind_algolync_seat', {
+        method: 'POST',
+        body: {
+          p_license_key: licenseKey,
+          p_account_number: accountNumber,
+          p_account_type: accountType,
+          p_broker_server: brokerServer,
+          p_previous_account_number: null,
+        },
+      });
+      if (!result || result.success !== true) {
+        return json({ valid: false, message: result?.reason || 'The account could not be assigned to an available license seat.' }, 403);
       }
     }
 
-    return NextResponse.json({
+    return json({
       valid: true,
-      license_type: 'INSTITUTIONAL_PRO',
+      license_type: license.tier || 'ALGOLYNC_ACTIVE',
       account: accountNumber,
-      message: 'License verified. Active cloud telemetry enabled.',
+      account_type: accountType,
+      ea_slug: license.ea_slug,
+      message: 'License verified against the active server entitlement and assigned seat.',
     });
-  } catch (err: unknown) {
-    return NextResponse.json({ valid: false, message: err instanceof Error ? err.message : 'Validation error' }, { status: 500 });
+  } catch (error) {
+    console.error('License validation failed:', error instanceof Error ? error.message : String(error));
+    return json({ valid: false, message: 'License validation service is temporarily unavailable.' }, 503);
   }
 }
