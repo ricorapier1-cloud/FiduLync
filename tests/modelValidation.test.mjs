@@ -1,8 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import validator from '../.quant-test/modelValidation.js';
-
-const { validateModelTrades } = validator;
+import { validateModelTrades } from '../.quant-test/modelValidation.js';
 const datasetFingerprint = 'a'.repeat(64);
 const codeFingerprint = 'b'.repeat(64);
 function trades(count = 200) {
