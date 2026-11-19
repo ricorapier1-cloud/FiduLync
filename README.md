@@ -29,7 +29,7 @@ Set server-side values in `.env.local` or the deployment secret manager:
 | Variable | Purpose |
 | --- | --- |
 | `ALGOLYNC_PRIVATE_KEY` (legacy alias: `ALGO_PRIVATE_API_KEY`) | Static secret for authenticated signal and EA heartbeat API requests; not required for same-origin Store signal previews |
-| `UPSTASH_REDIS_REST_URL` | Upstash REST endpoint for shared caching, EA heartbeat state, and closed-trade history; in-process fallback is used if unavailable |
+| `UPSTASH_REDIS_REST_URL` | Upstash REST endpoint for shared caching and legacy transient EA heartbeat state; in-process cache is ephemeral and is not durable telemetry storage |
 | `UPSTASH_REDIS_REST_TOKEN` | Server-only Upstash REST token |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL for persisted macro snapshots |
 | `SUPABASE_SECRET_KEY` / `SUPABASE_SERVICE_ROLE_KEY` | Server-only Supabase persistence and atomic security RPC access; never expose to a browser |
@@ -97,7 +97,7 @@ The macro adapter validates upstream policy rates, inflation, COT positioning, a
 
 The scheduled `/api/cron/sync-macro` route uses `CRON_SECRET`. Upstash provides shared EA heartbeat telemetry; when not configured, the dashboard reports process-local fallback storage.
 
-Historical Supabase migrations are retained for auditability. The Personal Quant owner console uses owner-only passwordless authentication. Escrow is excluded from active workflows; historical financial records remain protected for audit and server-side retention. Legacy store, checkout and EA licensing routes remain separate from the personal quant supervisor.
+Historical Supabase migrations are retained for auditability. The Personal Quant owner console uses owner-only email-and-password authentication; email is used only for password recovery. Licensed customer heartbeat and closed-trade telemetry are persisted in Supabase and do not fall back to process-local storage. Escrow is excluded from active workflows; historical financial records remain protected for audit and server-side retention. Legacy store, checkout and EA licensing routes remain separate from the personal quant supervisor.
 
 ## Windows MT5 handoff and compile gate
 
