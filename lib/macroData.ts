@@ -449,7 +449,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     asOf: new Date().toISOString(),
     source: cachedSnapshot.source === 'fallback' ? 'fallback' : 'partial',
   };
-  const [fredResult, finnhubResult, alphaResult, fmpResult, cotResult, frankfurterResult, calendarResult, ecbResult, bocResult, boeResult, worldBankResult] = await Promise.allSettled([
+  const [fredResult, finnhubResult, alphaResult, fmpResult, cotResult, frankfurterResult, calendarResult, ecbResult, bocResult, boeResult, worldBankResult, bojResult, rbaResult, rbnzResult, snbResult] = await Promise.allSettled([
     fredApiKey ? getFredUsdUpdates(fredApiKey) : Promise.resolve(null),
     finnhubApiKey ? getFinnhubCatalysts(finnhubApiKey) : Promise.resolve(null),
     alphaVantageKey ? getAlphaVantageUsdUpdates(alphaVantageKey) : Promise.resolve(null),
@@ -588,7 +588,25 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
   } else {
     console.warn('Bank of England official Bank Rate is unavailable:', boeResult.reason);
   }
-  if (worldBankResult.status === 'fulfilled') {
+
+  const officialPolicyResults: Array<{ code: string; result: PromiseSettledResult<import('@/lib/internationalMacro').OfficialPolicyObservation> }> = [
+    { code: 'JPY', result: bojResult }, { code: 'AUD', result: rbaResult },
+    { code: 'NZD', result: rbnzResult }, { code: 'CHF', result: snbResult },
+  ];
+  for (const item of officialPolicyResults) {
+    if (item.result.status !== 'fulfilled') {
+      console.warn(`Official ${item.code} central-bank policy-rate source unavailable:`, item.result.reason);
+      continue;
+    }
+    const currency = snapshot.currencies.find((entry) => entry.code === item.code);
+    if (!currency || !Number.isFinite(item.result.value.value)) continue;
+    currency.policyRate = item.result.value.value;
+    currency.policyRateSource = 'provider';
+    currency.policyRateAsOf = item.result.value.asOf;
+    currency.policyRateSourceUrl = item.result.value.sourceUrl;
+    hasLiveData = true;
+  }
+\n  if (worldBankResult.status === 'fulfilled') {
     for (const observation of worldBankResult.value) {
       const currency = snapshot.currencies.find((item) => item.code === observation.currency);
       if (!currency || currency.inflationSource === 'provider') continue;
