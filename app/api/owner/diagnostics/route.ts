@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { timingSafeEqual } from 'node:crypto';
-import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { enforceDistributedRateLimit } from '@/lib/rateLimit';
 import { requireOwner } from '@/lib/ownerAuth';
 
 export const dynamic = 'force-dynamic';
@@ -42,9 +42,9 @@ export async function GET(request: Request) {
   if (!owner && !serviceAuthorized) {
     return NextResponse.json({ error: 'Owner authentication required.' }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
   }
-  if (!checkRateLimit(owner?.id ?? getClientIp(request), 5, 60_000)) {
-    return NextResponse.json({ error: 'Diagnostics rate limit exceeded.' }, { status: 429, headers: { 'Cache-Control': 'no-store' } });
-  }
+  const rate = await enforceDistributedRateLimit(request, 'owner-diagnostics', 5, 60_000);
+  if (rate.unavailable) return NextResponse.json({ error: 'Diagnostics rate limiter is unavailable.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+  if (!rate.allowed) return NextResponse.json({ error: 'Diagnostics rate limit exceeded.' }, { status: 429, headers: { 'Cache-Control': 'no-store' } });
 
   const checks: Record<string, Check> = {};
   const tasks: Array<Promise<[string, Check]>> = [];
