@@ -4,13 +4,14 @@ This runbook is for the project owner. Never commit secret values to GitHub, pas
 
 ## Current release posture
 
-- Development branch: `fix/institutional-api-contracts`
+- Development branch: `feat/personal-quant-edition`
 - Production branch: `main` (not changed by this work)
 - Public project domain: `https://fidulync.vercel.app`
-- Paystack payments fail closed until the production secret is configured.
+- Production remains on `main`; the current Personal Quant feature branch is not yet promoted.
+- Paystack live processing is disabled, and paid checkout remains blocked until merchant activation plus an approved private compiled `.ex5` release artifact.
 - License email delivery and email-verified MT5 account transfers require `RESEND_API_KEY` and a verified `LICENSE_FROM_EMAIL`.
 - MT5 heartbeat and trade ingestion fail closed until the private EA API key is configured.
-- No compiled `.ex5` trading robot is represented as available until it has been built and tested in MetaEditor.
+- No compiled `.ex5` trading robot is represented as available until it has been built and tested in MetaEditor, uploaded to private Storage, hash metadata registered, and explicitly owner-approved.
 
 ## Required Vercel Production environment variables
 
@@ -43,15 +44,15 @@ Other configured market-data providers may require `FX_API_KEY`, `FRED_API_KEY`,
 6. Deploy after changing environment variables.
 7. Test a successful payment, failed payment, duplicate webhook delivery, and a callback retry with a Paystack test account in Preview before enabling live sales.
 
-The checkout currently prices subscriptions in minor currency units: NGN 65,000 monthly, USD 49 monthly, NGN 250,000 lifetime, USD 199 lifetime. Confirm these prices and tax/refund terms before enabling live sales.
+The database currently stores NGN 65,000 monthly, USD 49 monthly, NGN 250,000 lifetime and USD 199 lifetime for the three active catalogue products. Confirm taxes, refunds and Paystack merchant terms before enabling sales. The checkout API independently verifies server-side prices and refuses checkout until a compiled release artifact is approved.
 
 ## MT5 / EA bridge setup (when a laptop is available)
 
 1. Set the same strong `ALGOLYNC_PRIVATE_KEY` in Vercel and the EA's private request configuration (the legacy `ALGO_PRIVATE_API_KEY` alias is also accepted). Do not hardcode it into a public downloadable source file.
-2. Add `https://fidulync.vercel.app` to MT5 Tools → Options → Expert Advisors → Allow WebRequest for listed URL.
-3. Compile the EA in MetaEditor and resolve all compiler errors and warnings.
-4. Verify license validation against a real purchased test license and the correct MT5 account.
-5. Verify heartbeat, closed-trade ingestion, customer-specific account history, and offline status.
+2. Add the exact verified deployment origin to MT5 Tools → Options → Expert Advisors → Allow WebRequest for listed URL.
+3. Put actual product `.mq5` source files in `MQL5/Experts/Release/`; run `scripts/compile_mt5.ps1 -MetaEditorPath "<actual MetaEditor path>" -RequireProductSources` and resolve all compiler errors and warnings.
+4. Upload the compiled `.ex5` through `/owner` → Release governance, verify the displayed SHA-256, complete demo-account validation, and explicitly approve the artifact before attempting paid or demo license validation.
+5. Verify publisher heartbeat, closed-trade ingestion, customer-specific account history, and stale/offline status.
 6. Run on a demo account before any live trading. No automated profitability or safety guarantee is implied.
 
 ## Release gates
@@ -70,3 +71,8 @@ Do not promote the development branch to `main` or switch on live selling until:
 - Never put private keys, Supabase secret keys, service-role keys, Paystack secret keys, or cron secrets in client-side variables or Git.
 - Rotate any credential that has been pasted into public source, logs, or chat.
 - Keep the WhatsApp support component and its existing behavior unchanged.
+
+
+## EA artifact release workflow
+
+The owner console includes direct-to-private-Storage `.ex5` upload, SHA-256 metadata registration, explicit release approval and audited revocation. Binary upload uses a short-lived signed Supabase Storage URL so large files do not pass through the Vercel function body. Uploading does not approve a release. Checkout, demo entitlement creation, paid license provisioning and validation all remain blocked until the artifact is approved and the private object is still present.
