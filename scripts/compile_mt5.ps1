@@ -11,11 +11,10 @@ param(
 $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $includeRoot = Join-Path $repoRoot "MQL5"
-$editor = (Resolve-Path $MetaEditorPath).Path
-
-if (-not (Test-Path -LiteralPath $editor -PathType Leaf)) {
+if (-not (Test-Path -LiteralPath $MetaEditorPath -PathType Leaf)) {
     throw "MetaEditor executable not found: $MetaEditorPath"
 }
+$editor = (Resolve-Path $MetaEditorPath).Path
 
 $sourceFiles = @(
     (Join-Path $includeRoot "Experts\FiduLync_Supervisor_Probe.mq5"),
@@ -59,6 +58,11 @@ foreach ($source in $sourceFiles) {
     # MQL5 root so <FiduLync/...> resolves from MQL5\Include\FiduLync.
     $arguments = '/compile:"{0}" /include:"{1}" /log' -f $source, $includeRoot
     $process = Start-Process -FilePath $editor -ArgumentList $arguments -Wait -PassThru
+
+    if ($process.ExitCode -ne 0) {
+        $failures.Add("MetaEditor exited with code $($process.ExitCode) for $source.")
+        continue
+    }
 
     if (-not (Test-Path -LiteralPath $logPath -PathType Leaf)) {
         $failures.Add("MetaEditor did not create a compilation log for $source (process exit $($process.ExitCode)).")
