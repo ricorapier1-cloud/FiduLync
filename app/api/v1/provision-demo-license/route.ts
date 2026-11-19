@@ -17,6 +17,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export async function POST(req: Request) {
+  return NextResponse.json({ error: 'Customer demo licences are not part of Personal Quant Edition.' }, { status: 410, headers: { 'Cache-Control': 'no-store' } });
+
   const rate = await enforceDistributedRateLimit(req, 'provision-demo-license', 5, 60 * 60_000);
   if (rate.unavailable) return NextResponse.json({ success: false, error: 'Demo provisioning is temporarily unavailable.' }, { status: 503 });
   if (!rate.allowed) return NextResponse.json({ success: false, error: 'Demo request limit reached. Try again later.' }, { status: 429 });
