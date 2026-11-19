@@ -149,7 +149,7 @@ export async function GET(request: Request) {
       const blockers = [
         ...(!macroFresh || rawMacro.source === 'fallback' ? ['MACRO_SNAPSHOT_NOT_FRESH_OR_PROVIDER'] : []),
         ...(!policyVerified ? ['PAIR_POLICY_OR_INFLATION_INPUTS_UNVERIFIED'] : []),
-        ...([base, quote].filter((currency): currency is NonNullable<typeof currency> => Boolean(currency && ['JPY','AUD','NZD','CHF'].includes(currency.code))).some((currency) => !requiresTimestampedPolicy(currency)) ? ['OFFICIAL_POLICY_OBSERVATION_MISSING_OR_STALE'] : []),
+        ...([base, quote].some((currency) => Boolean(currency && ['JPY','AUD','NZD','CHF'].includes(currency.code) && !requiresTimestampedPolicy(currency))) ? ['OFFICIAL_POLICY_OBSERVATION_MISSING_OR_STALE'] : []),
         ...(!yieldVerified ? ['COMPARABLE_TWO_YEAR_YIELDS_UNVERIFIED'] : []),
         ...(!cotFresh ? ['RELEVANT_COT_POSITIONING_MISSING_OR_STALE'] : []),
         ...(!calendarVerified ? ['ECONOMIC_CALENDAR_NOT_PROVIDER_VERIFIED'] : []),
