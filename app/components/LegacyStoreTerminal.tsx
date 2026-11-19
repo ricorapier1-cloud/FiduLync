@@ -258,6 +258,11 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
           </div>
         </section>
 
+        <section className="mt-5 rounded-xl border border-amber-300/20 bg-amber-300/[0.04] p-4 sm:p-5" aria-label="Verified telemetry status">
+          <div className="font-mono text-[9px] tracking-[0.17em] text-amber-200">LIVE VERIFIED TELEMETRY / PROVENANCE STATUS</div>
+          <p className="mt-2 text-xs leading-5 text-slate-300">No independently verified live-performance dataset is currently published for these catalog strategies. Broker-verified results will only be shown after authenticated MT5 installation data, account isolation, complete trade history and execution-cost evidence have been reconciled. A heartbeat or user-reported trade record alone is not proof of performance.</p>
+        </section>
+
         <LiveAccountMonitor />
 
         <section className="mt-11" aria-labelledby="strategies-heading">
@@ -339,10 +344,10 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
           <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
             <div>
               <div className="font-mono text-[9px] tracking-[0.17em] text-slate-500">05 / CLOSED-TRADE LEDGER</div>
-              <h2 id="expectancy-heading" className="mt-1 text-lg font-semibold">Live Strategy Expectancy &amp; Risk Metrics</h2>
+              <h2 id="expectancy-heading" className="mt-1 text-lg font-semibold">Reported Closed-Trade Ledger (Not Independently Verified)</h2>
             </div>
             <div className="font-mono text-[9px] text-slate-500">
-              {initialTradeExpectancy.configured ? 'UPSTASH REDIS' : 'IN-PROCESS FALLBACK'} · {initialTradeExpectancy.total_trades} CLOSED
+              {initialTradeExpectancy.configured ? 'REPORTED LEDGER / UPSTASH' : 'LOCAL REPORTING FALLBACK'} · {initialTradeExpectancy.total_trades} CLOSED
             </div>
           </div>
           <div className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-4 sm:p-5">
@@ -355,7 +360,7 @@ export default function StoreTerminal({ initialFleet, telemetryError, bridgeSour
               <ExpectancyMetric label="MAX DRAWDOWN" value={initialTradeExpectancy.max_drawdown_pct === null ? '—' : `${initialTradeExpectancy.max_drawdown_pct.toFixed(2)}%`} />
               <ExpectancyMetric label="SAMPLE SIZE" value={String(initialTradeExpectancy.total_trades)} />
             </div>
-            <p className="mt-3 text-[9px] leading-4 text-slate-500">Drawdown is measured against the closed-trade cumulative P&amp;L peak; account-equity drawdown requires an account balance baseline.</p>
+            <p className="mt-3 text-[9px] leading-4 text-slate-500">These records are submitted telemetry and are not labelled broker-verified. Drawdown is measured against closed-trade cumulative P&amp;L peak; account-equity drawdown requires an independently reconciled balance baseline.</p>
             <div className="mt-5 border-t border-white/[0.07] pt-4">
               <h3 className="font-mono text-[9px] tracking-[0.15em] text-slate-500">RECENT CLOSED TRADES</h3>
               {initialTradeExpectancy.recent_closed_trades.length === 0 ? (
