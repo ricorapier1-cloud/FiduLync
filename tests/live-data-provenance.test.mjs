@@ -88,6 +88,8 @@ test('Ghost Protocol requires a fresh MT5 quote and enforces the 0.65 quality th
   assert.match(marketFeeds, /query\.set\('installation_id', `eq\.\$\{installationId\}`\)/);
   assert.match(marketFeeds, /if \(installationId\) return mt5Quotes/);
   assert.match(signalEngine, /quoteAgeMs <= personalRiskPolicy\.maxQuoteAgeMs/);
+  assert.match(signalEngine, /if \(installationId \|\| nearNewsLockoutTransition/);
+  assert.match(marketFeeds, /Execution-quality quotes must bypass shared cache/);
   assert.match(signalEngine, /quoteAgeMs >= -5_000/);
   assert.match(signalEngine, /safeToTrade = riskBudget\.approved && ghost\.allowed/);
   assert.match(signalEngine, /ghost_score: ghost\.score/);
