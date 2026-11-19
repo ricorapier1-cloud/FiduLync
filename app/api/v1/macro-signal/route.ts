@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getMacroSignal, isSupportedSignalSymbol } from '@/lib/signalEngine';
-import { isAlgoAuthorized, isSameOriginBrowserRequest } from '@/lib/algoAuth';
+import { isSameOriginBrowserRequest } from '@/lib/algoAuth';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
@@ -14,9 +14,8 @@ export async function GET(request: Request) {
     );
   }
 
-  // The Store's same-origin preview is allowed without exposing the EA secret.
-  // MT5 clients must authenticate with the server-side x-algo-key.
-  if (!isSameOriginBrowserRequest(request) && !isAlgoAuthorized(request)) {
+  // Research signal preview is same-origin browser-only. EAs use the per-installation supervisor token instead.
+  if (!isSameOriginBrowserRequest(request)) {
     return NextResponse.json(
       { error: 'Unauthorized signal request.' },
       { status: 401, headers: { 'Cache-Control': 'no-store' } }
