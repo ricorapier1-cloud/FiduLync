@@ -130,6 +130,8 @@ class AlgoLyncSecurityContractTests(unittest.TestCase):
                 source = self.read(page)
                 if page == "app/store/page.tsx":
                     source += self.read("app/components/LegacyStoreTerminal.tsx")
+                if page == "app/account/page.tsx":
+                    source += self.read("components/AlgoLyncAccountPortal.tsx")
                 self.assertIn("BACK TO TERMINAL", source)
         shell = self.read("components/PlatformShell.tsx")
         self.assertIn("const mobileLinks = [", shell)
