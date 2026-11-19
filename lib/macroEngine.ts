@@ -57,17 +57,25 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
       || (snapshot.calendarProvider === 'macro-provider' && process.env.MACRO_DATA_PROVIDER_LICENSE_APPROVED === 'true')
     );
 
+    const cot = cotAllowed ? snapshot.cot : [];
+    const catalysts = calendarAllowed ? snapshot.catalysts : [];
+    const ecbRates = process.env.FRANKFURTER_COMMERCIAL_USE_APPROVED === 'true' ? snapshot.ecbRates : undefined;
+    const hasVerifiedProviderData = currencies.length > 0 || cot.length > 0 || catalysts.length > 0;
+    if (!hasVerifiedProviderData && (!ecbRates || Object.keys(ecbRates).length === 0)) return getFallbackSnapshot();
+
     return {
       ...snapshot,
-      source: snapshot.source === 'provider' && completeG10 ? 'provider' : 'partial',
+      source: hasVerifiedProviderData
+        ? snapshot.source === 'provider' && completeG10 ? 'provider' : 'partial'
+        : 'fallback',
       currencies,
-      cot: cotAllowed ? snapshot.cot : [],
+      cot,
       cotSource: cotAllowed ? 'provider' : 'unavailable',
       cotProvider: cotAllowed ? snapshot.cotProvider : undefined,
-      catalysts: calendarAllowed ? snapshot.catalysts : [],
+      catalysts,
       calendarSource: calendarAllowed ? 'provider' : 'reference',
       calendarProvider: calendarAllowed ? snapshot.calendarProvider : undefined,
-      ecbRates: process.env.FRANKFURTER_COMMERCIAL_USE_APPROVED === 'true' ? snapshot.ecbRates : undefined,
+      ecbRates,
     };
   } catch (error) {
     console.warn('Macro providers and cached snapshots are unavailable; no macro observations will be substituted.', error);
