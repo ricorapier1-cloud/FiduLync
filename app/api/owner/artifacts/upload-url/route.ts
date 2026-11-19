@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireOwner } from '@/lib/ownerAuth';
 import { enforceDistributedRateLimit } from '@/lib/rateLimit';
 import { isSupabaseConfigured, supabaseRead } from '@/lib/supabaseAdmin';
+import { hasPrivateStorageObject } from '@/lib/productRelease';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,6 +57,9 @@ export async function POST(request: Request) {
     const serviceKey = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
     if (!supabaseUrl || !serviceKey) throw new Error('Private Storage credentials are not configured.');
     const storagePath = `${input.slug}/${input.version}/${input.sha256}.ex5`;
+    if (await hasPrivateStorageObject(storagePath)) {
+      return json({ already_exists: true, storage_path: storagePath, message: 'This content-addressed object already exists; registration will verify it.' }, 409);
+    }
     const encodedPath = storagePath.split('/').map(encodeURIComponent).join('/');
     const signed = await fetch(`${supabaseUrl}/storage/v1/object/upload/sign/algolync-artifacts/${encodedPath}`, {
       method: 'POST',
