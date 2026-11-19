@@ -8,6 +8,8 @@ const macroEngine = read('../lib/macroEngine.ts');
 const dashboard = read('../app/components/MacroDashboard.tsx');
 const marketFeeds = read('../lib/marketFeeds.ts');
 const technicalEngine = read('../lib/technicalEngine.ts');
+const quantRisk = read('../lib/quantRisk.ts');
+const signalEngine = read('../lib/signalEngine.ts');
 const aiBrief = read('../lib/aiBrief.ts');
 const storeTerminal = read('../app/components/StoreTerminal.tsx');
 const storePage = read('../app/store/page.tsx');
@@ -70,6 +72,20 @@ test('personal-use provider gates are separate from commercial permissions', () 
   assert.match(marketFeeds, /T00:00:00\.000Z/);
   assert.match(technicalEngine, /TWELVE_DATA_PERSONAL_DISPLAY_PLAN_ACTIVE/);
   assert.match(technicalEngine, /MARKET_DATA_PROVIDER_PERSONAL_USE_ENABLED/);
+});
+
+test('Ghost Protocol requires a fresh MT5 quote and enforces the 0.65 quality threshold', () => {
+  assert.match(quantRisk, /GHOST_PROTOCOL_THRESHOLD = 0\.65/);
+  assert.match(quantRisk, /quoteFresh/);
+  assert.match(quantRisk, /GHOST_BROKER_QUOTE_UNAVAILABLE/);
+  assert.match(quantRisk, /score >= GHOST_PROTOCOL_THRESHOLD/);
+  assert.match(signalEngine, /technical\.data_source === 'mt5'/);
+  assert.match(signalEngine, /brokerQuote\.source === 'mt5'/);
+  assert.match(signalEngine, /quoteAgeMs <= 120_000/);
+  assert.match(signalEngine, /safeToTrade = riskBudget\.approved && ghost\.allowed/);
+  assert.match(signalEngine, /ghost_score: ghost\.score/);
+  assert.match(technicalEngine, /atr_expansion_ratio/);
+  assert.match(storeTerminal, /GHOST PROTOCOL/);
 });
 
 test('FRED observations are not transmitted to external AI prompts', () => {
