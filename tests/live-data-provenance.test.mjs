@@ -15,6 +15,13 @@ const paidProvisioning = read('../lib/provisionLicense.ts');
 const demoProvisioning = read('../app/api/v1/provision-demo-license/route.ts');
 const productCatalog = read('../lib/eaCatalog.ts');
 const catalogUi = read('../components/QuantStrategyCatalog.tsx');
+const artifactApi = read('../app/api/owner/artifacts/route.ts');
+const uploadUrlApi = read('../app/api/owner/artifacts/upload-url/route.ts');
+const registerApi = read('../app/api/owner/artifacts/register/route.ts');
+const artifactUi = read('../app/owner/OwnerArtifactRelease.tsx');
+const compileScript = read('../scripts/compile_mt5.ps1');
+const productReadiness = read('../app/api/v1/product-readiness/route.ts');
+const readme = read('../README.md');
 
 test('provider outage returns an empty, untimestamped macro fallback', () => {
   const fallback = macroData.match(/export function getFallbackSnapshot\(\): MacroSnapshot \{[\s\S]*?\n\}/)?.[0];
@@ -65,4 +72,25 @@ test('catalogue does not ship illustrative performance metrics or equity curves'
   assert.doesNotMatch(productCatalog, /winRate|profitFactor|sharpeRatio|maxDrawdown|equityCurvePoints/);
   assert.doesNotMatch(catalogUi, /InteractiveSparkline|strategy\.winRate|strategy\.profitFactor|SIMULATED ILLUSTRATION/);
   assert.match(catalogUi, /AWAITING APPROVED BUILD/);
+});
+
+test('private EA artifact upload uses owner-only signed Storage URLs and audited registration', () => {
+  assert.match(artifactApi, /requireOwner/);
+  assert.match(artifactApi, /set_ea_product_artifact_release_status/);
+  assert.match(uploadUrlApi, /object\/upload\/sign\/algolync-artifacts/);
+  assert.match(uploadUrlApi, /requireOwner/);
+  assert.match(registerApi, /hasPrivateStorageObject/);
+  assert.match(registerApi, /record_ea_product_artifact_upload/);
+  assert.match(artifactUi, /crypto\.subtle\.digest\('SHA-256'/);
+  assert.match(artifactUi, /api\/owner\/artifacts\/upload-url/);
+  assert.match(artifactUi, /api\/owner\/artifacts\/register/);
+});
+
+test('owner release approval is distinct from upload and laptop compile is prepared', () => {
+  assert.match(artifactUi, /Approve release/);
+  assert.match(artifactUi, /zero errors and zero warnings/);
+  assert.match(compileScript, /RequireProductSources/);
+  assert.match(compileScript, /Experts\\Release/);
+  assert.match(productReadiness, /enforceDistributedRateLimit/);
+  assert.match(readme, /There is no curated or synthetic event fallback/);
 });
