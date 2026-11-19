@@ -1,6 +1,6 @@
 import { createHmac, randomInt, randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
-import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { enforceDistributedRateLimit } from '@/lib/rateLimit';
 import { isSupabaseConfigured, supabaseInsert, supabaseQuery, supabaseRead } from '@/lib/supabaseAdmin';
 import { sendTransferCodeEmail } from '@/lib/transactionalEmail';
 
@@ -11,10 +11,10 @@ function codeHash(requestId: string, code: string, pepper: string) {
 }
 
 export async function POST(request: Request) {
-  const ip = getClientIp(request);
-  if (!checkRateLimit(ip, 5, 60 * 60_000)) {
-    return NextResponse.json({ success: false, error: 'Too many binding attempts. Try again later.' }, { status: 429 });
-  }
+  const rate = await enforceDistributedRateLimit(request, 'license-bind-transfer', 5, 60 * 60_000);
+  if (rate.unavailable) return NextResponse.json({ success: false, error: 'License binding security service is unavailable.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+  if (!rate.allowed) return NextResponse.json({ success: false, error: 'Too many binding attempts. Try again later.' }, { status: 429, headers: { 'Cache-Control': 'no-store' } });
+  if (Number(request.headers.get('content-length') ?? 0) > 8192) return NextResponse.json({ success: false, error: 'Request body exceeds 8 KB.' }, { status: 413 });
 
   const pepper = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || '').trim();
   if (!isSupabaseConfigured() || !pepper) {
