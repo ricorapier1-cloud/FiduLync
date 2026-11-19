@@ -33,7 +33,7 @@ export type PointInTimeObservation = {
 };
 
 function finiteDate(value: string): number | null {
-  if (typeof value !== 'string' || !/(Z|[+-]\\d{2}:?\\d{2})$/i.test(value)) return null;
+  if (typeof value !== 'string' || !/(Z|[+-]\d{2}:?\d{2})$/i.test(value)) return null;
   const epoch = Date.parse(value);
   return Number.isFinite(epoch) ? epoch : null;
 }
