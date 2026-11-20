@@ -23,7 +23,7 @@ A configured API key is not proof of a current data response or a provider entit
 - Frankfurter provides daily reference exchange rates only; these are never executable or real-time broker quotes.
 - CFTC COT reports are weekly positioning context, not intraday order flow.
 - FRED data may be used for personal, non-commercial research subject to its terms, attribution and any series-level copyright notices. FRED-derived observations are not sent to external AI prompts.
-- BLS and BEA are not yet direct live adapters in this build; their US series are currently sourced through FRED where available. Any future direct adapters must use official endpoints, preserve actual observation/release dates and apply required attribution.
+- Direct official BLS adapters now retrieve headline CPI, core CPI, unemployment and nonfarm payroll series; BEA NIPA retrieves annualized quarterly real GDP when `BEA_API_KEY` is configured. BLS/BEA observations are displayed as research context with observation periods and retrieval time. Exact release timestamps and historical vintages are not yet joined, so these series are not admitted to point-in-time backtests or signal factors.
 - Finnhub, Twelve Data, Alpha Vantage, FMP, FairEconomy and custom feeds remain disabled unless the owner's personal plan explicitly permits the exact asset class, programmatic access, caching and in-app display.
 - Stale, missing, revised, incomplete or contradictory data must produce an unavailable/degraded state. No reference values, demo values or cached data may be labelled live.
 
@@ -75,7 +75,7 @@ See .env.example. Core variables include:
 - NEXT_PUBLIC_SUPABASE_URL, SUPABASE_URL, and server-side Supabase secret/service-role key
 - OWNER_EMAIL
 - CRON_SECRET
-- FRED_API_KEY for permitted personal macro research
+- FRED_API_KEY for permitted personal macro research\n- BLS_API_KEY optional for higher BLS API limits; BEA_API_KEY required for BEA GDP
 - UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN when shared caching/rate limiting is enabled
 - GEMINI_API_KEY optional; FRED observations are excluded from prompts
 
