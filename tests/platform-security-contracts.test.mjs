@@ -68,12 +68,14 @@ test('database enforces global MT5 seat uniqueness across LIVE and DEMO types', 
   assert.match(migration, /WHERE mt5_login IS NOT NULL/);
 });
 
-test('personal EA Lab separates live research readiness from execution approval', async () => {
-  const source = await read('app/components/StoreTerminal.tsx');
-  assert.match(source, /Research readiness only/);
-  assert.match(source, /The supervisor is an advisory gate only/);
-  assert.match(source, /does not place broker orders/);
-  assert.doesNotMatch(source, /Paystack|Checkout|Customer Portal|license_key/);
+test('private EA fleet module exposes read-only telemetry behind owner authorization', async () => {
+  const source = await read('app/owner/OwnerOperations.tsx');
+  assert.match(source, /\/api\/owner\/operations/);
+  assert.match(source, /\/api\/mt5\/installations/);
+  assert.match(source, /Portfolio risk telemetry/);
+  assert.match(source, /does not override trading or risk eligibility checks/);
+  assert.match(source, /Order approval/);
+  assert.doesNotMatch(source, /Paystack|Checkout|Customer Portal/);
 });
 
 test('retired account and customer pages route to the private owner console', async () => {
@@ -83,14 +85,13 @@ test('retired account and customer pages route to the private owner console', as
   }
 });
 
-test('active secondary pages retain navigation back to the terminal', async () => {
-  for (const path of ['app/store/page.tsx', 'app/owner/page.tsx', 'app/privacy/page.tsx', 'app/terms/page.tsx', 'app/faq/page.tsx', 'app/guide/page.tsx']) {
-    const source = await read(path);
-    if (path === 'app/store/page.tsx') {
-      const terminal = await read('app/components/StoreTerminal.tsx');
-      assert.match(terminal, /BACK TO TERMINAL/);
-    } else {
-      assert.match(source, /BACK TO TERMINAL|Back to Terminal|Back to terminal/, path);
-    }
-  }
+test('public navigation replaces owner entry with strategy validation', async () => {
+  const shell = await read('components/PlatformShell.tsx');
+  const footer = await read('components/PlatformFooter.tsx');
+  assert.match(shell, /href: '\/research\/validation'/);
+  assert.match(shell, /Strategy Lab/);
+  assert.doesNotMatch(shell, /href: '\/owner'/);
+  assert.doesNotMatch(shell, /href: '\/store'/);
+  assert.match(footer, /Strategy validation & risk lab/);
+  assert.doesNotMatch(footer, /Owner Console|\/store/);
 });
