@@ -50,3 +50,15 @@ test('dashboard reports a failed assessment as unavailable instead of loading fo
   assert.match(dashboard, /DATA OFFLINE/);
   assert.match(dashboard, /Research feed unavailable/);
 });
+
+test('dashboard does not mislabel policy-minus-inflation as a real bond yield', () => {
+  assert.match(dashboard, /EX-POST REAL POLICY DIFF/);
+  assert.match(dashboard, /USD EX-POST REAL POLICY/);
+  assert.doesNotMatch(dashboard, /REAL YIELD DIFF/);
+  assert.doesNotMatch(dashboard, /USD REAL YIELD/);
+});
+
+test('daily reference FX rates are not presented as live executable quotes', () => {
+  assert.match(dashboard, /DAILY REFERENCE RATES/);
+  assert.doesNotMatch(dashboard, /LIVE REFERENCE FEED/);
+});
