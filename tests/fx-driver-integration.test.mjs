@@ -29,3 +29,10 @@ test('currency context excludes absent and stale COT instead of imputing neutral
   assert.match(currencyStrength, /positionAgeMs <= 10 \* 24 \* 60 \* 60_000/);
   assert.doesNotMatch(currencyStrength, /cot\.get\(currency\.code\) \?\? 50/);
 });
+
+test('dashboard reports a failed assessment as unavailable instead of loading forever', () => {
+  assert.match(dashboard, /status: 'ready' \| 'unavailable'/);
+  assert.match(dashboard, /status: 'unavailable'/);
+  assert.match(dashboard, /DATA OFFLINE/);
+  assert.match(dashboard, /Research feed unavailable/);
+});
