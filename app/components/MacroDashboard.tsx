@@ -323,6 +323,9 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
               ['Unemployment', snapshot.usIndicators?.unemploymentRatePct, snapshot.usIndicators?.unemploymentPeriod, '%'],
               ['Nonfarm payroll change', snapshot.usIndicators?.nonfarmPayrollMonthlyChangeThousands, snapshot.usIndicators?.payrollPeriod, 'k'],
               ['Real GDP annualized QoQ', snapshot.usIndicators?.realGdpAnnualizedQuarterlyPct, snapshot.usIndicators?.realGdpPeriod, '%'],
+              ['10Y Treasury nominal yield', snapshot.usIndicators?.tenYearTreasuryYieldPct, snapshot.usIndicators?.tenYearTreasuryYieldAsOf, '%'],
+              ['10Y TIPS real yield', snapshot.usIndicators?.tenYearRealYieldPct, snapshot.usIndicators?.tenYearRealYieldAsOf, '%'],
+              ['10Y breakeven inflation', snapshot.usIndicators?.tenYearBreakevenInflationPct, snapshot.usIndicators?.tenYearBreakevenInflationAsOf, '%'],
             ].map(([label, value, period, unit]) => (
               <article className="macro-currency-card" key={String(label)}>
                 <div className="macro-currency-card-head"><strong>{String(label)}</strong><span className="mono">{value === undefined ? 'UNAVAILABLE' : 'OFFICIAL SERIES'}</span></div>
