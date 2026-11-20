@@ -74,7 +74,11 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
     const cot = cotAllowed ? snapshot.cot : [];
     const catalysts = calendarAllowed ? snapshot.catalysts : [];
     const ecbRates = snapshot.ecbRates;
-    const hasVerifiedProviderData = currencies.length > 0 || cot.length > 0 || catalysts.length > 0;
+    const fredMacroAllowed = Boolean(process.env.FRED_API_KEY?.trim());
+    const usIndicatorsAllowed = Boolean(snapshot.usIndicators)
+      && (fredMacroAllowed || !snapshot.usIndicators!.sources.some((source) => source.includes('(FRED)')));
+    const usIndicators = usIndicatorsAllowed ? snapshot.usIndicators : undefined;
+    const hasVerifiedProviderData = currencies.length > 0 || cot.length > 0 || catalysts.length > 0 || Boolean(usIndicators);
     if (!hasVerifiedProviderData && (!ecbRates || Object.keys(ecbRates).length === 0)) return getFallbackSnapshot();
 
     return {
@@ -87,6 +91,7 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
       cotSource: cotAllowed ? 'provider' : 'unavailable',
       cotProvider: cotAllowed ? snapshot.cotProvider : undefined,
       catalysts,
+      usIndicators,
       calendarSource: calendarAllowed ? 'provider' : 'reference',
       calendarProvider: calendarAllowed ? snapshot.calendarProvider : undefined,
       ecbRates,
