@@ -94,15 +94,6 @@ function CatalystCountdownDisplay({ target }: { target: string }) {
   return <span>{countdown}</span>;
 }
 
-function biasLabel(score: number | null) {
-  if (score === null) return 'Unavailable';
-  if (score >= 70) return 'Extreme bullish';
-  if (score >= 30) return 'Bullish';
-  if (score <= -70) return 'Extreme bearish';
-  if (score <= -30) return 'Bearish';
-  return 'Balanced';
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
