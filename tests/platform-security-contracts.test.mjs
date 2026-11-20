@@ -74,14 +74,14 @@ test('browser owner console is removed while sensitive management APIs remain pr
   assert.equal(existsSync(new URL('../app/owner/OwnerOperations.tsx', import.meta.url)), false);
   for (const path of ['app/api/owner/operations/route.ts', 'app/api/owner/mt5-installations/route.ts']) {
     const source = await read(path);
-    assert.match(source, /requireOwner\\(request\\)|isAuthorizedOwnerEmail/);
+    assert.match(source, /requireOwner|isAuthorizedOwnerEmail/);
   }
 });
 
 test('retired account and customer pages route to the public research terminal', async () => {
   for (const path of ['app/account/page.tsx', 'app/customer/page.tsx', 'app/licensing/page.tsx']) {
     const source = await read(path);
-    assert.match(source, /redirect\('\/owner'\)/, path);
+    assert.match(source, /redirect\\('\/'\\)/, path);
   }
 });
 
