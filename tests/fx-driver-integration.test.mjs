@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const route = readFileSync(new URL('../app/api/research/fx-drivers/route.ts', import.meta.url), 'utf8');
 const dashboard = readFileSync(new URL('../app/components/MacroDashboard.tsx', import.meta.url), 'utf8');
+const currencyStrength = readFileSync(new URL('../lib/currencyStrength.ts', import.meta.url), 'utf8');
 
 test('FX driver endpoint invokes the evidence-weighted engine and fails closed', () => {
   assert.match(route, /assessFxDrivers\(pair, factors, confirmation/);
@@ -21,4 +22,10 @@ test('dashboard uses the engine assessment instead of the legacy heuristic score
   assert.match(dashboard, /fxAssessment\?\.setup/);
   assert.doesNotMatch(dashboard, /function calculateBias\(/);
   assert.doesNotMatch(dashboard, /percentile \?\? 50/);
+});
+
+test('currency context excludes absent and stale COT instead of imputing neutral positioning', () => {
+  assert.match(currencyStrength, /positionAgeMs/);
+  assert.match(currencyStrength, /positionAgeMs <= 10 \* 24 \* 60 \* 60_000/);
+  assert.doesNotMatch(currencyStrength, /cot\.get\(currency\.code\) \?\? 50/);
 });
