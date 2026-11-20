@@ -313,6 +313,32 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
         </div>
       </section>
 
+      <section id="us-macro" className="macro-section" aria-labelledby="us-macro-title">
+        <div className="macro-section-heading"><div><span className="eyebrow">US STATISTICAL RELEASES</span><h2 id="us-macro-title">Inflation, employment & growth</h2></div><span className="macro-section-note mono">BLS / BEA · RESEARCH CONTEXT</span></div>
+        <div className="macro-panel macro-matrix-panel">
+          <div className="macro-currency-cards">
+            {[
+              ['Headline CPI YoY', snapshot.usIndicators?.cpiYearOverYearPct, snapshot.usIndicators?.cpiPeriod, '%'],
+              ['Core CPI YoY', snapshot.usIndicators?.coreCpiYearOverYearPct, snapshot.usIndicators?.coreCpiPeriod, '%'],
+              ['Unemployment', snapshot.usIndicators?.unemploymentRatePct, snapshot.usIndicators?.unemploymentPeriod, '%'],
+              ['Nonfarm payroll change', snapshot.usIndicators?.nonfarmPayrollMonthlyChangeThousands, snapshot.usIndicators?.payrollPeriod, 'k'],
+              ['Real GDP annualized QoQ', snapshot.usIndicators?.realGdpAnnualizedQuarterlyPct, snapshot.usIndicators?.realGdpPeriod, '%'],
+            ].map(([label, value, period, unit]) => (
+              <article className="macro-currency-card" key={String(label)}>
+                <div className="macro-currency-card-head"><strong>{String(label)}</strong><span className="mono">{value === undefined ? 'UNAVAILABLE' : 'OFFICIAL SERIES'}</span></div>
+                <div className="macro-currency-card-stats"><b className="mono">{typeof value === 'number' ? `${value > 0 ? '+' : ''}${value.toFixed(2)}${String(unit)}` : '—'}</b><small>{typeof period === 'string' ? period : 'No verified observation'}</small></div>
+              </article>
+            ))}
+          </div>
+          <div className="macro-panel-foot">
+            <span>{snapshot.usIndicators?.sources.join(' · ') || 'BLS / BEA adapters not configured or currently unavailable.'}</span>
+            <span className="mono">OBSERVATION PERIOD ≠ RELEASE TIMESTAMP</span>
+          </div>
+          <p className="macro-csi-note">Official statistical observations are displayed as macro context. They do not independently change pair bias or qualify as point-in-time backtest inputs until exact release timestamps and historical vintages are joined.</p>
+          <p className="macro-csi-note">This product uses Bureau of Economic Analysis (BEA) data but is not endorsed or certified by BEA.</p>
+        </div>
+      </section>
+
       <TopPairBanner />
       <div className="macro-two-column">
         <section id="bias" className="macro-section" aria-labelledby="bias-title">
