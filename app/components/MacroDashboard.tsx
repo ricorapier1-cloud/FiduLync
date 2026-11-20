@@ -105,9 +105,14 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
   const [now, setNow] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [aiBrief, setAiBrief] = useState<{ bullets: string[]; source: 'gemini' | 'rules' } | null>(null);
-  const [fxAssessment, setFxAssessment] = useState<FxDriverAssessment | null>(null);
-  const [fxEvidenceUnavailable, setFxEvidenceUnavailable] = useState<string[]>([]);
-  const [fxAssessmentLoading, setFxAssessmentLoading] = useState(false);
+  const [fxResearch, setFxResearch] = useState<{
+    pair: string;
+    assessment: FxDriverAssessment;
+    unavailable: string[];
+  } | null>(null);
+  const fxAssessment = fxResearch?.pair === pair ? fxResearch.assessment : null;
+  const fxEvidenceUnavailable = fxResearch?.pair === pair ? fxResearch.unavailable : [];
+  const fxAssessmentLoading = fxAssessment === null;
   const currencyStrength = getCurrencyStrengthIndex(snapshot);
   const score = fxAssessment && fxAssessment.setup !== 'NO_SETUP' ? fxAssessment.combinedScore : null;
   const sortedCatalysts = [...snapshot.catalysts]
@@ -151,9 +156,6 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
     : null;
   useEffect(() => {
     const controller = new AbortController();
-    setFxAssessment(null);
-    setFxEvidenceUnavailable([]);
-    setFxAssessmentLoading(true);
     void fetch(`/api/research/fx-drivers?pair=${encodeURIComponent(pair)}`, {
       cache: 'no-store',
       signal: controller.signal,
@@ -165,19 +167,20 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
         || !Array.isArray(payload.assessment.blockers)) {
         throw new Error('FX research assessment payload failed validation.');
       }
-      setFxAssessment(payload.assessment as unknown as FxDriverAssessment);
       const unavailable = isRecord(payload.evidence) && Array.isArray(payload.evidence.unavailable)
         ? payload.evidence.unavailable
         : [];
-      setFxEvidenceUnavailable(unavailable.flatMap((item) =>
-        isRecord(item) && typeof item.reason === 'string' ? [item.reason] : [],
-      ));
+      setFxResearch({
+        pair,
+        assessment: payload.assessment as unknown as FxDriverAssessment,
+        unavailable: unavailable.flatMap((item) =>
+          isRecord(item) && typeof item.reason === 'string' ? [item.reason] : [],
+        ),
+      });
     }).catch((error: unknown) => {
       if (error instanceof Error && error.name !== 'AbortError') {
         console.warn('FX driver assessment unavailable; no setup will be shown.', error);
       }
-    }).finally(() => {
-      if (!controller.signal.aborted) setFxAssessmentLoading(false);
     });
     return () => controller.abort();
   }, [pair]);
