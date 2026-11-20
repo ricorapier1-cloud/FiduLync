@@ -4,6 +4,11 @@ const OWNER_COOKIE = 'fidulync_owner_session';
 
 const PUBLIC_ASSET_PATHS = new Set([
   '/favicon.ico',
+  '/icon',
+  '/icon.svg',
+  '/apple-icon',
+  '/opengraph-image',
+  '/manifest.webmanifest',
   '/robots.txt',
   '/sitemap.xml',
   '/manifest.json',
