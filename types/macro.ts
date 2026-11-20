@@ -51,6 +51,12 @@ export type OfficialUsMacroIndicators = {
   payrollPeriod?: string;
   realGdpAnnualizedQuarterlyPct?: number;
   realGdpPeriod?: string;
+  tenYearTreasuryYieldPct?: number;
+  tenYearTreasuryYieldAsOf?: string;
+  tenYearRealYieldPct?: number;
+  tenYearRealYieldAsOf?: string;
+  tenYearBreakevenInflationPct?: number;
+  tenYearBreakevenInflationAsOf?: string;
   retrievedAt: string;
   sources: string[];
 };
