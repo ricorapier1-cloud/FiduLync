@@ -643,6 +643,7 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
         eur.policyRate = ecbResult.value.policyRate;
         eur.policyRateSource = 'provider';
         eur.policyRateProvider = 'ecb';
+        eur.policyRateAsOf = ecbResult.value.policyRateAsOf;
         hasLiveData = true;
       }
       if (isFiniteNumber(ecbResult.value.inflation)) {
@@ -650,11 +651,13 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
         eur.inflationLabel = 'HICP';
         eur.inflationSource = 'provider';
         eur.inflationProvider = 'ecb';
+        eur.inflationAsOf = ecbResult.value.inflationAsOf;
         hasLiveData = true;
       }
       if (isFiniteNumber(ecbResult.value.twoYearYield)) {
         eur.twoYearYield = ecbResult.value.twoYearYield;
         eur.twoYearYieldSource = 'provider';
+        eur.twoYearYieldAsOf = ecbResult.value.twoYearYieldAsOf;
         hasLiveData = true;
       }
     }
@@ -668,6 +671,7 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
         cad.policyRate = bocResult.value.policyRate;
         cad.policyRateSource = 'provider';
         cad.policyRateProvider = 'bank-of-canada';
+        cad.policyRateAsOf = bocResult.value.policyRateAsOf;
         hasLiveData = true;
       }
       if (isFiniteNumber(bocResult.value.inflation)) {
@@ -675,6 +679,7 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
         cad.inflationLabel = 'CPI';
         cad.inflationSource = 'provider';
         cad.inflationProvider = 'bank-of-canada';
+        cad.inflationAsOf = bocResult.value.inflationAsOf;
         hasLiveData = true;
       }
     }
@@ -684,9 +689,11 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
   if (boeResult.status === 'fulfilled') {
     const gbp = snapshot.currencies.find((currency) => currency.code === 'GBP');
     if (gbp) {
-      gbp.policyRate = boeResult.value;
+      gbp.policyRate = boeResult.value.value;
       gbp.policyRateSource = 'provider';
       gbp.policyRateProvider = 'bank-of-england';
+      gbp.policyRateAsOf = boeResult.value.asOf;
+      gbp.policyRateSourceUrl = boeResult.value.sourceUrl;
       hasLiveData = true;
     }
   } else {
