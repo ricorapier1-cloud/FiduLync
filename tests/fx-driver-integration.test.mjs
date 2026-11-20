@@ -24,10 +24,24 @@ test('dashboard uses the engine assessment instead of the legacy heuristic score
   assert.doesNotMatch(dashboard, /percentile \?\? 50/);
 });
 
-test('currency context excludes absent and stale COT instead of imputing neutral positioning', () => {
-  assert.match(currencyStrength, /positionAgeMs/);
-  assert.match(currencyStrength, /positionAgeMs <= 10 \* 24 \* 60 \* 60_000/);
-  assert.doesNotMatch(currencyStrength, /cot\.get\(currency\.code\) \?\? 50/);
+test('currency context requires dated provider observations and excludes non-point-in-time COT', () => {
+  assert.match(currencyStrength, /validObservationDate\(item\.policyRateAsOf/);
+  assert.match(currencyStrength, /validObservationDate\(item\.inflationAsOf/);
+  assert.match(currencyStrength, /currencies\.length < 3/);
+  assert.doesNotMatch(currencyStrength, /snapshot\.cot/);
+  assert.match(dashboard, /COT is excluded until its publication timestamp is preserved/);
+});
+
+test('central-bank adapters preserve observation dates for policy and inflation context', () => {
+  const international = readFileSync(new URL('../lib/internationalMacro.ts', import.meta.url), 'utf8');
+  const macroData = readFileSync(new URL('../lib/macroData.ts', import.meta.url), 'utf8');
+  assert.match(international, /TIME_PERIOD/);
+  assert.match(international, /policyRateAsOf/);
+  assert.match(international, /inflationAsOf/);
+  assert.match(international, /OfficialPolicyObservation/);
+  assert.match(macroData, /eur\.policyRateAsOf = ecbResult\.value\.policyRateAsOf/);
+  assert.match(macroData, /cad\.inflationAsOf = bocResult\.value\.inflationAsOf/);
+  assert.match(macroData, /gbp\.policyRateAsOf = boeResult\.value\.asOf/);
 });
 
 test('dashboard reports a failed assessment as unavailable instead of loading forever', () => {
