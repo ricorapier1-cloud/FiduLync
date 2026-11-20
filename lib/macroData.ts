@@ -144,11 +144,13 @@ function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies'
     || !Array.isArray(value.cot)
     || !Array.isArray(value.catalysts)) return null;
 
-  if (!value.currencies.every(isCurrency) || !value.cot.every(isCotPosition) || !value.catalysts.every(isCatalyst)) return null;
+  if (!value.currencies.every(isCurrency) || !value.cot.every(isCotPosition) || !value.catalysts.every(isCatalyst)
+    || (value.usIndicators !== undefined && !isUsIndicators(value.usIndicators))) return null;
   return {
     currencies: value.currencies,
     cot: value.cot,
     catalysts: value.catalysts,
+    ...(value.usIndicators === undefined ? {} : { usIndicators: value.usIndicators }),
   };
 }
 
