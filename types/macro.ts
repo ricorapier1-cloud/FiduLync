@@ -40,7 +40,23 @@ export type EconomicCatalyst = {
   actual: string | null;
 };
 
+export type OfficialUsMacroIndicators = {
+  cpiYearOverYearPct?: number;
+  cpiPeriod?: string;
+  coreCpiYearOverYearPct?: number;
+  coreCpiPeriod?: string;
+  unemploymentRatePct?: number;
+  unemploymentPeriod?: string;
+  nonfarmPayrollMonthlyChangeThousands?: number;
+  payrollPeriod?: string;
+  realGdpAnnualizedQuarterlyPct?: number;
+  realGdpPeriod?: string;
+  retrievedAt: string;
+  sources: string[];
+};
+
 export type MacroSnapshot = {
+  usIndicators?: OfficialUsMacroIndicators;
   asOf: string;
   source: 'fallback' | 'provider' | 'partial';
   cotSource?: 'unavailable' | 'provider';
