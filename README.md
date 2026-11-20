@@ -41,18 +41,25 @@ A configured API key is not proof of a current data response or a provider entit
 
 The active application does not use user login, an owner console, customer registration, checkout, Paystack, subscriptions, escrow, customer licensing, customer portals or commercial support workflows. The research pages are accessible without a user account. Sensitive administration, installation-token provisioning and ingestion APIs remain server-authorized; removing the browser login does not make those APIs public. Legacy commercial routes return HTTP 410 Gone; historical database and audit records are retained rather than deleted.
 
-## Access model\n\n- Open the research terminal directly; no user login is required.\n- The browser-based owner console and sign-in/password-recovery screens have been removed.\n- Administrative and MT5 installation APIs remain protected server-side. They must not be called from public browser code.\n- MT5 publisher-token provisioning is not available through the UI; do not run the publisher until a token has been securely provisioned through an authorized operator process.\n\n## MT5 integration
+## Access model
+
+- Open the research terminal directly; no user login is required.
+- The browser-based owner console and sign-in/password-recovery screens have been removed.
+- Administrative and MT5 installation APIs remain protected server-side. They must not be called from public browser code.
+- MT5 publisher-token provisioning is not available through the UI; do not run the publisher until a token has been securely provisioned through an authorized operator process.
+
+## MT5 integration
 
 The MT5 publisher must run on the same Windows machine/VPS as the already logged-in MetaTrader 5 terminal.
 
 1. Install MetaTrader 5 and log in to the intended broker account.
-2. Download FiduLync_MT5_Market_Publisher.py and mt5_risk_state.py from the Personal EA Lab.
-3. Install Python and the MetaTrader5 package: py -m pip install MetaTrader5.
-4. Register the terminal in /owner and set FIDULYNC_INGEST_URL to https://fidulync.vercel.app/api/v1/market-data/ingest and FIDULYNC_PUBLISHER_TOKEN in the Windows environment.
-5. Configure canonical-to-broker symbol mappings, including suffixes, for example EURUSD=EURUSD.a and XAUUSD=XAUUSD.a.
-6. Run the publisher and confirm fresh quotes, closed candles and installation heartbeat through authorized server-side diagnostics.
-7. Download QuantSupervisor.mqh to MQL5/Include/FiduLync/QuantSupervisor.mqh. Compile the EA and the no-trade connectivity probe in MetaEditor.
-8. Configure the EA with the installation ID and private publisher token. Keep token-bearing .set files private.
+2. Download FiduLync_MT5_Market_Publisher.py and mt5_risk_state.py from the repository.
+3. Install Python and the MetaTrader5 package: `py -m pip install MetaTrader5`.
+4. Obtain an installation token through the authorized server-side provisioning process. No browser login or owner console is provided. Set `FIDULYNC_INGEST_URL=https://fidulync.vercel.app/api/v1/market-data/ingest` and `FIDULYNC_PUBLISHER_TOKEN` in the Windows environment only after secure provisioning.
+5. Configure canonical-to-broker symbol mappings, including suffixes, for example `EURUSD=EURUSD.a` and `XAUUSD=XAUUSD.a`.
+6. Run the publisher and verify fresh quotes, closed candles and installation heartbeat through authorized server-side diagnostics.
+7. Download `QuantSupervisor.mqh` to `MQL5/Include/FiduLync/QuantSupervisor.mqh`. Compile the EA and the no-trade connectivity probe in MetaEditor.
+8. Configure the EA with the installation ID and private publisher token. Keep token-bearing `.set` files private.
 9. Run MetaEditor compilation with zero errors and zero warnings, Strategy Tester, and demo forward testing before considering live use.
 
 For long-term research, run the separate Historical Candle Backfill utility once after the terminal is connected. It imports only broker-provided closed H1/H4/D1 bars from the configured start date (default 1996-01-01), in bounded batches, and reports actual coverage. Broker retention may be shorter than 30 years; missing periods remain missing and must never be synthesized. The Windows MT5 environment is required for actual MQL5 compilation and broker-terminal validation. A web build cannot prove that an EA compiles or that a broker feed is live.
