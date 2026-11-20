@@ -81,7 +81,7 @@ test('browser owner console is removed while sensitive management APIs remain pr
 test('retired account and customer pages route to the public research terminal', async () => {
   for (const path of ['app/account/page.tsx', 'app/customer/page.tsx', 'app/licensing/page.tsx']) {
     const source = await read(path);
-    assert.match(source, /redirect\\('\/'\\)/, path);
+    assert.ok(source.includes("redirect('/')"), path);
   }
 });
 
