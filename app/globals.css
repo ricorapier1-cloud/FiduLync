@@ -441,7 +441,7 @@ button { color: inherit; }
   .case-architecture i { width: 7px; }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 767px) {
   .topbar-inner { width: calc(100% - 32px); height: 64px; gap: 10px; }
   .desktop-nav { display: none; }
   .menu-toggle { display: inline-flex; }
