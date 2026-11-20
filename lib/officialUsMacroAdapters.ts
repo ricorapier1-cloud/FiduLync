@@ -38,8 +38,11 @@ function parseBlsObservations(payload: unknown, seriesId: string): BLSObservatio
     if (!isRecord(item) || typeof item.year !== 'string' || typeof item.period !== 'string'
       || !/^M(0[1-9]|1[0-2])$/.test(item.period) || typeof item.value !== 'string') return [];
     const year = Number(item.year);
-    const value = Number(item.value.replace(/,/g, ''));
-    return Number.isInteger(year) && Number.isFinite(value) ? [{ year, period: item.period, value }] : [];
+    const normalizedValue = item.value.replace(/,/g, '').trim();
+    const value = Number(normalizedValue);
+    return normalizedValue !== '' && Number.isInteger(year) && Number.isFinite(value)
+      ? [{ year, period: item.period, value }]
+      : [];
   });
   return rows.sort((a, b) => b.year - a.year || b.period.localeCompare(a.period));
 }
@@ -88,7 +91,8 @@ export function parseBeaRealGdpResponse(payload: unknown): { realGdpAnnualizedQu
     if (!isRecord(item) || String(item.LineNumber ?? '') !== '1'
       || typeof item.TimePeriod !== 'string' || !/^\d{4}Q[1-4]$/.test(item.TimePeriod)
       || typeof item.DataValue !== 'string') return false;
-    return Number.isFinite(Number(item.DataValue.replace(/,/g, '').replace(/%/g, '').trim()));
+    const normalized = item.DataValue.replace(/,/g, '').replace(/%/g, '').trim();
+    return normalized !== '' && Number.isFinite(Number(normalized));
   });
   rows.sort((a, b) => String(b.TimePeriod).localeCompare(String(a.TimePeriod)));
   const latest = rows[0];
