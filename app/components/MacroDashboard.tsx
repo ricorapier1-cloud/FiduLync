@@ -299,7 +299,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
               <span className={`macro-csi-score mono ${strength >= 0 ? 'macro-positive' : 'macro-negative'}`}>{strength > 0 ? '+' : ''}{strength}</span>
             </div>
           ))}</div>
-          <p className="macro-csi-note">Relative policy and real-rate score, adjusted for available COT positioning; not a price-return index.</p>
+          <p className="macro-csi-note">Descriptive cross-sectional policy and real-rate context only. COT is excluded until its publication timestamp is preserved; this is not a price-return forecast or trading signal.</p>
         </div>
         <div className="macro-brief-panel">
           <div className="macro-section-heading"><div><span className="eyebrow">QUALITATIVE / NON-EXECUTION</span><h2>AI Macro Desk Brief</h2></div><span className="macro-section-note mono">{aiBrief?.source === 'gemini' ? 'GEMINI' : aiBrief ? 'RULE-BASED' : 'LOADING'}</span></div>
