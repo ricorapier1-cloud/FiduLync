@@ -68,17 +68,17 @@ test('database enforces global MT5 seat uniqueness across LIVE and DEMO types', 
   assert.match(migration, /WHERE mt5_login IS NOT NULL/);
 });
 
-test('private EA fleet module exposes read-only telemetry behind owner authorization', async () => {
-  const source = await read('app/owner/OwnerOperations.tsx');
-  assert.match(source, /\/api\/owner\/operations/);
-  assert.match(source, /\/api\/mt5\/installations/);
-  assert.match(source, /Portfolio risk telemetry/);
-  assert.match(source, /does not override trading or risk eligibility checks/);
-  assert.match(source, /Order approval/);
-  assert.doesNotMatch(source, /Paystack|Checkout|Customer Portal/);
+test('browser owner console is removed while sensitive management APIs remain protected', async () => {
+  const { existsSync } = await import('node:fs');
+  assert.equal(existsSync(new URL('../app/owner/page.tsx', import.meta.url)), false);
+  assert.equal(existsSync(new URL('../app/owner/OwnerOperations.tsx', import.meta.url)), false);
+  for (const path of ['app/api/owner/operations/route.ts', 'app/api/owner/mt5-installations/route.ts']) {
+    const source = await read(path);
+    assert.match(source, /requireOwner\\(request\\)|isAuthorizedOwnerEmail/);
+  }
 });
 
-test('retired account and customer pages route to the private owner console', async () => {
+test('retired account and customer pages route to the public research terminal', async () => {
   for (const path of ['app/account/page.tsx', 'app/customer/page.tsx', 'app/licensing/page.tsx']) {
     const source = await read(path);
     assert.match(source, /redirect\('\/owner'\)/, path);
