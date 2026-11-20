@@ -33,12 +33,19 @@ export default function ResearchNotebook() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('Saved only in this browser. Notebook records are not synced to a server or other devices.');
   useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(STORAGE_KEY);
-      if (!stored) return;
-      const parsed: unknown = JSON.parse(stored);
-      if (Array.isArray(parsed)) setItems(parsed as Hypothesis[]);
-    } catch { setMessage('Local notebook data could not be read; stored browser data was left untouched.'); }
+    let active = true;
+    void (async () => {
+      await Promise.resolve();
+      try {
+        const stored = window.localStorage.getItem(STORAGE_KEY);
+        if (!stored) return;
+        const parsed: unknown = JSON.parse(stored);
+        if (active && Array.isArray(parsed)) setItems(parsed as Hypothesis[]);
+      } catch {
+        if (active) setMessage('Local notebook data could not be read; stored browser data was left untouched.');
+      }
+    })();
+    return () => { active = false; };
   }, []);
   async function save(event: React.FormEvent) {
     event.preventDefault(); setBusy(true); setMessage('');
