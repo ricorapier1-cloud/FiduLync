@@ -12,7 +12,7 @@ const links = [
   { href: '/research', label: 'Quant Research', icon: 'chart' },
   { href: '/research/validation', label: 'Strategy Validation', icon: 'activity' },
   { href: '/analytics', label: 'Cross-Asset & Performance', icon: 'radio' },
-  { href: '/research/notebook', label: 'Research Notebook', icon: 'book' },
+  { href: '/research/notebook', label: 'Research Notebook', icon: 'calendar-clock' },
   { href: '/faq', label: 'Help', icon: 'activity' },
 ] as const satisfies readonly { href: string; label: string; icon: BrandGlyphName }[];
 
