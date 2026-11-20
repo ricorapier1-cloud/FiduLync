@@ -335,7 +335,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
             ].map(([label, value, period, unit]) => (
               <article className="macro-currency-card" key={String(label)}>
                 <div className="macro-currency-card-head"><strong>{String(label)}</strong><span className="mono">{value === undefined ? 'UNAVAILABLE' : 'OFFICIAL SERIES'}</span></div>
-                <div className="macro-currency-card-stats"><b className="mono">{typeof value === 'number' ? `${value > 0 ? '+' : ''}${value.toFixed(2)}${String(unit)}` : '—'}</b><small>{typeof period === 'string' ? period : 'No verified observation'}</small></div>
+                <div className="macro-currency-card-stats"><b className="mono">{typeof value === 'number' ? `${value.toFixed(2)}${String(unit)}` : '—'}</b><small>{typeof period === 'string' ? period : 'No verified observation'}</small></div>
               </article>
             ))}
           </div>
