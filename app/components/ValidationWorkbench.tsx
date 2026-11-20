@@ -1,18 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { createClient, type Session } from '@supabase/supabase-js';
+import { useState } from 'react';
 import Link from 'next/link';
 import {
   applyExecutionCostStress, calculateTradeMetrics, evaluateWalkForward, monteCarloBootstrap,
   type CostedTrade, type NetTrade, type WalkForwardFold,
 } from '@/lib/validationEngine';
-
-const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
-const supabaseKey = (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim();
-const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey, {
-  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' },
-}) : null;
 
 type Result = {
   metrics: ReturnType<typeof calculateTradeMetrics>;
@@ -26,9 +19,6 @@ function pretty(value: number | null | undefined, digits = 2) {
 }
 
 export default function ValidationWorkbench() {
-  const [session, setSession] = useState<Session | null>(null);
-  const [authorized, setAuthorized] = useState(false);
-  const [authChecked, setAuthChecked] = useState(!supabase);
   const [tradesJson, setTradesJson] = useState('');
   const [foldsJson, setFoldsJson] = useState('');
   const [costsJson, setCostsJson] = useState('');
@@ -36,25 +26,6 @@ export default function ValidationWorkbench() {
   const [result, setResult] = useState<Result | null>(null);
   const [message, setMessage] = useState('No dataset loaded. Import actual, closed trade outcomes to begin.');
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    const verify = async (current: Session | null) => {
-      if (!current) { if (active) { setSession(null); setAuthorized(false); setAuthChecked(true); } return; }
-      try {
-        const response = await fetch('/api/owner/verify', {
-          headers: { Authorization: 'Bearer ' + current.access_token }, cache: 'no-store',
-        });
-        if (active) { setSession(current); setAuthorized(response.ok); setAuthChecked(true); }
-      } catch {
-        if (active) { setSession(null); setAuthorized(false); setAuthChecked(true); }
-      }
-    };
-    if (!supabase) return;
-    void supabase.auth.getSession().then(({ data }) => verify(data.session));
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => { void verify(next); });
-    return () => { active = false; listener.subscription.unsubscribe(); };
-  }, []);
 
   async function loadFile(file: File | undefined) {
     if (!file) return;
@@ -101,9 +72,6 @@ export default function ValidationWorkbench() {
       setMessage(error instanceof Error ? error.message : 'Validation could not be completed.');
     } finally { setBusy(false); }
   }
-
-  if (!authChecked) return <div className="mx-auto max-w-3xl px-4 py-20 text-sm text-slate-400">Verifying private owner session…</div>;
-  if (!authorized || !session) return <div className="mx-auto max-w-3xl px-4 py-20 text-slate-100"><h1 className="text-xl font-semibold">Private owner access required</h1><p className="mt-2 text-sm text-slate-400">Sign in to the private terminal before using the validation workbench.</p><Link href="/owner" className="mt-4 inline-block text-sm text-emerald-300 underline">Open owner sign-in</Link></div>;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 pb-32 text-slate-100 sm:px-6">
