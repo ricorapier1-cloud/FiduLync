@@ -132,8 +132,8 @@ function isCatalyst(value: unknown): value is EconomicCatalyst {
 function isUsIndicators(value: unknown): value is OfficialUsMacroIndicators {
   if (!isRecord(value) || typeof value.retrievedAt !== 'string' || !Number.isFinite(Date.parse(value.retrievedAt))
     || !Array.isArray(value.sources) || !value.sources.every((source) => typeof source === 'string')) return false;
-  const numericKeys = ['cpiYearOverYearPct', 'coreCpiYearOverYearPct', 'unemploymentRatePct', 'nonfarmPayrollMonthlyChangeThousands', 'realGdpAnnualizedQuarterlyPct'];
-  const dateKeys = ['cpiPeriod', 'coreCpiPeriod', 'unemploymentPeriod', 'payrollPeriod', 'realGdpPeriod'];
+  const numericKeys = ['cpiYearOverYearPct', 'coreCpiYearOverYearPct', 'unemploymentRatePct', 'nonfarmPayrollMonthlyChangeThousands', 'realGdpAnnualizedQuarterlyPct', 'tenYearTreasuryYieldPct', 'tenYearRealYieldPct', 'tenYearBreakevenInflationPct'];
+  const dateKeys = ['cpiPeriod', 'coreCpiPeriod', 'unemploymentPeriod', 'payrollPeriod', 'realGdpPeriod', 'tenYearTreasuryYieldAsOf', 'tenYearRealYieldAsOf', 'tenYearBreakevenInflationAsOf'];
   return numericKeys.every((key) => value[key] === undefined || isFiniteNumber(value[key]))
     && dateKeys.every((key) => value[key] === undefined || typeof value[key] === 'string');
 }
