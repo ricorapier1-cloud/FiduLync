@@ -25,7 +25,7 @@ test('BLS parser calculates year-over-year CPI and monthly payroll change from m
 });
 
 test('BLS parser rejects malformed and unsuccessful provider responses', () => {
-  assert.throws(() => parseBlsMacroResponse({ status: 'REQUEST_FAILED', Results: { series: [] } }), /BLS response/);
+  assert.throws(() => parseBlsMacroResponse({ status: 'REQUEST_FAILED', Results: { series: [] } }), /BLS returned an invalid response/);
 });
 
 test('BEA parser selects the latest valid quarterly real GDP observation', () => {
