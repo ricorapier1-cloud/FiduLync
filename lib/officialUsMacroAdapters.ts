@@ -21,6 +21,13 @@ export type OfficialUsMacroSnapshot = {
   sources: string[];
 };
 
+export const BLS_SERIES_IDS = {
+  headlineCpi: 'CUUR0000SA0',
+  coreCpi: 'CUUR0000SA0L1E',
+  unemployment: 'LNS14000000',
+  nonfarmPayrolls: 'CES0000000001',
+} as const;
+
 type BLSObservation = { year: number; period: string; value: number };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -60,10 +67,10 @@ export function parseBlsMacroResponse(payload: unknown): Omit<OfficialUsMacroSna
     throw new Error('BLS response has no series data.');
   }
   const find = (id: string) => parseBlsObservations(payload, id);
-  const headline = yearOverYear(find('CUUR0000SA0'));
-  const core = yearOverYear(find('CUUR0000SA0L1E'));
-  const unemployment = find('LNS14000000')[0];
-  const payroll = find('CES0000000001');
+  const headline = yearOverYear(find(BLS_SERIES_IDS.headlineCpi));
+  const core = yearOverYear(find(BLS_SERIES_IDS.coreCpi));
+  const unemployment = find(BLS_SERIES_IDS.unemployment)[0];
+  const payroll = find(BLS_SERIES_IDS.nonfarmPayrolls);
   const latestPayroll = payroll[0];
   const previousPayroll = latestPayroll && payroll.find((row) =>
     row.year === (latestPayroll.period === 'M01' ? latestPayroll.year - 1 : latestPayroll.year)
@@ -89,7 +96,7 @@ export function parseBeaRealGdpResponse(payload: unknown): { realGdpAnnualizedQu
   if (!Array.isArray(results.Data)) throw new Error('BEA returned no NIPA data rows.');
   const rows = results.Data.filter((item): item is Record<string, unknown> => {
     if (!isRecord(item) || String(item.LineNumber ?? '') !== '1'
-      || typeof item.TimePeriod !== 'string' || !/^\d{4}Q[1-4]$/.test(item.TimePeriod)
+      || typeof item.TimePeriod !== 'string' || !/^\\d{4}Q[1-4]$/.test(item.TimePeriod)
       || typeof item.DataValue !== 'string') return false;
     const normalized = item.DataValue.replace(/,/g, '').replace(/%/g, '').trim();
     return normalized !== '' && Number.isFinite(Number(normalized));
@@ -113,7 +120,7 @@ export async function fetchOfficialUsMacro(): Promise<OfficialUsMacroSnapshot | 
   jobs.push((async () => {
     const currentYear = new Date().getUTCFullYear();
     const body: Record<string, unknown> = {
-      seriesid: ['CUUR0000SA0', 'CUSR0000SA0L1E', 'LNS14000000', 'CES0000000001'],
+      seriesid: Object.values(BLS_SERIES_IDS),
       startyear: String(currentYear - 2),
       endyear: String(currentYear),
     };
