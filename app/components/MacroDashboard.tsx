@@ -6,6 +6,7 @@ import Link from 'next/link';
 import BrandGlyph from '@/components/BrandGlyph';
 import { getCurrencyStrengthIndex } from '@/lib/currencyStrength';
 import type { MacroSnapshot, MarketQuote } from '@/types/macro';
+import type { FxDriverAssessment } from '@/lib/forexResearchEngine';
 
 type MacroDashboardProps = {
   initialSnapshot: MacroSnapshot;
@@ -93,29 +94,6 @@ function CatalystCountdownDisplay({ target }: { target: string }) {
   return <span>{countdown}</span>;
 }
 
-function calculateBias(snapshot: MacroSnapshot, pairSymbol: (typeof pairs)[number]['symbol']) {
-  const pair = pairs.find((item) => item.symbol === pairSymbol) ?? pairs[0];
-  const usd = snapshot.currencies.find((currency) => currency.code === 'USD');
-  if (!usd || usd.policyRateSource !== 'provider' || usd.inflationSource !== 'provider') return null;
-  if (pair.base === 'XAU') {
-    const goldPosition = snapshot.cot.find((position) => position.market === 'GOLD');
-    return Math.max(-100, Math.min(100, Math.round(
-      (usd.policyRate - usd.inflation) * -18 + ((goldPosition?.percentile ?? 50) - 50) * 0.18,
-    )));
-  }
-
-  const base = snapshot.currencies.find((currency) => currency.code === pair.base);
-  const quote = snapshot.currencies.find((currency) => currency.code === pair.quote);
-  if (!base || !quote || base.policyRateSource !== 'provider' || base.inflationSource !== 'provider'
-    || quote.policyRateSource !== 'provider' || quote.inflationSource !== 'provider') return null;
-  const basePosition = snapshot.cot.find((position) => position.market === pair.base);
-  const quotePosition = snapshot.cot.find((position) => position.market === pair.quote);
-  const policyDifferential = base.policyRate - quote.policyRate;
-  const realYieldDifferential = (base.policyRate - base.inflation) - (quote.policyRate - quote.inflation);
-  const cotDifferential = ((basePosition?.percentile ?? 50) - (quotePosition?.percentile ?? 50)) * 0.18;
-  return Math.max(-100, Math.min(100, Math.round(policyDifferential * 12 + realYieldDifferential * 9 + cotDifferential)));
-}
-
 function biasLabel(score: number | null) {
   if (score === null) return 'Unavailable';
   if (score >= 70) return 'Extreme bullish';
@@ -136,8 +114,10 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
   const [now, setNow] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [aiBrief, setAiBrief] = useState<{ bullets: string[]; source: 'gemini' | 'rules' } | null>(null);
+  const [fxAssessment, setFxAssessment] = useState<FxDriverAssessment | null>(null);
+  const [fxAssessmentLoading, setFxAssessmentLoading] = useState(false);
   const currencyStrength = getCurrencyStrengthIndex(snapshot);
-  const score = calculateBias(snapshot, pair);
+  const score = fxAssessment && fxAssessment.setup !== 'NO_SETUP' ? fxAssessment.combinedScore : null;
   const sortedCatalysts = [...snapshot.catalysts]
     .filter((catalyst) => now === null || Date.parse(catalyst.scheduledAt) >= now)
     .sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt));
@@ -177,6 +157,33 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
     && quoteCurrency.policyRateSource === 'provider' && quoteCurrency.inflationSource === 'provider'
     ? Math.round(((baseCurrency.policyRate - baseCurrency.inflation) - (quoteCurrency.policyRate - quoteCurrency.inflation)) * 100)
     : null;
+  useEffect(() => {
+    const controller = new AbortController();
+    setFxAssessment(null);
+    setFxAssessmentLoading(true);
+    void fetch(`/api/research/fx-drivers?pair=${encodeURIComponent(pair)}`, {
+      cache: 'no-store',
+      signal: controller.signal,
+    }).then(async (response) => {
+      if (!response.ok) throw new Error(`FX research assessment returned ${response.status}.`);
+      const payload: unknown = await response.json();
+      if (!isRecord(payload) || !isRecord(payload.assessment)
+        || typeof payload.assessment.setup !== 'string'
+        || !Array.isArray(payload.assessment.blockers)) {
+        throw new Error('FX research assessment payload failed validation.');
+      }
+      setFxAssessment(payload.assessment as unknown as FxDriverAssessment);
+    }).catch((error: unknown) => {
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.warn('FX driver assessment unavailable; no setup will be shown.', error);
+      }
+    }).finally(() => {
+      if (!controller.signal.aborted) setFxAssessmentLoading(false);
+    });
+    return () => controller.abort();
+  }, [pair]);
+
+
   const policySpread = verifiedMacroCurrencies.length > 1
     ? Math.max(...verifiedMacroCurrencies.map((currency) => currency.policyRate)) - Math.min(...verifiedMacroCurrencies.map((currency) => currency.policyRate))
     : null;
@@ -352,16 +359,17 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
       <TopPairBanner />
       <div className="macro-two-column">
         <section id="bias" className="macro-section" aria-labelledby="bias-title">
-          <div className="macro-section-heading"><div><span className="eyebrow">02 / RELATIVE VALUE</span><h2 id="bias-title">Pair bias analyzer</h2></div><span className="macro-section-note mono">RULE-BASED MODEL</span></div>
+          <div className="macro-section-heading"><div><span className="eyebrow">02 / RELATIVE VALUE</span><h2 id="bias-title">Pair bias analyzer</h2></div><span className="macro-section-note mono">EVIDENCE-WEIGHTED FX ENGINE</span></div>
           <div className="macro-panel macro-bias-panel">
             <label className="macro-select-label" htmlFor="macro-pair">INSTRUMENT</label>
             <div className="macro-select-wrap"><select id="macro-pair" value={pair} onChange={(event) => setPair(event.target.value as (typeof pairs)[number]['symbol'])}>{pairs.map((item) => <option key={item.symbol} value={item.symbol}>{item.symbol}</option>)}</select><BrandGlyph name="chevron-down" size={16} /></div>
-            <div className={`macro-score macro-score-${score !== null && score > 0 ? 'up' : score !== null && score < 0 ? 'down' : 'flat'}`}><span className="mono">{score === null ? '—' : `${score > 0 ? '+' : ''}${score}`}</span><span>{score === null ? 'NO VERIFIED INPUTS' : '/ 110'}</span></div>
-            <div className="macro-score-label"><strong>{biasLabel(score)}</strong><span className="mono">FUNDAMENTAL BIAS</span></div>
+            <div className={`macro-score macro-score-${score !== null && score > 0 ? 'up' : score !== null && score < 0 ? 'down' : 'flat'}`}><span className="mono">{score === null ? '—' : `${score > 0 ? '+' : ''}${score}`}</span><span>{score === null ? (fxAssessmentLoading ? 'ASSESSING' : 'NO SETUP') : '/ 100'}</span></div>
+            <div className="macro-score-label"><strong>{fxAssessment?.setup === 'LONG_BIAS' ? 'Long research bias' : fxAssessment?.setup === 'SHORT_BIAS' ? 'Short research bias' : fxAssessmentLoading ? 'Assessment pending' : 'NO SETUP'}</strong><span className="mono">RESEARCH ONLY · NOT AN ORDER</span></div>
             <div className="macro-bias-meter"><span className="macro-meter-mid" />{score !== null && <span className={`macro-meter-pointer ${score >= 0 ? 'macro-pointer-up' : 'macro-pointer-down'}`} style={{ left: `${50 + score / 2}%` }} />}</div>
             <div className="macro-meter-scale mono"><span>-100 BEAR</span><span>NEUTRAL</span><span>+100 BULL</span></div>
-            <div className="macro-bias-drivers"><div><span>{activePair.base === 'XAU' ? 'USD REAL YIELD' : 'POLICY DIFF'}</span><strong className="mono">{activePair.base === 'XAU' && quoteCurrency && quoteCurrency.policyRateSource === 'provider' && quoteCurrency.inflationSource === 'provider' ? formatBasisPoints(Math.round((quoteCurrency.policyRate - quoteCurrency.inflation) * 100)) : policyDifferentialBps === null ? '—' : formatBasisPoints(policyDifferentialBps)}</strong></div><div><span>REAL YIELD DIFF</span><strong className="mono">{realYieldDifferentialBps === null ? '—' : formatBasisPoints(realYieldDifferentialBps)}</strong></div><div><span>MODEL SCOPE</span><strong>Macro inputs only</strong></div></div>
-            <p className="macro-disclaimer">Heuristic score derived from the supplied snapshot. It excludes valuation, growth, risk premia, and technicals; do not use as a standalone execution signal.</p>
+            <div className="macro-bias-drivers"><div><span>{activePair.base === 'XAU' ? 'USD REAL YIELD' : 'POLICY DIFF'}</span><strong className="mono">{activePair.base === 'XAU' && quoteCurrency && quoteCurrency.policyRateSource === 'provider' && quoteCurrency.inflationSource === 'provider' ? formatBasisPoints(Math.round((quoteCurrency.policyRate - quoteCurrency.inflation) * 100)) : policyDifferentialBps === null ? '—' : formatBasisPoints(policyDifferentialBps)}</strong></div><div><span>REAL YIELD DIFF</span><strong className="mono">{realYieldDifferentialBps === null ? '—' : formatBasisPoints(realYieldDifferentialBps)}</strong></div><div><span>MODEL COVERAGE</span><strong className="mono">{fxAssessment ? `${Math.round(fxAssessment.evidenceCoverage * 100)}% · ${fxAssessment.confidence.toFixed(2)} confidence` : 'Awaiting assessment'}</strong></div></div>
+            <p className="macro-disclaimer">The evidence-weighted engine requires point-in-time macro drivers and verified closed-bar technical confirmation. Missing or stale evidence is excluded; no directional setup is emitted when coverage, agreement, volatility, or execution-cost checks fail. Research only; execution is disabled.</p>
+            {fxAssessment && fxAssessment.blockers.length > 0 && <div className="macro-csi-note"><strong>ACTIVE MODEL BLOCKERS</strong><ul>{fxAssessment.blockers.map((blocker) => <li key={blocker}>{blocker.replaceAll('_', ' ')}</li>)}</ul></div>}
           </div>
         </section>
 
