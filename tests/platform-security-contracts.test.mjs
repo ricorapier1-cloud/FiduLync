@@ -62,7 +62,7 @@ test('legacy Paystack provisioning is not reachable through active route handler
 });
 
 test('database enforces global MT5 seat uniqueness across LIVE and DEMO types', async () => {
-  const migration = await read('supabase/migrations/20261119130000_global_mt5_seat_login_uniqueness.sql');
+  const migration = await read('supabase/migrations/20261119115211_global_mt5_seat_login_uniqueness.sql');
   assert.match(migration, /CREATE UNIQUE INDEX IF NOT EXISTS ea_license_seats_mt5_login_global_uidx/);
   assert.match(migration, /ON public\.ea_license_seats \(mt5_login\)/);
   assert.match(migration, /WHERE mt5_login IS NOT NULL/);
