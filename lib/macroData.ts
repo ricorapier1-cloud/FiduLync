@@ -768,6 +768,8 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
           || isFiniteNumber(fred.tenYearBreakevenInflationPct) ? ['Federal Reserve Bank of St. Louis (FRED)'] : []),
       ])],
     };
+    if (isFiniteNumber(fred.tenYearTreasuryYieldPct) || isFiniteNumber(fred.tenYearRealYieldPct)
+      || isFiniteNumber(fred.tenYearBreakevenInflationPct)) hasLiveData = true;
   }
   if (cotResult.status === 'fulfilled' && Array.isArray(cotResult.value) && cotResult.value.every(isCotPosition)) {
     snapshot.cot = cotResult.value;
