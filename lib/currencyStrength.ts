@@ -2,40 +2,56 @@ import type { MacroSnapshot } from '@/types/macro';
 
 export const MAJOR_CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'SEK', 'NOK'] as const;
 export type MajorCurrency = (typeof MAJOR_CURRENCIES)[number];
-export type CurrencyStrength = { currency: MajorCurrency; score: number; cotPercentile?: number; cotAsOf?: string };
+export type CurrencyStrength = {
+  currency: MajorCurrency;
+  score: number;
+  policyRateAsOf: string;
+  inflationAsOf: string;
+};
 
-export function getCurrencyStrengthIndex(snapshot: MacroSnapshot): CurrencyStrength[] {
+const MAX_POLICY_AGE_MS = 180 * 24 * 60 * 60_000;
+const MAX_INFLATION_AGE_MS = 900 * 24 * 60 * 60_000;
+
+function validObservationDate(value: string | undefined, now: number, maxAgeMs: number): boolean {
+  if (!value) return false;
+  const timestamp = Date.parse(value);
+  const age = now - timestamp;
+  return Number.isFinite(timestamp) && age >= 0 && age <= maxAgeMs;
+}
+
+function zScores(values: number[]): number[] {
+  const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+  const variance = values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length;
+  const standardDeviation = Math.sqrt(variance);
+  return standardDeviation > 0
+    ? values.map((value) => (value - mean) / standardDeviation)
+    : values.map(() => 0);
+}
+
+/**
+ * Descriptive cross-sectional policy/real-rate context only.
+ * It is not a return forecast or an FX signal. COT is intentionally excluded:
+ * the stored COT date is the position observation date, not its publication time.
+ */
+export function getCurrencyStrengthIndex(snapshot: MacroSnapshot, now = Date.now()): CurrencyStrength[] {
   const currencies = snapshot.currencies.filter((item) =>
     MAJOR_CURRENCIES.includes(item.code as MajorCurrency)
     && item.policyRateSource === 'provider'
-    && item.inflationSource === 'provider');
-  if (!currencies.length) return [];
-  const cot = new Map(snapshot.cot.map((item) => [item.market, item]));
-  const rawScores = currencies.map((currency) => {
-    const position = cot.get(currency.code);
-    const positionAgeMs = position?.asOf ? Date.now() - Date.parse(position.asOf) : Number.POSITIVE_INFINITY;
-    const freshPosition = position
-      && Number.isFinite(positionAgeMs)
-      && positionAgeMs >= 0
-      && positionAgeMs <= 10 * 24 * 60 * 60_000
-      ? position
-      : undefined;
-    return {
-      currency: currency.code as MajorCurrency,
-      raw: currency.policyRate * 0.45
-        + (currency.policyRate - currency.inflation) * 0.45
-        + (freshPosition ? ((freshPosition.percentile - 50) / 50) * 0.1 : 0),
-      ...(freshPosition ? { cotPercentile: freshPosition.percentile, cotAsOf: freshPosition.asOf } : {}),
-    };
-  });
-  const mean = rawScores.reduce((total, item) => total + item.raw, 0) / rawScores.length;
-  const maxDeviation = Math.max(...rawScores.map((item) => Math.abs(item.raw - mean)), 0.01);
-  return rawScores
-    .map(({ currency, raw }) => ({
-      currency,
-      score: Math.round(Math.max(-100, Math.min(100, ((raw - mean) / maxDeviation) * 100))),
-    }))
-    .sort((left, right) => right.score - left.score || left.currency.localeCompare(right.currency));
+    && item.inflationSource === 'provider'
+    && Number.isFinite(item.policyRate)
+    && Number.isFinite(item.inflation)
+    && validObservationDate(item.policyRateAsOf, now, MAX_POLICY_AGE_MS)
+    && validObservationDate(item.inflationAsOf, now, MAX_INFLATION_AGE_MS));
+  if (currencies.length < 3) return [];
+
+  const policyZ = zScores(currencies.map((currency) => currency.policyRate));
+  const realRateZ = zScores(currencies.map((currency) => currency.policyRate - currency.inflation));
+  return currencies.map((currency, index) => ({
+    currency: currency.code as MajorCurrency,
+    score: Math.round(Math.max(-100, Math.min(100, ((policyZ[index] + realRateZ[index]) / 2) * 35))),
+    policyRateAsOf: currency.policyRateAsOf!,
+    inflationAsOf: currency.inflationAsOf!,
+  })).sort((left, right) => right.score - left.score || left.currency.localeCompare(right.currency));
 }
 
 export function getLiquiditySession(date = new Date()): 'ASIAN_RANGE' | 'LONDON_KILLZONE' | 'NY_OVERLAP' | 'OFF_HOURS' {
