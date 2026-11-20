@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const macroData = read('../lib/macroData.ts');
@@ -120,7 +120,6 @@ test('personal edition retires checkout and customer licence APIs', () => {
 });
 
 test('browser owner console is absent while administration APIs remain protected', () => {
-  const { existsSync } = require('node:fs');
   for (const path of [
     '../app/owner/page.tsx',
     '../app/owner/OwnerOperations.tsx',
