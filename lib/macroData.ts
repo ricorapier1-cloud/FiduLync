@@ -779,7 +779,7 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
   if (!snapshot.usIndicators && fredResult.status === 'fulfilled') {
     snapshot.usIndicators = { retrievedAt: new Date().toISOString(), sources: [] };
   }
-  if (snapshot.usIndicators && fredResult.status === 'fulfilled') {
+  if (snapshot.usIndicators && fredResult.status === 'fulfilled' && fredResult.value) {
     const fred = fredResult.value;
     snapshot.usIndicators = {
       ...snapshot.usIndicators,
