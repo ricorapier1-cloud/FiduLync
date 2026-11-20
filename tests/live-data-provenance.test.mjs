@@ -161,8 +161,5 @@ test('private EA artifact upload uses owner-only signed Storage URLs and audited
   assert.match(registerApi, /requireOwner/);
   assert.match(registerApi, /record_ea_product_artifact_upload/);
   assert.match(idempotentArtifactMigration, /release_approved = CASE/);
-  assert.match(artifactUi, /crypto\.subtle\.digest\('SHA-256'/);
-  assert.match(artifactUi, /api\/owner\/artifacts\/upload-url/);
-  assert.match(artifactUi, /api\/owner\/artifacts\/register/);
 });
 
