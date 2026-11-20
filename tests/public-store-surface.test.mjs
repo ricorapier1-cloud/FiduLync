@@ -1,24 +1,43 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
-const storePage = read('../app/store/page.tsx');
-const storeComponent = read('../app/components/StoreTerminal.tsx');
+const shell = read('../components/PlatformShell.tsx');
+const footer = read('../components/PlatformFooter.tsx');
+const proxy = read('../proxy.ts');
 
-test('personal EA Lab contains no customer checkout, licence or payment UI', () => {
-  assert.match(storePage, /StoreTerminal/);
-  assert.doesNotMatch(storePage, /LegacyStoreTerminal|Paystack|bridgeSource|readFile/);
-  assert.doesNotMatch(storeComponent, /Paystack|Checkout|Customer Portal|license_key|payment_reference/i);
+test('public storefront and customer checkout surfaces are absent', () => {
+  assert.equal(existsSync(new URL('../app/store/page.tsx', import.meta.url)), false);
+  assert.equal(existsSync(new URL('../app/components/StoreTerminal.tsx', import.meta.url)), false);
+  assert.doesNotMatch(shell, /Paystack|Checkout|Customer Portal|Subscription|\/store/);
+  assert.doesNotMatch(footer, /Paystack|Checkout|Customer Portal|Subscription|\/store/);
 });
 
-test('personal EA Lab remains advisory and does not place broker orders', () => {
-  assert.match(storeComponent, /Research readiness only/);
-  assert.match(storeComponent, /does not place broker orders/);
-  assert.match(storeComponent, /QuantSupervisor\.mqh/);
+test('owner sign-in is not exposed through navigation or footer', () => {
+  assert.doesNotMatch(shell, /href: '\/owner'|href="\/owner"|EA Fleet/);
+  assert.doesNotMatch(footer, /href="\/owner"|Owner Console/);
+  assert.match(shell, /Strategy Validation/);
+  assert.match(shell, /\/research\/validation/);
 });
 
-test('private MT5 publisher credentials and internal bridge source are not rendered', () => {
-  assert.doesNotMatch(storeComponent, /x-algo-key|ALGO_PRIVATE_API_KEY|Authorization:\s*Bearer/i);
-  assert.doesNotMatch(storeComponent, /bridgeSource|View exact downloadable bridge source|Copy bridge source/);
+test('private terminal gate fails closed and does not broadly exempt file extensions', () => {
+  assert.match(proxy, /fidulync_owner_session/);
+  assert.match(proxy, /PUBLIC_ASSET_PATHS/);
+  assert.match(proxy, /'\/icon\.svg'/);
+  assert.match(proxy, /manifest\.webmanifest/);
+  assert.match(proxy, /redirectToOwner\(request, true\)/);
+  assert.doesNotMatch(proxy, /\\\.[a-zA-Z0-9]\{2,8\}\$/);
+  assert.match(proxy, /X-Robots-Tag/);
+});
+
+test('legacy commerce endpoints explicitly return Gone', () => {
+  for (const path of [
+    '../app/api/v1/create-checkout/route.ts',
+    '../app/api/v1/customer-portal/route.ts',
+    '../app/api/v1/paystack-webhook/route.ts',
+    '../app/api/paystack/webhook/route.ts',
+  ]) {
+    assert.match(read(path), /status:\s*410/, path);
+  }
 });

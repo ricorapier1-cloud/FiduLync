@@ -28,7 +28,7 @@ function pretty(value: number | null | undefined, digits = 2) {
 export default function ValidationWorkbench() {
   const [session, setSession] = useState<Session | null>(null);
   const [authorized, setAuthorized] = useState(false);
-  const [authChecked, setAuthChecked] = useState(false);
+  const [authChecked, setAuthChecked] = useState(!supabase);
   const [tradesJson, setTradesJson] = useState('');
   const [foldsJson, setFoldsJson] = useState('');
   const [costsJson, setCostsJson] = useState('');
@@ -50,7 +50,7 @@ export default function ValidationWorkbench() {
         if (active) { setSession(null); setAuthorized(false); setAuthChecked(true); }
       }
     };
-    if (!supabase) { setAuthChecked(true); return; }
+    if (!supabase) return;
     void supabase.auth.getSession().then(({ data }) => verify(data.session));
     const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => { void verify(next); });
     return () => { active = false; listener.subscription.unsubscribe(); };
@@ -103,7 +103,7 @@ export default function ValidationWorkbench() {
   }
 
   if (!authChecked) return <div className="mx-auto max-w-3xl px-4 py-20 text-sm text-slate-400">Verifying private owner session…</div>;
-  if (!authorized || !session) return <div className="mx-auto max-w-3xl px-4 py-20 text-slate-100"><h1 className="text-xl font-semibold">Private owner access required</h1><p className="mt-2 text-sm text-slate-400">Sign in to the owner console before using the validation workbench.</p><Link href="/owner" className="mt-4 inline-block text-sm text-emerald-300 underline">Open owner sign-in</Link></div>;
+  if (!authorized || !session) return <div className="mx-auto max-w-3xl px-4 py-20 text-slate-100"><h1 className="text-xl font-semibold">Private owner access required</h1><p className="mt-2 text-sm text-slate-400">Sign in to the private terminal before using the validation workbench.</p><Link href="/owner" className="mt-4 inline-block text-sm text-emerald-300 underline">Open owner sign-in</Link></div>;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 pb-32 text-slate-100 sm:px-6">

@@ -14,8 +14,8 @@ const technicalEngine = read('../lib/technicalEngine.ts');
 const quantRisk = read('../lib/quantRisk.ts');
 const signalEngine = read('../lib/signalEngine.ts');
 const aiBrief = read('../lib/aiBrief.ts');
-const storeTerminal = read('../app/components/StoreTerminal.tsx');
-const storePage = read('../app/store/page.tsx');
+const ownerOperations = read('../app/owner/OwnerOperations.tsx');
+const ownerTradingDesk = read('../app/owner/OwnerTradingDesk.tsx');
 const envExample = read('../.env.example');
 const historicalBackfill = read('../scripts/mt5_historical_backfill.py');
 const publicHistoricalBackfill = read('../public/downloads/FiduLync_MT5_Historical_Backfill.py');
@@ -94,7 +94,6 @@ test('Ghost Protocol requires a fresh MT5 quote and enforces the 0.65 quality th
   assert.match(signalEngine, /safeToTrade = riskBudget\.approved && ghost\.allowed/);
   assert.match(signalEngine, /ghost_score: ghost\.score/);
   assert.match(technicalEngine, /atr_expansion_ratio/);
-  assert.match(storeTerminal, /GHOST PROTOCOL/);
 });
 
 test('FRED observations are not transmitted to external AI prompts', () => {
@@ -123,15 +122,16 @@ test('personal edition retires checkout and customer licence APIs', () => {
   assert.doesNotMatch(envExample, /PAYSTACK_SECRET_KEY|PAYSTACK_WEBHOOK_SECRET|ALGO_PRIVATE_API_KEY/);
 });
 
-test('private EA lab uses owner MT5 publisher and supervisor components only', () => {
-  assert.match(storePage, /import StoreTerminal/);
-  assert.doesNotMatch(storePage, /LegacyStoreTerminal|Paystack|bridgeSource|readFile/);
-  assert.match(storeTerminal, /QuantSupervisor\.mqh/);
-  assert.match(storeTerminal, /FiduLync_MT5_Market_Publisher\.py/);
-  assert.match(storeTerminal, /per-installation publisher token/);
-  assert.doesNotMatch(storeTerminal, /MacroLyncBridge|Paystack|Checkout|Eridam_Nexus|Velocity_Vault|MacroLync_G10|ALGO_PRIVATE_API_KEY/);
-  assert.match(storeTerminal, /atr_sl_pips === null \? 'Unavailable'/);
-  assert.match(storeTerminal, /atr_tp_pips === null \? 'Unavailable'/);
+test('private EA fleet monitor uses owner-scoped MT5 and risk telemetry', () => {
+  assert.match(ownerOperations, /\/api\/owner\/operations/);
+  assert.match(ownerOperations, /\/api\/mt5\/installations/);
+  assert.match(ownerOperations, /latest_heartbeat_age_seconds/);
+  assert.match(ownerOperations, /latest_quote_age_seconds/);
+  assert.match(ownerOperations, /open_risk_verified/);
+  assert.match(ownerOperations, /Owner-only/);
+  assert.doesNotMatch(ownerOperations, /Paystack|Checkout|Customer Portal/);
+  assert.match(ownerTradingDesk, /observed broker data/);
+  assert.match(ownerTradingDesk, /active MT5 connector/);
 });
 
 test('live MT5 publisher supports partial G10 maps and preserves broker execution metadata', () => {

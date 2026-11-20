@@ -38,13 +38,13 @@ export default function ResearchNotebook() {
   const [parameters, setParameters] = useState('{}');
   const [falsification, setFalsification] = useState('{"criteria": []}');
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('Checking private owner session…');
+  const [message, setMessage] = useState(supabase ? 'Checking private owner session…' : 'Supabase owner authentication is not configured.');
 
   const load = useCallback(async (current: Session) => {
     const verify = await fetch('/api/owner/verify', {
       headers: { Authorization: 'Bearer ' + current.access_token }, cache: 'no-store',
     });
-    if (!verify.ok) throw new Error('Owner authentication is required. Sign in through the private EA Fleet page.');
+    if (!verify.ok) throw new Error('Owner authentication is required. Sign in through the private terminal sign-in page.');
     const response = await fetch('/api/owner/research-hypotheses', {
       headers: { Authorization: 'Bearer ' + current.access_token }, cache: 'no-store',
     });
@@ -56,10 +56,10 @@ export default function ResearchNotebook() {
 
   useEffect(() => {
     let active = true;
-    if (!supabase) { setMessage('Supabase owner authentication is not configured.'); return; }
+    if (!supabase) return;
     void supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
-      if (!data.session) { setMessage('Sign in through the private EA Fleet page to use the research notebook.'); return; }
+      if (!data.session) { setMessage('Sign in through the private terminal sign-in page to use the research notebook.'); return; }
       setSession(data.session);
       void load(data.session).catch((error: unknown) => {
         if (active) setMessage(error instanceof Error ? error.message : 'Owner session verification failed.');
@@ -69,7 +69,7 @@ export default function ResearchNotebook() {
       if (!active) return;
       setSession(next);
       if (next) void load(next).catch((error: unknown) => setMessage(error instanceof Error ? error.message : 'Research notebook unavailable.'));
-      else { setItems([]); setMessage('Sign in through the private EA Fleet page to use the research notebook.'); }
+      else { setItems([]); setMessage('Sign in through the private terminal sign-in page to use the research notebook.'); }
     });
     return () => { active = false; listener.subscription.unsubscribe(); };
   }, [load]);

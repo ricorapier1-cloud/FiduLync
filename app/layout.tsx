@@ -15,6 +15,7 @@ export const metadata: Metadata = {
     template: '%s | FiduLync Personal Quant',
   },
   description: 'Private quantitative market research, disciplined risk planning and MT5 EA supervision for personal trading.',
+  robots: { index: false, follow: false, noarchive: true },
   openGraph: {
     type: 'website',
     siteName: 'FiduLync Personal Quant',

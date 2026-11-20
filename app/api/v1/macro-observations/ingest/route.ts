@@ -57,7 +57,7 @@ export async function POST(request: Request) {
     if (!isRecord(raw) || typeof raw.provider !== 'string' || !PROVIDERS.has(raw.provider.toUpperCase())
       || typeof raw.series_id !== 'string' || raw.series_id.length < 1 || raw.series_id.length > 160
       || typeof raw.region_code !== 'string' || !/^[A-Z0-9_-]{2,12}$/i.test(raw.region_code)
-      || typeof raw.observation_period !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(raw.observation_period)
+      || typeof raw.observation_period !== 'string' || !isValidDateOnly(raw.observation_period)
       || typeof raw.value !== 'number' || !Number.isFinite(raw.value)
       || typeof raw.observation_at !== 'string' || typeof raw.released_at !== 'string'
       || typeof raw.retrieved_at !== 'string'
