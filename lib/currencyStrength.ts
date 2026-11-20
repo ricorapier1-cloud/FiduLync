@@ -10,7 +10,7 @@ export function getCurrencyStrengthIndex(snapshot: MacroSnapshot): CurrencyStren
     && item.policyRateSource === 'provider'
     && item.inflationSource === 'provider');
   if (!currencies.length) return [];
-  const cot = new Map(snapshot.cot.map((item) => [item.market, item.percentile]));
+  const cot = new Map(snapshot.cot.map((item) => [item.market, item]));
   const rawScores = currencies.map((currency) => {
     const position = cot.get(currency.code);
     const positionAgeMs = position?.asOf ? Date.now() - Date.parse(position.asOf) : Number.POSITIVE_INFINITY;
