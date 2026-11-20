@@ -89,7 +89,7 @@ test('public navigation replaces owner entry with strategy validation', async ()
   const shell = await read('components/PlatformShell.tsx');
   const footer = await read('components/PlatformFooter.tsx');
   assert.match(shell, /href: '\/research\/validation'/);
-  assert.match(shell, /Strategy Lab/);
+  assert.match(shell, /Private workspace/);
   assert.doesNotMatch(shell, /href: '\/owner'/);
   assert.doesNotMatch(shell, /href: '\/store'/);
   assert.match(footer, /Strategy validation & risk lab/);
