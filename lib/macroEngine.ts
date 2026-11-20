@@ -77,16 +77,28 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
     const fredMacroAllowed = Boolean(process.env.FRED_API_KEY?.trim());
     const officialStatisticsAvailable = Boolean(snapshot.usIndicators?.sources.some((source) =>
       source.includes('(BLS)') || source.includes('(BEA)')));
-    const fredCrossAssetKeys = [
-      'tenYearTreasuryYieldPct', 'tenYearTreasuryYieldAsOf', 'tenYearRealYieldPct', 'tenYearRealYieldAsOf',
-      'tenYearBreakevenInflationPct', 'tenYearBreakevenInflationAsOf', 'usdBroadIndex', 'usdBroadIndexAsOf',
-      'vixIndex', 'vixIndexAsOf', 'sp500Index', 'sp500IndexAsOf', 'wtiOilUsd', 'wtiOilAsOf',
-      'brentOilUsd', 'brentOilAsOf', 'usHighYieldSpreadPct', 'usHighYieldSpreadAsOf',
+    const fredDailyPairs = [
+      ['tenYearTreasuryYieldPct', 'tenYearTreasuryYieldAsOf'],
+      ['tenYearRealYieldPct', 'tenYearRealYieldAsOf'],
+      ['tenYearBreakevenInflationPct', 'tenYearBreakevenInflationAsOf'],
+      ['usdBroadIndex', 'usdBroadIndexAsOf'],
+      ['vixIndex', 'vixIndexAsOf'],
+      ['sp500Index', 'sp500IndexAsOf'],
+      ['wtiOilUsd', 'wtiOilAsOf'],
+      ['brentOilUsd', 'brentOilAsOf'],
+      ['usHighYieldSpreadPct', 'usHighYieldSpreadAsOf'],
     ] as const;
+    const fredDailyFields = Object.fromEntries(fredDailyPairs.flatMap(([valueKey, dateKey]) => {
+      const observedAt = snapshot.usIndicators?.[dateKey];
+      const fresh = fredMacroAllowed && observationFresh(observedAt, 7);
+      return fresh
+        ? []
+        : [[valueKey, undefined], [dateKey, undefined]];
+    }));
     const filteredUsIndicators = snapshot.usIndicators ? {
       ...snapshot.usIndicators,
       sources: snapshot.usIndicators.sources.filter((source) => fredMacroAllowed || !source.includes('(FRED)')),
-      ...(fredMacroAllowed ? {} : Object.fromEntries(fredCrossAssetKeys.map((key) => [key, undefined]))),
+      ...fredDailyFields,
     } : undefined;
     const usIndicators = filteredUsIndicators
       && (officialStatisticsAvailable || (fredMacroAllowed && filteredUsIndicators.sources.length > 0))
