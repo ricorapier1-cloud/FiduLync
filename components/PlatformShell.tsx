@@ -53,8 +53,8 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
           </nav>
 
           <div className="topbar-actions">
-            <span className="secure-pill" aria-label="Private research workspace">
-              <span className="secure-dot" /> Private workspace
+            <span className="secure-pill" aria-label="No sign-in required">
+              <span className="secure-dot" /> No sign-in required
             </span>
             <button
               type="button"
