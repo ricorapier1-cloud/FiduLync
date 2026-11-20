@@ -26,7 +26,7 @@ export default function PlatformFooter() {
               <span className="flex h-7 w-7 items-center justify-center rounded-md border border-emerald-400/30 bg-emerald-400/10 text-emerald-400"><BrandGlyph name="shield" size={16} /></span>
               <span className="text-base font-semibold tracking-tight text-slate-100">Fidu<span className="text-emerald-400">Lync</span></span>
             </div>
-            <p className="mt-3 max-w-sm text-xs leading-5 text-slate-400">Private quantitative macro research, cross-asset analysis, strategy validation and read-only MT5 risk supervision for personal use.</p>
+            <p className="mt-3 max-w-sm text-xs leading-5 text-slate-400">Quantitative macro research, cross-asset analysis, strategy validation and read-only MT5 market-data tools.</p>
           </div>
 
           <div>
@@ -59,7 +59,7 @@ export default function PlatformFooter() {
         </div>
 
         <div className="mt-6 flex flex-col gap-2 border-t border-white/[0.06] pt-5 text-[10px] text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-          <span>FiduLync Personal Quant Edition · Private single-operator research workspace</span>
+          <span>FiduLync Personal Quant Edition · Research terminal · No user sign-in required</span>
           <span>Read-only risk monitoring · No brokerage or order execution</span>
         </div>
       </div>
