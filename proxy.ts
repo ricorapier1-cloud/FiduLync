@@ -2,13 +2,29 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const OWNER_COOKIE = 'fidulync_owner_session';
 
+const PUBLIC_ASSET_PATHS = new Set([
+  '/favicon.ico',
+  '/robots.txt',
+  '/sitemap.xml',
+  '/manifest.json',
+  '/sw.js',
+  '/apple-icon.png',
+  '/brand-emblem.svg',
+  '/brand-mark.svg',
+  '/icon-1024.png',
+  '/icon-192.png',
+  '/icon-192x192.png',
+  '/icon-512.png',
+  '/icon-512x512.png',
+  '/logo.png',
+  '/logo.svg',
+  '/maskable-icon.png',
+]);
+
 function isPublicAsset(pathname: string): boolean {
   return pathname.startsWith('/_next/static/')
     || pathname.startsWith('/_next/image')
-    || pathname === '/favicon.ico'
-    || pathname === '/robots.txt'
-    || pathname === '/sitemap.xml'
-    || /\.[a-zA-Z0-9]{2,8}$/.test(pathname);
+    || PUBLIC_ASSET_PATHS.has(pathname);
 }
 
 function redirectToOwner(request: NextRequest, clearCookie: boolean): NextResponse {
