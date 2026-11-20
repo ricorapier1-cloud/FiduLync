@@ -96,7 +96,7 @@ export function parseBeaRealGdpResponse(payload: unknown): { realGdpAnnualizedQu
   if (!Array.isArray(results.Data)) throw new Error('BEA returned no NIPA data rows.');
   const rows = results.Data.filter((item): item is Record<string, unknown> => {
     if (!isRecord(item) || String(item.LineNumber ?? '') !== '1'
-      || typeof item.TimePeriod !== 'string' || !/^\\d{4}Q[1-4]$/.test(item.TimePeriod)
+      || typeof item.TimePeriod !== 'string' || !/^\d{4}Q[1-4]$/.test(item.TimePeriod)
       || typeof item.DataValue !== 'string') return false;
     const normalized = item.DataValue.replace(/,/g, '').replace(/%/g, '').trim();
     return normalized !== '' && Number.isFinite(Number(normalized));
