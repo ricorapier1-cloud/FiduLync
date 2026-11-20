@@ -4,6 +4,10 @@ import { getFallbackSnapshot, loadMacroSnapshot } from '@/lib/macroData';
 import { getCachedData } from '@/lib/redisCache';
 import type { MacroCurrency, MacroSnapshot } from '@/types/macro';
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
 export type FundamentalSignal = {
   score: number;
   policyDiffBps: number;
