@@ -19,7 +19,7 @@ Provider permissions are personal-use-specific. Public official sources and Fran
 
 FiduLync Personal Quant Edition is a private, single-operator quantitative research, risk-governance and MT5 EA-supervision system. It is not a customer SaaS, EA marketplace, subscription business, escrow service, broker, copy-trading service or managed-account service.
 
-Preserve all existing useful UI, market research, MacroLync, analytics, account telemetry, data ingestion, owner diagnostics, authentication, security controls and support affordances. Retire commercial flows from the personal navigation and runtime only after dependency mapping and regression tests. Do not delete populated historical financial records or audit history. Escrow remains excluded from all active product workflows.
+Preserve useful research UI, market research, MacroLync, analytics, read-only account telemetry, data ingestion, server-side privileged API authorization and security controls. Do not expose a browser login, Owner Console, customer portal or commercial workflows. Retire commercial flows from the personal navigation and runtime only after dependency mapping and regression tests. Do not delete populated historical financial records or audit history. Escrow remains excluded from all active product workflows.
 
 ### Explicit non-goals
 - No customer registration, customer billing, Paystack checkout, subscription renewals, customer EA catalogue or commercial licence provisioning in the personal product experience.
