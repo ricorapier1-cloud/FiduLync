@@ -345,6 +345,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
           </div>
           <p className="macro-csi-note">Official statistical observations are displayed as macro context. They do not independently change pair bias or qualify as point-in-time backtest inputs until exact release timestamps and historical vintages are joined.</p>
           <p className="macro-csi-note">This product uses Bureau of Economic Analysis (BEA) data but is not endorsed or certified by BEA.</p>
+          <p className="macro-csi-note">BLS.gov cannot vouch for the data or analyses derived from these data after the data have been retrieved from BLS.gov.</p>
         </div>
       </section>
 
