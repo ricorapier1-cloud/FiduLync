@@ -1,8 +1,8 @@
-# FiduLync Personal Quant Edition — owner and market-data runbook
+# FiduLync Personal Quant Edition — MT5 market-data runbook
 
 ## Product boundary
 
-FiduLync is a private, single-operator, personal non-commercial quantitative research and MT5 supervision workspace. There is no customer checkout, Paystack, subscription, escrow, customer licensing or public EA marketplace. Historical commercial routes return HTTP 410. The owner login, private MT5 publisher and research governance remain active.
+FiduLync is a private, single-operator, personal non-commercial quantitative research and MT5 supervision workspace. There is no customer checkout, Paystack, subscription, escrow, customer licensing or public EA marketplace. Historical commercial routes return HTTP 410. There is no browser login or owner console. Private MT5 publisher ingestion remains server-authorized.
 
 ## Private owner access
 
@@ -14,7 +14,7 @@ FiduLync is a private, single-operator, personal non-commercial quantitative res
 
 ## Hybrid market data
 
-1. Register a publisher in /owner. The bearer token is displayed once; store it only in the local Windows MT5 publisher environment.
+1. Use a securely provisioned installation token. No browser console is available to create or display tokens; store the token only in the local Windows MT5 publisher environment.
 2. Publisher sends HTTPS POST batches to /api/v1/market-data/ingest using:
    - Authorization: Bearer <publisher-token>
    - x-mt5-timestamp: <UTC ISO timestamp>
@@ -32,11 +32,11 @@ The repository includes scripts/mt5_market_publisher.py. It uses the official Me
 
 1. Install Python 3.11+ and MetaTrader 5 on a Windows PC/VPS. Log in to the broker terminal manually and confirm Market Watch symbols are available.
 2. Install the Python package: py -m pip install MetaTrader5.
-3. Create a publisher token in /owner, then set it only in the local environment as FIDULYNC_PUBLISHER_TOKEN.
+3. Obtain a publisher token through the authorized server-side provisioning procedure, then set it only in the local environment as FIDULYNC_PUBLISHER_TOKEN.
 4. Set FIDULYNC_INGEST_URL to https://fidulync.vercel.app/api/v1/market-data/ingest.
 5. Set MT5_SYMBOL_MAP for the symbols actually offered by the broker, including suffixes, for example EURUSD=EURUSD.a,GBPUSD=GBPUSD.a,USDJPY=USDJPY.a,XAUUSD=XAUUSD.a. Partial maps are supported; unavailable symbols are not fabricated.
 6. Keep MT5_PUBLISH_INTERVAL_SECONDS=1 (the default; the Ghost Protocol quote-age ceiling is 2 seconds). Run py scripts/mt5_market_publisher.py. It sends bounded recent closed H1/H4/D1 bars and refreshed broker quotes, then only new closed bars. It never opens or modifies trades.
-7. Check the owner console's publisher last-seen time, quote age and market diagnostics. If the publisher stops, quotes become stale and Ghost Protocol abstains.
+7. Check publisher last-seen time, quote age and market diagnostics through authorized server-side diagnostics. If the publisher stops, quotes become stale and Ghost Protocol abstains.
 
 ## Historical 1996–2026 research backfill
 
