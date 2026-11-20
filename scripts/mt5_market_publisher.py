@@ -447,7 +447,7 @@ def post_batch(
 
 def main() -> int:
     if not PUBLISHER_TOKEN.startswith("flmt5_") or len(PUBLISHER_TOKEN) < 40:
-        print("Set FIDULYNC_PUBLISHER_TOKEN to the private token created in the FiduLync owner console.")
+        print("Set FIDULYNC_PUBLISHER_TOKEN to the private token provisioned through the authorized operator process.")
         return 2
     if not INGEST_URL.lower().startswith("https://"):
         print("FIDULYNC_INGEST_URL must use HTTPS.")
