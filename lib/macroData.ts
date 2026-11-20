@@ -747,6 +747,9 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
   } else if (usMacroResult.status === 'rejected') {
     console.warn('Official BLS/BEA macro indicators are unavailable:', usMacroResult.reason);
   }
+  if (!snapshot.usIndicators && fredResult.status === 'fulfilled') {
+    snapshot.usIndicators = { retrievedAt: new Date().toISOString(), sources: [] };
+  }
   if (snapshot.usIndicators && fredResult.status === 'fulfilled') {
     const fred = fredResult.value;
     snapshot.usIndicators = {
