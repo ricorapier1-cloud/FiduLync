@@ -56,7 +56,6 @@ export function parseBlsMacroResponse(payload: unknown): Omit<OfficialUsMacroSna
   if (!isRecord(payload) || !isRecord(payload.Results) || !Array.isArray(payload.Results.series)) {
     throw new Error('BLS response has no series data.');
   }
-  const series = payload.Results.series as unknown[];
   const find = (id: string) => parseBlsObservations(payload, id);
   const headline = yearOverYear(find('CUUR0000SA0'));
   const core = yearOverYear(find('CUSR0000SA0L1E'));
@@ -66,7 +65,6 @@ export function parseBlsMacroResponse(payload: unknown): Omit<OfficialUsMacroSna
   const previousPayroll = latestPayroll && payroll.find((row) =>
     row.year === (latestPayroll.period === 'M01' ? latestPayroll.year - 1 : latestPayroll.year)
     && row.period === (latestPayroll.period === 'M01' ? 'M12' : `M${String(Number(latestPayroll.period.slice(1)) - 1).padStart(2, '0')}`));
-  void series;
   return {
     cpiYearOverYearPct: headline.value,
     cpiPeriod: headline.period,
