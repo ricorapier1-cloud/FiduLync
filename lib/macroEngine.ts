@@ -100,8 +100,17 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
       sources: snapshot.usIndicators.sources.filter((source) => fredMacroAllowed || !source.includes('(FRED)')),
       ...fredDailyFields,
     } : undefined;
+    const hasOfficialStatisticsValues = officialStatisticsAvailable && [
+      snapshot.usIndicators?.cpiYearOverYearPct,
+      snapshot.usIndicators?.coreCpiYearOverYearPct,
+      snapshot.usIndicators?.unemploymentRatePct,
+      snapshot.usIndicators?.nonfarmPayrollMonthlyChangeThousands,
+      snapshot.usIndicators?.realGdpAnnualizedQuarterlyPct,
+    ].some(isFiniteNumber);
+    const hasFreshFredDailyValues = fredDailyPairs.some(([valueKey]) =>
+      isFiniteNumber(filteredUsIndicators?.[valueKey]));
     const usIndicators = filteredUsIndicators
-      && (officialStatisticsAvailable || (fredMacroAllowed && filteredUsIndicators.sources.length > 0))
+      && (hasOfficialStatisticsValues || (fredMacroAllowed && hasFreshFredDailyValues))
       ? filteredUsIndicators
       : undefined;
     const hasVerifiedProviderData = currencies.length > 0 || cot.length > 0 || catalysts.length > 0 || Boolean(usIndicators);
