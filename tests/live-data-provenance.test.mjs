@@ -17,7 +17,6 @@ const aiBrief = read('../lib/aiBrief.ts');
 const envExample = read('../.env.example');
 const historicalBackfill = read('../scripts/mt5_historical_backfill.py');
 const publicHistoricalBackfill = read('../public/downloads/FiduLync_MT5_Historical_Backfill.py');
-const readme = read('../README.md');
 const uploadUrlApi = read('../app/api/owner/artifacts/upload-url/route.ts');
 const registerApi = read('../app/api/owner/artifacts/register/route.ts');
 const idempotentArtifactMigration = read('../supabase/migrations/20261119133834_idempotent_ea_artifact_registration.sql');
