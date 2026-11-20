@@ -1,6 +1,6 @@
 # FiduLync Personal Quant Edition
 
-> **Private, single-operator quantitative research workstation. Personal, non-commercial use only.**
+> **Quantitative research workstation. No user login or owner-console interface.**
 
 FiduLync combines fundamental macro research, quantitative technical/statistical analysis, portfolio-risk intelligence and private MetaTrader 5 data/supervision tooling. It is intended for the owner's research and analysis. It is not a broker, customer SaaS, investment adviser, managed account, copy-trading service or public EA marketplace. The central application does not place, modify or close broker orders.
 
@@ -39,19 +39,9 @@ A configured API key is not proof of a current data response or a provider entit
 
 ## Personal-use scope
 
-The active application does not use customer registration, checkout, Paystack, subscriptions, escrow, customer licensing, customer portals or commercial support workflows. Legacy commercial routes return HTTP 410 Gone; historical database and audit records are retained rather than deleted. The owner login and private MT5 installation tokens remain.
+The active application does not use user login, an owner console, customer registration, checkout, Paystack, subscriptions, escrow, customer licensing, customer portals or commercial support workflows. The research pages are accessible without a user account. Sensitive administration, installation-token provisioning and ingestion APIs remain server-authorized; removing the browser login does not make those APIs public. Legacy commercial routes return HTTP 410 Gone; historical database and audit records are retained rather than deleted.
 
-## Private owner access
-
-1. Open the /owner route.
-2. Sign in with the already registered owner email/password account.
-3. Use the private Owner Console to register a trusted MT5 terminal and issue its one-time publisher token.
-4. Store the token privately. The server stores its hash; never paste it into public chat, source control or screenshots.
-5. Revoke an installation token if the terminal or machine is retired.
-
-There is no public owner registration.
-
-## MT5 integration
+## Access model\n\n- Open the research terminal directly; no user login is required.\n- The browser-based owner console and sign-in/password-recovery screens have been removed.\n- Administrative and MT5 installation APIs remain protected server-side. They must not be called from public browser code.\n- MT5 publisher-token provisioning is not available through the UI; do not run the publisher until a token has been securely provisioned through an authorized operator process.\n\n## MT5 integration
 
 The MT5 publisher must run on the same Windows machine/VPS as the already logged-in MetaTrader 5 terminal.
 
@@ -60,7 +50,7 @@ The MT5 publisher must run on the same Windows machine/VPS as the already logged
 3. Install Python and the MetaTrader5 package: py -m pip install MetaTrader5.
 4. Register the terminal in /owner and set FIDULYNC_INGEST_URL to https://fidulync.vercel.app/api/v1/market-data/ingest and FIDULYNC_PUBLISHER_TOKEN in the Windows environment.
 5. Configure canonical-to-broker symbol mappings, including suffixes, for example EURUSD=EURUSD.a and XAUUSD=XAUUSD.a.
-6. Run the publisher and confirm fresh quotes, closed candles, account snapshots and installation heartbeat in the owner console.
+6. Run the publisher and confirm fresh quotes, closed candles and installation heartbeat through authorized server-side diagnostics.
 7. Download QuantSupervisor.mqh to MQL5/Include/FiduLync/QuantSupervisor.mqh. Compile the EA and the no-trade connectivity probe in MetaEditor.
 8. Configure the EA with the installation ID and private publisher token. Keep token-bearing .set files private.
 9. Run MetaEditor compilation with zero errors and zero warnings, Strategy Tester, and demo forward testing before considering live use.
