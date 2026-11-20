@@ -58,7 +58,7 @@ export function parseBlsMacroResponse(payload: unknown): Omit<OfficialUsMacroSna
   }
   const find = (id: string) => parseBlsObservations(payload, id);
   const headline = yearOverYear(find('CUUR0000SA0'));
-  const core = yearOverYear(find('CUSR0000SA0L1E'));
+  const core = yearOverYear(find('CUUR0000SA0L1E'));
   const unemployment = find('LNS14000000')[0];
   const payroll = find('CES0000000001');
   const latestPayroll = payroll[0];
