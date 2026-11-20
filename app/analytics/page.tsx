@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -19,7 +18,7 @@ export default function PerformanceLabPage() {
   return (
     <main className="min-h-screen bg-[#030A08] px-4 py-10 pb-36 text-emerald-50">
       <div className="mx-auto max-w-4xl">
-        <Link href="/" className="font-mono text-xs text-emerald-400 hover:underline">← BACK TO MACRO TERMINAL</Link>
+        <a href="/" className="font-mono text-xs text-emerald-400 hover:underline">← BACK TO MACRO TERMINAL</a>
         <header className="mb-8 mt-8">
           <p className="mb-2 font-mono text-xs tracking-widest text-emerald-400">PERFORMANCE LAB / EVIDENCE FIRST</p>
           <h1 className="mb-3 text-3xl font-bold tracking-tight">Measure what your account actually did.</h1>
@@ -33,12 +32,8 @@ export default function PerformanceLabPage() {
           <div className="font-mono text-[10px] tracking-widest text-amber-200">DATA STATUS / NOT YET VALIDATED</div>
           <h2 className="mt-2 text-lg font-semibold text-white">Awaiting verified owner trade history</h2>
           <p className="mt-2 text-xs leading-5 text-emerald-100/70">
-            Connect and verify your own MT5 terminal in the restricted Owner Console. Once the ingestion and account-isolation checks pass,
-            the Performance Lab can calculate metrics from real closed trades. Until then, blank is more accurate than a fabricated score.
+            MT5 trade history has not been connected yet. When the desktop terminal and publisher are available, verified and account-isolated closed-trade records can populate these metrics. Until then, blank is more accurate than a fabricated score.
           </p>
-          <Link href="/owner" className="mt-4 inline-flex rounded-lg border border-emerald-300/30 px-4 py-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-300/10">
-            Open Owner Console
-          </Link>
         </section>
 
         <section className="mt-8 grid gap-3 sm:grid-cols-2">
