@@ -15,15 +15,15 @@ This is a private, single-operator quantitative research and MT5 EA-supervision 
 
 No customer registration, checkout, subscriptions, Paystack, escrow, public EA marketplace, paid customer licences, customer support portal, copy trading, pooled funds or broker order execution by the central application.
 
-Preserve the existing private owner email/password login, Supabase data, audit history, MT5 publisher security and useful research components. Do not delete historical financial or audit records merely because commercial workflows are retired.
+Preserve Supabase data, audit history, server-side authorization and MT5 publisher security. The browser research terminal has no login page, customer account portal or Owner Console. Privileged APIs remain server-authorized and fail closed; this backend authorization is not a browser login experience. Do not delete historical financial or audit records merely because commercial workflows are retired.
 
-## Owner access
+## Privileged API and MT5 access
 
-- Use `/owner` with the existing registered owner email and password.
-- Preserve password recovery and server-side owner verification.
-- Enable Supabase leaked-password protection and configure a verified SMTP sender for account recovery.
-- Keep service-role keys, MT5 publisher tokens and API keys server-side.
-- Issue a separate one-time hashed publisher token for each trusted MT5 terminal; revoke tokens when a terminal is retired.
+- `/owner` is intentionally removed and must return 404. Do not restore an Owner Console or browser login flow.
+- Privileged research/operations APIs require a verified server-side owner bearer token and exact configured owner identity; unauthenticated requests must fail closed. Never accept an owner identity supplied only in a request body or user-editable metadata.
+- Keep Supabase service-role/secret keys, owner credentials, MT5 publisher tokens and provider API keys server-side. Never expose them through `NEXT_PUBLIC_` variables, browser bundles, logs or responses.
+- MT5 publisher ingestion uses a separate hashed per-installation token. Provisioning/revocation must be performed only through a separately authenticated privileged workflow; the public research UI must not expose token creation or secret material.
+- The current browser edition deliberately has no interactive owner sign-in or token-provisioning console. MT5 onboarding therefore remains an operator setup task until a separately approved, secure workflow is provided.
 
 ## Data-provider policy
 
@@ -65,11 +65,11 @@ Frankfurter public reference rates do not require a commercial approval flag and
 ## MT5 connection (Windows terminal required)
 
 1. Install MetaTrader 5 and log in to the intended broker terminal.
-2. In `/owner`, create a uniquely labelled MT5 publisher installation and copy its one-time token.
+2. Provision a uniquely labelled MT5 publisher installation through the authenticated privileged setup workflow and securely retrieve its one-time token. The removed `/owner` browser console is not an available setup path.
 3. Configure the publisher on the Windows terminal/VPS using the token in a private environment variable; never commit it.
 4. Map broker-specific symbols, including suffixes, explicitly (for example, `EURUSD.a` or `XAUUSD.a`).
 5. Publish broker bid/ask, closed H1/H4/D1 candles, symbol contract metadata, account equity/margin, open positions and closed-deal history.
-6. Confirm quote freshness, candle completeness, installation identity and server ingestion timestamps in the owner console.
+6. Confirm quote freshness, candle completeness, installation identity and server ingestion timestamps using authenticated operational diagnostics.
 7. Compile all MQL5 includes/EAs in MetaEditor with zero errors and zero warnings. Run Strategy Tester, then demo forward testing.
 8. Keep EA execution disabled until data, risk, model validation and execution-quality evidence pass independent review.
 
@@ -91,7 +91,7 @@ The web app can prepare and validate the server-side components, but it cannot c
 ## Current operational gates
 
 - GitHub CI passes on the exact proposed commit.
-- Vercel preview build succeeds and protected owner routes pass authenticated smoke tests.
+- Vercel preview build succeeds; `/owner` is 404; legacy commercial routes redirect away; privileged APIs reject unauthenticated requests and accept only their documented server-side credentials.
 - Vercel's daily production cron returns an authenticated, truthful success/degraded status; manual on-demand refresh remains available. Macro cadence follows official release schedules, while market tick/candle data comes from MT5.
 - Production deployment commit matches the reviewed Git commit.
 - Supabase RLS and security advisors have no unresolved critical exposure.
