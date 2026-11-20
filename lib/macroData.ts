@@ -178,11 +178,14 @@ async function getFredObservations(seriesId: string, apiKey: string): Promise<Ob
 }
 
 async function getFredUsdUpdates(apiKey: string) {
-  const [rateResult, pceResult, cpiResult, twoYearResult] = await Promise.allSettled([
+  const [rateResult, pceResult, cpiResult, twoYearResult, tenYearResult, realYieldResult, breakevenResult] = await Promise.allSettled([
     getFredObservations('DFF', apiKey),
     getFredObservations('PCEPILFE', apiKey),
     getFredObservations('CPIAUCSL', apiKey),
     getFredObservations('DGS2', apiKey),
+    getFredObservations('DGS10', apiKey),
+    getFredObservations('DFII10', apiKey),
+    getFredObservations('T10YIE', apiKey),
   ]);
   const latestYearOverYear = (observations: Observation[]) => {
     const latest = observations[0];
@@ -194,6 +197,9 @@ async function getFredUsdUpdates(apiKey: string) {
   if (pceResult.status === 'rejected') console.warn('FRED Core PCE is unavailable:', pceResult.reason);
   if (cpiResult.status === 'rejected') console.warn('FRED CPI is unavailable:', cpiResult.reason);
   if (twoYearResult.status === 'rejected') console.warn('FRED 2-Year Treasury yield is unavailable:', twoYearResult.reason);
+  if (tenYearResult.status === 'rejected') console.warn('FRED 10-Year Treasury yield is unavailable:', tenYearResult.reason);
+  if (realYieldResult.status === 'rejected') console.warn('FRED 10-Year TIPS real yield is unavailable:', realYieldResult.reason);
+  if (breakevenResult.status === 'rejected') console.warn('FRED 10-Year breakeven inflation is unavailable:', breakevenResult.reason);
   return {
     policyRate: rateResult.status === 'fulfilled' ? rateResult.value[0]?.value : undefined,
     policyRateAsOf: rateResult.status === 'fulfilled' ? rateResult.value[0]?.date : undefined,
@@ -203,6 +209,12 @@ async function getFredUsdUpdates(apiKey: string) {
     cpiAsOf: cpiResult.status === 'fulfilled' ? cpiResult.value[0]?.date : undefined,
     twoYearYield: twoYearResult.status === 'fulfilled' ? twoYearResult.value[0]?.value : undefined,
     twoYearYieldAsOf: twoYearResult.status === 'fulfilled' ? twoYearResult.value[0]?.date : undefined,
+    tenYearTreasuryYieldPct: tenYearResult.status === 'fulfilled' ? tenYearResult.value[0]?.value : undefined,
+    tenYearTreasuryYieldAsOf: tenYearResult.status === 'fulfilled' ? tenYearResult.value[0]?.date : undefined,
+    tenYearRealYieldPct: realYieldResult.status === 'fulfilled' ? realYieldResult.value[0]?.value : undefined,
+    tenYearRealYieldAsOf: realYieldResult.status === 'fulfilled' ? realYieldResult.value[0]?.date : undefined,
+    tenYearBreakevenInflationPct: breakevenResult.status === 'fulfilled' ? breakevenResult.value[0]?.value : undefined,
+    tenYearBreakevenInflationAsOf: breakevenResult.status === 'fulfilled' ? breakevenResult.value[0]?.date : undefined,
   };
 }
 
