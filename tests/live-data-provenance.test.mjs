@@ -14,13 +14,10 @@ const technicalEngine = read('../lib/technicalEngine.ts');
 const quantRisk = read('../lib/quantRisk.ts');
 const signalEngine = read('../lib/signalEngine.ts');
 const aiBrief = read('../lib/aiBrief.ts');
-const ownerOperations = read('../app/owner/OwnerOperations.tsx');
-const ownerTradingDesk = read('../app/owner/OwnerTradingDesk.tsx');
 const envExample = read('../.env.example');
 const historicalBackfill = read('../scripts/mt5_historical_backfill.py');
 const publicHistoricalBackfill = read('../public/downloads/FiduLync_MT5_Historical_Backfill.py');
 const readme = read('../README.md');
-const artifactUi = read('../app/owner/OwnerArtifactRelease.tsx');
 const uploadUrlApi = read('../app/api/owner/artifacts/upload-url/route.ts');
 const registerApi = read('../app/api/owner/artifacts/register/route.ts');
 const idempotentArtifactMigration = read('../supabase/migrations/20261119133834_idempotent_ea_artifact_registration.sql');
@@ -122,16 +119,21 @@ test('personal edition retires checkout and customer licence APIs', () => {
   assert.doesNotMatch(envExample, /PAYSTACK_SECRET_KEY|PAYSTACK_WEBHOOK_SECRET|ALGO_PRIVATE_API_KEY/);
 });
 
-test('private EA fleet monitor uses owner-scoped MT5 and risk telemetry', () => {
-  assert.match(ownerOperations, /\/api\/owner\/operations/);
-  assert.match(ownerOperations, /\/api\/mt5\/installations/);
-  assert.match(ownerOperations, /latest_heartbeat_age_seconds/);
-  assert.match(ownerOperations, /latest_quote_age_seconds/);
-  assert.match(ownerOperations, /open_risk_verified/);
-  assert.match(ownerOperations, /Owner-only/);
-  assert.doesNotMatch(ownerOperations, /Paystack|Checkout|Customer Portal/);
-  assert.match(ownerTradingDesk, /observed broker data/);
-  assert.match(ownerTradingDesk, /active MT5 connector/);
+test('browser owner console is absent while administration APIs remain protected', () => {
+  const { existsSync } = require('node:fs');
+  for (const path of [
+    '../app/owner/page.tsx',
+    '../app/owner/OwnerOperations.tsx',
+    '../app/owner/OwnerTradingDesk.tsx',
+    '../app/owner/OwnerResearchGovernance.tsx',
+    '../app/owner/OwnerArtifactRelease.tsx',
+  ]) {
+    assert.equal(existsSync(new URL(path, import.meta.url)), false);
+  }
+  const ownerOperationsApi = read('../app/api/owner/operations/route.ts');
+  const installationsApi = read('../app/api/owner/mt5-installations/route.ts');
+  assert.match(ownerOperationsApi, /isAuthorizedOwnerEmail|requireOwner/);
+  assert.match(installationsApi, /requireOwner/);
 });
 
 test('live MT5 publisher supports partial G10 maps and preserves broker execution metadata', () => {
@@ -165,8 +167,3 @@ test('private EA artifact upload uses owner-only signed Storage URLs and audited
   assert.match(artifactUi, /api\/owner\/artifacts\/register/);
 });
 
-test('owner release approval is distinct from upload and laptop compile is prepared', () => {
-  assert.match(artifactUi, /Approve release/);
-  assert.match(artifactUi, /zero errors and zero warnings/);
-  assert.match(readme, /Personal Quant Edition/);
-});
