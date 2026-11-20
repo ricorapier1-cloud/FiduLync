@@ -24,8 +24,8 @@ test('owner sign-in is not exposed through navigation or footer', () => {
 test('private terminal gate fails closed and does not broadly exempt file extensions', () => {
   assert.match(proxy, /fidulync_owner_session/);
   assert.match(proxy, /PUBLIC_ASSET_PATHS/);
-  assert.match(proxy, /'\\/icon\\.svg'/);
-  assert.match(proxy, /manifest\\.webmanifest/);
+  assert.match(proxy, /'\/icon\.svg'/);
+  assert.match(proxy, /manifest\.webmanifest/);
   assert.match(proxy, /redirectToOwner\(request, true\)/);
   assert.doesNotMatch(proxy, /\\\.[a-zA-Z0-9]\{2,8\}\$/);
   assert.match(proxy, /X-Robots-Tag/);
