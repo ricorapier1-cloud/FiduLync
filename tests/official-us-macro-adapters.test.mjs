@@ -11,7 +11,7 @@ test('BLS parser calculates year-over-year CPI and monthly payroll change from m
     status: 'REQUEST_SUCCEEDED',
     Results: { series: [
       makeSeries('CUUR0000SA0', [[2026, 'M03', 330], [2025, 'M03', 320]]),
-      makeSeries('CUSR0000SA0L1E', [[2026, 'M03', 340], [2025, 'M03', 333]]),
+      makeSeries('CUUR0000SA0L1E', [[2026, 'M03', 340], [2025, 'M03', 333]]),
       makeSeries('LNS14000000', [[2026, 'M03', 4.1]]),
       makeSeries('CES0000000001', [[2026, 'M03', 160100], [2026, 'M02', 160000]]),
     ] },
