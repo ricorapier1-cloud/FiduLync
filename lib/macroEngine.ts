@@ -75,9 +75,23 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
     const catalysts = calendarAllowed ? snapshot.catalysts : [];
     const ecbRates = snapshot.ecbRates;
     const fredMacroAllowed = Boolean(process.env.FRED_API_KEY?.trim());
-    const usIndicatorsAllowed = Boolean(snapshot.usIndicators)
-      && (fredMacroAllowed || !snapshot.usIndicators!.sources.some((source) => source.includes('(FRED)')));
-    const usIndicators = usIndicatorsAllowed ? snapshot.usIndicators : undefined;
+    const officialStatisticsAvailable = Boolean(snapshot.usIndicators?.sources.some((source) =>
+      source.includes('(BLS)') || source.includes('(BEA)')));
+    const fredCrossAssetKeys = [
+      'tenYearTreasuryYieldPct', 'tenYearTreasuryYieldAsOf', 'tenYearRealYieldPct', 'tenYearRealYieldAsOf',
+      'tenYearBreakevenInflationPct', 'tenYearBreakevenInflationAsOf', 'usdBroadIndex', 'usdBroadIndexAsOf',
+      'vixIndex', 'vixIndexAsOf', 'sp500Index', 'sp500IndexAsOf', 'wtiOilUsd', 'wtiOilAsOf',
+      'brentOilUsd', 'brentOilAsOf', 'usHighYieldSpreadPct', 'usHighYieldSpreadAsOf',
+    ] as const;
+    const filteredUsIndicators = snapshot.usIndicators ? {
+      ...snapshot.usIndicators,
+      sources: snapshot.usIndicators.sources.filter((source) => fredMacroAllowed || !source.includes('(FRED)')),
+      ...(fredMacroAllowed ? {} : Object.fromEntries(fredCrossAssetKeys.map((key) => [key, undefined]))),
+    } : undefined;
+    const usIndicators = filteredUsIndicators
+      && (officialStatisticsAvailable || (fredMacroAllowed && filteredUsIndicators.sources.length > 0))
+      ? filteredUsIndicators
+      : undefined;
     const hasVerifiedProviderData = currencies.length > 0 || cot.length > 0 || catalysts.length > 0 || Boolean(usIndicators);
     if (!hasVerifiedProviderData && (!ecbRates || Object.keys(ecbRates).length === 0)) return getFallbackSnapshot();
 
