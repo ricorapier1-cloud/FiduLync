@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { requireOwner } from '@/lib/ownerAuth';
 import { supabaseInsert, supabaseQuery, supabaseRead } from '@/lib/supabaseAdmin';
+import { enforceDistributedRateLimit } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -9,6 +10,9 @@ export const runtime = 'nodejs';
 export async function GET(request: Request) {
   const owner = await requireOwner(request);
   if (!owner) return NextResponse.json({ error: 'Owner authentication required.' }, { status: 401 });
+  const rate = await enforceDistributedRateLimit(request, 'owner-mt5-installations-read', 30, 60_000);
+  if (rate.unavailable) return NextResponse.json({ error: 'MT5 installation service is unavailable.' }, { status: 503 });
+  if (!rate.allowed) return NextResponse.json({ error: 'MT5 installation rate limit exceeded.' }, { status: 429 });
   try {
     const rows = await supabaseRead<Array<{ id: string; label: string; status: string; broker: string | null; server: string | null; last_seen_at: string | null; created_at: string }>>(
       'mt5_installations',
@@ -23,6 +27,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const owner = await requireOwner(request);
   if (!owner) return NextResponse.json({ error: 'Owner authentication required.' }, { status: 401 });
+  const rate = await enforceDistributedRateLimit(request, 'owner-mt5-installations-create', 10, 60_000);
+  if (rate.unavailable) return NextResponse.json({ error: 'MT5 installation service is unavailable.' }, { status: 503 });
+  if (!rate.allowed) return NextResponse.json({ error: 'MT5 installation rate limit exceeded.' }, { status: 429 });
   let body: unknown;
   try { body = await request.json(); } catch {
     return NextResponse.json({ error: 'A valid JSON request is required.' }, { status: 400 });
@@ -46,7 +53,9 @@ export async function POST(request: Request) {
         metadata: { label, broker, server },
       });
     } catch (auditError) {
-      console.error('MT5 installation audit insert failed:', auditError);
+      console.error('MT5 installation audit failed; revoking unlogged token:', auditError);
+      await supabaseQuery('mt5_installations', { method: 'PATCH', query: `id=eq.${rows[0].id}&user_id=eq.${owner.id}`, body: { status: 'revoked' } });
+      throw new Error('Installation audit failed; the token was revoked and not returned.');
     }
     return NextResponse.json({
       success: true,
@@ -63,6 +72,9 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   const owner = await requireOwner(request);
   if (!owner) return NextResponse.json({ error: 'Owner authentication required.' }, { status: 401 });
+  const rate = await enforceDistributedRateLimit(request, 'owner-mt5-installations-revoke', 10, 60_000);
+  if (rate.unavailable) return NextResponse.json({ error: 'MT5 installation service is unavailable.' }, { status: 503 });
+  if (!rate.allowed) return NextResponse.json({ error: 'MT5 installation rate limit exceeded.' }, { status: 429 });
   let body: unknown;
   try { body = await request.json(); } catch {
     return NextResponse.json({ error: 'A valid JSON request is required.' }, { status: 400 });
@@ -83,7 +95,10 @@ export async function DELETE(request: Request) {
         owner_email: owner.email, action: 'MT5_INSTALLATION_REVOKED', subject_id: id,
         metadata: { revoked_at: new Date().toISOString() },
       });
-    } catch (auditError) { console.error('MT5 revocation audit insert failed:', auditError); }
+    } catch (auditError) {
+      console.error('MT5 revocation audit insert failed:', auditError);
+      return NextResponse.json({ error: 'Installation is revoked, but the audit event failed. Investigate before further administration.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+    }
     return NextResponse.json({ success: true, id, status: 'revoked' }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     console.error('MT5 installation revocation failed:', error);

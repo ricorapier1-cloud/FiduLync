@@ -1,132 +1,72 @@
 import Link from 'next/link';
-import BrandGlyph from '@/components/BrandGlyph';
+import type { Metadata } from 'next';
 
-export const metadata = {
-  title: 'Terms of Service & Risk Disclosure | MacroLync & AlgoLync',
-  description: 'Institutional terms of service, high-risk capital warnings, software licensing agreements, and risk disclosures for MacroLync and AlgoLync.',
+export const metadata: Metadata = {
+  title: 'Personal Use, Data Provenance & Trading Risk',
+  description: 'Personal-use scope, data-source terms and risk disclosures for FiduLync Personal Quant Edition.',
 };
+
+const sections = [
+  {
+    title: '1. Personal-use scope',
+    body: 'FiduLync Personal Quant Edition is a private, single-operator research and MT5 EA-supervision workspace. It is not a customer SaaS, broker, investment adviser, managed account, copy-trading service, marketplace, escrow service or payment product. Customer registration, checkout, subscriptions and commercial EA licensing are not part of this edition.',
+  },
+  {
+    title: '2. Research, not investment advice',
+    body: 'Macro observations, technical indicators, quantitative scores, currency strength, correlations, market regimes, event-risk summaries and model outputs are research tools. They are not recommendations, solicitations or promises to buy or sell any financial instrument. A confluence score is not a calibrated probability unless separate out-of-sample calibration evidence is explicitly supplied.',
+  },
+  {
+    title: '3. Market-data provenance and freshness',
+    body: 'Every observation should retain its provider, source timestamp, retrieval timestamp, symbol, timeframe and broker/terminal identity where applicable. Reference rates, delayed feeds, historical bars and cached observations must never be described as real-time executable broker prices. Missing, stale, revised, incomplete or contradictory inputs must be labelled unavailable/degraded and excluded from affected decisions.',
+  },
+  {
+    title: '4. Provider terms and attribution',
+    body: 'The owner is responsible for using each API and dataset only within its applicable personal-use plan, rate limits, caching rules, exchange entitlements and copyright restrictions. FRED data is used only for personal, non-commercial research with required attribution and series-level copyright notices preserved. FRED-derived observations are not sent to external AI prompts. CFTC positioning is weekly and is not an intraday flow measure. Frankfurter rates are public reference rates, not live trading quotes. Third-party data is not redistributed.',
+  },
+  {
+    title: '5. AI-generated commentary',
+    body: 'Optional AI commentary is explanatory only. It must use supplied, permitted facts, identify unavailable context, and never invent prices, events, source observations or certainty. AI output has no execution authority. When FRED observations are present, they are kept out of external AI prompts and local deterministic analysis is used instead.',
+  },
+  {
+    title: '6. Technical research and backtesting',
+    body: 'Indicators and backtests depend on source quality, correct timestamps, broker specifications and realistic costs. Avoid look-ahead bias, survivorship bias, data leakage, overfitting and unrepresentative market regimes. Separate in-sample, validation and untouched out-of-sample data. Include spread, commission, swap, slippage, latency, rejected orders and stressed-market conditions. Simulated/backtested results are not live verified performance and do not predict future results.',
+  },
+  {
+    title: '7. MT5 connectivity and EA supervision',
+    body: 'The private MT5 connector is designed for authenticated data publishing and research/risk supervision. The central application does not place, modify or close broker orders. EA approval responses are not guarantees; the EA must independently validate prices, contract specifications, margin, stop-loss, take-profit, spread, slippage, news and account-level risk immediately before any order. Never share broker passwords. Publisher tokens are secrets and must be stored privately and revoked if exposed.',
+  },
+  {
+    title: '8. Capital and automated-trading risk',
+    body: 'Forex, CFDs, futures, precious metals and leveraged products carry substantial risk. Leverage magnifies losses; gaps, spread expansion, slippage, low liquidity, rejected orders, broker outages, VPS/network failure and software defects can cause losses beyond expectations. Always compile and test MQL5 code in MetaEditor, run Strategy Tester and forward-test on a demo account before considering live use. Never trade money you cannot afford to lose.',
+  },
+  {
+    title: '9. Security and personal data',
+    body: 'Access is restricted to the configured owner identity. Server-side secrets, service-role keys, API keys and MT5 publisher tokens must never be placed in client code, public repositories or screenshots. The platform should collect only the account telemetry needed for the owner’s own research and risk supervision. No public customer accounts are intended.',
+  },
+  {
+    title: '10. No warranty or performance certification',
+    body: 'The application and provider feeds are supplied as research tooling. Availability, accuracy, completeness, timeliness and fitness for a particular purpose are not guaranteed. A successful software build or API response does not certify a strategy, broker execution path, EA or live-trading system as profitable or safe.',
+  },
+];
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-[#080a0f] text-slate-100">
-      <div className="mx-auto w-full max-w-4xl px-5 py-9 sm:px-8 lg:py-12">
-        {/* Navigation & Header */}
-        <div className="border-b border-white/[0.08] pb-7">
-          <div className="flex items-center gap-2">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.1] bg-white/[0.04] px-3 py-1.5 text-xs text-slate-300 transition hover:border-emerald-400/40 hover:text-emerald-300"
-            >
-              <span>←</span> Back to Terminal
-            </Link>
-          </div>
-          <div className="mt-4 flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-amber-300">
-            <BrandGlyph name="shield-alert" size={14} className="text-amber-300" />
-            REGULATORY DISCLOSURE &amp; LEGAL GOVERNANCE
-          </div>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
-            Terms of Service &amp; Risk Disclosure
-          </h1>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            Effective Date: November 2026. Please review these operational rules and statutory risk warnings before utilizing our platform or purchasing software licenses.
-          </p>
-        </div>
-
-        {/* Content Sections */}
-        <div className="mt-8 space-y-8 text-xs leading-6 text-slate-300">
-          {/* Section 1 */}
-          <section className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-6">
-            <h2 className="text-base font-semibold text-amber-300">
-              1. High Risk Capital &amp; Leveraged Trading Warning
-            </h2>
-            <p className="mt-3">
-              Trading spot foreign exchange (Forex), currency futures, and Contracts for Difference (CFDs) carries an extremely high level of financial risk and is not suitable for all investors. Leveraged trading can result in the rapid loss of your entire deposited capital.
-            </p>
-            <p className="mt-2">
-              Before running any Expert Advisor (EA) or executing trades based on MacroLync quantitative signals, you must independently evaluate whether trading is appropriate in light of your financial condition, level of experience, and risk tolerance. You should never trade with money you cannot afford to lose.
-            </p>
+    <main className="mx-auto min-h-[75vh] w-full max-w-4xl px-5 py-10 pb-44 text-slate-100">
+      <Link href="/" className="font-mono text-xs text-emerald-300 hover:underline">← BACK TO TERMINAL</Link>
+      <header className="mb-8 mt-8">
+        <p className="font-mono text-[10px] tracking-[0.2em] text-emerald-300">FIDULYNC / PERSONAL QUANT EDITION</p>
+        <h1 className="mt-3 text-3xl font-semibold">Personal-use & risk policy</h1>
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">Private research, source attribution, data integrity, MT5 supervision and capital-risk boundaries.</p>
+      </header>
+      <div className="space-y-4">
+        {sections.map((section) => (
+          <section key={section.title} className="rounded-xl border border-white/10 bg-[#0c1118] p-5">
+            <h2 className="text-sm font-semibold text-white">{section.title}</h2>
+            <p className="mt-3 text-xs leading-6 text-slate-400">{section.body}</p>
           </section>
-
-          {/* Section 2 */}
-          <section className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-6">
-            <h2 className="text-base font-semibold text-slate-100">
-              2. Non-Advisory &amp; Research-Only Disclaimer
-            </h2>
-            <p className="mt-3">
-              MacroLync and AlgoLync operate exclusively as quantitative software vendors and macroeconomic research intelligence providers. None of the content, currency bias scores, regime indicators, or API endpoints constitute personal financial, tax, or investment advice.
-            </p>
-            <p className="mt-2">
-              All trading decisions remain solely at your own discretion and risk. MacroLync and AlgoLync do not act as a broker, custodian, portfolio manager, or registered financial adviser.
-            </p>
-          </section>
-
-          {/* Section 3 */}
-          <section className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-6">
-            <h2 className="text-base font-semibold text-slate-100">
-              3. Algorithmic Software Licensing &amp; Activation
-            </h2>
-            <p className="mt-3">
-              AlgoLync strategies (including Eridam Nexus Adaptive Pro and Velocity Vault) are delivered under a proprietary one-time software license:
-            </p>
-            <ul className="mt-2 list-disc pl-5 space-y-1.5 text-slate-300">
-              <li>Each purchase grants a non-exclusive, non-transferable, single-operator lifetime license bound to your designated MetaTrader 5 account.</li>
-              <li>You may not redistribute, resell, sublicense, decompile, reverse-engineer, or publicly share the binary files (.ex5) or client include files (.mqh).</li>
-              <li>Attempting to bypass cloud license validation or broadcast proprietary signals will result in immediate termination of the license key without compensation.</li>
-            </ul>
-          </section>
-
-          {/* Section 4 */}
-          <section className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-6">
-            <h2 className="text-base font-semibold text-slate-100">
-              4. Execution Risks &amp; Third-Party Broker Dependencies
-            </h2>
-            <p className="mt-3">
-              Automated execution depends on external technical factors beyond our control, including broker execution speed, server slippage, spread widening during news releases, VPS uptime, and Internet connectivity.
-            </p>
-            <p className="mt-2">
-              MacroLync and AlgoLync are not liable for any losses, margin calls, or missed trades caused by broker server outages, data feed latency, or network disconnects.
-            </p>
-          </section>
-
-          {/* Section 5 */}
-          <section className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-6">
-            <h2 className="text-base font-semibold text-slate-100">
-              5. Refund Policy
-            </h2>
-            <p className="mt-3">
-              Due to the nature of electronic digital products and instant server key binding, all software license sales are final and non-refundable once an activation key has been verified against an MT5 account.
-            </p>
-            <p className="mt-2">
-              Our trading desk provides complete setup assistance and onboarding over WhatsApp to ensure your system is properly configured.
-            </p>
-          </section>
-
-          {/* Section 6 - Privacy */}
-          <section id="privacy" className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-6">
-            <h2 className="text-base font-semibold text-slate-100">
-              6. Privacy Policy &amp; Account Data
-            </h2>
-            <p className="mt-3">
-              We collect minimal operational data necessary to service your license: your account login number, generated license key, and heartbeat telemetry. We never collect or store your broker trading account password or personal trading credentials.
-            </p>
-          </section>
-
-          {/* Desk Contact */}
-          <section className="rounded-xl border border-emerald-400/20 bg-emerald-400/[0.04] p-6">
-            <h2 className="text-base font-semibold text-emerald-300">
-              7. Operator &amp; Compliance Inquiries
-            </h2>
-            <p className="mt-2 text-slate-300">
-              For licensing transfers, account rebinding, or corporate institutional inquiries, contact our desk directly:
-            </p>
-            <div className="mt-3 font-mono text-xs text-slate-200">
-              <div>Desk Contact: WhatsApp +234 803 721 2445</div>
-              <div>Platform: MacroLync &amp; AlgoLync</div>
-              <div>Operating Jurisdiction: Federal Republic of Nigeria &amp; International Private E-Commerce</div>
-            </div>
-          </section>
-        </div>
+        ))}
       </div>
-    </div>
+      <p className="mt-8 text-[10px] leading-5 text-slate-500">This product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis.</p>
+    </main>
   );
 }

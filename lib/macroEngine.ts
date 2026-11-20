@@ -2,7 +2,11 @@ import 'server-only';
 
 import { getFallbackSnapshot, loadMacroSnapshot } from '@/lib/macroData';
 import { getCachedData } from '@/lib/redisCache';
-import type { MacroSnapshot } from '@/types/macro';
+import type { MacroCurrency, MacroSnapshot } from '@/types/macro';
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
 
 export type FundamentalSignal = {
   score: number;
@@ -15,9 +19,124 @@ export type FundamentalSignal = {
 
 export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnapshot> {
   try {
-    return await getCachedData('macro:snapshot', loadMacroSnapshot, 900, forceRefresh);
+    const snapshot = await getCachedData('macro:snapshot', loadMacroSnapshot, 900, forceRefresh);
+    if (snapshot.source === 'fallback') return getFallbackSnapshot();
+
+    const refreshedAt = Date.parse(snapshot.asOf);
+    const ageMs = Date.now() - refreshedAt;
+    if (!Number.isFinite(refreshedAt) || ageMs < -5 * 60_000 || ageMs > 24 * 60 * 60_000) {
+      console.warn('Macro snapshot exceeded the 24-hour freshness limit; provider data is marked unavailable.');
+      return getFallbackSnapshot();
+    }
+
+    const policyProviderApproved = (provider: MacroCurrency['policyRateProvider']) => {
+      if (provider === 'fred') return true; // Personal FRED research use; attribution is displayed in the dashboard.
+      if (provider === 'alpha-vantage') return process.env.ALPHA_VANTAGE_PERSONAL_PLAN_ACTIVE === 'true';
+      if (provider === 'macro-provider') return process.env.MACRO_DATA_PROVIDER_PERSONAL_USE_ENABLED === 'true';
+      if (provider === 'swiss-national-bank') return process.env.SNB_DATA_SOURCE_ENABLED === 'true';
+      return Boolean(provider);
+    };
+    const inflationProviderApproved = (provider: MacroCurrency['inflationProvider']) => {
+      if (provider === 'fred') return true;
+      if (provider === 'alpha-vantage') return process.env.ALPHA_VANTAGE_PERSONAL_PLAN_ACTIVE === 'true';
+      if (provider === 'macro-provider') return process.env.MACRO_DATA_PROVIDER_PERSONAL_USE_ENABLED === 'true';
+      return Boolean(provider);
+    };
+
+    const observationFresh = (asOf: string | undefined, maxAgeDays: number) => {
+      if (!asOf) return false;
+      const observedAt = Date.parse(asOf);
+      const ageMs = Date.now() - observedAt;
+      return Number.isFinite(observedAt) && ageMs >= -5 * 60_000 && ageMs <= maxAgeDays * 24 * 60 * 60_000;
+    };
+    const currencies = snapshot.currencies.filter((currency) =>
+      currency.policyRateSource === 'provider'
+      && currency.inflationSource === 'provider'
+      && policyProviderApproved(currency.policyRateProvider)
+      && inflationProviderApproved(currency.inflationProvider)
+      && (currency.policyRateProvider !== 'fred' || observationFresh(currency.policyRateAsOf, 10))
+      && (currency.inflationProvider !== 'fred' || observationFresh(currency.inflationAsOf, 60))
+    ).map((currency) => {
+      if (currency.twoYearYieldSource === 'provider' && !observationFresh(currency.twoYearYieldAsOf, 10)) {
+        return { ...currency, twoYearYield: undefined, twoYearYieldSource: undefined, twoYearYieldAsOf: undefined };
+      }
+      return currency;
+    });
+    const coreG10 = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'SEK', 'NOK'];
+    const completeG10 = coreG10.every((code) => currencies.some((currency) => currency.code === code));
+
+    const cotAllowed = snapshot.cotSource === 'provider'
+      && (snapshot.cotProvider === 'cftc'
+        || (snapshot.cotProvider === 'custom' && process.env.COT_DATA_PROVIDER_PERSONAL_USE_ENABLED === 'true'));
+    const calendarAllowed = snapshot.calendarSource === 'provider' && (
+      (snapshot.calendarProvider === 'fair-economy' && process.env.FAIRECONOMY_PERSONAL_PLAN_ACTIVE === 'true')
+      || (snapshot.calendarProvider === 'finnhub' && process.env.FINNHUB_PERSONAL_PLAN_ACTIVE === 'true')
+      || (snapshot.calendarProvider === 'fmp' && process.env.FMP_PERSONAL_PLAN_ACTIVE === 'true')
+      || (snapshot.calendarProvider === 'macro-provider' && process.env.MACRO_DATA_PROVIDER_PERSONAL_USE_ENABLED === 'true')
+    );
+
+    const cot = cotAllowed ? snapshot.cot : [];
+    const catalysts = calendarAllowed ? snapshot.catalysts : [];
+    const ecbRates = snapshot.ecbRates;
+    const fredMacroAllowed = Boolean(process.env.FRED_API_KEY?.trim());
+    const officialStatisticsAvailable = Boolean(snapshot.usIndicators?.sources.some((source) =>
+      source.includes('(BLS)') || source.includes('(BEA)')));
+    const fredDailyPairs = [
+      ['tenYearTreasuryYieldPct', 'tenYearTreasuryYieldAsOf'],
+      ['tenYearRealYieldPct', 'tenYearRealYieldAsOf'],
+      ['tenYearBreakevenInflationPct', 'tenYearBreakevenInflationAsOf'],
+      ['usdBroadIndex', 'usdBroadIndexAsOf'],
+      ['vixIndex', 'vixIndexAsOf'],
+      ['sp500Index', 'sp500IndexAsOf'],
+      ['wtiOilUsd', 'wtiOilAsOf'],
+      ['brentOilUsd', 'brentOilAsOf'],
+      ['usHighYieldSpreadPct', 'usHighYieldSpreadAsOf'],
+    ] as const;
+    const fredDailyFields = Object.fromEntries(fredDailyPairs.flatMap(([valueKey, dateKey]) => {
+      const observedAt = snapshot.usIndicators?.[dateKey];
+      const fresh = fredMacroAllowed && observationFresh(observedAt, 7);
+      return fresh
+        ? []
+        : [[valueKey, undefined], [dateKey, undefined]];
+    }));
+    const filteredUsIndicators = snapshot.usIndicators ? {
+      ...snapshot.usIndicators,
+      sources: snapshot.usIndicators.sources.filter((source) => fredMacroAllowed || !source.includes('(FRED)')),
+      ...fredDailyFields,
+    } : undefined;
+    const hasOfficialStatisticsValues = officialStatisticsAvailable && [
+      snapshot.usIndicators?.cpiYearOverYearPct,
+      snapshot.usIndicators?.coreCpiYearOverYearPct,
+      snapshot.usIndicators?.unemploymentRatePct,
+      snapshot.usIndicators?.nonfarmPayrollMonthlyChangeThousands,
+      snapshot.usIndicators?.realGdpAnnualizedQuarterlyPct,
+    ].some(isFiniteNumber);
+    const hasFreshFredDailyValues = fredDailyPairs.some(([valueKey]) =>
+      isFiniteNumber(filteredUsIndicators?.[valueKey]));
+    const usIndicators = filteredUsIndicators
+      && (hasOfficialStatisticsValues || (fredMacroAllowed && hasFreshFredDailyValues))
+      ? filteredUsIndicators
+      : undefined;
+    const hasVerifiedProviderData = currencies.length > 0 || cot.length > 0 || catalysts.length > 0 || Boolean(usIndicators);
+    if (!hasVerifiedProviderData && (!ecbRates || Object.keys(ecbRates).length === 0)) return getFallbackSnapshot();
+
+    return {
+      ...snapshot,
+      source: hasVerifiedProviderData
+        ? snapshot.source === 'provider' && completeG10 ? 'provider' : 'partial'
+        : 'fallback',
+      currencies,
+      cot,
+      cotSource: cotAllowed ? 'provider' : 'unavailable',
+      cotProvider: cotAllowed ? snapshot.cotProvider : undefined,
+      catalysts,
+      usIndicators,
+      calendarSource: calendarAllowed ? 'provider' : 'reference',
+      calendarProvider: calendarAllowed ? snapshot.calendarProvider : undefined,
+      ecbRates,
+    };
   } catch (error) {
-    console.warn('Macro providers and cached snapshots are unavailable; serving reference macro levels.', error);
+    console.warn('Macro providers and cached snapshots are unavailable; no macro observations will be substituted.', error);
     return getFallbackSnapshot();
   }
 }

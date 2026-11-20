@@ -38,14 +38,14 @@ Attribution: https://support.twelvedata.com/en/articles/12647398-attribution-gui
 
 ### BEA
 
-BEA API terms permit services to analyze and display BEA data, subject to their terms. Display the required notice: "This product uses the Bureau of Economic Analysis (BEA) Data API but is not endorsed or certified by BEA." The BEA adapter is not yet integrated into the macro calculation pipeline; diagnostics alone do not constitute integration.
+BEA API terms permit services to analyze and display BEA data, subject to their terms. Display the required notice: "This product uses the Bureau of Economic Analysis (BEA) Data API but is not endorsed or certified by BEA." The BEA NIPA adapter is integrated for quarterly real GDP context. Its observations are not used in point-in-time backtests until actual release timestamps and vintages are joined.
 
 Terms: https://apps.bea.gov/api/_pdf/bea_api_tos.pdf
 API documentation: https://apps.bea.gov/API/docs/
 
 ### Bureau of Labor Statistics (BLS)
 
-When public API data is used, cite the date retrieved and state: "BLS.gov cannot vouch for the data or analyses derived from these data after the data have been retrieved from BLS.gov." Do not use BLS logos or falsely represent modified data as official BLS output. The BLS adapter is not yet integrated into the macro calculation pipeline.
+When public API data is used, cite the date retrieved and state: "BLS.gov cannot vouch for the data or analyses derived from these data after the data have been retrieved from BLS.gov." Do not use BLS logos or falsely represent modified data as official BLS output. The BLS adapter is integrated for CPI, core CPI, unemployment and nonfarm payroll context. The API response's observation period is not treated as its release timestamp; no BLS observation is admitted to point-in-time backtests until release metadata is joined.
 
 Terms: https://www.bls.gov/developers/termsOfService.htm
 
@@ -75,3 +75,10 @@ Before every release:
 ## Accuracy and integrity
 
 Provider terms do not guarantee data accuracy. Every observation must carry source, retrieval time, observation/release time, units, frequency, freshness, revision status and validation status. Missing, stale, revised, contradictory or malformed observations must be flagged and excluded from execution decisions. Never replace missing live observations with reference values while labelling the result live.
+
+
+## Central-bank adapter commercial-use gates
+
+The SNB data portal states that reuse of its data is permitted for non-commercial purposes compatible with its purpose. FiduLync must not ingest SNB observations for commercial use until the applicable commercial permission is verified. The CHF adapter therefore remains disabled unless `SNB_COMMERCIAL_USE_APPROVED=true` is configured after documented permission. It fails closed by leaving CHF policy-rate provenance unverified. Do not set this variable merely to bypass the guard.
+
+RBA, BOJ and RBNZ observations are fetched from their official public statistical interfaces with source links retained in the macro snapshot. Verify each provider's current reuse terms before commercial distribution, and keep any provider-specific opt-in gate in place where required.

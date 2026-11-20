@@ -67,7 +67,7 @@ The broker adapter must supply account-currency pip value per lot, stop distance
 
 1. Install MT5 on a Windows PC or VPS and connect to the intended broker account.
 2. Add the FiduLync publisher URL to MT5 WebRequest allow-list.
-3. Register the terminal in the owner console and store its publisher token securely in MT5 terminal inputs.
+3. Obtain an installation token through the authorized server-side provisioning process and store it securely in MT5 terminal inputs.
 4. Start closed-candle and bid/ask publishing; confirm installation heartbeat, symbol mapping, timestamps and at least 200 closed candles per required timeframe.
 5. Confirm broker pip/tick values, volume step, contract size, commission, swap, stop/freeze levels and margin calculation.
 6. Run historical tests and the full walk-forward validation report.
