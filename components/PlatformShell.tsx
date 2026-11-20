@@ -53,9 +53,9 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
           </nav>
 
           <div className="topbar-actions">
-            <Link className="secure-pill" href="/research/validation">
-              <span className="secure-dot" /> Strategy Lab
-            </Link>
+            <span className="secure-pill" aria-label="Private research workspace">
+              <span className="secure-dot" /> Private workspace
+            </span>
             <button
               type="button"
               className="menu-toggle"
