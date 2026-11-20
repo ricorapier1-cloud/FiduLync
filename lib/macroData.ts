@@ -144,13 +144,14 @@ function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies'
     || !Array.isArray(value.cot)
     || !Array.isArray(value.catalysts)) return null;
 
+  const usIndicators = value.usIndicators;
   if (!value.currencies.every(isCurrency) || !value.cot.every(isCotPosition) || !value.catalysts.every(isCatalyst)
-    || (value.usIndicators !== undefined && !isUsIndicators(value.usIndicators))) return null;
+    || (usIndicators !== undefined && !isUsIndicators(usIndicators))) return null;
   return {
     currencies: value.currencies,
     cot: value.cot,
     catalysts: value.catalysts,
-    ...(value.usIndicators === undefined ? {} : { usIndicators: value.usIndicators }),
+    ...(usIndicators === undefined ? {} : isUsIndicators(usIndicators) ? { usIndicators } : {}),
   };
 }
 
@@ -548,6 +549,7 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
     getReserveBankOfAustraliaPolicyRate(),
     getReserveBankOfNewZealandPolicyRate(),
     process.env.SNB_DATA_SOURCE_ENABLED === 'true' ? getSwissNationalBankPolicyRate() : Promise.reject(new Error('SNB data source is disabled.')),
+    getCachedData('macro:official-us-statistics', fetchOfficialUsMacro, 6 * 60 * 60),
   ]);
   let hasLiveData = false;
   if (fredResult.status === 'fulfilled' && isRecord(fredResult.value)) {
