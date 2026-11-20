@@ -747,6 +747,23 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
   } else if (usMacroResult.status === 'rejected') {
     console.warn('Official BLS/BEA macro indicators are unavailable:', usMacroResult.reason);
   }
+  if (snapshot.usIndicators && fredResult.status === 'fulfilled') {
+    const fred = fredResult.value;
+    snapshot.usIndicators = {
+      ...snapshot.usIndicators,
+      tenYearTreasuryYieldPct: isFiniteNumber(fred.tenYearTreasuryYieldPct) ? fred.tenYearTreasuryYieldPct : undefined,
+      tenYearTreasuryYieldAsOf: fred.tenYearTreasuryYieldAsOf,
+      tenYearRealYieldPct: isFiniteNumber(fred.tenYearRealYieldPct) ? fred.tenYearRealYieldPct : undefined,
+      tenYearRealYieldAsOf: fred.tenYearRealYieldAsOf,
+      tenYearBreakevenInflationPct: isFiniteNumber(fred.tenYearBreakevenInflationPct) ? fred.tenYearBreakevenInflationPct : undefined,
+      tenYearBreakevenInflationAsOf: fred.tenYearBreakevenInflationAsOf,
+      sources: [...new Set([
+        ...snapshot.usIndicators.sources,
+        ...(isFiniteNumber(fred.tenYearTreasuryYieldPct) || isFiniteNumber(fred.tenYearRealYieldPct)
+          || isFiniteNumber(fred.tenYearBreakevenInflationPct) ? ['Federal Reserve Bank of St. Louis (FRED)'] : []),
+      ])],
+    };
+  }
   if (cotResult.status === 'fulfilled' && Array.isArray(cotResult.value) && cotResult.value.every(isCotPosition)) {
     snapshot.cot = cotResult.value;
     snapshot.cotSource = 'provider';
