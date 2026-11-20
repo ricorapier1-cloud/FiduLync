@@ -4,9 +4,12 @@ import { readFileSync } from 'node:fs';
 
 const workbench = readFileSync('app/components/ValidationWorkbench.tsx', 'utf8');
 
-test('validation workbench requires server-verified owner authentication', () => {
-  assert.ok(workbench.includes("fetch('/api/owner/verify'"));
-  assert.ok(workbench.includes('if (!authorized || !session)'));
+test('validation workbench is available without login and runs locally', () => {
+  assert.ok(!workbench.includes('@supabase/supabase-js'));
+  assert.ok(!workbench.includes('/api/owner/verify'));
+  assert.ok(!workbench.toLowerCase().includes('sign in'));
+  assert.ok(workbench.includes('runValidation'));
+  assert.ok(workbench.includes('Analysis completed locally'));
 });
 
 test('validation imports are bounded and calculations remain local', () => {
