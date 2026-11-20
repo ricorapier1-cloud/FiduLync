@@ -132,8 +132,8 @@ function isCatalyst(value: unknown): value is EconomicCatalyst {
 function isUsIndicators(value: unknown): value is OfficialUsMacroIndicators {
   if (!isRecord(value) || typeof value.retrievedAt !== 'string' || !Number.isFinite(Date.parse(value.retrievedAt))
     || !Array.isArray(value.sources) || !value.sources.every((source) => typeof source === 'string')) return false;
-  const numericKeys = ['cpiYearOverYearPct', 'coreCpiYearOverYearPct', 'unemploymentRatePct', 'nonfarmPayrollMonthlyChangeThousands', 'realGdpAnnualizedQuarterlyPct', 'tenYearTreasuryYieldPct', 'tenYearRealYieldPct', 'tenYearBreakevenInflationPct'];
-  const dateKeys = ['cpiPeriod', 'coreCpiPeriod', 'unemploymentPeriod', 'payrollPeriod', 'realGdpPeriod', 'tenYearTreasuryYieldAsOf', 'tenYearRealYieldAsOf', 'tenYearBreakevenInflationAsOf'];
+  const numericKeys = ['cpiYearOverYearPct', 'coreCpiYearOverYearPct', 'unemploymentRatePct', 'nonfarmPayrollMonthlyChangeThousands', 'realGdpAnnualizedQuarterlyPct', 'tenYearTreasuryYieldPct', 'tenYearRealYieldPct', 'tenYearBreakevenInflationPct', 'usdBroadIndex', 'vixIndex', 'sp500Index', 'wtiOilUsd', 'brentOilUsd', 'usHighYieldSpreadPct'];
+  const dateKeys = ['cpiPeriod', 'coreCpiPeriod', 'unemploymentPeriod', 'payrollPeriod', 'realGdpPeriod', 'tenYearTreasuryYieldAsOf', 'tenYearRealYieldAsOf', 'tenYearBreakevenInflationAsOf', 'usdBroadIndexAsOf', 'vixIndexAsOf', 'sp500IndexAsOf', 'wtiOilAsOf', 'brentOilAsOf', 'usHighYieldSpreadAsOf'];
   return numericKeys.every((key) => value[key] === undefined || isFiniteNumber(value[key]))
     && dateKeys.every((key) => value[key] === undefined || typeof value[key] === 'string');
 }
@@ -787,14 +787,32 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
       tenYearRealYieldAsOf: fred.tenYearRealYieldAsOf,
       tenYearBreakevenInflationPct: isFiniteNumber(fred.tenYearBreakevenInflationPct) ? fred.tenYearBreakevenInflationPct : undefined,
       tenYearBreakevenInflationAsOf: fred.tenYearBreakevenInflationAsOf,
+      usdBroadIndex: isFiniteNumber(fred.usdBroadIndex) ? fred.usdBroadIndex : undefined,
+      usdBroadIndexAsOf: fred.usdBroadIndexAsOf,
+      vixIndex: isFiniteNumber(fred.vixIndex) ? fred.vixIndex : undefined,
+      vixIndexAsOf: fred.vixIndexAsOf,
+      sp500Index: isFiniteNumber(fred.sp500Index) ? fred.sp500Index : undefined,
+      sp500IndexAsOf: fred.sp500IndexAsOf,
+      wtiOilUsd: isFiniteNumber(fred.wtiOilUsd) ? fred.wtiOilUsd : undefined,
+      wtiOilAsOf: fred.wtiOilAsOf,
+      brentOilUsd: isFiniteNumber(fred.brentOilUsd) ? fred.brentOilUsd : undefined,
+      brentOilAsOf: fred.brentOilAsOf,
+      usHighYieldSpreadPct: isFiniteNumber(fred.usHighYieldSpreadPct) ? fred.usHighYieldSpreadPct : undefined,
+      usHighYieldSpreadAsOf: fred.usHighYieldSpreadAsOf,
       sources: [...new Set([
         ...snapshot.usIndicators.sources,
-        ...(isFiniteNumber(fred.tenYearTreasuryYieldPct) || isFiniteNumber(fred.tenYearRealYieldPct)
-          || isFiniteNumber(fred.tenYearBreakevenInflationPct) ? ['Federal Reserve Bank of St. Louis (FRED)'] : []),
+        ...([
+          fred.tenYearTreasuryYieldPct, fred.tenYearRealYieldPct, fred.tenYearBreakevenInflationPct,
+          fred.usdBroadIndex, fred.vixIndex, fred.sp500Index, fred.wtiOilUsd, fred.brentOilUsd,
+          fred.usHighYieldSpreadPct,
+        ].some(isFiniteNumber) ? ['Federal Reserve Bank of St. Louis (FRED)'] : []),
       ])],
     };
-    if (isFiniteNumber(fred.tenYearTreasuryYieldPct) || isFiniteNumber(fred.tenYearRealYieldPct)
-      || isFiniteNumber(fred.tenYearBreakevenInflationPct)) hasLiveData = true;
+    if ([
+      fred.tenYearTreasuryYieldPct, fred.tenYearRealYieldPct, fred.tenYearBreakevenInflationPct,
+      fred.usdBroadIndex, fred.vixIndex, fred.sp500Index, fred.wtiOilUsd, fred.brentOilUsd,
+      fred.usHighYieldSpreadPct,
+    ].some(isFiniteNumber)) hasLiveData = true;
   }
   if (cotResult.status === 'fulfilled' && Array.isArray(cotResult.value) && cotResult.value.every(isCotPosition)) {
     snapshot.cot = cotResult.value;
