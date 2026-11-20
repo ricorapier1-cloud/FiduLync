@@ -38,14 +38,14 @@ Attribution: https://support.twelvedata.com/en/articles/12647398-attribution-gui
 
 ### BEA
 
-BEA API terms permit services to analyze and display BEA data, subject to their terms. Display the required notice: "This product uses the Bureau of Economic Analysis (BEA) Data API but is not endorsed or certified by BEA." The BEA adapter is not yet integrated into the macro calculation pipeline; diagnostics alone do not constitute integration.
+BEA API terms permit services to analyze and display BEA data, subject to their terms. Display the required notice: "This product uses the Bureau of Economic Analysis (BEA) Data API but is not endorsed or certified by BEA." The BEA NIPA adapter is integrated for quarterly real GDP context. Its observations are not used in point-in-time backtests until actual release timestamps and vintages are joined.
 
 Terms: https://apps.bea.gov/api/_pdf/bea_api_tos.pdf
 API documentation: https://apps.bea.gov/API/docs/
 
 ### Bureau of Labor Statistics (BLS)
 
-When public API data is used, cite the date retrieved and state: "BLS.gov cannot vouch for the data or analyses derived from these data after the data have been retrieved from BLS.gov." Do not use BLS logos or falsely represent modified data as official BLS output. The BLS adapter is not yet integrated into the macro calculation pipeline.
+When public API data is used, cite the date retrieved and state: "BLS.gov cannot vouch for the data or analyses derived from these data after the data have been retrieved from BLS.gov." Do not use BLS logos or falsely represent modified data as official BLS output. The BLS adapter is integrated for CPI, core CPI, unemployment and nonfarm payroll context. The API response's observation period is not treated as its release timestamp; no BLS observation is admitted to point-in-time backtests until release metadata is joined.
 
 Terms: https://www.bls.gov/developers/termsOfService.htm
 
