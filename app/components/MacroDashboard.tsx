@@ -259,7 +259,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
     <div className="macro-page pb-36 sm:pb-12 md:pb-8">
       <div className="macro-statusline mono">
         <span><span className={`macro-pulse${liveQuoteAvailable ? ' macro-pulse-live' : ''}`} /> MACRO INTELLIGENCE / GLOBAL FX</span>
-        <span className="macro-status-right"><span className={`macro-feed-badge${liveQuoteAvailable || liveReferenceAvailable ? ' macro-feed-live' : ''}`}>{liveQuoteAvailable ? 'LIVE FEED' : liveReferenceAvailable ? 'DAILY REFERENCE RATES' : snapshot.source === 'provider' ? 'PROVIDER FEED' : snapshot.source === 'partial' ? 'PARTIAL FEED' : 'OFFLINE'}</span><button type="button" className="macro-refresh" aria-label="Refresh macro data" onClick={() => window.location.reload()}><BrandGlyph name="refresh" size={13} className={refreshing ? 'macro-spin' : ''} /> REFRESH</button><Link href="/store" className="macro-refresh">PERSONAL EA LAB</Link></span>
+        <span className="macro-status-right"><span className={`macro-feed-badge${liveQuoteAvailable || liveReferenceAvailable ? ' macro-feed-live' : ''}`}>{liveQuoteAvailable ? 'LIVE FEED' : liveReferenceAvailable ? 'DAILY REFERENCE RATES' : snapshot.source === 'provider' ? 'PROVIDER FEED' : snapshot.source === 'partial' ? 'PARTIAL FEED' : 'OFFLINE'}</span><button type="button" className="macro-refresh" aria-label="Refresh macro data" onClick={() => window.location.reload()}><BrandGlyph name="refresh" size={13} className={refreshing ? 'macro-spin' : ''} /> REFRESH</button><Link href="/research" className="macro-refresh">QUANT RESEARCH</Link></span>
       </div>
       <div className="macro-quote-strip" aria-label="Live FX quotes">
         {quotes.filter((quote) => now !== null && now - Date.parse(quote.timestamp) >= 0 && now - Date.parse(quote.timestamp) <= 48 * 60 * 60_000).map((quote) => <span key={quote.symbol} className="macro-quote mono"><strong>{quote.symbol}</strong><b>{quote.price.toFixed(quote.symbol.startsWith('XAU') ? 2 : quote.symbol.endsWith('JPY') ? 3 : 5)}</b><small title={`Source: ${quote.source}; timestamp: ${quote.timestamp}`}>{quote.source === 'mt5' ? 'MT5 BROKER' : quote.source === 'finnhub' ? 'FINNHUB' : quote.source === 'frankfurter' ? 'ECB REF' : quote.source === 'gold-api' ? 'GOLD REF' : 'FX REF'} · {formatQuoteAge(quote.timestamp, now)}</small></span>)}
@@ -271,7 +271,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
           <span className="eyebrow">GLOBAL MACRO / DAILY BRIEF</span>
           <h1 id="macro-title">Read the regime.<br /><span>Position with context.</span></h1>
           <p>Policy divergence, real yields, and positioning pressure across the G10. Decision support, not a trade signal.</p>
-          <Link className="macro-intro-action" href="/store"><BrandGlyph name="trend" size={15} /> Open the Personal EA Lab <BrandGlyph name="arrow-up-right" size={13} /></Link>
+          <Link className="macro-intro-action" href="/research"><BrandGlyph name="trend" size={15} /> Open Quant Research <BrandGlyph name="arrow-up-right" size={13} /></Link>
         </div>
         <div className="macro-intro-meta mono">
           <span>SNAPSHOT / {snapshot.source === 'provider' ? 'PROVIDER VERIFIED' : snapshot.source === 'partial' ? 'PARTIAL PROVIDER DATA' : liveReferenceAvailable ? 'REFERENCE ONLY' : 'NO VERIFIED DATA'}</span>
@@ -411,7 +411,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
 
       <footer className="macro-footer">
         <div><Link className="macro-footer-brand" href="/"><span>Macro<span>Lync</span></span><small>GLOBAL FX INTELLIGENCE</small></Link><p>Independent personal research tooling. Not investment advice.</p><p className="mt-2 max-w-2xl text-[10px] leading-5 text-slate-500">This product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis. FRED® data is used for personal, non-commercial research with source attribution.</p></div>
-        <div className="macro-footer-actions"><Link href="/store"><BrandGlyph name="trend" size={15} /> Personal EA Lab <BrandGlyph name="arrow-up-right" size={13} /></Link></div>
+        <div className="macro-footer-actions"><Link href="/research"><BrandGlyph name="trend" size={15} /> Quant Research Workspace <BrandGlyph name="arrow-up-right" size={13} /></Link></div>
         <span className="macro-footer-legal mono">RESEARCH TOOLING / NOT FINANCIAL ADVICE</span>
       </footer>
     </div>
