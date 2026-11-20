@@ -180,7 +180,8 @@ async function getFredObservations(seriesId: string, apiKey: string): Promise<Ob
 }
 
 async function getFredUsdUpdates(apiKey: string) {
-  const [rateResult, pceResult, cpiResult, twoYearResult, tenYearResult, realYieldResult, breakevenResult] = await Promise.allSettled([
+  const [rateResult, pceResult, cpiResult, twoYearResult, tenYearResult, realYieldResult, breakevenResult,
+    usdBroadResult, vixResult, sp500Result, wtiResult, brentResult, creditSpreadResult] = await Promise.allSettled([
     getFredObservations('DFF', apiKey),
     getFredObservations('PCEPILFE', apiKey),
     getFredObservations('CPIAUCSL', apiKey),
@@ -188,6 +189,12 @@ async function getFredUsdUpdates(apiKey: string) {
     getFredObservations('DGS10', apiKey),
     getFredObservations('DFII10', apiKey),
     getFredObservations('T10YIE', apiKey),
+    getFredObservations('DTWEXBGS', apiKey),
+    getFredObservations('VIXCLS', apiKey),
+    getFredObservations('SP500', apiKey),
+    getFredObservations('DCOILWTICO', apiKey),
+    getFredObservations('DCOILBRENTEU', apiKey),
+    getFredObservations('BAMLH0A0HYM2', apiKey),
   ]);
   const latestYearOverYear = (observations: Observation[]) => {
     const latest = observations[0];
@@ -202,6 +209,12 @@ async function getFredUsdUpdates(apiKey: string) {
   if (tenYearResult.status === 'rejected') console.warn('FRED 10-Year Treasury yield is unavailable:', tenYearResult.reason);
   if (realYieldResult.status === 'rejected') console.warn('FRED 10-Year TIPS real yield is unavailable:', realYieldResult.reason);
   if (breakevenResult.status === 'rejected') console.warn('FRED 10-Year breakeven inflation is unavailable:', breakevenResult.reason);
+  if (usdBroadResult.status === 'rejected') console.warn('FRED broad trade-weighted USD index is unavailable:', usdBroadResult.reason);
+  if (vixResult.status === 'rejected') console.warn('FRED VIX is unavailable:', vixResult.reason);
+  if (sp500Result.status === 'rejected') console.warn('FRED S&P 500 is unavailable:', sp500Result.reason);
+  if (wtiResult.status === 'rejected') console.warn('FRED WTI oil is unavailable:', wtiResult.reason);
+  if (brentResult.status === 'rejected') console.warn('FRED Brent oil is unavailable:', brentResult.reason);
+  if (creditSpreadResult.status === 'rejected') console.warn('FRED US high-yield credit spread is unavailable:', creditSpreadResult.reason);
   return {
     policyRate: rateResult.status === 'fulfilled' ? rateResult.value[0]?.value : undefined,
     policyRateAsOf: rateResult.status === 'fulfilled' ? rateResult.value[0]?.date : undefined,
@@ -217,6 +230,18 @@ async function getFredUsdUpdates(apiKey: string) {
     tenYearRealYieldAsOf: realYieldResult.status === 'fulfilled' ? realYieldResult.value[0]?.date : undefined,
     tenYearBreakevenInflationPct: breakevenResult.status === 'fulfilled' ? breakevenResult.value[0]?.value : undefined,
     tenYearBreakevenInflationAsOf: breakevenResult.status === 'fulfilled' ? breakevenResult.value[0]?.date : undefined,
+    usdBroadIndex: usdBroadResult.status === 'fulfilled' ? usdBroadResult.value[0]?.value : undefined,
+    usdBroadIndexAsOf: usdBroadResult.status === 'fulfilled' ? usdBroadResult.value[0]?.date : undefined,
+    vixIndex: vixResult.status === 'fulfilled' ? vixResult.value[0]?.value : undefined,
+    vixIndexAsOf: vixResult.status === 'fulfilled' ? vixResult.value[0]?.date : undefined,
+    sp500Index: sp500Result.status === 'fulfilled' ? sp500Result.value[0]?.value : undefined,
+    sp500IndexAsOf: sp500Result.status === 'fulfilled' ? sp500Result.value[0]?.date : undefined,
+    wtiOilUsd: wtiResult.status === 'fulfilled' ? wtiResult.value[0]?.value : undefined,
+    wtiOilAsOf: wtiResult.status === 'fulfilled' ? wtiResult.value[0]?.date : undefined,
+    brentOilUsd: brentResult.status === 'fulfilled' ? brentResult.value[0]?.value : undefined,
+    brentOilAsOf: brentResult.status === 'fulfilled' ? brentResult.value[0]?.date : undefined,
+    usHighYieldSpreadPct: creditSpreadResult.status === 'fulfilled' ? creditSpreadResult.value[0]?.value : undefined,
+    usHighYieldSpreadAsOf: creditSpreadResult.status === 'fulfilled' ? creditSpreadResult.value[0]?.date : undefined,
   };
 }
 
