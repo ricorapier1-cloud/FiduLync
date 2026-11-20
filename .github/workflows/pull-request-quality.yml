@@ -5,7 +5,7 @@ on:
   pull_request:
     branches: [main, feat/personal-quant-edition]
   push:
-    branches: [feat/personal-quant-edition]
+    branches: [feat/personal-quant-edition, refactor/institutional-terminal-navigation]
 
 concurrency:
   group: personal-quant-${{ github.event.pull_request.head.ref || github.ref }}
