@@ -40,15 +40,6 @@ class PersonalQuantSecurityContractTests(unittest.TestCase):
         self.assertIn("occurred_at", migration)
         self.assertIn("GRANT EXECUTE", migration)
 
-    def test_owner_login_is_password_only_with_recovery_only_email(self):
-        for path in ("app/owner/page.tsx",):
-            with self.subTest(path=path):
-                source = self.read(path)
-                self.assertIn("signInWithPassword", source)
-                self.assertIn("resetPasswordForEmail", source)
-                self.assertNotIn("signInWithOtp", source)
-                self.assertNotIn("verifyOtp", source)
-
     def test_private_owner_mutations_verify_the_owner_identity(self):
         owner_routes = (
             "app/api/owner/operations/route.ts",
@@ -80,22 +71,28 @@ class PersonalQuantSecurityContractTests(unittest.TestCase):
         self.assertNotIn("isAlgoAuthorized", source)
         self.assertNotIn("ALGO_PRIVATE_API_KEY", source)
 
-    def test_private_ea_fleet_uses_owner_only_read_only_telemetry(self):
-        owner = self.read("app/owner/OwnerOperations.tsx")
-        desk = self.read("app/owner/OwnerTradingDesk.tsx")
+    def test_browser_owner_console_is_removed_and_admin_apis_remain_protected(self):
+        for path in (
+            "app/owner/page.tsx",
+            "app/owner/OwnerOperations.tsx",
+            "app/owner/OwnerTradingDesk.tsx",
+            "app/owner/OwnerResearchGovernance.tsx",
+            "app/owner/OwnerArtifactRelease.tsx",
+        ):
+            with self.subTest(path=path):
+                self.assertFalse((ROOT / path).exists())
+        for route in (
+            "app/api/owner/operations/route.ts",
+            "app/api/owner/mt5-installations/route.ts",
+            "app/api/owner/artifacts/upload-url/route.ts",
+            "app/api/owner/artifacts/register/route.ts",
+        ):
+            with self.subTest(route=route):
+                source = self.read(route)
+                self.assertTrue("requireOwner(request)" in source or "isAuthorizedOwnerEmail" in source)
         shell = self.read("components/PlatformShell.tsx")
-        self.assertIn("Active MT5 installs", owner)
-        self.assertIn("Portfolio risk telemetry", owner)
-        self.assertIn("Owner-only", owner)
-        self.assertIn("/api/mt5/installations", owner)
-        self.assertIn("does not override trading or risk eligibility checks", owner)
-        self.assertIn("observed broker data", desk)
-        self.assertNotIn("Paystack", owner)
-        self.assertNotIn("Checkout", owner)
-        self.assertNotIn("license_key", owner)
         self.assertNotIn("href: '/owner'", shell)
-        self.assertNotIn("OwnerControlPlane", owner)
-        self.assertNotIn("id: 'platform'", owner)
+        self.assertNotIn("Owner Console", shell)
 
     def test_personal_policy_and_ghost_gate_are_fail_closed(self):
         policy = self.read("lib/riskPolicy.ts")
@@ -124,10 +121,10 @@ class PersonalQuantSecurityContractTests(unittest.TestCase):
         self.assertIn("x-mt5-timestamp", supervisor)
         self.assertIn("x-mt5-nonce", supervisor)
 
-    def test_secondary_customer_pages_redirect_to_private_owner_console(self):
+    def test_secondary_customer_pages_redirect_to_public_research_terminal(self):
         for page in ("app/account/page.tsx", "app/customer/page.tsx", "app/licensing/page.tsx"):
             with self.subTest(page=page):
-                self.assertIn("redirect('/owner')", self.read(page))
+                self.assertIn("redirect('/')", self.read(page))
 
     def test_personal_risk_policy_discloses_research_only_boundary(self):
         terms = self.read("app/terms/page.tsx")
@@ -136,7 +133,7 @@ class PersonalQuantSecurityContractTests(unittest.TestCase):
         self.assertIn("not investment advice", terms)
         self.assertIn("does not place, modify or close broker orders", terms)
         self.assertIn("FRED", terms)
-        self.assertIn("Personal, non-commercial use only", readme)
+        self.assertIn("No user login or owner-console interface", readme)
 
 
 if __name__ == "__main__":
