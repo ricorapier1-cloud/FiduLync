@@ -729,6 +729,12 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
   if (fmpResult.status === 'rejected') {
     console.error('Financial Modeling Prep calendar unavailable:', fmpResult.reason);
   }
+  if (usMacroResult.status === 'fulfilled' && usMacroResult.value) {
+    snapshot.usIndicators = usMacroResult.value;
+    hasLiveData = true;
+  } else if (usMacroResult.status === 'rejected') {
+    console.warn('Official BLS/BEA macro indicators are unavailable:', usMacroResult.reason);
+  }
   if (cotResult.status === 'fulfilled' && Array.isArray(cotResult.value) && cotResult.value.every(isCotPosition)) {
     snapshot.cot = cotResult.value;
     snapshot.cotSource = 'provider';
