@@ -107,12 +107,14 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
   const [aiBrief, setAiBrief] = useState<{ bullets: string[]; source: 'gemini' | 'rules' } | null>(null);
   const [fxResearch, setFxResearch] = useState<{
     pair: string;
-    assessment: FxDriverAssessment;
+    status: 'ready' | 'unavailable';
+    assessment?: FxDriverAssessment;
     unavailable: string[];
   } | null>(null);
-  const fxAssessment = fxResearch?.pair === pair ? fxResearch.assessment : null;
-  const fxEvidenceUnavailable = fxResearch?.pair === pair ? fxResearch.unavailable : [];
-  const fxAssessmentLoading = fxAssessment === null;
+  const fxResearchForPair = fxResearch?.pair === pair ? fxResearch : null;
+  const fxAssessment = fxResearchForPair?.assessment ?? null;
+  const fxEvidenceUnavailable = fxResearchForPair?.unavailable ?? [];
+  const fxAssessmentLoading = fxResearchForPair === null;
   const currencyStrength = getCurrencyStrengthIndex(snapshot);
   const score = fxAssessment && fxAssessment.setup !== 'NO_SETUP' ? fxAssessment.combinedScore : null;
   const sortedCatalysts = [...snapshot.catalysts]
@@ -172,6 +174,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
         : [];
       setFxResearch({
         pair,
+        status: 'ready',
         assessment: payload.assessment as unknown as FxDriverAssessment,
         unavailable: unavailable.flatMap((item) =>
           isRecord(item) && typeof item.reason === 'string' ? [item.reason] : [],
@@ -180,6 +183,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
     }).catch((error: unknown) => {
       if (error instanceof Error && error.name !== 'AbortError') {
         console.warn('FX driver assessment unavailable; no setup will be shown.', error);
+        setFxResearch({ pair, status: 'unavailable', unavailable: [] });
       }
     });
     return () => controller.abort();
