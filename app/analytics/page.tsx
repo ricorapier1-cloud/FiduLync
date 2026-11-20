@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 
 export const metadata: Metadata = {
   title: 'Performance Lab',
@@ -18,7 +19,7 @@ export default function PerformanceLabPage() {
   return (
     <main className="min-h-screen bg-[#030A08] px-4 py-10 pb-36 text-emerald-50">
       <div className="mx-auto max-w-4xl">
-        <a href="/" className="font-mono text-xs text-emerald-400 hover:underline">← BACK TO MACRO TERMINAL</a>
+        <Link href="/" className="font-mono text-xs text-emerald-400 hover:underline">← BACK TO MACRO TERMINAL</Link>
         <header className="mb-8 mt-8">
           <p className="mb-2 font-mono text-xs tracking-widest text-emerald-400">PERFORMANCE LAB / EVIDENCE FIRST</p>
           <h1 className="mb-3 text-3xl font-bold tracking-tight">Measure what your account actually did.</h1>
