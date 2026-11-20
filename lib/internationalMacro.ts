@@ -39,19 +39,24 @@ function parseCsvRow(row: string): string[] {
   return cells;
 }
 
-async function getEcbSeries(series: string): Promise<number | undefined> {
+async function getEcbSeries(series: string): Promise<Observation | undefined> {
   const url = new URL(`https://data-api.ecb.europa.eu/service/data/${series.replace('.', '/')}`);
   url.searchParams.set('lastNObservations', '1');
   url.searchParams.set('format', 'csvdata');
   const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8_000) });
   if (!response.ok) throw new Error(`ECB returned ${response.status} for ${series}.`);
   const rows = (await response.text()).trim().split(/\r?\n/);
-  const valueColumn = parseCsvRow(rows[0] ?? '').indexOf('OBS_VALUE');
-  const value = Number(parseCsvRow(rows.at(-1) ?? '')[valueColumn]);
-  if (valueColumn < 0 || !Number.isFinite(value)) {
-    throw new Error(`ECB returned no usable observation for ${series}.`);
+  const headers = parseCsvRow(rows[0] ?? '');
+  const valueColumn = headers.indexOf('OBS_VALUE');
+  const dateColumn = headers.indexOf('TIME_PERIOD');
+  const latest = parseCsvRow(rows.at(-1) ?? '');
+  const value = Number(latest[valueColumn]);
+  const date = latest[dateColumn];
+  if (valueColumn < 0 || dateColumn < 0 || !Number.isFinite(value)
+    || !date || !Number.isFinite(Date.parse(date))) {
+    throw new Error(`ECB returned no usable dated observation for ${series}.`);
   }
-  return value;
+  return { date, value };
 }
 
 export async function getEcbMacroInputs() {
@@ -64,9 +69,12 @@ export async function getEcbMacroInputs() {
   if (inflationResult.status === 'rejected') console.warn('ECB HICP is unavailable:', inflationResult.reason);
   if (yieldResult.status === 'rejected') console.warn('ECB 2-year benchmark yield is unavailable:', yieldResult.reason);
   return {
-    policyRate: policyResult.status === 'fulfilled' ? policyResult.value : undefined,
-    inflation: inflationResult.status === 'fulfilled' ? inflationResult.value : undefined,
-    twoYearYield: yieldResult.status === 'fulfilled' ? yieldResult.value : undefined,
+    policyRate: policyResult.status === 'fulfilled' ? policyResult.value?.value : undefined,
+    policyRateAsOf: policyResult.status === 'fulfilled' ? policyResult.value?.date : undefined,
+    inflation: inflationResult.status === 'fulfilled' ? inflationResult.value?.value : undefined,
+    inflationAsOf: inflationResult.status === 'fulfilled' ? inflationResult.value?.date : undefined,
+    twoYearYield: yieldResult.status === 'fulfilled' ? yieldResult.value?.value : undefined,
+    twoYearYieldAsOf: yieldResult.status === 'fulfilled' ? yieldResult.value?.date : undefined,
   };
 }
 
@@ -76,7 +84,7 @@ function formatBankOfEnglandDate(date: Date) {
   return `${day}/${month}/${date.getUTCFullYear()}`;
 }
 
-export async function getBankOfEnglandPolicyRate() {
+export async function getBankOfEnglandPolicyRate(): Promise<OfficialPolicyObservation> {
   const url = new URL('https://www.bankofengland.co.uk/boeapps/database/_iadb-fromshowcolumns.asp');
   url.searchParams.set('csv.x', 'show');
   url.searchParams.set('Datefrom', formatBankOfEnglandDate(new Date(Date.now() - 14 * 24 * 60 * 60 * 1_000)));
@@ -89,12 +97,23 @@ export async function getBankOfEnglandPolicyRate() {
   const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8_000) });
   if (!response.ok) throw new Error(`Bank of England returned ${response.status} for official Bank Rate.`);
   const rows = (await response.text()).trim().split(/\r?\n/);
-  const valueColumn = parseCsvRow(rows[0] ?? '').indexOf('IUDBEDR');
+  const headers = parseCsvRow(rows[0] ?? '');
+  const valueColumn = headers.indexOf('IUDBEDR');
+  const dateColumn = headers.findIndex((column) => /date/i.test(column));
   for (const row of rows.slice(1).reverse()) {
-    const value = Number(parseCsvRow(row)[valueColumn]);
-    if (valueColumn >= 0 && Number.isFinite(value)) return value;
+    const cells = parseCsvRow(row);
+    const value = Number(cells[valueColumn]);
+    const date = cells[dateColumn];
+    if (valueColumn >= 0 && dateColumn >= 0 && Number.isFinite(value)
+      && date && Number.isFinite(Date.parse(date))) {
+      return {
+        value,
+        asOf: new Date(date).toISOString(),
+        sourceUrl: 'https://www.bankofengland.co.uk/boeapps/database/_iadb-fromshowcolumns.asp',
+      };
+    }
   }
-  throw new Error('Bank of England returned no usable official Bank Rate observation.');
+  throw new Error('Bank of England returned no usable dated official Bank Rate observation.');
 }
 
 async function getBankOfCanadaObservations(series: string): Promise<Observation[]> {
@@ -126,9 +145,15 @@ export async function getBankOfCanadaMacroInputs() {
   }
   const policy = policyResult.status === 'fulfilled' ? policyResult.value : [];
   const cpi = cpiResult.status === 'fulfilled' ? cpiResult.value : [];
+  const latestCpi = cpi[0];
+  const yearAgoCpi = latestCpi && cpi.find((item) =>
+    item.date.slice(0, 7) === `${Number(latestCpi.date.slice(0, 4)) - 1}${latestCpi.date.slice(4, 7)}`);
   return {
     policyRate: policy[0]?.value,
+    policyRateAsOf: policy[0]?.date,
     inflation: latestYearOverYear(cpi),
+    inflationAsOf: latestCpi?.date,
+    inflationComparisonAsOf: yearAgoCpi?.date,
   };
 }
 
