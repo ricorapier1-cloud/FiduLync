@@ -106,6 +106,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
   const [refreshing, setRefreshing] = useState(false);
   const [aiBrief, setAiBrief] = useState<{ bullets: string[]; source: 'gemini' | 'rules' } | null>(null);
   const [fxAssessment, setFxAssessment] = useState<FxDriverAssessment | null>(null);
+  const [fxEvidenceUnavailable, setFxEvidenceUnavailable] = useState<string[]>([]);
   const [fxAssessmentLoading, setFxAssessmentLoading] = useState(false);
   const currencyStrength = getCurrencyStrengthIndex(snapshot);
   const score = fxAssessment && fxAssessment.setup !== 'NO_SETUP' ? fxAssessment.combinedScore : null;
@@ -151,6 +152,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
   useEffect(() => {
     const controller = new AbortController();
     setFxAssessment(null);
+    setFxEvidenceUnavailable([]);
     setFxAssessmentLoading(true);
     void fetch(`/api/research/fx-drivers?pair=${encodeURIComponent(pair)}`, {
       cache: 'no-store',
@@ -164,6 +166,12 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
         throw new Error('FX research assessment payload failed validation.');
       }
       setFxAssessment(payload.assessment as unknown as FxDriverAssessment);
+      const unavailable = isRecord(payload.evidence) && Array.isArray(payload.evidence.unavailable)
+        ? payload.evidence.unavailable
+        : [];
+      setFxEvidenceUnavailable(unavailable.flatMap((item) =>
+        isRecord(item) && typeof item.reason === 'string' ? [item.reason] : [],
+      ));
     }).catch((error: unknown) => {
       if (error instanceof Error && error.name !== 'AbortError') {
         console.warn('FX driver assessment unavailable; no setup will be shown.', error);
@@ -361,6 +369,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
             <div className="macro-bias-drivers"><div><span>{activePair.base === 'XAU' ? 'USD REAL YIELD' : 'POLICY DIFF'}</span><strong className="mono">{activePair.base === 'XAU' && quoteCurrency && quoteCurrency.policyRateSource === 'provider' && quoteCurrency.inflationSource === 'provider' ? formatBasisPoints(Math.round((quoteCurrency.policyRate - quoteCurrency.inflation) * 100)) : policyDifferentialBps === null ? '—' : formatBasisPoints(policyDifferentialBps)}</strong></div><div><span>REAL YIELD DIFF</span><strong className="mono">{realYieldDifferentialBps === null ? '—' : formatBasisPoints(realYieldDifferentialBps)}</strong></div><div><span>MODEL COVERAGE</span><strong className="mono">{fxAssessment ? `${Math.round(fxAssessment.evidenceCoverage * 100)}% · ${fxAssessment.confidence.toFixed(2)} confidence` : 'Awaiting assessment'}</strong></div></div>
             <p className="macro-disclaimer">The evidence-weighted engine requires point-in-time macro drivers and verified closed-bar technical confirmation. Missing or stale evidence is excluded; no directional setup is emitted when coverage, agreement, volatility, or execution-cost checks fail. Research only; execution is disabled.</p>
             {fxAssessment && fxAssessment.blockers.length > 0 && <div className="macro-csi-note"><strong>ACTIVE MODEL BLOCKERS</strong><ul>{fxAssessment.blockers.map((blocker) => <li key={blocker}>{blocker.replaceAll('_', ' ')}</li>)}</ul></div>}
+            {fxEvidenceUnavailable.length > 0 && <div className="macro-csi-note"><strong>UNCONNECTED EVIDENCE</strong><ul>{fxEvidenceUnavailable.map((reason) => <li key={reason}>{reason}</li>)}</ul></div>}
           </div>
         </section>
 
