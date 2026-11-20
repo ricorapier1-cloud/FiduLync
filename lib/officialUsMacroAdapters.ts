@@ -84,9 +84,12 @@ export function parseBeaRealGdpResponse(payload: unknown): { realGdpAnnualizedQu
   const results = payload.BEAAPI.Results;
   if (Array.isArray(results.Error)) throw new Error('BEA reported an API error.');
   if (!Array.isArray(results.Data)) throw new Error('BEA returned no NIPA data rows.');
-  const rows = results.Data.filter((item): item is Record<string, unknown> =>
-    isRecord(item) && String(item.LineNumber ?? '') === '1'
-      && typeof item.TimePeriod === 'string' && /^\d{4}Q[1-4]$/.test(item.TimePeriod));
+  const rows = results.Data.filter((item): item is Record<string, unknown> => {
+    if (!isRecord(item) || String(item.LineNumber ?? '') !== '1'
+      || typeof item.TimePeriod !== 'string' || !/^\d{4}Q[1-4]$/.test(item.TimePeriod)
+      || typeof item.DataValue !== 'string') return false;
+    return Number.isFinite(Number(item.DataValue.replace(/,/g, '').replace(/%/g, '').trim()));
+  });
   rows.sort((a, b) => String(b.TimePeriod).localeCompare(String(a.TimePeriod)));
   const latest = rows[0];
   if (!latest || typeof latest.DataValue !== 'string') throw new Error('BEA real GDP series is unavailable.');
