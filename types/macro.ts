@@ -57,6 +57,18 @@ export type OfficialUsMacroIndicators = {
   tenYearRealYieldAsOf?: string;
   tenYearBreakevenInflationPct?: number;
   tenYearBreakevenInflationAsOf?: string;
+  usdBroadIndex?: number;
+  usdBroadIndexAsOf?: string;
+  vixIndex?: number;
+  vixIndexAsOf?: string;
+  sp500Index?: number;
+  sp500IndexAsOf?: string;
+  wtiOilUsd?: number;
+  wtiOilAsOf?: string;
+  brentOilUsd?: number;
+  brentOilAsOf?: string;
+  usHighYieldSpreadPct?: number;
+  usHighYieldSpreadAsOf?: string;
   retrievedAt: string;
   sources: string[];
 };
