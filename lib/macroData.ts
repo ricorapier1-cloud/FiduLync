@@ -1,5 +1,6 @@
 import 'server-only';
-import type { CotPosition, EconomicCatalyst, MacroCurrency, MacroSnapshot } from '@/types/macro';
+import type { CotPosition, EconomicCatalyst, MacroCurrency, MacroSnapshot, OfficialUsMacroIndicators } from '@/types/macro';
+import { fetchOfficialUsMacro } from '@/lib/officialUsMacroAdapters';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
 import {
   getBankOfCanadaMacroInputs,
@@ -128,7 +129,16 @@ function isCatalyst(value: unknown): value is EconomicCatalyst {
     && (typeof value.actual === 'string' || value.actual === null);
 }
 
-function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies' | 'cot' | 'catalysts'> | null {
+function isUsIndicators(value: unknown): value is OfficialUsMacroIndicators {
+  if (!isRecord(value) || typeof value.retrievedAt !== 'string' || !Number.isFinite(Date.parse(value.retrievedAt))
+    || !Array.isArray(value.sources) || !value.sources.every((source) => typeof source === 'string')) return false;
+  const numericKeys = ['cpiYearOverYearPct', 'coreCpiYearOverYearPct', 'unemploymentRatePct', 'nonfarmPayrollMonthlyChangeThousands', 'realGdpAnnualizedQuarterlyPct'];
+  const dateKeys = ['cpiPeriod', 'coreCpiPeriod', 'unemploymentPeriod', 'payrollPeriod', 'realGdpPeriod'];
+  return numericKeys.every((key) => value[key] === undefined || isFiniteNumber(value[key]))
+    && dateKeys.every((key) => value[key] === undefined || typeof value[key] === 'string');
+}
+
+function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies' | 'cot' | 'catalysts' | 'usIndicators'> | null {
   if (!isRecord(value)
     || !Array.isArray(value.currencies)
     || !Array.isArray(value.cot)
@@ -483,7 +493,7 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
     asOf: new Date().toISOString(),
     source: 'fallback',
   };
-  const [fredResult, finnhubResult, alphaResult, fmpResult, cotResult, frankfurterResult, calendarResult, ecbResult, bocResult, boeResult, worldBankResult, bojResult, rbaResult, rbnzResult, snbResult] = await Promise.allSettled([
+  const [fredResult, finnhubResult, alphaResult, fmpResult, cotResult, frankfurterResult, calendarResult, ecbResult, bocResult, boeResult, worldBankResult, bojResult, rbaResult, rbnzResult, snbResult, usMacroResult] = await Promise.allSettled([
     fredApiKey ? getFredUsdUpdates(fredApiKey) : Promise.resolve(null),
     finnhubApiKey ? getFinnhubCatalysts(finnhubApiKey) : Promise.resolve(null),
     alphaVantageKey ? getAlphaVantageUsdUpdates(alphaVantageKey) : Promise.resolve(null),
