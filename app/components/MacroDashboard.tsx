@@ -326,6 +326,12 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
               ['10Y Treasury nominal yield', snapshot.usIndicators?.tenYearTreasuryYieldPct, snapshot.usIndicators?.tenYearTreasuryYieldAsOf, '%'],
               ['10Y TIPS real yield', snapshot.usIndicators?.tenYearRealYieldPct, snapshot.usIndicators?.tenYearRealYieldAsOf, '%'],
               ['10Y breakeven inflation', snapshot.usIndicators?.tenYearBreakevenInflationPct, snapshot.usIndicators?.tenYearBreakevenInflationAsOf, '%'],
+              ['Broad trade-weighted USD', snapshot.usIndicators?.usdBroadIndex, snapshot.usIndicators?.usdBroadIndexAsOf, ''],
+              ['VIX volatility index', snapshot.usIndicators?.vixIndex, snapshot.usIndicators?.vixIndexAsOf, ''],
+              ['S&P 500 index', snapshot.usIndicators?.sp500Index, snapshot.usIndicators?.sp500IndexAsOf, ''],
+              ['WTI crude oil', snapshot.usIndicators?.wtiOilUsd, snapshot.usIndicators?.wtiOilAsOf, ' USD/bbl'],
+              ['Brent crude oil', snapshot.usIndicators?.brentOilUsd, snapshot.usIndicators?.brentOilAsOf, ' USD/bbl'],
+              ['US high-yield credit spread', snapshot.usIndicators?.usHighYieldSpreadPct, snapshot.usIndicators?.usHighYieldSpreadAsOf, '%'],
             ].map(([label, value, period, unit]) => (
               <article className="macro-currency-card" key={String(label)}>
                 <div className="macro-currency-card-head"><strong>{String(label)}</strong><span className="mono">{value === undefined ? 'UNAVAILABLE' : 'OFFICIAL SERIES'}</span></div>
@@ -334,7 +340,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
             ))}
           </div>
           <div className="macro-panel-foot">
-            <span>{snapshot.usIndicators?.sources.join(' · ') || 'BLS / BEA adapters not configured or currently unavailable.'}</span>
+            <span>{snapshot.usIndicators?.sources.join(' · ') || 'Official statistical / cross-asset adapters not configured or currently unavailable.'}</span>
             <span className="mono">OBSERVATION PERIOD ≠ RELEASE TIMESTAMP</span>
           </div>
           <p className="macro-csi-note">Official statistical observations are displayed as macro context. They do not independently change pair bias or qualify as point-in-time backtest inputs until exact release timestamps and historical vintages are joined.</p>
