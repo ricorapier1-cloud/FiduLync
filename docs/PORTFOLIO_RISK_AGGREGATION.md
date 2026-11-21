@@ -12,7 +12,7 @@ The aggregation endpoint reads:
 - `mt5_open_position_snapshots` rows linked by the exact manifest snapshot UUID;
 - the newest `mt5_account_snapshots` per installation/account.
 
-A position set is usable only when the latest manifest is complete, the observed row count equals `expected_positions`, every position row is marked complete, and the account and position snapshots are fresh and time-aligned.
+A position set is usable only when the latest manifest is complete, the observed row count equals `expected_positions`, every position row is marked complete, and the account and position snapshots are fresh and time-aligned within five seconds.
 
 ## Risk accounting
 
