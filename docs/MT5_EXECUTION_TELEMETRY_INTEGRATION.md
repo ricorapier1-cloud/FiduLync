@@ -15,7 +15,7 @@ Add the include and one global instance:
 CFiduLyncExecutionTelemetry FiduLyncTelemetry;
 ```
 
-In the EA's existing `OnInit()`, configure it with the production base URL and the private publisher token from the owner console, then start a five-second timer:
+In the EA's existing `OnInit()`, configure it with the production base URL and the private publisher token provisioned through an authorized server-side setup process (there is no browser token console), then start a five-second timer:
 
 ```mql5
 FiduLyncTelemetry.Configure("https://fidulync.vercel.app", InpPublisherToken, 5000);
@@ -63,6 +63,6 @@ Adapt that snippet to the EA's existing order wrapper and preserve its current t
 1. Add `https://fidulync.vercel.app` to MT5 Tools → Options → Expert Advisors → Allow WebRequest for listed URL.
 2. Compile the EA and include in MetaEditor; resolve all compiler errors and warnings.
 3. Run Strategy Tester, then demo-only forward testing.
-4. Confirm execution events and latency/slippage fields in the owner research-governance panel before any live use.
+4. Confirm execution events and latency/slippage fields through the authorized server-side research-governance API before any live use.
 
 The bridge batches events on a timer because MT5 WebRequest is synchronous. Do not call it on every tick. The server accepts standalone telemetry batches with the authenticated account login; evidence remains pending review and never enables execution by itself.
