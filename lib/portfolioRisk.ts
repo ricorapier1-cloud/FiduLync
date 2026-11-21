@@ -14,7 +14,7 @@ export type PortfolioPositionInput = {
   snapshotAt: string;
   snapshotComplete: boolean;
   symbol: string;
-  side: 'BUY' | 'SELL';
+  side: string;
   volume: number;
   entryPrice: number;
   stopLoss: number;
@@ -146,6 +146,13 @@ export function aggregatePortfolioRisk(
         accountBlockers.push('POSITION_ACCOUNT_IDENTITY_MISMATCH');
       }
 
+      const positionTime = Date.parse(position.snapshotAt);
+      const manifestTime = Date.parse(account.positionSnapshotAt);
+      if (!Number.isFinite(positionTime) || !Number.isFinite(manifestTime)
+        || Math.abs(positionTime - manifestTime) > 5_000) {
+        calculatedRiskComplete = false;
+        accountBlockers.push('POSITION_ROW_SNAPSHOT_MISALIGNED');
+      }
       const sideSign = position.side === 'BUY' ? 1 : position.side === 'SELL' ? -1 : 0;
       const validPosition = sideSign !== 0 && finitePositive(position.volume)
         && finitePositive(position.entryPrice) && finitePositive(position.contractSize);
@@ -196,7 +203,8 @@ export function aggregatePortfolioRisk(
       ? account.reportedOpenRiskCash : null;
     const riskDifferencePct = reportedRisk !== null && reportedRisk > 0
       ? Math.abs(calculatedRisk - reportedRisk) / reportedRisk * 100
-      : reportedRisk === 0 && calculatedRisk === 0 ? 0 : null;
+      : reportedRisk === 0 && calculatedRisk === 0 ? 0
+      : reportedRisk === 0 && calculatedRisk > 0 ? Number.POSITIVE_INFINITY : null;
     if (riskDifferencePct !== null && riskDifferencePct > policy.reconciliationTolerancePct) {
       accountBlockers.push('BROKER_AND_POSITION_RISK_MISMATCH');
     }
