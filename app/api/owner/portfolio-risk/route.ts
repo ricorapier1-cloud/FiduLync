@@ -87,6 +87,11 @@ export async function GET(request: Request) {
     }
 
     const manifests = [...latestManifestByAccount.values()];
+    const installationsWithoutManifest = installationIds.filter((id) =>
+      !manifests.some((manifest) => manifest.installation_id === id),
+    );
+    const manifestQueryAtLimit = (manifestResult.data ?? []).length >= 500;
+    const accountQueryAtLimit = (accountResult.data ?? []).length >= 500;
     const completeSnapshotIds = manifests.filter((row) => row.complete).map((row) => row.snapshot_id);
     const positionResult = completeSnapshotIds.length
       ? await supabase.from('mt5_open_position_snapshots')
