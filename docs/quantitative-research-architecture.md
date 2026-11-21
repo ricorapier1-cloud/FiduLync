@@ -10,7 +10,7 @@ The EA supervisor is not a broker execution service. It returns research/risk de
 
 - **MacroLync:** central-bank policy, inflation, real-rate context, yields, COT positioning, economic catalysts and cross-country macro differentials.
 - **QuantLync:** multi-timeframe technical analysis, market structure, volatility, correlation, currency strength, regime classification and statistical diagnostics.
-- **RiskLync:** broker-aware risk sizing, margin and exposure checks, drawdown limits, equity high-water protection, loss-streak controls, cooldowns and defensive abstention.
+- **RiskLync:** broker-aware risk sizing, margin and exposure checks, multi-account portfolio aggregation with account-currency isolation, native currency exposure, drawdown limits, equity high-water protection, loss-streak controls, cooldowns and defensive abstention.
 - **AlgoLync:** private MT5 market-data publisher, terminal health telemetry, EA supervision decisions, risk ceilings and release evidence for personal EA builds.
 - **Research validation:** historical data provenance, closed-bar calculations, walk-forward testing, out-of-sample evaluation, parameter stability and execution-cost stress.
 
@@ -24,7 +24,7 @@ The EA supervisor is not a broker execution service. It returns research/risk de
 - Publisher quote cadence and observed ingestion RTT are measurements, not guaranteed end-to-end EA latency. Requested-price slippage and order-to-fill latency require EA-side OnTradeTransaction telemetry and demo validation.
 - A technical-data-ready state is not a model approval or a trade instruction.
 
-## Position and exposure evidence
+## Position and exposure evidence\n\nThe authenticated portfolio risk endpoint reads the newest manifest per installation/account (including incomplete manifests), requires complete row counts, checks account/position snapshot freshness and alignment, and reconciles broker-reported open risk against a second position-level estimate. Cash risk is never summed across accounts with different deposit currencies. Native currency units are reported separately and are not represented as account-currency P/L. Missing stops or broker metadata make risk unavailable rather than zero. See `docs/PORTFOLIO_RISK_AGGREGATION.md`.\n
 
 The MT5 publisher sends a complete position set with a UUID snapshot ID, account login, capture time and expected position count. The ingestion API validates each position, inserts position rows, then writes a completion manifest last. Risk governance reads only snapshots with a complete manifest and matching row count. An explicit zero-position manifest is a valid flat snapshot; missing or incomplete data is not.
 
