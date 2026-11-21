@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation';
 
 /**
- * EA Fleet telemetry is part of the authenticated owner command centre.
- * Do not render a public fleet or storefront surface here.
+ * Account-specific fleet telemetry is private and is not exposed as a public page.
+ * The research terminal remains accessible without a browser login.
  */
 export default function EaFleetPage() {
-  redirect('/owner');
+  redirect('/analytics');
 }

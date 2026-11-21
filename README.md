@@ -8,11 +8,15 @@ FiduLync combines fundamental macro research, quantitative technical/statistical
 
 - **MacroLync** — central-bank policy, inflation, real-rate context, yields, COT positioning, economic catalysts and cross-country macro differentials.
 - **QuantLync** — multi-timeframe technical analysis, market structure, volatility, correlation, currency strength, regime classification, statistical diagnostics and signal research.
-- **RiskLync** — broker-aware risk sizing, margin and exposure checks, drawdown limits, equity high-water protection, loss-streak controls, cooldowns and defensive abstention.
+- **RiskLync** — broker-aware risk sizing, margin and exposure checks, multi-account/multi-EA portfolio risk aggregation, drawdown limits, equity high-water protection, loss-streak controls, cooldowns and defensive abstention.
 - **AlgoLync** — private MT5 market-data publisher, terminal health telemetry, EA supervision decisions, risk ceilings and owner-only release evidence for personal EA builds.
 - **Research validation** — historical data provenance, closed-bar calculations, walk-forward testing, out-of-sample evaluation, parameter stability and execution-cost stress.
 
 Initial research universe: G10 FX and XAUUSD. XAGUSD is deferred until broker-specific symbol contract, tick size/value, volume step, stop distance and margin metadata are verified.
+
+## Portfolio risk integration
+
+The authenticated read-only endpoint `GET /api/owner/portfolio-risk` aggregates the latest complete MT5 position manifests across active installations. It keeps cash risk separated by account currency, reports native base/quote currency exposure separately, reconciles broker-reported risk against position-level estimates, and fails closed on missing stops, stale snapshots, incomplete manifests or inconsistent position counts. It is not a trade execution endpoint. See `docs/PORTFOLIO_RISK_AGGREGATION.md`.
 
 ## Data integrity policy
 
@@ -72,7 +76,8 @@ See .env.example. Core variables include:
 - NEXT_PUBLIC_SUPABASE_URL, SUPABASE_URL, and server-side Supabase secret/service-role key
 - OWNER_EMAIL
 - CRON_SECRET
-- FRED_API_KEY for permitted personal macro research\n- BLS_API_KEY optional for higher BLS API limits; BEA_API_KEY required for BEA GDP
+- FRED_API_KEY for permitted personal macro research
+- BLS_API_KEY optional for higher BLS API limits; BEA_API_KEY required for BEA GDP
 - UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN when shared caching/rate limiting is enabled
 - GEMINI_API_KEY optional; FRED observations are excluded from prompts
 
