@@ -113,7 +113,7 @@ export async function GET(request: Request) {
         snapshotAt: row.captured_at,
         snapshotComplete: row.snapshot_complete === true,
         symbol: row.symbol,
-        side: row.side === 'BUY' || row.side === 'SELL' ? row.side : 'BUY',
+        side: row.side,
         volume: Number(row.volume),
         entryPrice: Number(row.price_open),
         stopLoss: Number(row.stop_loss),
