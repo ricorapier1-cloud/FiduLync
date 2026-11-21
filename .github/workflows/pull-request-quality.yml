@@ -4,6 +4,7 @@ name: Pull Request Quality Gate
 on:
   pull_request:
     branches: [main, feat/personal-quant-edition, feat/fidulync-mainline-clean]
+    types: [opened, synchronize, reopened, ready_for_review]
 concurrency:
   group: personal-quant-${{ github.event.pull_request.head.ref || github.ref }}
   cancel-in-progress: true
