@@ -149,6 +149,13 @@ export async function GET(request: Request) {
       maxSnapshotAgeMs: 30_000,
       reconciliationTolerancePct: 5,
     });
+    if (installationsWithoutManifest.length || manifestQueryAtLimit || accountQueryAtLimit) {
+      portfolio.status = 'DEGRADED';
+      if (installationsWithoutManifest.length) portfolio.blockers.push('ACTIVE_INSTALLATION_WITHOUT_POSITION_MANIFEST');
+      if (manifestQueryAtLimit) portfolio.blockers.push('MANIFEST_QUERY_LIMIT_REACHED');
+      if (accountQueryAtLimit) portfolio.blockers.push('ACCOUNT_SNAPSHOT_QUERY_LIMIT_REACHED');
+      portfolio.blockers = [...new Set(portfolio.blockers)];
+    }
     return NextResponse.json({
       portfolio,
       dataStatus: portfolio.status,
@@ -165,6 +172,9 @@ export async function GET(request: Request) {
         accountSnapshotMaxAgeMs: 30_000,
         positionManifestRequired: true,
         positionQueryTruncated,
+        installationsWithoutManifest: installationsWithoutManifest.length,
+        manifestQueryAtLimit,
+        accountQueryAtLimit,
       },
     }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
   } catch (error) {
