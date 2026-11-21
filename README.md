@@ -1,92 +1,116 @@
-# MacroLync Institutional Terminal
+# FiduLync Personal Quant Edition
 
-MacroLync is a single-operator quantitative FX and macro terminal. AlgoLync is its proprietary strategy vault and MT5 VPS telemetry monitor. The browser has no account or subscription flow; MT5/EA API requests use a private `x-algo-key` header.
+> **Quantitative research workstation. No user login or owner-console interface.**
 
-## Local development
+FiduLync combines fundamental macro research, quantitative technical/statistical analysis, portfolio-risk intelligence and private MetaTrader 5 data/supervision tooling. It is intended for the owner's research and analysis. It is not a broker, customer SaaS, investment adviser, managed account, copy-trading service or public EA marketplace. The central application does not place, modify or close broker orders.
 
-```bash
-npm install
-npm run dev
-```
+## Research modules
 
-Set server-side values in `.env.local` or the deployment secret manager:
+- **MacroLync** — central-bank policy, inflation, real-rate context, yields, COT positioning, economic catalysts and cross-country macro differentials.
+- **QuantLync** — multi-timeframe technical analysis, market structure, volatility, correlation, currency strength, regime classification, statistical diagnostics and signal research.
+- **RiskLync** — broker-aware risk sizing, margin and exposure checks, multi-account/multi-EA portfolio risk aggregation, drawdown limits, equity high-water protection, loss-streak controls, cooldowns and defensive abstention.
+- **AlgoLync** — private MT5 market-data publisher, terminal health telemetry, EA supervision decisions, risk ceilings and owner-only release evidence for personal EA builds.
+- **Research validation** — historical data provenance, closed-bar calculations, walk-forward testing, out-of-sample evaluation, parameter stability and execution-cost stress.
 
-| Variable | Purpose |
-| --- | --- |
-| `ALGOLYNC_PRIVATE_KEY` (legacy alias: `ALGO_PRIVATE_API_KEY`) | Static secret for authenticated signal and EA heartbeat API requests; not required for same-origin Store signal previews |
-| `UPSTASH_REDIS_REST_URL` | Upstash REST endpoint for shared caching, EA heartbeat state, and closed-trade history; in-process fallback is used if unavailable |
-| `UPSTASH_REDIS_REST_TOKEN` | Server-only Upstash REST token |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL for persisted macro snapshots |
-| `SUPABASE_SERVICE_ROLE_KEY` | Optional server-only Supabase persistence access; never expose to a browser |
-| `FINNHUB_API_KEY` | Optional FX quotes and economic calendar |
-| `FRED_API_KEY` | Optional; disabled unless separately approved for the intended commercial use and data handling |
-| `FRED_COMMERCIAL_USE_APPROVED` | Must remain `false` unless written permission covers the exact use, display, storage and caching |
-| `BEA_API_KEY` / `BLS_API_KEY` | Diagnostic credentials only; full adapters are not yet integrated |
-| `TWELVE_DATA_API_KEY` | Historical candle fallback; disabled for customer-facing use until commercial and exchange rights are approved |
-| `TWELVE_DATA_COMMERCIAL_USE_APPROVED` | Must remain `false` until the appropriate business tier, exchange permissions and external-display rights are documented |
-| `ALPHA_VANTAGE_API_KEY` | Optional fallback US policy-rate and CPI observations |
-| `FMP_API_KEY` | Optional economic calendar provider |
-| `MACRO_DATA_PROVIDER_URL` | Optional HTTPS endpoint returning validated currencies, COT positions, and catalysts |
-| `MACRO_DATA_PROVIDER_TOKEN` | Optional bearer token for the macro provider |
-| `MACRO_DATA_PROVIDER_LICENSE_APPROVED` | Must be `true` only after the custom provider contract permits this use |
-| `COT_DATA_PROVIDER_URL` | Optional HTTPS COT override; the public CFTC futures-only feed is used by default |
-| `COT_DATA_PROVIDER_TOKEN` | Optional bearer token for the COT provider |
-| `MARKET_DATA_PROVIDER_URL` | HTTPS candle endpoint accepting `pair` and `timeframe=H1|H4` |
-| `MARKET_DATA_PROVIDER_TOKEN` | Optional bearer token for the candle provider |
-| `MARKET_DATA_PROVIDER_LICENSE_APPROVED` | Must be `true` only after display, derived-data and redistribution rights are documented |
-| `NEXT_PUBLIC_APP_URL` | Canonical HTTP(S) origin for metadata and signal bridge display |
-| `CRON_SECRET` | Bearer secret for the scheduled macro snapshot refresh |
+Initial research universe: G10 FX and XAUUSD. XAGUSD is deferred until broker-specific symbol contract, tick size/value, volume step, stop distance and margin metadata are verified.
 
-Use a long, unique random value for `ALGOLYNC_PRIVATE_KEY` (or the accepted legacy `ALGO_PRIVATE_API_KEY`) and rotate it in the server secret manager and all EA configurations together. Never commit environment files or embed service-role/provider credentials in an EA.
+## Portfolio risk integration
 
-## Signal engine and API
+The authenticated read-only endpoint `GET /api/owner/portfolio-risk` aggregates the latest complete MT5 position manifests across active installations. It keeps cash risk separated by account currency, reports native base/quote currency exposure separately, reconciles broker-reported risk against position-level estimates, and fails closed on missing stops, stale snapshots, incomplete manifests or inconsistent position counts. It is not a trade execution endpoint. See `docs/PORTFOLIO_RISK_AGGREGATION.md`.
 
-`GET /api/v1/macro-signal?symbol=EURUSD` returns a flat JSON signal:
+## Data integrity policy
 
-```json
-{
-  "symbol": "EURUSD",
-  "bias": "NEUTRAL",
-  "confluence_score": 0,
-  "regime": "UNAVAILABLE",
-  "atr_sl_pips": null,
-  "atr_tp_pips": null,
-  "session": "OFF_HOURS",
-  "killzone_active": "OFF_SESSION",
-  "csi_spread": 0,
-  "max_risk_pct": 0,
-  "risk_multiplier": 0,
-  "news_lockout": false,
-  "safe_to_trade": false,
-  "timestamp_utc": "2026-11-12T00:00:00.000Z"
-}
-```
+A configured API key is not proof of a current data response or a provider entitlement.
 
-Send `x-algo-key: <ALGOLYNC_PRIVATE_KEY>` on signal requests. An optional `?key=` query parameter is supported for WebRequest clients; prefer the header to avoid exposing credentials in URLs and access logs. The same-origin `/store` signal preview uses browser same-origin request metadata and never receives the private EA key. The calendar uses FairEconomy/ForexFactory weekly JSON first, then configured Finnhub or FMP calendars, and finally curated reference events. Every high-impact event mapped to either pair currency blocks signals from 30 minutes before through 30 minutes after its scheduled UTC time. The macro layer contributes 60% of confluence; H1/H4 technical confluence contributes 40%. Signals remain neutral unless both `abs(csi_spread) >= 60` and `abs(confluence_score) >= 45`. `killzone_active` is `LONDON_OPEN`, `NY_OVERLAP`, `ASIAN_RANGE`, or `OFF_SESSION`. `max_risk_pct` and `risk_multiplier` are position-sizing multipliers: 0.50% maximum in trending expansion, 0.25% maximum in mean reversion, and 0% during high-volatility chop, news lockout, or any failed validation gate. Missing or stale technical inputs, a fallback-only macro snapshot, a news lockout, or a high-volatility chop regime disables trading.
+- Every market observation must retain provider, source timestamp, retrieval timestamp, symbol, timeframe and broker/terminal identity where relevant.
+- Broker quotes from the owner's MT5 terminal are the preferred source for executable bid/ask and broker candles.
+- Frankfurter provides daily reference exchange rates only; these are never executable or real-time broker quotes.
+- CFTC COT reports are weekly positioning context, not intraday order flow.
+- FRED data may be used for personal, non-commercial research subject to its terms, attribution and any series-level copyright notices. FRED-derived observations are not sent to external AI prompts.
+- Official BLS adapters retrieve headline/core CPI, unemployment and nonfarm payroll series; the BEA NIPA adapter retrieves annualized quarterly real GDP when `BEA_API_KEY` is configured. FRED adds daily 2Y/10Y nominal yields, 10Y TIPS real yield, 10Y breakeven inflation, the broad trade-weighted USD index, VIX, S&P 500, WTI/Brent oil and US high-yield credit spreads. These are macro research context with observation dates, not intraday quotes. BLS/BEA release timestamps and historical vintages are not yet joined, so these series are excluded from point-in-time backtests and causal signal factors.
+- Finnhub, Twelve Data, Alpha Vantage, FMP, FairEconomy and custom feeds remain disabled unless the owner's personal plan explicitly permits the exact asset class, programmatic access, caching and in-app display.
+- Stale, missing, revised, incomplete or contradictory data must produce an unavailable/degraded state. No reference values, demo values or cached data may be labelled live.
 
-Live quotes and technical calculations use a 60-second Upstash TTL. Macro snapshots use a 900-second TTL; signals use a 15-second TTL with cache bypass around news-lockout boundaries.
+## Architecture
 
-## MT5 heartbeat and include
+- Next.js / TypeScript application deployed through Vercel.
+- Supabase Auth and PostgreSQL for the single owner identity, private installations, market observations, risk decisions, audit events and research state.
+- Upstash Redis for bounded shared caching and distributed rate limiting where configured.
+- Official macro adapters and provider-specific market-data adapters.
+- Windows MT5 Python publisher for broker quotes, closed candles, account/risk telemetry and verified closed-deal history.
+- MQL5 Quant Supervisor include for authenticated, fail-closed research/risk decisions.
+- Gemini is optional commentary only. It is never execution authority and receives no FRED-derived observations.
 
-`POST /api/v1/ea-heartbeat` accepts the EA's private `x-algo-key` header plus `mt5_account`, `license_key`, `ea_name`, `account_number`, `balance`, `equity`, `floating_pnl`, `drawdown_pct`, `open_positions`, and `status`. The server validates the exact active license/account pair against Supabase before storing telemetry. `GET /api/v1/ea-heartbeat?mt5_account=...` and `GET /api/v1/trade-log?mt5_account=...` require the matching customer license in the `x-license-key` header; they are read-only, return `Cache-Control: no-store`, and fail closed with `503` when Supabase is unavailable or `401` for a mismatched/expired license. Never send broker master or investor passwords to FiduLync. `POST /api/v1/trade-log` accepts the same private `x-algo-key` plus `mt5_account`, `license_key`, `ticket`, `symbol`, `direction`, `entry_price`, `exit_price`, `profit_usd`, `r_multiple`, `confluence_score`, `regime`, and `closed_at_utc`. Trade records are persisted in Supabase `trade_ledger` with a unique account/ticket/symbol key; reads always filter by both account and license. Apply `supabase/migrations/202611150001_customer_account_telemetry.sql` before deploying these routes.
+## Personal-use scope
 
-The shipped `public/mql5/MacroLyncBridge.mqh` has optional trailing `license_key` arguments on `MacroLyncSendHeartbeat` and `MacroLyncHeartbeatEveryFiveMinutes`; pass the buyer's EA license key. `LogClosedTrade` additionally requires the MT5 login and license key in its trailing `mt5_account` and `license_key` arguments. Example heartbeat call: `MacroLyncHeartbeatEveryFiveMinutes(..., "RUNNING", InpLicenseKey)`. Example close call: `LogClosedTrade(..., closedAtUtc, 5000, AccountInfoInteger(ACCOUNT_LOGIN), InpLicenseKey)`. Keep `ALGOLYNC_PRIVATE_KEY` server-side and in the EA configuration; it is distinct from the customer's license key. The customer Live Account Monitor polls every 15 seconds and displays only the bound account.
+The active application does not use user login, an owner console, customer registration, checkout, Paystack, subscriptions, escrow, customer licensing, customer portals or commercial support workflows. The research pages are accessible without a user account. Sensitive administration, installation-token provisioning and ingestion APIs remain server-authorized; removing the browser login does not make those APIs public. Legacy commercial routes return HTTP 410 Gone; historical database and audit records are retained rather than deleted.
 
-Download [`public/mql5/MacroLyncBridge.mqh`](./public/mql5/MacroLyncBridge.mqh) from `/store`; the displayed source and clipboard action use that exact file. It has no DLL dependencies, uses `char[]` buffers for `WebRequest()` and UTF-8 conversion buffers for JSON, and defaults signal execution to defensive hold on network errors, timeouts, non-200 or empty responses, malformed responses, or news lockout. `LogClosedTrade(...)` sends a validated close record; call it from the EA's `OnTradeTransaction` handler after the EA has determined the trade's realized USD P&amp;L, R multiple, confluence, regime, and UTC close timestamp. Set `#property strict` in the consuming `.mq5` EA; MQL5 ignores program properties placed in `.mqh` include files. Configure MetaTrader 5 **Tools → Options → Expert Advisors → Allow WebRequest for listed URL** with the deployed HTTPS origin.
+## Access model
 
-## Data providers and deployment
+- Open the research terminal directly; no user login is required.
+- The browser-based owner console and sign-in/password-recovery screens have been removed.
+- Administrative and MT5 installation APIs remain protected server-side. They must not be called from public browser code.
+- MT5 publisher-token provisioning is not available through the UI; do not run the publisher until a token has been securely provisioned through an authorized operator process.
 
-The macro adapter validates upstream policy rates, inflation, COT positioning, and catalysts; live data can be combined with a persisted Supabase snapshot. The CFTC adapter calculates non-commercial net-position percentiles. Candle provider responses must contain at least 200 chronologically valid candles per requested timeframe for EMA alignment and technical calculations.
+## MT5 integration
 
-The scheduled `/api/cron/sync-macro` route uses `CRON_SECRET`. Upstash provides shared EA heartbeat telemetry; when not configured, the dashboard reports process-local fallback storage.
+The MT5 publisher must run on the same Windows machine/VPS as the already logged-in MetaTrader 5 terminal.
 
-Historical Supabase migrations are retained for auditability. The application does not expose escrow, billing or user-authentication routes. The escrow retirement migration removes empty escrow-only tables and revokes all client access to populated historical escrow/transaction records; those records are retained for audit and server-side retention only.
+1. Install MetaTrader 5 and log in to the intended broker account.
+2. Download FiduLync_MT5_Market_Publisher.py and mt5_risk_state.py from the repository.
+3. Install Python and the MetaTrader5 package: `py -m pip install MetaTrader5`.
+4. Obtain an installation token through the authorized server-side provisioning process. No browser login or owner console is provided. Set `FIDULYNC_INGEST_URL=https://fidulync.vercel.app/api/v1/market-data/ingest` and `FIDULYNC_PUBLISHER_TOKEN` in the Windows environment only after secure provisioning.
+5. Configure canonical-to-broker symbol mappings, including suffixes, for example `EURUSD=EURUSD.a` and `XAUUSD=XAUUSD.a`.
+6. Run the publisher and verify fresh quotes, closed candles and installation heartbeat through authorized server-side diagnostics.
+7. Download `QuantSupervisor.mqh` to `MQL5/Include/FiduLync/QuantSupervisor.mqh`. Compile the EA and the no-trade connectivity probe in MetaEditor.
+8. Configure the EA with the installation ID and private publisher token. Keep token-bearing `.set` files private.
+9. Run MetaEditor compilation with zero errors and zero warnings, Strategy Tester, and demo forward testing before considering live use.
 
-## Verification
+For long-term research, run the separate Historical Candle Backfill utility once after the terminal is connected. It imports only broker-provided closed H1/H4/D1 bars from the configured start date (default 1996-01-01), in bounded batches, and reports actual coverage. Broker retention may be shorter than 30 years; missing periods remain missing and must never be synthesized. The Windows MT5 environment is required for actual MQL5 compilation and broker-terminal validation. A web build cannot prove that an EA compiles or that a broker feed is live.
 
-```bash
+## Server environment
+
+See .env.example. Core variables include:
+
+- PERSONAL_QUANT_EDITION=true
+- NEXT_PUBLIC_SUPABASE_URL, SUPABASE_URL, and server-side Supabase secret/service-role key
+- OWNER_EMAIL
+- CRON_SECRET
+- FRED_API_KEY for permitted personal macro research
+- BLS_API_KEY optional for higher BLS API limits; BEA_API_KEY required for BEA GDP
+- UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN when shared caching/rate limiting is enabled
+- GEMINI_API_KEY optional; FRED observations are excluded from prompts
+
+Optional market-data plans require explicit personal-use flags in .env.example. Leave those flags false until the owner's provider plan permits the exact use.
+
+## Development and quality checks
+
+~~~bash
+npm ci
+npm run lint
 npx tsc --noEmit
+npm run test:quant
 npm run build
-```
+~~~
 
-Trading involves substantial risk. Signals are research and execution inputs, not guarantees; EAs must retain independent account-level exposure, equity, and drawdown controls.
+The CI workflow also validates the Python publisher syntax and MT5 risk telemetry tests.
+
+## Risk and research standards
+
+- Use closed bars for technical calculations; do not mix brokers or symbol contracts in one series.
+- Prevent look-ahead, survivorship, timestamp alignment and revised-data leakage.
+- Separate in-sample, validation and untouched out-of-sample periods.
+- Use walk-forward analysis, Monte Carlo, parameter stability and realistic spread/commission/swap/slippage stress.
+- Report expectancy, profit factor, max drawdown, recovery factor, exposure, turnover, trade count and uncertainty.
+- Do not label confluence scores as calibrated probabilities without calibration evidence.
+- Ghost Protocol is a deterministic 0–1 market-quality gate with a 0.65 minimum. It requires fresh broker quotes and candles from the same MT5 installation, then scores structure, ATR expansion/stability, spread quality and spread-to-ATR shock. It is not a win probability.
+- Default personal risk policy: 1% maximum per-trade risk, 2% portfolio risk, 4% daily drawdown, 8% weekly drawdown, 15% high-water drawdown, 10% maximum margin usage, 30-point maximum spread, 0.12 spread/ATR ceiling, three consecutive losses and 1.5 minimum reward/risk. Execution, model validation and execution-quality switches remain disabled until owner demo validation.
+- Keep grids, martingale, averaging down and unbounded progressive sizing excluded.
+- Enforce SL/TP, margin, spread, slippage, news/weekend, daily/weekly drawdown, equity high-water and loss-streak protections in the EA as well as the supervisory service.
+- Missing or stale data must result in DEGRADED/ABSTAIN, never a guessed signal.
+
+## Current readiness boundaries
+
+A passing GitHub build verifies code quality, not live-data availability, MQL5 compilation, broker connectivity or strategy profitability. The MT5 installation/quote/candle/heartbeat/trade tables remain empty until the owner runs the publisher from a Windows MT5 terminal. Official macro research refreshes on the providers' actual publication cadence, through the Vercel production daily cron and on-demand refresh; a separate GitHub Actions scheduler is intentionally not used. FX tick-level quotes and closed broker candles come from the private MT5 publisher, not the macro cron. Production promotion requires a preview build of the exact reviewed commit, authenticated owner smoke tests and successful runtime verification.
+
+This application is a research and supervisory tool. It does not certify an EA, strategy, broker connection or live-trading system as profitable or safe.

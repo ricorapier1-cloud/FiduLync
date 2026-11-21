@@ -1,15 +1,11 @@
 import 'server-only';
 
-export const AUTHORIZED_OWNER_EMAILS = new Set([
-  'ricorapier1@gmail.com',
-  'fidulync@gmail.com',
-  (process.env.OWNER_EMAIL || '').trim().toLowerCase(),
-  (process.env.ADMIN_EMAIL || '').trim().toLowerCase(),
-].filter(Boolean));
+// Privileged access belongs to one explicitly configured administrator.
+// Support and customer mailboxes are never implicitly trusted.
+const OWNER_EMAIL = (process.env.OWNER_EMAIL || '').trim().toLowerCase();
 
 export function isAuthorizedOwnerEmail(email?: string | null): boolean {
-  if (!email) return false;
-  return AUTHORIZED_OWNER_EMAILS.has(email.trim().toLowerCase());
+  return Boolean(email && OWNER_EMAIL && email.trim().toLowerCase() === OWNER_EMAIL);
 }
 
 export type VerifiedOwner = { id: string; email: string };
@@ -26,11 +22,11 @@ export async function requireOwner(request: Request): Promise<VerifiedOwner | nu
     || process.env.SUPABASE_ANON_KEY
     || ''
   ).trim();
-  if (!accessToken || !supabaseUrl || !publishableKey) return null;
+  if (!accessToken || accessToken.length > 8192 || !supabaseUrl || !publishableKey || !OWNER_EMAIL) return null;
 
   try {
-    const response = await fetch(`${supabaseUrl.replace(/\/$/, '')}/auth/v1/user`, {
-      headers: { apikey: publishableKey, Authorization: `Bearer ${accessToken}` },
+    const response = await fetch(supabaseUrl.replace(/\/$/, '') + '/auth/v1/user', {
+      headers: { apikey: publishableKey, Authorization: 'Bearer ' + accessToken },
       cache: 'no-store',
       signal: AbortSignal.timeout(5_000),
     });
@@ -40,10 +36,11 @@ export async function requireOwner(request: Request): Promise<VerifiedOwner | nu
     const record = user as Record<string, unknown>;
     const email = typeof record.email === 'string' ? record.email.trim().toLowerCase() : '';
     const id = typeof record.id === 'string' ? record.id : '';
-    const verified = typeof record.email_confirmed_at === 'string' || typeof record.confirmed_at === 'string' || record.role === 'authenticated';
-    if (!isAuthorizedOwnerEmail(email) || !id || !verified) return null;
+    const confirmed = typeof record.email_confirmed_at === 'string' || typeof record.confirmed_at === 'string';
+    if (!isAuthorizedOwnerEmail(email) || !id || !confirmed) return null;
     return { id, email };
   } catch {
+    // Auth provider errors are always deny, never fail open.
     return null;
   }
 }

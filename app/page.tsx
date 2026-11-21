@@ -1,4 +1,3 @@
-import { QuantStrategyCatalog } from "@/components/QuantStrategyCatalog";
 import MacroDashboard from '@/app/components/MacroDashboard';
 import { getMacroSnapshot } from '@/lib/macroEngine';
 import { getMarketQuotes } from '@/lib/marketFeeds';
@@ -21,8 +20,5 @@ export default async function Home() {
     />
   );
 }
-
-
-export function InjectedCatalog() { return <QuantStrategyCatalog />; }
 
 // Cache-bust timestamp: 1794746778579

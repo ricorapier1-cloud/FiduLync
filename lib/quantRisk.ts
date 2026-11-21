@@ -50,6 +50,62 @@ export function deriveRiskBudget(input: RiskGateInput): RiskGateResult {
   };
 }
 
+export const GHOST_PROTOCOL_THRESHOLD = 0.65;
+
+export type GhostProtocolInput = {
+  quoteFresh: boolean;
+  trendStructureStrength: number;
+  atrExpansionRatio: number;
+  spreadPoints: number;
+  spreadAtrRatio: number;
+  maxSpreadPoints?: number;
+  maxSpreadAtrRatio?: number;
+};
+
+export type GhostProtocolResult = {
+  score: number | null;
+  allowed: boolean;
+  blockers: string[];
+};
+
+/**
+ * Non-trading market-quality gate. The 0..1 score is a deterministic quality
+ * composite, not a probability or prediction. A fresh broker quote is mandatory.
+ */
+export function calculateGhostProtocol(input: GhostProtocolInput): GhostProtocolResult {
+  if (!input.quoteFresh) {
+    return { score: null, allowed: false, blockers: ['GHOST_BROKER_QUOTE_UNAVAILABLE'] };
+  }
+  const maxSpreadPoints = input.maxSpreadPoints ?? 30;
+  const maxSpreadAtrRatio = input.maxSpreadAtrRatio ?? 0.12;
+  const values = [
+    input.trendStructureStrength, input.atrExpansionRatio,
+    input.spreadPoints, input.spreadAtrRatio, maxSpreadPoints, maxSpreadAtrRatio,
+  ];
+  if (!values.every(Number.isFinite)
+    || input.atrExpansionRatio <= 0
+    || input.spreadPoints < 0
+    || input.spreadAtrRatio < 0) {
+    return { score: null, allowed: false, blockers: ['GHOST_INPUTS_UNAVAILABLE'] };
+  }
+
+  const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
+  const structure = clamp01(input.trendStructureStrength);
+  const volatilityStability = clamp01(1 - Math.abs(input.atrExpansionRatio - 1) / 1.5);
+  const spreadQuality = clamp01(1 - input.spreadPoints / maxSpreadPoints);
+  const spreadShockStability = clamp01(1 - input.spreadAtrRatio / maxSpreadAtrRatio);
+  const atrExpansionStability = clamp01(1 - Math.max(0, input.atrExpansionRatio - 1) / 1.5);
+  const score = Number((
+    structure * 0.25
+    + volatilityStability * 0.20
+    + spreadQuality * 0.20
+    + spreadShockStability * 0.20
+    + atrExpansionStability * 0.15
+  ).toFixed(3));
+  const blockers = score >= GHOST_PROTOCOL_THRESHOLD ? [] : ['GHOST_SCORE_BELOW_0_65'];
+  return { score, allowed: blockers.length === 0, blockers };
+}
+
 export type PositionSizeInput = {
   equity: number;
   riskPct: number;

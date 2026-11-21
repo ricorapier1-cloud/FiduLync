@@ -39,19 +39,24 @@ function parseCsvRow(row: string): string[] {
   return cells;
 }
 
-async function getEcbSeries(series: string): Promise<number | undefined> {
+async function getEcbSeries(series: string): Promise<Observation | undefined> {
   const url = new URL(`https://data-api.ecb.europa.eu/service/data/${series.replace('.', '/')}`);
   url.searchParams.set('lastNObservations', '1');
   url.searchParams.set('format', 'csvdata');
   const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8_000) });
   if (!response.ok) throw new Error(`ECB returned ${response.status} for ${series}.`);
   const rows = (await response.text()).trim().split(/\r?\n/);
-  const valueColumn = parseCsvRow(rows[0] ?? '').indexOf('OBS_VALUE');
-  const value = Number(parseCsvRow(rows.at(-1) ?? '')[valueColumn]);
-  if (valueColumn < 0 || !Number.isFinite(value)) {
-    throw new Error(`ECB returned no usable observation for ${series}.`);
+  const headers = parseCsvRow(rows[0] ?? '');
+  const valueColumn = headers.indexOf('OBS_VALUE');
+  const dateColumn = headers.indexOf('TIME_PERIOD');
+  const latest = parseCsvRow(rows.at(-1) ?? '');
+  const value = Number(latest[valueColumn]);
+  const date = latest[dateColumn];
+  if (valueColumn < 0 || dateColumn < 0 || !Number.isFinite(value)
+    || !date || !Number.isFinite(Date.parse(date))) {
+    throw new Error(`ECB returned no usable dated observation for ${series}.`);
   }
-  return value;
+  return { date, value };
 }
 
 export async function getEcbMacroInputs() {
@@ -64,9 +69,12 @@ export async function getEcbMacroInputs() {
   if (inflationResult.status === 'rejected') console.warn('ECB HICP is unavailable:', inflationResult.reason);
   if (yieldResult.status === 'rejected') console.warn('ECB 2-year benchmark yield is unavailable:', yieldResult.reason);
   return {
-    policyRate: policyResult.status === 'fulfilled' ? policyResult.value : undefined,
-    inflation: inflationResult.status === 'fulfilled' ? inflationResult.value : undefined,
-    twoYearYield: yieldResult.status === 'fulfilled' ? yieldResult.value : undefined,
+    policyRate: policyResult.status === 'fulfilled' ? policyResult.value?.value : undefined,
+    policyRateAsOf: policyResult.status === 'fulfilled' ? policyResult.value?.date : undefined,
+    inflation: inflationResult.status === 'fulfilled' ? inflationResult.value?.value : undefined,
+    inflationAsOf: inflationResult.status === 'fulfilled' ? inflationResult.value?.date : undefined,
+    twoYearYield: yieldResult.status === 'fulfilled' ? yieldResult.value?.value : undefined,
+    twoYearYieldAsOf: yieldResult.status === 'fulfilled' ? yieldResult.value?.date : undefined,
   };
 }
 
@@ -76,7 +84,7 @@ function formatBankOfEnglandDate(date: Date) {
   return `${day}/${month}/${date.getUTCFullYear()}`;
 }
 
-export async function getBankOfEnglandPolicyRate() {
+export async function getBankOfEnglandPolicyRate(): Promise<OfficialPolicyObservation> {
   const url = new URL('https://www.bankofengland.co.uk/boeapps/database/_iadb-fromshowcolumns.asp');
   url.searchParams.set('csv.x', 'show');
   url.searchParams.set('Datefrom', formatBankOfEnglandDate(new Date(Date.now() - 14 * 24 * 60 * 60 * 1_000)));
@@ -89,12 +97,23 @@ export async function getBankOfEnglandPolicyRate() {
   const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8_000) });
   if (!response.ok) throw new Error(`Bank of England returned ${response.status} for official Bank Rate.`);
   const rows = (await response.text()).trim().split(/\r?\n/);
-  const valueColumn = parseCsvRow(rows[0] ?? '').indexOf('IUDBEDR');
+  const headers = parseCsvRow(rows[0] ?? '');
+  const valueColumn = headers.indexOf('IUDBEDR');
+  const dateColumn = headers.findIndex((column) => /date/i.test(column));
   for (const row of rows.slice(1).reverse()) {
-    const value = Number(parseCsvRow(row)[valueColumn]);
-    if (valueColumn >= 0 && Number.isFinite(value)) return value;
+    const cells = parseCsvRow(row);
+    const value = Number(cells[valueColumn]);
+    const date = cells[dateColumn];
+    if (valueColumn >= 0 && dateColumn >= 0 && Number.isFinite(value)
+      && date && Number.isFinite(Date.parse(date))) {
+      return {
+        value,
+        asOf: new Date(date).toISOString(),
+        sourceUrl: 'https://www.bankofengland.co.uk/boeapps/database/_iadb-fromshowcolumns.asp',
+      };
+    }
   }
-  throw new Error('Bank of England returned no usable official Bank Rate observation.');
+  throw new Error('Bank of England returned no usable dated official Bank Rate observation.');
 }
 
 async function getBankOfCanadaObservations(series: string): Promise<Observation[]> {
@@ -126,9 +145,15 @@ export async function getBankOfCanadaMacroInputs() {
   }
   const policy = policyResult.status === 'fulfilled' ? policyResult.value : [];
   const cpi = cpiResult.status === 'fulfilled' ? cpiResult.value : [];
+  const latestCpi = cpi[0];
+  const yearAgoCpi = latestCpi && cpi.find((item) =>
+    item.date.slice(0, 7) === `${Number(latestCpi.date.slice(0, 4)) - 1}${latestCpi.date.slice(4, 7)}`);
   return {
     policyRate: policy[0]?.value,
+    policyRateAsOf: policy[0]?.date,
     inflation: latestYearOverYear(cpi),
+    inflationAsOf: latestCpi?.date,
+    inflationComparisonAsOf: yearAgoCpi?.date,
   };
 }
 
@@ -165,4 +190,118 @@ export async function getWorldBankG10Inflation(): Promise<WorldBankInflation[]> 
     console.warn(`World Bank annual CPI is unavailable for ${countries[index][1]}:`, result.reason);
     return [];
   });
+}
+
+
+export type OfficialPolicyObservation = { value: number; asOf: string; sourceUrl: string };
+
+function cleanHtmlText(value: string) {
+  return value.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+    .replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim();
+}
+
+function findDateValuePairs(payload: unknown): Observation[] {
+  const found: Observation[] = [];
+  const visit = (value: unknown, depth = 0) => {
+    if (depth > 12 || value === null || typeof value !== 'object') return;
+    if (Array.isArray(value)) { for (const item of value) visit(item, depth + 1); return; }
+    const row = value as Record<string, unknown>;
+    const dateValue = Object.entries(row).find(([key, item]) =>
+      /^(date|time|period|observation_date|report_date|年月|期)$/i.test(key) && typeof item === 'string');
+    const numericValue = Object.entries(row).find(([key, item]) =>
+      /^(value|obs_value|data|rate|observation|値)$/i.test(key) && (typeof item === 'number' || (typeof item === 'string' && item.trim() !== '')));
+    if (dateValue && numericValue) {
+      const date = String(dateValue[1]);
+      const parsed = Number(numericValue[1]);
+      if (Number.isFinite(Date.parse(date)) && Number.isFinite(parsed)) found.push({ date, value: parsed });
+    }
+    for (const child of Object.values(row)) visit(child, depth + 1);
+  };
+  visit(payload);
+  return found.sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+}
+
+export async function getBankOfJapanPolicyRate(): Promise<OfficialPolicyObservation> {
+  const url = new URL('https://www.stat-search.boj.or.jp/api/v1/getDataCode');
+  url.searchParams.set('format', 'json');
+  url.searchParams.set('lang', 'en');
+  url.searchParams.set('db', 'FM01');
+  url.searchParams.set('code', 'STRDCLUCON');
+  url.searchParams.set('startDate', '202401');
+  const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8_000) });
+  if (!response.ok) throw new Error(`BOJ time-series API returned ${response.status}.`);
+  const observations = findDateValuePairs(await response.json());
+  const latest = observations[0];
+  if (!latest) throw new Error('BOJ API returned no parseable overnight call-rate observation.');
+  return { value: latest.value, asOf: latest.date, sourceUrl: url.origin + url.pathname + '?db=FM01&code=STRDCLUCON' };
+}
+
+export async function getReserveBankOfNewZealandPolicyRate(): Promise<OfficialPolicyObservation> {
+  const sourceUrl = 'https://www.rbnz.govt.nz/statistics/series/exchange-and-interest-rates/wholesale-interest-rates';
+  const response = await fetch(sourceUrl, { cache: 'no-store', headers: { Accept: 'text/html' }, signal: AbortSignal.timeout(8_000) });
+  if (!response.ok) throw new Error(`RBNZ OCR series returned ${response.status}.`);
+  const html = await response.text();
+  const rows = [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)].map((match) =>
+    [...match[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((cell) => cleanHtmlText(cell[1])));
+  const headerIndex = rows.findIndex((row) => row.some((cell) => /Official Cash Rate.*OCR/i.test(cell)));
+  if (headerIndex < 0) throw new Error('RBNZ OCR column was not found in the official table.');
+  const header = rows[headerIndex];
+  const valueIndex = header.findIndex((cell) => /Official Cash Rate.*OCR/i.test(cell));
+  for (const row of rows.slice(headerIndex + 1)) {
+    const date = row[0];
+    const value = Number((row[valueIndex] ?? '').replace(/,/g, ''));
+    const parsedDate = date ? new Date(date) : null;
+    if (parsedDate && Number.isFinite(parsedDate.getTime()) && Number.isFinite(value)) {
+      return { value, asOf: parsedDate.toISOString(), sourceUrl };
+    }
+  }
+  throw new Error('RBNZ official OCR table contained no parseable observations.');
+}
+
+export async function getReserveBankOfAustraliaPolicyRate(): Promise<OfficialPolicyObservation> {
+  const sourceUrl = 'https://www.rba.gov.au/statistics/cash-rate/';
+  const response = await fetch(sourceUrl, { cache: 'no-store', headers: { Accept: 'text/html' }, signal: AbortSignal.timeout(8_000) });
+  if (!response.ok) throw new Error(`RBA cash-rate target page returned ${response.status}.`);
+  const html = await response.text();
+  const rows = [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)].map((match) =>
+    [...match[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((cell) => cleanHtmlText(cell[1])));
+  const headerIndex = rows.findIndex((row) => row.some((cell) => /Effective Date/i.test(cell))
+    && row.some((cell) => /Cash rate target/i.test(cell)));
+  if (headerIndex < 0) throw new Error('RBA cash-rate decision table header was not found.');
+  const header = rows[headerIndex];
+  const dateIndex = header.findIndex((cell) => /Effective Date/i.test(cell));
+  const rateIndex = header.findIndex((cell) => /Cash rate target/i.test(cell));
+  for (const row of rows.slice(headerIndex + 1)) {
+    const date = row[dateIndex];
+    const value = Number((row[rateIndex] ?? '').replace(/,/g, ''));
+    const parsedDate = date ? new Date(date) : null;
+    if (parsedDate && Number.isFinite(parsedDate.getTime()) && Number.isFinite(value)) {
+      return { value, asOf: parsedDate.toISOString(), sourceUrl };
+    }
+  }
+  throw new Error('RBA cash-rate decision table contained no parseable target observation.');
+}
+
+export async function getSwissNationalBankPolicyRate(): Promise<OfficialPolicyObservation> {
+  if (process.env.SNB_PERSONAL_USE_ENABLED !== 'true') {
+    throw new Error('SNB data source is disabled until its personal-use terms are confirmed.');
+  }
+  const sourceUrl = 'https://data.snb.ch/api/cube/snboffzisa/data/csv/en';
+  const response = await fetch(sourceUrl, { cache: 'no-store', headers: { Accept: 'text/csv' }, signal: AbortSignal.timeout(8_000) });
+  if (!response.ok) throw new Error(`SNB official-interest-rates cube returned ${response.status}.`);
+  const csv = await response.text();
+  const rows = csv.split(/\r?\n/).filter(Boolean);
+  const parsed = rows.map(parseCsvRow);
+  const header = parsed[0] ?? [];
+  const dateIndex = header.findIndex((cell) => /date|period/i.test(cell));
+  const rateIndex = header.findIndex((cell) => /policy rate|official rate|interest rate/i.test(cell));
+  if (dateIndex < 0 || rateIndex < 0) throw new Error('SNB cube schema did not expose a clearly labelled policy-rate column.');
+  for (const row of parsed.slice(1).reverse()) {
+    const date = row[dateIndex];
+    const value = Number(row[rateIndex]);
+    if (date && Number.isFinite(Date.parse(date)) && Number.isFinite(value)) {
+      return { value, asOf: new Date(date).toISOString(), sourceUrl };
+    }
+  }
+  throw new Error('SNB official-interest-rates cube contained no parseable policy-rate observation.');
 }

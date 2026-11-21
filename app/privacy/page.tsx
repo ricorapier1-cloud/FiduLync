@@ -1,104 +1,44 @@
 import Link from 'next/link';
-import BrandGlyph from '@/components/BrandGlyph';
+import type { Metadata } from 'next';
 
-export const metadata = {
-  title: 'Privacy & Data Governance Policy | MacroLync & AlgoLync',
-  description: 'Data protection principles, investor credential confidentiality, and telemetry governance for MacroLync and AlgoLync.',
+export const metadata: Metadata = {
+  title: 'Privacy Notice',
+  description: 'How FiduLync, MacroLync and AlgoLync process account, licensing and telemetry data.',
 };
+
+const sections = [
+  ['1. Data controller and contact', 'FiduLync is operated by AkinsootoFx. Before commercial launch, the operator must publish its full legal entity name, registered/business address, privacy contact and applicable data-protection contact details on this page.'],
+  ['2. Data we process', 'Depending on the features used, we may process customer email addresses, payment references, licence identifiers, MT5 account login numbers, broker/server labels, EA version information, terminal heartbeat telemetry, account balance/equity and position snapshots, execution-quality events, closed-trade records, support correspondence and basic security/network metadata such as IP-derived rate-limit hashes. Do not submit broker passwords or remote-access credentials.'],
+  ['3. Payment information', 'Checkout is handed off to Paystack or another named payment processor. Payment-card and bank credentials are entered on the processor-hosted payment page. FiduLync is designed to retain the payment reference, amount, currency, status, customer email and licence entitlement details needed for reconciliation; it should not collect or store full card numbers, CVV values, PINs or online-banking passwords.'],
+  ['4. Purposes and legal bases', 'Data is used to authenticate owner/customer access, issue and validate licences, enforce account-seat limits, process payment confirmations, provide customer support, operate MT5 telemetry and research features, prevent fraud and abuse, secure the service, and meet applicable legal/accounting obligations. The final legal basis for each purpose must be documented by the operator under the laws that apply to the customer.'],
+  ['5. Service providers and transfers', 'Data may be processed by Supabase (database/authentication), Vercel (hosting), Paystack (payments), email delivery providers, market-data providers and other infrastructure providers configured by the operator. Those providers may process data in countries outside the customer’s country. The operator must document each processor, its location, transfer safeguards and retention terms before commercial launch.'],
+  ['6. Sharing and sale', 'FiduLync does not intend to sell personal information. Data is shared only with service providers needed to operate the service, where required by law, to protect users or the platform, or with a recipient the user has expressly authorized. Provider access should be limited to the minimum necessary.'],
+  ['7. Security', 'The platform uses server-side authorization, database access controls, rate limiting and restricted service credentials. No internet-connected service can guarantee absolute security. Users must protect passwords, email accounts, licence keys, MT5 publisher tokens and devices. If a credential is exposed, revoke or rotate it promptly and contact the operator.'],
+  ['8. Retention', 'Payment and licence records, security audit events and relevant telemetry may be retained for service operation, fraud prevention, dispute handling and legal/accounting requirements. Retention periods should be documented by data category and applied consistently. Users may request deletion where applicable law provides that right, subject to legal retention duties and legitimate security needs.'],
+  ['9. User rights', 'Depending on applicable law, users may have rights to access, correct, delete, restrict or object to certain processing, and to receive a copy of their data or withdraw consent where consent is the legal basis. Requests should be sent to the published privacy contact. Identity verification may be required before responding.'],
+  ['10. Children', 'The commercial licensing service is not designed for children. Do not create a customer account or submit personal data if you are below the age required to enter a binding contract in your jurisdiction.'],
+  ['11. Updates', 'This notice may be updated when the platform, providers or applicable legal requirements change. Material changes should be dated and communicated through the service where required.'],
+];
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-[#080a0f] text-slate-100">
-      <div className="mx-auto w-full max-w-4xl px-5 py-9 sm:px-8 lg:py-12">
-        {/* Navigation & Header */}
-        <div className="border-b border-white/[0.08] pb-7">
-          <div className="flex items-center gap-2">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.1] bg-white/[0.04] px-3 py-1.5 text-xs text-slate-300 transition hover:border-emerald-400/40 hover:text-emerald-300"
-            >
-              <span>←</span> Back to Terminal
-            </Link>
-          </div>
-          <div className="mt-4 flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] text-cyan-300">
-            <BrandGlyph name="shield" size={14} className="text-cyan-300" />
-            CONFIDENTIALITY &amp; DATA GOVERNANCE
-          </div>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
-            Privacy &amp; Data Governance Policy
-          </h1>
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            Effective Date: November 2026. This policy outlines how FiduLync, MacroLync, and AlgoLync process information, protect user confidentiality, and isolate trading credentials.
-          </p>
-        </div>
-
-        {/* Content Sections */}
-        <div className="mt-8 space-y-8 text-xs leading-6 text-slate-300">
-          <section className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-6">
-            <h2 className="text-base font-semibold text-cyan-300">
-              1. Non-Custodial Architecture &amp; Zero Broker Password Storage
-            </h2>
-            <p className="mt-3">
-              FiduLync operates as a purely analytical intelligence platform and software vendor. We never collect, request, or store your trading account master trading passwords, broker withdrawal credentials, or personal identity banking documents.
-            </p>
-            <p className="mt-2 text-slate-400">
-              Our Expert Advisors execute locally inside your own MetaTrader 5 (MT5) client terminal or virtual private server (VPS). License verification relies solely on cryptographic license tokens matched against your numerical MT5 account login ID.
-            </p>
+    <main className="mx-auto min-h-[75vh] w-full max-w-4xl px-5 py-10 pb-44 text-slate-100">
+      <Link href="/" className="font-mono text-xs text-emerald-300 hover:underline">← BACK TO TERMINAL</Link>
+      <header className="mb-8 mt-8">
+        <p className="font-mono text-[10px] tracking-[0.2em] text-emerald-300">FIDULYNC / PRIVACY</p>
+        <h1 className="mt-3 text-3xl font-semibold">Privacy Notice</h1>
+        <p className="mt-3 text-xs leading-6 text-slate-400">How account, payment, licensing and MT5 telemetry data is processed. Updated 19 November 2026.</p>
+        <p className="mt-3 rounded-lg border border-amber-300/20 bg-amber-300/[0.04] p-3 text-xs leading-5 text-amber-100">Operator contact and jurisdiction-specific privacy details must be completed and legally reviewed before public commercial launch.</p>
+      </header>
+      <div className="space-y-4">
+        {sections.map(([title, body]) => (
+          <section key={title} className="rounded-xl border border-white/10 bg-[#0c1118] p-5">
+            <h2 className="text-sm font-semibold text-white">{title}</h2>
+            <p className="mt-3 text-xs leading-6 text-slate-400">{body}</p>
           </section>
-
-          <section className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-6">
-            <h2 className="text-base font-semibold text-cyan-300">
-              2. Data Collected &amp; Purpose of Processing
-            </h2>
-            <p className="mt-3">
-              We process minimal information required to provision and maintain your software license:
-            </p>
-            <ul className="mt-2 list-inside list-disc space-y-1.5 text-slate-300">
-              <li><strong className="text-white">Email Address:</strong> Used for license key delivery, customer support, and essential operational notices.</li>
-              <li><strong className="text-white">MT5 Account Number:</strong> Cryptographically bound to your license key to verify valid execution entitlements.</li>
-              <li><strong className="text-white">Transaction Reference:</strong> Generated by our payment processor (Paystack) to reconcile one-time or subscription billing. Payment card data is processed directly by the payment processor and is never held on our servers.</li>
-              <li><strong className="text-white">Telemetry &amp; Heartbeats:</strong> Optional EA telemetry (such as equity shield status, ping latency, and open drawdown percentage) transmitted by your MT5 terminal to populate your private telemetry dashboard.</li>
-            </ul>
-          </section>
-
-          <section className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-6">
-            <h2 className="text-base font-semibold text-cyan-300">
-              3. Telemetry Confidentiality &amp; Anonymization
-            </h2>
-            <p className="mt-3">
-              Live account monitoring and telemetry statistics displayed across the AlgoLync terminal are strictly anonymized. Aggregated trade expectancy metrics do not expose personal identifiers, account balances, or broker credentials to third parties.
-            </p>
-          </section>
-
-          <section className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-6">
-            <h2 className="text-base font-semibold text-cyan-300">
-              4. Cookies &amp; Local Client State
-            </h2>
-            <p className="mt-3">
-              We utilize minimal client-side browser storage (such as localStorage and secure session cookies) strictly for maintaining active authentication sessions and UI preferences (such as selected currency and terminal theme). We do not employ third-party advertising tracking cookies.
-            </p>
-          </section>
-
-          <section className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-6">
-            <h2 className="text-base font-semibold text-cyan-300">
-              5. Inquiries &amp; Data Subject Rights
-            </h2>
-            <p className="mt-3">
-              You may request license deregistration, account unbinding, or data erasure at any time by contacting our governance desk at <span className="font-mono text-cyan-300">fidulync@gmail.com</span> or via the institutional WhatsApp desk at <span className="font-mono text-cyan-300">+234 803 721 2445</span>.
-            </p>
-          </section>
-        </div>
-
-        {/* Footer Navigation */}
-        <div className="mt-10 border-t border-white/[0.08] pt-6 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-500">
-          <div>&copy; 2026 FiduLync &bull; MacroLync &amp; AlgoLync Governance</div>
-          <div className="flex gap-4">
-            <Link href="/terms" className="hover:text-slate-300">Terms of Service</Link>
-            <Link href="/faq" className="hover:text-slate-300">FAQ</Link>
-            <Link href="/store" className="hover:text-slate-300">Store</Link>
-          </div>
-        </div>
+        ))}
       </div>
-    </div>
+      <p className="mt-8 text-xs text-slate-500">For product and trading-risk terms, see <Link href="/terms" className="text-emerald-300 underline">Terms &amp; Risk Disclosure</Link>.</p>
+    </main>
   );
 }
