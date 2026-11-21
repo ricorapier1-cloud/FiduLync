@@ -18,10 +18,15 @@ test('personal edition keeps payment and customer account endpoints retired', ()
   }
 });
 
-test('macro refresh does not depend on a second scheduled GitHub secret', () => {
-  assert.equal(existsSync(new URL('../.github/workflows/hourly-macro-sync.yml', import.meta.url)), false);
+test('macro refresh has hourly authenticated scheduling plus a Vercel fallback', () => {
+  const workflowPath = new URL('../.github/workflows/hourly-macro-sync.yml', import.meta.url);
+  assert.equal(existsSync(workflowPath), true);
+  const workflow = readFileSync(workflowPath, 'utf8');
+  assert.match(workflow, /cron:\s*'17 \* \* \* \*'/);
+  assert.match(workflow, /secrets\.CRON_SECRET/);
+  assert.match(workflow, /api\/cron\/sync-macro/);
   const vercel = JSON.parse(source('../vercel.json'));
-  assert.ok(vercel.crons.some((cron) => cron.path === '/api/cron/sync-macro' && cron.schedule === '0 0 * * *'));
+  assert.ok(vercel.crons.some((cron) => cron.path === '/api/cron/sync-macro'));
 });
 
 test('Quant Lab is a distinct technical research surface', () => {
