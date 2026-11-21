@@ -14,7 +14,11 @@ FiduLync combines fundamental macro research, quantitative technical/statistical
 
 Initial research universe: G10 FX and XAUUSD. XAGUSD is deferred until broker-specific symbol contract, tick size/value, volume step, stop distance and margin metadata are verified.
 
-## Portfolio risk integration\n\nThe authenticated read-only endpoint `GET /api/owner/portfolio-risk` aggregates the latest complete MT5 position manifests across active installations. It keeps cash risk separated by account currency, reports native base/quote currency exposure separately, reconciles broker-reported risk against position-level estimates, and fails closed on missing stops, stale snapshots, incomplete manifests or inconsistent position counts. It is not a trade execution endpoint. See `docs/PORTFOLIO_RISK_AGGREGATION.md`.\n\n## Data integrity policy
+## Portfolio risk integration
+
+The authenticated read-only endpoint `GET /api/owner/portfolio-risk` aggregates the latest complete MT5 position manifests across active installations. It keeps cash risk separated by account currency, reports native base/quote currency exposure separately, reconciles broker-reported risk against position-level estimates, and fails closed on missing stops, stale snapshots, incomplete manifests or inconsistent position counts. It is not a trade execution endpoint. See `docs/PORTFOLIO_RISK_AGGREGATION.md`.
+
+## Data integrity policy
 
 A configured API key is not proof of a current data response or a provider entitlement.
 
@@ -72,7 +76,8 @@ See .env.example. Core variables include:
 - NEXT_PUBLIC_SUPABASE_URL, SUPABASE_URL, and server-side Supabase secret/service-role key
 - OWNER_EMAIL
 - CRON_SECRET
-- FRED_API_KEY for permitted personal macro research\n- BLS_API_KEY optional for higher BLS API limits; BEA_API_KEY required for BEA GDP
+- FRED_API_KEY for permitted personal macro research
+- BLS_API_KEY optional for higher BLS API limits; BEA_API_KEY required for BEA GDP
 - UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN when shared caching/rate limiting is enabled
 - GEMINI_API_KEY optional; FRED observations are excluded from prompts
 
