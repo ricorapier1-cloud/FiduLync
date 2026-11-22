@@ -54,7 +54,7 @@ class PersonalQuantSecurityContractTests(unittest.TestCase):
         self.assertIn("createHash('sha256')", source)
         self.assertIn("token_hash=eq.", source)
         self.assertIn("status=eq.active", source)
-        self.assertIn("X-MT5-Timestamp", source)
+        self.assertIn("x-mt5-timestamp", source)
         self.assertIn("enforceDistributedRateLimit", source)
         self.assertIn("INSUFFICIENT_EVIDENCE", source)
         self.assertIn("Cache-Control", source)
