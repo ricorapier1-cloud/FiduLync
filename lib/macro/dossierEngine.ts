@@ -75,9 +75,9 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
 
   const baseInflation = isGold ? 0.0 : (baseCcy?.inflation ?? 2.5);
   const quoteInflation = quoteCcy?.inflation ?? 2.8;
-  const baseReal = isGold ? -crossAsset.usTenYearRealYield : (basePolicy - baseInflation);
-  const quoteReal = quotePolicy - quoteInflation;
-  const realPolicyRateDiffBps = essentialEvidenceVerified ? Math.round((baseReal - quoteReal) * 100) : 0;
+  const baseRealPolicyRate = isGold ? -crossAsset.usTenYearRealYield : (basePolicy - baseInflation);
+  const quoteRealPolicyRate = quotePolicy - quoteInflation;
+  const realPolicyRateDiffBps = essentialEvidenceVerified ? Math.round((baseRealPolicyRate - quoteRealPolicyRate) * 100) : 0;
 
   const base2Y = !isGold && baseCcy?.twoYearYieldSource === 'provider' && isFreshObservation(baseCcy.twoYearYieldObservationDate, 60)
     ? baseCcy.twoYearYield ?? null : null;
@@ -96,10 +96,10 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
   let rawScore = 0;
   if (essentialEvidenceVerified) {
     const policyImpact = (policyDiffBps / 100) * 14;
-    const realYieldImpact = (realYieldDiffBps / 100) * 16;
+    const realPolicyRateImpact = (realPolicyRateDiffBps / 100) * 16;
     const twoYearImpact = twoYearYieldDiffBps === null ? 0 : (twoYearYieldDiffBps / 100) * 10;
     const cotImpact = (baseCot && quoteCot) ? (cotPercentileDiff / 100) * 12 : 0;
-    rawScore = Math.round(policyImpact + realYieldImpact + twoYearImpact + cotImpact);
+    rawScore = Math.round(policyImpact + realPolicyRateImpact + twoYearImpact + cotImpact);
   }
 
   // Apply penalty factor for missing components
@@ -129,10 +129,10 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
     contradicting.push(`Base currency suffers a ${Math.abs(policyDiffBps)} bps nominal policy rate discount.`);
   }
 
-  if (realYieldDiffBps > 0) {
-    supporting.push(`Real interest rate differential favors base currency by ${realYieldDiffBps} bps.`);
-  } else if (realYieldDiffBps < 0) {
-    contradicting.push(`Real interest rate differential favors quote currency by ${Math.abs(realYieldDiffBps)} bps.`);
+  if (realPolicyRateDiffBps > 0) {
+    supporting.push(`Real interest rate differential favors base currency by ${realPolicyRateDiffBps} bps.`);
+  } else if (realPolicyRateDiffBps < 0) {
+    contradicting.push(`Real interest rate differential favors quote currency by ${Math.abs(realPolicyRateDiffBps)} bps.`);
   }
 
   if (twoYearYieldDiffBps !== null) {
@@ -222,7 +222,7 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
     biasScore,
     confidence,
     policyDiffBps,
-    realYieldDiffBps,
+    realPolicyRateDiffBps,
     twoYearYieldDiffBps,
     cotPercentileDiff,
     crossAssetConfirmation,
