@@ -1,3 +1,7 @@
+> **SUPERSEDED — 2026-11-22.** This seven-stage design is preserved for historical reference. Its technical signal, broker telemetry, EA fleet/risk approval and owner-console stages are not active FiduLync responsibilities under the current mandate. Use [the current MacroLync mandate](../FIDULYNC_MACROLYNC_FUNDAMENTAL_MANDATE.md): FiduLync owns macro/fundamental intelligence and a read-only macro-context bridge; independent MT5 EAs own technical decisions, execution and risk management. Do not treat the old seven-stage pipeline as an instruction to restore retired endpoints.
+
+---
+
 # FiduLync / MacroLync — Seven-Stage Personal Quant Architecture
 
 **Product boundary:** one owner, personal non-commercial use, no customers, public EA catalog, subscriptions, payments, checkout, escrow, commercial licensing, or multi-tenant seats. The application is a research and read-only supervisory terminal. It must never send, modify, or close broker orders.
