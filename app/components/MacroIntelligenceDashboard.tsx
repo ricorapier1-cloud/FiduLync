@@ -24,7 +24,7 @@ export default function MacroIntelligenceDashboard({ snapshot }: { snapshot: Mac
   const us = snapshot.usIndicators;
 
   return (
-    <main className="min-h-screen bg-[#050b10] px-4 py-8 pb-24 text-slate-100 sm:px-6">
+    <div className="min-h-screen bg-[#050b10] px-4 py-8 pb-24 text-slate-100 sm:px-6">
       <div className="mx-auto max-w-7xl space-y-8">
         <header className="flex flex-col gap-5 border-b border-white/10 pb-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -111,6 +111,6 @@ export default function MacroIntelligenceDashboard({ snapshot }: { snapshot: Mac
           <p className="mt-2 text-xs leading-5 text-amber-100/80">Only observations actually returned by approved providers are shown. OIS/futures repricing, options, forwards, cross-currency basis, matched maturity real-yield spreads, historical surprise consensus and fully synchronized cross-asset correlation history are not claimed as available unless their sources are connected and validated. A missing field is not zero.</p>
         </section>
       </div>
-    </main>
+    </div>
   );
 }
