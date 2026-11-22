@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 export default function MacroLyncGuidePage() {
   return (
-    <main className="min-h-screen bg-[#080a0f] px-4 py-10 pb-24 text-slate-100">
+    <div className="min-h-screen bg-[#080a0f] px-4 py-10 pb-24 text-slate-100">
       <div className="mx-auto max-w-3xl space-y-8">
         <header className="border-b border-white/10 pb-5">
           <Link href="/" className="text-xs font-mono text-emerald-300 hover:underline">← BACK TO MACRO TERMINAL</Link>
@@ -50,6 +50,6 @@ export default function MacroLyncGuidePage() {
           <p className="mt-3 text-sm leading-6 text-slate-400">Never interpret a reference exchange rate, cached observation, model estimate or stale value as a live tradable quote. FiduLync is a research tool, not a broker, signal guarantee or trade execution service.</p>
         </section>
       </div>
-    </main>
+    </div>
   );
 }
