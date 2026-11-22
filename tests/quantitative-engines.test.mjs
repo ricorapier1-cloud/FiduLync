@@ -22,6 +22,9 @@ test('pair dossier requires provider-sourced policy and inflation observations',
   assert.match(dossier, /policyRateSource === 'provider'/);
   assert.match(dossier, /inflationSource === 'provider'/);
   assert.match(dossier, /essentialEvidenceVerified/);
+  assert.match(dossier, /policyRateObservationDate/);
+  assert.match(dossier, /inflationObservationDate/);
+  assert.match(dossier, /isFreshObservation/);
   assert.match(dossier, /INSUFFICIENT EVIDENCE — NO RELIABLE CONCLUSION/);
   assert.doesNotMatch(dossier, /gdpGrowthYoY \?\? 1\.0|unemploymentRate \?\? 4\.0/);
 });
@@ -41,9 +44,12 @@ test('country profile engine does not publish hardcoded macro baselines', () => 
 test('currency strength uses only provider-sourced policy and inflation data', () => {
   assert.match(strength, /policyRateSource === 'provider'/);
   assert.match(strength, /inflationSource === 'provider'/);
+  assert.match(strength, /isFreshObservation/);
 });
 
 test('dashboard marks cross-asset values unavailable until verified feeds exist', () => {
   assert.match(dashboard, /No verified live adapter/);
+  assert.match(dashboard, /snapshot\.providerStatus\?\.length/);
+  assert.doesNotMatch(dashboard, /FRED \(St\. Louis Fed\)[\s\S]{0,200}HEALTHY/);
   assert.doesNotMatch(dashboard, /4\.35%|2\.05%|14\.80|\$76\.40|\$2,740/);
 });

@@ -28,10 +28,10 @@ function ruleBasedBrief(snapshot: Awaited<ReturnType<typeof getMacroSnapshot>>):
         : 'Currency-strength inputs are incomplete; treat relative-value rankings as provisional.',
       crowded.length
         ? `COT crowding alert: ${crowded.slice(0, 3).join(', ')} is at a 10th/90th percentile extreme.`
-        : 'No COT market currently meets the 10th/90th percentile crowding threshold.',
+        : snapshot.cot.length === 0 ? 'COT positioning is unavailable; no crowding conclusion can be made.' : 'No COT market currently meets the 10th/90th percentile crowding threshold.',
       nextCatalyst
         ? `Next high-impact catalyst: ${nextCatalyst.region} ${nextCatalyst.title} at ${nextCatalyst.scheduledAt}.`
-        : 'No upcoming high-impact catalyst is listed in the current calendar snapshot.',
+        : snapshot.calendarSource === 'provider' ? 'No upcoming high-impact catalyst is listed in the provider calendar window.' : 'Economic calendar feed is not verified; no catalyst conclusion can be made.',
     ],
   };
 }
@@ -44,13 +44,14 @@ async function generateGeminiBrief(
   if (!apiKey) return fallback;
 
   const inputs = {
-    rateDifferentials: snapshot.currencies.map((currency) => ({
+    rateDifferentials: snapshot.currencies.filter((currency) => currency.policyRateSource === 'provider' && currency.inflationSource === 'provider').map((currency) => ({
       currency: currency.code,
       policyRatePct: currency.policyRate,
       inflationPct: currency.inflation,
       realRatePct: Number((currency.policyRate - currency.inflation).toFixed(2)),
     })),
     csi: getCurrencyStrengthIndex(snapshot),
+    dataQuality: { macroSource: snapshot.source, calendarSource: snapshot.calendarSource, cotSource: snapshot.cotSource, note: 'Only provider-sourced, fresh observations are eligible. Missing or stale data must be treated as unavailable.' },
     cotExtremes: snapshot.cot.filter((item) => item.percentile >= 90 || item.percentile <= 10),
     tierOneCalendar: snapshot.catalysts.filter((item) => item.impact === 'High')
       .sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt)).slice(0, 5),
@@ -97,5 +98,5 @@ export async function getMacroBrief(): Promise<MacroBrief> {
       console.warn('Gemini brief generation failed; serving the deterministic desk note.', error);
       return ruleBasedBrief(snapshot);
     }
-  }, 3_600);
+  }, 300);
 }

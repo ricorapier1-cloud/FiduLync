@@ -26,6 +26,13 @@ export function getCrossAssetTelemetry(snapshot: MacroSnapshot): CrossAssetTelem
   };
 }
 
+function isFreshObservation(date: string | undefined, maxAgeDays: number): boolean {
+  if (!date) return false;
+  const timestamp = Date.parse(date);
+  const age = Date.now() - timestamp;
+  return Number.isFinite(timestamp) && age >= -5 * 60_000 && age <= maxAgeDays * 86_400_000;
+}
+
 export function classifyMacroRegime(snapshot: MacroSnapshot, _crossAsset: CrossAssetTelemetry): MacroRegime {
   const highImpactSoon = snapshot.catalysts.some((event) => {
     if (event.impact !== 'High') return false;
@@ -36,7 +43,9 @@ export function classifyMacroRegime(snapshot: MacroSnapshot, _crossAsset: CrossA
 
   const g8 = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD'];
   const verified = g8.map((code) => snapshot.currencies.find((currency) => currency.code === code))
-    .filter((currency) => currency?.policyRateSource === 'provider' && currency.inflationSource === 'provider');
+    .filter((currency) => currency?.policyRateSource === 'provider' && currency.inflationSource === 'provider'
+      && isFreshObservation(currency.policyRateObservationDate, 180)
+      && isFreshObservation(currency.inflationObservationDate, 120));
   if (verified.length < 4) return 'INSUFFICIENT_EVIDENCE';
 
   const rates = verified.map((currency) => currency!.policyRate);

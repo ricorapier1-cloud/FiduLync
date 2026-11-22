@@ -27,6 +27,13 @@ const pairs = [
   { symbol: 'XAUUSD', base: 'XAU', quote: 'USD' },
 ] as const;
 
+function isFreshObservation(date: string | undefined, maxAgeDays: number) {
+  if (!date) return false;
+  const timestamp = Date.parse(date);
+  const age = Date.now() - timestamp;
+  return Number.isFinite(timestamp) && age >= -5 * 60_000 && age <= maxAgeDays * 86_400_000;
+}
+
 function formatRate(value: number) {
   return `${value.toFixed(2)}%`;
 }
@@ -348,8 +355,8 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
             </thead>
             <tbody>
               {currencies.map((currency) => {
-                const verifiedPolicy = currency.policyRateSource === 'provider';
-                const verifiedInflation = currency.inflationSource === 'provider';
+                const verifiedPolicy = currency.policyRateSource === 'provider' && isFreshObservation(currency.policyRateObservationDate, 180);
+                const verifiedInflation = currency.inflationSource === 'provider' && isFreshObservation(currency.inflationObservationDate, 120);
                 const realRate = verifiedPolicy && verifiedInflation ? currency.policyRate - currency.inflation : null;
                 return (
                   <tr key={currency.code}>
@@ -357,17 +364,17 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
                     <td>{currency.centralBank}</td>
                     <td className="mono">
                       {verifiedPolicy ? formatRate(currency.policyRate) : 'UNAVAILABLE'}
-                      <small>{currency.policyRateSource === 'provider' ? 'PROVIDER' : 'REFERENCE'}</small>
+                      <small>{verifiedPolicy ? `PROVIDER · OBS ${currency.policyRateObservationDate}` : currency.policyRateSource === 'provider' ? `STALE / DATE ${currency.policyRateObservationDate ?? 'UNKNOWN'}` : 'REFERENCE / NOT SCORED'}</small>
                     </td>
                     <td>
                       <span className="mono">{verifiedInflation ? formatRate(currency.inflation) : 'UNAVAILABLE'}</span>
-                      <small>{currency.corePce !== undefined && currency.cpi !== undefined ? `Core PCE ${formatRate(currency.corePce)} · CPI ${formatRate(currency.cpi)}` : currency.inflationLabel}</small>
+                      <small>{verifiedInflation ? `PROVIDER · OBS ${currency.inflationObservationDate}` : currency.inflationSource === 'provider' ? `STALE / DATE ${currency.inflationObservationDate ?? 'UNKNOWN'}` : 'REFERENCE / NOT SCORED'}</small>
                     </td>
                     <td className="mono">
-                      {currency.twoYearYield === undefined ? '—' : (
+                      {currency.twoYearYield === undefined || currency.twoYearYieldSource !== 'provider' || !isFreshObservation(currency.twoYearYieldObservationDate, 60) ? '—' : (
                         <>
                           {formatRate(currency.twoYearYield)}
-                          <small>{currency.twoYearYieldSource === 'provider' ? 'PROVIDER' : 'REFERENCE'}</small>
+                          <small>PROVIDER · OBS {currency.twoYearYieldObservationDate}</small>
                         </>
                       )}
                     </td>
@@ -619,58 +626,24 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
       {/* Provider Health & Telemetry Diagnostics */}
       <section id="health" className="macro-section" aria-labelledby="health-title">
         <div className="macro-section-heading">
-          <div>
-            <span className="eyebrow">06 / TELEMETRY</span>
-            <h2 id="health-title">Data Ingestion Health &amp; Freshness</h2>
-          </div>
-          <span className="macro-section-note mono">PROVIDER CIRCUIT STATUS</span>
+          <div><span className="eyebrow">06 / TELEMETRY</span><h2 id="health-title">Data Ingestion Health &amp; Freshness</h2></div>
+          <span className="macro-section-note mono">OBSERVED STATUS ONLY</span>
         </div>
-
         <div className="macro-panel p-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <div className="p-3 rounded border border-white/[0.08] bg-[#0c1016]">
-              <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-slate-300">FRED (St. Louis Fed)</span>
-                <span className="text-emerald-400 font-bold">HEALTHY</span>
-              </div>
-              <div className="text-[11px] text-slate-500 font-mono mt-1">DFF, PCEPILFE, CPIAUCSL, DGS2</div>
+          {snapshot.providerStatus?.length ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {snapshot.providerStatus.map((provider) => (
+                <div key={provider.name} className="p-3 rounded border border-white/[0.08] bg-[#0c1016]">
+                  <div className="flex items-center justify-between gap-2 text-xs font-mono">
+                    <span className="text-slate-300">{provider.name}</span>
+                    <span className={provider.status === 'HEALTHY' ? 'text-emerald-400' : provider.status === 'UNCONFIGURED' || provider.status === 'OFFLINE' ? 'text-rose-400' : 'text-amber-300'}>{provider.status}</span>
+                  </div>
+                  <div className="text-[11px] text-slate-500 font-mono mt-1">{provider.freshness} · {provider.latencyMs === null ? 'Latency unmeasured' : `${provider.latencyMs} ms`}</div>
+                  <div className="text-[10px] text-slate-600 font-mono mt-1">{provider.lastSuccessfulSyncUtc ? `Last success ${provider.lastSuccessfulSyncUtc}` : 'No successful health check recorded'}</div>
+                </div>
+              ))}
             </div>
-            <div className="p-3 rounded border border-white/[0.08] bg-[#0c1016]">
-              <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-slate-300">ECB Data Portal</span>
-                <span className="text-emerald-400 font-bold">HEALTHY</span>
-              </div>
-              <div className="text-[11px] text-slate-500 font-mono mt-1">Deposit facility rate &amp; Euro FX reference</div>
-            </div>
-            <div className="p-3 rounded border border-white/[0.08] bg-[#0c1016]">
-              <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-slate-300">CFTC Socrata Portal</span>
-                <span className="text-emerald-400 font-bold">HEALTHY</span>
-              </div>
-              <div className="text-[11px] text-slate-500 font-mono mt-1">Weekly financial commitments of traders</div>
-            </div>
-            <div className="p-3 rounded border border-white/[0.08] bg-[#0c1016]">
-              <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-slate-300">Bank of Canada Valet</span>
-                <span className="text-emerald-400 font-bold">HEALTHY</span>
-              </div>
-              <div className="text-[11px] text-slate-500 font-mono mt-1">Target policy rate observations</div>
-            </div>
-            <div className="p-3 rounded border border-white/[0.08] bg-[#0c1016]">
-              <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-slate-300">Finnhub FX Real-Time</span>
-                <span className="text-emerald-400 font-bold">HEALTHY</span>
-              </div>
-              <div className="text-[11px] text-slate-500 font-mono mt-1">Live G10 currency quotes</div>
-            </div>
-            <div className="p-3 rounded border border-white/[0.08] bg-[#0c1016]">
-              <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-slate-300">Upstash Distributed Cache</span>
-                <span className="text-emerald-400 font-bold">HEALTHY</span>
-              </div>
-              <div className="text-[11px] text-slate-500 font-mono mt-1">Low-latency Edge KV store</div>
-            </div>
-          </div>
+          ) : <p className="macro-empty">Provider health telemetry is unavailable. Credential presence is not treated as a successful health check.</p>}
         </div>
       </section>
 
