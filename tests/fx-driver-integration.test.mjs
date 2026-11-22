@@ -44,7 +44,7 @@ test('central-bank adapters preserve observation dates for policy and inflation 
 
 test('dashboard labels policy-minus-inflation as a proxy, not a market real yield', () => {
   assert.match(dashboard, /Policy minus inflation is a simplified ex-post proxy/);
-  assert.doesNotMatch(dashboard, /matched-maturity market real yield/);
+  assert.match(dashboard, /not a matched-maturity market real yield/);
 });
 
 test('dashboard never labels reference values as live executable quotes', () => {
