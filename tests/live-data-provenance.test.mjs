@@ -5,21 +5,14 @@ import { existsSync, readFileSync } from 'node:fs';
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const macroData = read('../lib/macroData.ts');
 const macroEngine = read('../lib/macroEngine.ts');
-const dashboard = read('../app/components/MacroDashboard.tsx');
-const marketFeeds = read('../lib/marketFeeds.ts');
-const publisher = read('../scripts/mt5_market_publisher.py');
-const publicPublisher = read('../public/downloads/FiduLync_MT5_Market_Publisher.py');
+const dashboard = read('../app/components/MacroIntelligenceDashboard.tsx');
+const crossAsset = read('../app/analytics/page.tsx');
+const homePage = read('../app/page.tsx');
 const macroTypes = read('../types/macro.ts');
-const technicalEngine = read('../lib/technicalEngine.ts');
-const quantRisk = read('../lib/quantRisk.ts');
-const signalEngine = read('../lib/signalEngine.ts');
 const aiBrief = read('../lib/aiBrief.ts');
 const envExample = read('../.env.example');
-const historicalBackfill = read('../scripts/mt5_historical_backfill.py');
-const publicHistoricalBackfill = read('../public/downloads/FiduLync_MT5_Historical_Backfill.py');
-const uploadUrlApi = read('../app/api/owner/artifacts/upload-url/route.ts');
-const registerApi = read('../app/api/owner/artifacts/register/route.ts');
-const idempotentArtifactMigration = read('../supabase/migrations/20261119133834_idempotent_ea_artifact_registration.sql');
+const macroContextApi = read('../app/api/v1/macro-context/route.ts');
+const macroContextBridge = read('../MQL5/Include/FiduLync/MacroContextBridge.mqh');
 
 test('provider outage returns an empty, untimestamped macro fallback', () => {
   const fallback = macroData.match(/export function getFallbackSnapshot\(\): MacroSnapshot \{[\s\S]*?\n\}/)?.[0];
@@ -53,43 +46,31 @@ test('weekly CFTC and daily reference feeds use bounded shared caching', () => {
   assert.match(macroData, /getCachedData\('macro:frankfurter-reference', getFrankfurterRates, 6 \* 60 \* 60\)/);
 });
 
-test('dashboard never substitutes hardcoded events or fabricated risk values', () => {
-  assert.doesNotMatch(dashboard, /US Non-Farm Payrolls|425 bps \(G8\)|Tier-1 Catalyst • 13:30 UTC/);
-  assert.match(dashboard, /providerPolicyInputs/);
-  assert.match(dashboard, /NO VERIFIED DATA/);
-  assert.match(dashboard, /formatQuoteAge\(quote\.timestamp, now\)/);
-  assert.match(dashboard, /SNAPSHOT REFRESHED/);
-  assert.match(dashboard, /not endorsed or certified by the Federal Reserve Bank of St\. Louis/);
-  assert.doesNotMatch(dashboard, /'LIVE' : snapshot\.source/);
+test('active terminal is macro-only and does not depend on technical signals or broker quotes', () => {
+  assert.match(homePage, /MacroIntelligenceDashboard/);
+  assert.match(homePage, /getMacroSnapshot/);
+  assert.doesNotMatch(homePage, /getMarketQuotes|MarketQuote|technicalEngine|signalEngine/);
+  assert.match(dashboard, /G8 currency strength/);
+  assert.match(dashboard, /Central-bank policy & inflation matrix/);
+  assert.match(dashboard, /CFTC COT/);
+  assert.match(dashboard, /Upcoming economic events/);
+  assert.doesNotMatch(dashboard, /FxDriverAssessment|technical_data_verified|safeToTrade|OrderSend|ATR|RSI|ADX/);
 });
 
-test('personal-use provider gates are separate from commercial permissions', () => {
-  assert.match(marketFeeds, /FINNHUB_PERSONAL_PLAN_ACTIVE === 'true'/);
-  assert.match(marketFeeds, /EXCHANGERATE_API_PERSONAL_USE_ENABLED/);
-  assert.match(marketFeeds, /GOLD_API_PERSONAL_USE_ENABLED/);
-  assert.match(marketFeeds, /Frankfurter is a public reference-rate service/);
-  assert.match(marketFeeds, /T00:00:00\.000Z/);
-  assert.match(technicalEngine, /TWELVE_DATA_PERSONAL_DISPLAY_PLAN_ACTIVE/);
-  assert.match(technicalEngine, /MARKET_DATA_PROVIDER_PERSONAL_USE_ENABLED/);
+test('cross-asset board displays source observations and refuses fabricated correlations', () => {
+  assert.match(crossAsset, /Cross-asset observations/);
+  assert.match(crossAsset, /tenYearRealYieldPct/);
+  assert.match(crossAsset, /usdBroadIndex/);
+  assert.match(crossAsset, /snapshot\.cot/);
+  assert.match(crossAsset, /not displayed until synchronized historical observations/);
+  assert.doesNotMatch(crossAsset, /correlationCoefficient\s*=\s*0\./);
 });
 
-test('Ghost Protocol requires a fresh MT5 quote and enforces the 0.65 quality threshold', () => {
-  assert.match(quantRisk, /GHOST_PROTOCOL_THRESHOLD = 0\.65/);
-  assert.match(quantRisk, /quoteFresh/);
-  assert.match(quantRisk, /GHOST_BROKER_QUOTE_UNAVAILABLE/);
-  assert.match(quantRisk, /score >= GHOST_PROTOCOL_THRESHOLD/);
-  assert.match(signalEngine, /technical\.data_source === 'mt5'/);
-  assert.match(signalEngine, /brokerQuote\.source === 'mt5'/);
-  assert.match(signalEngine, /getMarketQuotes\(installationId\)/);
-  assert.match(marketFeeds, /query\.set\('installation_id', `eq\.\$\{installationId\}`\)/);
-  assert.match(marketFeeds, /if \(installationId\) return mt5Quotes/);
-  assert.match(signalEngine, /quoteAgeMs <= personalRiskPolicy\.maxQuoteAgeMs/);
-  assert.match(signalEngine, /if \(installationId \|\| nearNewsLockoutTransition/);
-  assert.match(marketFeeds, /Execution-quality quotes must bypass shared cache/);
-  assert.match(signalEngine, /quoteAgeMs >= -5_000/);
-  assert.match(signalEngine, /safeToTrade = riskBudget\.approved && ghost\.allowed/);
-  assert.match(signalEngine, /ghost_score: ghost\.score/);
-  assert.match(technicalEngine, /atr_expansion_ratio/);
+test('provider entitlements remain explicit and separate from key presence', () => {
+  assert.match(macroData, /COT_DATA_PROVIDER_PERSONAL_USE_ENABLED === 'true'/);
+  assert.match(macroData, /SNB_DATA_SOURCE_ENABLED === 'true'/);
+  assert.match(envExample, /PERSONAL_QUANT_EDITION=true/);
+  assert.doesNotMatch(envExample, /PAYSTACK_SECRET_KEY|PAYSTACK_WEBHOOK_SECRET/);
 });
 
 test('FRED observations are not transmitted to external AI prompts', () => {
@@ -112,13 +93,11 @@ test('personal edition retires checkout and customer licence APIs', () => {
     '../app/api/paystack/webhook/route.ts',
     '../app/api/owner/licenses/route.ts',
   ]) {
-    assert.match(read(path), /status:\s*410/ , path);
+    assert.match(read(path), /status:\s*410/, path);
   }
-  assert.match(envExample, /PERSONAL_QUANT_EDITION=true/);
-  assert.doesNotMatch(envExample, /PAYSTACK_SECRET_KEY|PAYSTACK_WEBHOOK_SECRET|ALGO_PRIVATE_API_KEY/);
 });
 
-test('browser owner console is absent while administration APIs remain protected', () => {
+test('browser owner console is absent while privileged installation APIs remain protected', () => {
   for (const path of [
     '../app/owner/page.tsx',
     '../app/owner/OwnerOperations.tsx',
@@ -128,37 +107,32 @@ test('browser owner console is absent while administration APIs remain protected
   ]) {
     assert.equal(existsSync(new URL(path, import.meta.url)), false);
   }
-  const ownerOperationsApi = read('../app/api/owner/operations/route.ts');
   const installationsApi = read('../app/api/owner/mt5-installations/route.ts');
-  assert.match(ownerOperationsApi, /isAuthorizedOwnerEmail|requireOwner/);
   assert.match(installationsApi, /requireOwner/);
 });
 
-test('live MT5 publisher supports partial G10 maps and preserves broker execution metadata', () => {
-  assert.equal(publisher, publicPublisher);
-  assert.match(publisher, /G10_CROSS_SYMBOLS = \{base \+ quote/);
-  assert.doesNotMatch(publisher, /missing = set\(DEFAULT_SYMBOL_MAP\)/);
-  assert.match(marketFeeds, /spread_points/);
-  assert.match(marketFeeds, /broker: row\.broker/);
-  assert.match(marketFeeds, /\^\[A-Z\]\{6\}\$/);
-  assert.match(macroTypes, /symbol: string/);
+test('MT5 macro context is installation-authenticated and read-only', () => {
+  assert.match(macroContextApi, /createHash\('sha256'\)/);
+  assert.match(macroContextApi, /token_hash=eq\./);
+  assert.match(macroContextApi, /status=eq\.active/);
+  assert.match(macroContextApi, /X-MT5-Timestamp/);
+  assert.match(macroContextApi, /enforceDistributedRateLimit/);
+  assert.match(macroContextApi, /high_impact_lockout: !calendarVerified/);
+  assert.match(macroContextApi, /INSUFFICIENT_EVIDENCE/);
+  assert.doesNotMatch(macroContextApi, /OrderSend|CTrade|PositionClose|PositionModify/);
+  assert.match(macroContextBridge, /\/api\/v1\/macro-context\?symbol=/);
+  assert.match(macroContextBridge, /Authorization: Bearer/);
+  assert.match(macroContextBridge, /X-MT5-Timestamp/);
+  assert.doesNotMatch(macroContextBridge, /OrderSend|CTrade|PositionClose|PositionModify/);
 });
 
-test('historical MT5 backfill imports only real closed broker bars and never trades', () => {
-  assert.equal(historicalBackfill, publicHistoricalBackfill);
-  assert.match(historicalBackfill, /MT5_BACKFILL_START.*1996-01-01/);
-  assert.match(historicalBackfill, /copy_rates_range/);
-  assert.match(historicalBackfill, /bar_epoch \+ seconds > now_epoch/);
-  assert.match(historicalBackfill, /BATCH_SIZE = .*1000/);
-  assert.match(historicalBackfill, /FIDULYNC_PUBLISHER_TOKEN/);
-  assert.match(historicalBackfill, /is_closed/);
-  assert.doesNotMatch(historicalBackfill, /order_send|order_send_async|TRADE_ACTION/);
-});
-
-test('private EA artifact upload uses owner-only signed Storage URLs and audited registration', () => {
-  assert.match(uploadUrlApi, /requireOwner/);
-  assert.match(registerApi, /requireOwner/);
-  assert.match(registerApi, /record_ea_product_artifact_upload/);
-  assert.match(idempotentArtifactMigration, /release_approved = CASE/);
+test('technical EA approval, broker ingestion and legacy signal routes are retired', () => {
+  for (const path of [
+    '../app/api/v1/ea-supervisor/decision/route.ts',
+    '../app/api/v1/market-data/ingest/route.ts',
+    '../app/api/v1/macro-signal/route.ts',
+  ]) {
+    assert.match(read(path), /status:\s*410/, path);
+  }
 });
 
