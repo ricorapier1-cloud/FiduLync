@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const route = readFileSync(new URL('../app/api/research/fx-drivers/route.ts', import.meta.url), 'utf8');
-const dashboard = readFileSync(new URL('../app/components/MacroDashboard.tsx', import.meta.url), 'utf8');
+const dashboard = readFileSync(new URL('../app/components/MacroIntelligenceDashboard.tsx', import.meta.url), 'utf8');
 const currencyStrength = readFileSync(new URL('../lib/currencyStrength.ts', import.meta.url), 'utf8');
 
-test('FX driver endpoint invokes the evidence-weighted engine and fails closed', () => {
+test('FX driver research endpoint uses evidence-weighted macro factors and fails closed', () => {
   assert.match(route, /assessFxDrivers\(pair, factors, confirmation/);
   assert.match(route, /const factors: FxDriverObservation\[\] = \[\]/);
   assert.match(route, /structureZ: null/);
@@ -17,11 +17,10 @@ test('FX driver endpoint invokes the evidence-weighted engine and fails closed',
   assert.match(route, /No point-in-time OIS or policy-futures path history/);
 });
 
-test('dashboard uses the engine assessment instead of the legacy heuristic score', () => {
-  assert.match(dashboard, /\/api\/research\/fx-drivers/);
-  assert.match(dashboard, /fxAssessment\?\.setup/);
-  assert.doesNotMatch(dashboard, /function calculateBias\(/);
-  assert.doesNotMatch(dashboard, /percentile \?\? 50/);
+test('active dashboard is macro-only and does not consume technical FX signal output', () => {
+  assert.match(dashboard, /G8 currency strength/);
+  assert.match(dashboard, /Central-bank policy & inflation matrix/);
+  assert.doesNotMatch(dashboard, /\/api\/research\/fx-drivers|fxAssessment|technical_data_verified|safeToTrade/);
 });
 
 test('currency context requires dated provider observations and excludes non-point-in-time COT', () => {
@@ -29,7 +28,6 @@ test('currency context requires dated provider observations and excludes non-poi
   assert.match(currencyStrength, /validObservationDate\(item\.inflationAsOf/);
   assert.match(currencyStrength, /currencies\.length < 3/);
   assert.doesNotMatch(currencyStrength, /snapshot\.cot/);
-  assert.match(dashboard, /COT is excluded until its publication timestamp is preserved/);
 });
 
 test('central-bank adapters preserve observation dates for policy and inflation context', () => {
@@ -44,21 +42,12 @@ test('central-bank adapters preserve observation dates for policy and inflation 
   assert.match(macroData, /gbp\.policyRateAsOf = boeResult\.value\.asOf/);
 });
 
-test('dashboard reports a failed assessment as unavailable instead of loading forever', () => {
-  assert.match(dashboard, /status: 'ready' \| 'unavailable'/);
-  assert.match(dashboard, /status: 'unavailable'/);
-  assert.match(dashboard, /DATA OFFLINE/);
-  assert.match(dashboard, /Research feed unavailable/);
+test('dashboard labels policy-minus-inflation as a proxy, not a market real yield', () => {
+  assert.match(dashboard, /Policy minus inflation is a simplified ex-post proxy/);
+  assert.doesNotMatch(dashboard, /matched-maturity market real yield/);
 });
 
-test('dashboard does not mislabel policy-minus-inflation as a real bond yield', () => {
-  assert.match(dashboard, /EX-POST REAL POLICY DIFF/);
-  assert.match(dashboard, /USD EX-POST REAL POLICY/);
-  assert.doesNotMatch(dashboard, /REAL YIELD DIFF/);
-  assert.doesNotMatch(dashboard, /USD REAL YIELD/);
-});
-
-test('daily reference FX rates are not presented as live executable quotes', () => {
-  assert.match(dashboard, /DAILY REFERENCE RATES/);
-  assert.doesNotMatch(dashboard, /LIVE REFERENCE FEED/);
+test('dashboard never labels reference values as live executable quotes', () => {
+  assert.match(dashboard, /Only observations actually returned by approved providers are shown/);
+  assert.doesNotMatch(dashboard, /LIVE REFERENCE FEED|LIVE BROKER QUOTE/);
 });
