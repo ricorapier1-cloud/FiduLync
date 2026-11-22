@@ -9,23 +9,23 @@ const jetBrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jet
 
 export const metadata: Metadata = {
   metadataBase: getAppBaseUrl(),
-  applicationName: 'MacroLync & AlgoLync Terminal',
+  applicationName: 'MacroLync Institutional Terminal',
   title: {
-    default: 'MacroLync & AlgoLync | Institutional Trading Terminal',
-    template: '%s | MacroLync & AlgoLync',
+    default: 'MacroLync | Institutional Macro & Fundamental Intelligence Center',
+    template: '%s | MacroLync',
   },
-  description: 'MacroLync quantitative FX and macro research with the AlgoLync strategy vault and MT5 telemetry bridge.',
+  description: 'Institutional macroeconomic intelligence platform, central-bank divergence tracking, real-yield differentials, and read-only MT5 fundamental context.',
   openGraph: {
     type: 'website',
-    siteName: 'MacroLync & AlgoLync',
-    title: 'MacroLync & AlgoLync | Institutional Trading Terminal',
-    description: 'MacroLync quantitative FX and macro research with the AlgoLync strategy vault and MT5 telemetry bridge.',
+    siteName: 'MacroLync',
+    title: 'MacroLync | Institutional Macro & Fundamental Intelligence Center',
+    description: 'Institutional macroeconomic intelligence platform, central-bank divergence tracking, real-yield differentials, and read-only MT5 fundamental context.',
     images: ['/opengraph-image.png'],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'MacroLync & AlgoLync | Institutional Trading Terminal',
-    description: 'MacroLync FX research, AlgoLync strategies, event risk, and MT5 fleet telemetry.',
+    title: 'MacroLync | Institutional Macro & Fundamental Intelligence Center',
+    description: 'Institutional macroeconomic intelligence platform, central-bank divergence tracking, real-yield differentials, and read-only MT5 fundamental context.',
     images: ['/opengraph-image.png'],
   },
 };

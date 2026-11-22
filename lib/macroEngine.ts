@@ -3,6 +3,9 @@ import 'server-only';
 import { getFallbackSnapshot, loadMacroSnapshot } from '@/lib/macroData';
 import { getCachedData } from '@/lib/redisCache';
 import type { MacroSnapshot } from '@/types/macro';
+import { getCrossAssetTelemetry, classifyMacroRegime } from '@/lib/macro/crossAssetEngine';
+import { getCountryProfiles } from '@/lib/macro/countryProfiles';
+import { getProviderTelemetry } from '@/lib/macro/providerTelemetry';
 
 export type FundamentalSignal = {
   score: number;
@@ -14,12 +17,27 @@ export type FundamentalSignal = {
 };
 
 export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnapshot> {
+  let snapshot: MacroSnapshot;
   try {
-    return await getCachedData('macro:snapshot', loadMacroSnapshot, 900, forceRefresh);
+    snapshot = await getCachedData('macro:snapshot', loadMacroSnapshot, 900, forceRefresh);
   } catch (error) {
     console.warn('Macro providers and cached snapshots are unavailable; serving reference macro levels.', error);
-    return getFallbackSnapshot();
+    snapshot = getFallbackSnapshot();
   }
+
+  // Enrich with cross-asset telemetry, country profiles, regime classification, and provider diagnostics
+  const crossAsset = getCrossAssetTelemetry(snapshot);
+  const regime = classifyMacroRegime(snapshot, crossAsset);
+  const countryProfiles = getCountryProfiles(snapshot);
+  const providerStatus = getProviderTelemetry();
+
+  return {
+    ...snapshot,
+    crossAsset,
+    regime,
+    countryProfiles,
+    providerStatus,
+  };
 }
 
 export function getFundamentalSignal(snapshot: MacroSnapshot, pair: string): FundamentalSignal | null {

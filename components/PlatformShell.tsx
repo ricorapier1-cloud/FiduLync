@@ -7,32 +7,21 @@ import BrandGlyph, { type BrandGlyphName } from '@/components/BrandGlyph';
 import WhatsAppSupportButton from '@/components/WhatsAppSupportButton';
 import PlatformFooter from '@/components/PlatformFooter';
 
-const links = [
-  { href: '/', label: 'MacroLync', icon: 'shield' },
-  { href: '/store', label: 'AlgoLync Vault', icon: 'chart' },
-  { href: '/account', label: 'My License', icon: 'shield' },
-  { href: '/faq', label: 'FAQ', icon: 'activity' },
-  { href: '/terms', label: 'Terms & Risk', icon: 'shield-alert' },
-  { href: '/owner', label: 'Owner Console', icon: 'shield' },
-] as const satisfies readonly { href: string; label: string; icon: BrandGlyphName }[];
-
-const macroLinks = [
-  { href: '#matrix', label: 'Macro matrix', icon: 'chart' },
-  { href: '#bias', label: 'Pair bias', icon: 'gauge' },
-  { href: '#catalysts', label: 'Catalysts', icon: 'calendar' },
-  { href: '#positioning', label: 'Positioning', icon: 'radio' },
-  { href: '/store', label: 'AlgoLync Vault', icon: 'chart' },
-  { href: '/account', label: 'My License', icon: 'shield' },
-  { href: '/faq', label: 'FAQ', icon: 'activity' },
-  { href: '/terms', label: 'Terms & Risk', icon: 'shield-alert' },
-  { href: '/owner', label: 'Owner Console', icon: 'shield' },
+const navigationLinks = [
+  { href: '/', label: 'Macro Terminal', icon: 'shield' },
+  { href: '/#matrix', label: 'Policy Matrix', icon: 'chart' },
+  { href: '/#bias', label: 'Pair Bias', icon: 'gauge' },
+  { href: '/#catalysts', label: 'Catalysts', icon: 'calendar' },
+  { href: '/#regimes', label: 'Cross-Asset', icon: 'radio' },
+  { href: '/notebook', label: 'Research Notebook', icon: 'activity' },
+  { href: '/workbench', label: 'Validation Workbench', icon: 'trend' },
+  { href: '/faq', label: 'FAQ', icon: 'shield-alert' },
 ] as const satisfies readonly { href: string; label: string; icon: BrandGlyphName }[];
 
 export default function PlatformShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const isHome = pathname === '/';
-  const navigation = isHome ? macroLinks : links;
 
   return (
     <>
@@ -42,33 +31,28 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
             <span className="brand-mark"><BrandGlyph name="shield" size={19} strokeWidth={2.2} /></span>
             <span className="brand-copy">
               <span className="brand-name">Macro<span>Lync</span></span>
-              <span className="brand-caption">INSTITUTIONAL FX TERMINAL</span>
+              <span className="brand-caption">INSTITUTIONAL MACRO INTELLIGENCE</span>
             </span>
           </Link>
 
           <nav className="desktop-nav" aria-label="Main navigation">
-            {navigation.map(({ href, label }) => (
-              <Link
-                key={href}
-                href={href}
-                className={`nav-link ${href.startsWith('#') ? '' : pathname === href ? 'nav-link-active' : ''}`}
-              >
-                {label}
-              </Link>
-            ))}
+            {navigationLinks.map(({ href, label }) => {
+              const isActive = href === '/' ? pathname === '/' : pathname === href;
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`nav-link ${isActive ? 'nav-link-active' : ''}`}
+                >
+                  {label}
+                </Link>
+              );
+            })}
           </nav>
 
           <div className="topbar-actions">
-            <a
-              href="https://wa.me/2348037212445?text=Hello%20Desk%2C%20I%20have%20an%20enquiry%20regarding%20AlgoLync%20EAs"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-400/10 h-11 w-11 justify-center p-0 font-mono text-[10px] text-emerald-300 transition hover:bg-emerald-400/20"
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> 
-            </a>
-            <Link className="secure-pill" href={isHome ? '/store' : '/'}>
-              <span className="secure-dot" /> {isHome ? 'AlgoLync Vault' : 'Macro terminal'}
+            <Link className="secure-pill" href="/notebook">
+              <span className="secure-dot" /> Research Notebook
             </Link>
             <button
               type="button"
@@ -91,7 +75,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
             onClick={(event) => event.stopPropagation()}
           >
             <div className="drawer-heading">
-              <span className="eyebrow">{isHome ? 'MACROLYNC' : 'ALGOLYNC VAULT'}</span>
+              <span className="eyebrow">MACROLYNC TERMINAL</span>
               <button
                 type="button"
                 className="icon-button"
@@ -101,7 +85,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
                 <BrandGlyph name="close" size={18} />
               </button>
             </div>
-            {navigation.map(({ href, label, icon }) => (
+            {navigationLinks.map(({ href, label, icon }) => (
               <Link
                 key={href}
                 href={href}
@@ -111,18 +95,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
                 <BrandGlyph name={icon} size={18} /> {label} <BrandGlyph name="arrow-up-right" size={15} className="drawer-arrow" />
               </Link>
             ))}
-            <div className="mt-4 border-t border-white/[0.08] pt-4">
-              <a
-                href="https://wa.me/2348037212445?text=Hello%20Desk%2C%20I%20have%20an%20enquiry%20regarding%20AlgoLync%20EAs"
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => setDrawerOpen(false)}
-                className="flex items-center justify-center gap-2 rounded-lg bg-emerald-400 py-2.5 font-mono text-xs font-semibold text-[#07120d]"
-              >
-                : +234 803 721 2445
-              </a>
-            </div>
-            <div className="drawer-footer">Single-operator quantitative trading terminal</div>
+            <div className="drawer-footer">Institutional Macro &amp; Fundamental Intelligence Center</div>
           </nav>
         </div>
       )}
@@ -134,7 +107,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
 
       {!isHome && (
         <nav className="mobile-tabbar" aria-label="Bottom navigation">
-          {links.map(({ href, label, icon }) => (
+          {navigationLinks.slice(0, 4).map(({ href, label, icon }) => (
             <Link
               key={href}
               href={href}

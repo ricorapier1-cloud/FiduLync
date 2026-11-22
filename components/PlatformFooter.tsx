@@ -12,7 +12,6 @@ export default function PlatformFooter() {
   return (
     <footer className="mt-16 border-t border-white/[0.08] bg-[#06080c] text-slate-400">
       <div className="mx-auto max-w-7xl px-5 py-10 sm:px-8">
-        {/* Inner Page Back Button */}
         {!isHome && (
           <div className="mb-8">
             <button
@@ -32,16 +31,16 @@ export default function PlatformFooter() {
                 <BrandGlyph name="shield" size={16} />
               </span>
               <span className="text-base font-semibold tracking-tight text-slate-100">
-                Macro<span className="text-emerald-400">Lync</span> &amp; Algo<span className="text-emerald-400">Lync</span>
+                Macro<span className="text-emerald-400">Lync</span>
               </span>
             </div>
             <p className="mt-3 text-xs leading-5 text-slate-400">
-              Institutional quantitative macroeconomic intelligence terminal, proprietary EA execution architecture, and automated MT5 telemetry bridge.
+              Institutional quantitative macroeconomic and fundamental foreign-exchange intelligence center. Concentrates exclusively on understanding macroeconomic drivers, monetary policy divergence, and cross-asset capital flows.
             </p>
           </div>
 
           <div>
-            <span className="font-mono text-[10px] uppercase tracking-widest text-slate-300">Terminal Modules</span>
+            <span className="font-mono text-[10px] uppercase tracking-widest text-slate-300">Research Modules</span>
             <ul className="mt-3 space-y-2 text-xs">
               <li>
                 <Link href="/" className="transition hover:text-emerald-300">
@@ -49,56 +48,55 @@ export default function PlatformFooter() {
                 </Link>
               </li>
               <li>
-                <Link href="/store" className="transition hover:text-emerald-300">
-                  AlgoLync Strategy Vault &amp; Store
+                <Link href="/notebook" className="transition hover:text-emerald-300">
+                  Macro Research Notebook
+                </Link>
+              </li>
+              <li>
+                <Link href="/workbench" className="transition hover:text-emerald-300">
+                  Validation &amp; Backtest Workbench
                 </Link>
               </li>
               <li>
                 <Link href="/faq" className="transition hover:text-emerald-300">
-                  Terminal &amp; Strategy FAQ
-                </Link>
-              </li>
-              <li>
-                <Link href="/terms" className="transition hover:text-emerald-300">
-                  Terms &amp; Risk Disclosure
+                  Methodology &amp; Architecture FAQ
                 </Link>
               </li>
             </ul>
           </div>
 
           <div>
-            <span className="font-mono text-[10px] uppercase tracking-widest text-slate-300">Support &amp; Desk</span>
+            <span className="font-mono text-[10px] uppercase tracking-widest text-slate-300">Research Desk</span>
             <ul className="mt-3 space-y-2 text-xs">
               <li>
                 <a
-                  href="https://wa.me/2348037212445?text=Hello%20Desk%2C%20I%20have%20an%20enquiry%20regarding%20AlgoLync%20EAs"
+                  href="https://wa.me/2348037212445?text=Hello%20Desk%2C%20I%20have%20an%20enquiry%20regarding%20MacroLync%20Research"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 text-emerald-300 transition hover:underline"
                 >
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                  WhatsApp: +234 803 721 2445
+                  WhatsApp Desk: +234 803 721 2445
                 </a>
               </li>
-              <li className="text-slate-400">Lagos / London Trading Desk Hours</li>
-              <li className="text-slate-500 font-mono text-[11px]">Mon – Fri: 07:00 – 21:00 UTC</li>
+              <li className="text-slate-400">Global Macro Research Support</li>
+              <li className="text-slate-500 font-mono text-[11px]">UTC Coverage: 07:00 – 21:00</li>
             </ul>
           </div>
 
           <div>
-            <span className="font-mono text-[10px] uppercase tracking-widest text-slate-300">MT5 Include Files</span>
+            <span className="font-mono text-[10px] uppercase tracking-widest text-slate-300">MT5 Context Interface</span>
             <div className="mt-3 flex flex-col gap-2 text-xs">
-              <a
-                href="/mql5/MacroLyncLicense.mqh"
-                download
-                className="inline-flex items-center gap-2 rounded border border-white/[0.1] bg-white/[0.03] px-3 py-1.5 text-[11px] text-slate-300 transition hover:border-emerald-400/40 hover:text-emerald-300"
-              >
-                <BrandGlyph name="arrow-down" size={13} /> MacroLyncLicense.mqh
-              </a>
+              <span className="text-[11px] text-slate-400">
+                External read-only JSON bridge for connected MT5 EAs:
+              </span>
+              <code className="text-[10px] bg-white/[0.04] p-1.5 rounded text-emerald-300 font-mono">
+                GET /api/v1/macro-context?symbol=EURUSD
+              </code>
               <a
                 href="/mql5/MacroLyncBridge.mqh"
                 download
-                className="inline-flex items-center gap-2 rounded border border-white/[0.1] bg-white/[0.03] px-3 py-1.5 text-[11px] text-slate-300 transition hover:border-emerald-400/40 hover:text-emerald-300"
+                className="inline-flex items-center gap-2 rounded border border-white/[0.1] bg-white/[0.03] px-3 py-1.5 text-[11px] text-slate-300 transition hover:border-emerald-400/40 hover:text-emerald-300 mt-1"
               >
                 <BrandGlyph name="arrow-down" size={13} /> MacroLyncBridge.mqh
               </a>
@@ -106,26 +104,26 @@ export default function PlatformFooter() {
           </div>
         </div>
 
-        {/* Regulatory & Capital Risk Warning */}
+        {/* Regulatory & Research Disclaimer */}
         <div className="mt-10 rounded-xl border border-white/[0.06] bg-[#0c1016] p-4 text-[10px] leading-5 text-slate-400 sm:p-5">
           <div className="flex items-center gap-2 font-mono uppercase tracking-wider text-amber-300">
             <BrandGlyph name="shield-alert" size={14} className="text-amber-300" />
-            High Risk Capital Warning &amp; Legal Disclaimer
+            Institutional Research Governance &amp; Market Risk Warning
           </div>
           <p className="mt-2 text-slate-400">
-            Trading foreign exchange (Forex) and Contracts for Difference (CFDs) on margin carries a high level of risk and may not be suitable for all investors. High leverage can work against you as well as for you. Before deciding to trade foreign exchange or utilize automated Expert Advisors, you should carefully consider your investment objectives, level of experience, and risk appetite. There is a possibility that you could sustain a loss of some or all of your initial capital. Past performance, backtests, or hypothetical results are not indicative of future market outcomes.
+            Foreign exchange trading and cross-asset investments carry significant financial risk. MacroLync produces quantitative models, macroeconomic regime classifications, and fundamental relative-value metrics strictly for research, analysis, and educational purposes. MacroLync does not execute broker orders, manage client funds, or provide personalized investment advice.
           </p>
           <p className="mt-2 text-slate-500">
-            MacroLync and AlgoLync provide quantitative analysis, macro intelligence models, and execution software tools for research and automated trading execution. We do not provide personalized financial, legal, or investment advice.
+            Technical trading decisions, leverage management, and order execution remain the sole responsibility of individual traders and their independent execution systems.
           </p>
         </div>
 
         <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-white/[0.06] pt-6 font-mono text-[10px] text-slate-400">
-          <div>© {new Date().getFullYear()} MacroLync &amp; AlgoLync. All rights reserved.</div>
+          <div>© {new Date().getFullYear()} MacroLync Institutional Research Center. All rights reserved.</div>
           <div className="flex items-center gap-4">
             <Link href="/faq" className="hover:text-slate-300">FAQ</Link>
             <Link href="/terms" className="hover:text-slate-300">Terms of Service</Link>
-            <Link href="/terms#privacy" className="hover:text-slate-300">Privacy Policy</Link>
+            <Link href="/privacy" className="hover:text-slate-300">Privacy Policy</Link>
           </div>
         </div>
       </div>
