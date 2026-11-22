@@ -10,6 +10,16 @@ export const runtime = 'nodejs';
 type Installation = { id: string; status: string };
 const CURRENCIES = new Set(['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD']);
 const NO_STORE = { 'Cache-Control': 'no-store, max-age=0', Pragma: 'no-cache' };
+const REGION_ALIASES: Record<string, string[]> = {
+  USD: ['USD', 'US', 'USA', 'UNITED STATES', 'FEDERAL RESERVE'],
+  EUR: ['EUR', 'EU', 'EURO AREA', 'EUROZONE', 'EUROPEAN CENTRAL BANK'],
+  GBP: ['GBP', 'UK', 'UNITED KINGDOM', 'BRITAIN', 'BANK OF ENGLAND'],
+  JPY: ['JPY', 'JP', 'JAPAN', 'BANK OF JAPAN'],
+  CHF: ['CHF', 'CH', 'SWITZERLAND', 'SWISS NATIONAL BANK'],
+  CAD: ['CAD', 'CA', 'CANADA', 'BANK OF CANADA'],
+  AUD: ['AUD', 'AU', 'AUSTRALIA', 'RESERVE BANK OF AUSTRALIA'],
+  NZD: ['NZD', 'NZ', 'NEW ZEALAND', 'RESERVE BANK OF NEW ZEALAND'],
+};
 
 function response(body: unknown, status = 200) {
   return NextResponse.json(body, { status, headers: NO_STORE });
@@ -81,8 +91,11 @@ export async function GET(request: Request) {
         const eventTime = Date.parse(event.scheduledAt);
         if (!Number.isFinite(eventTime)) return false;
         const region = event.region.toUpperCase();
-        return (region.includes(baseCode) || region.includes(quoteCode) || region === 'GLOBAL')
-          && eventTime >= now - 15 * 60_000 && eventTime <= now + 24 * 60 * 60_000;
+        const baseAliases = REGION_ALIASES[baseCode] ?? [baseCode];
+        const quoteAliases = REGION_ALIASES[quoteCode] ?? [quoteCode];
+        const relevantRegion = region === 'GLOBAL'
+          || [...baseAliases, ...quoteAliases].some((alias) => region.includes(alias));
+        return relevantRegion && eventTime >= now - 15 * 60_000 && eventTime <= now + 24 * 60 * 60_000;
       })
       .map((event) => {
         const eventTime = Date.parse(event.scheduledAt);
@@ -100,6 +113,7 @@ export async function GET(request: Request) {
 
     const activeLockout = highImpactEvents.find((event) =>
       event.minutes_until >= -15 && event.minutes_until <= 30);
+    const calendarVerified = snapshot.calendarSource === 'provider';
     const policyDiffBps = base && quote
       ? Math.round((base.policyRate - quote.policyRate) * 100)
       : null;
@@ -118,16 +132,17 @@ export async function GET(request: Request) {
       data_status: evidenceVerified ? snapshot.source.toUpperCase() : 'INSUFFICIENT_EVIDENCE',
       fundamental_bias: bias,
       fundamental_score: score,
+      score_method: 'Uncalibrated policy, inflation, positioning and cross-asset heuristic; not a probability or execution signal.',
       macro_regime: evidenceVerified && policyDiffBps !== null && Math.abs(policyDiffBps) >= 50
         ? 'POLICY_DIVERGENCE' : evidenceVerified ? 'MIXED_OR_UNCONFIRMED' : 'INSUFFICIENT_EVIDENCE',
       policy_rate_differential_bps: evidenceVerified ? policyDiffBps : null,
       policy_real_rate_proxy_differential_bps: evidenceVerified ? realRateDiffBps : null,
       event_risk: {
-        high_impact_lockout: Boolean(activeLockout),
+        high_impact_lockout: !calendarVerified || Boolean(activeLockout),
         lockout_rule: '30 minutes before through 15 minutes after scheduled high-impact events',
         active_event: activeLockout ?? null,
         upcoming_high_impact_events: highImpactEvents,
-        calendar_status: snapshot.calendarSource === 'provider' ? 'PROVIDER' : 'REFERENCE_OR_UNAVAILABLE',
+        calendar_status: calendarVerified ? 'PROVIDER' : 'REFERENCE_OR_UNAVAILABLE',
       },
       provenance: {
         snapshot_as_of: snapshot.asOf || null,
@@ -137,12 +152,16 @@ export async function GET(request: Request) {
           policy_rate_as_of: base.policyRateAsOf ?? null,
           inflation_source: base.inflationProvider ?? base.inflationSource ?? null,
           inflation_as_of: base.inflationAsOf ?? null,
+          policy_rate_source_url: base.policyRateSourceUrl ?? null,
+          inflation_source_url: base.inflationSourceUrl ?? null,
         } : null,
         quote_currency: quote ? {
           code: quote.code, policy_rate_source: quote.policyRateProvider ?? quote.policyRateSource ?? null,
           policy_rate_as_of: quote.policyRateAsOf ?? null,
           inflation_source: quote.inflationProvider ?? quote.inflationSource ?? null,
           inflation_as_of: quote.inflationAsOf ?? null,
+          policy_rate_source_url: quote.policyRateSourceUrl ?? null,
+          inflation_source_url: quote.inflationSourceUrl ?? null,
         } : null,
       },
       limitations: [
