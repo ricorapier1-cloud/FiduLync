@@ -19,7 +19,7 @@ export type FundamentalSignal = {
 export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnapshot> {
   let snapshot: MacroSnapshot;
   try {
-    snapshot = await getCachedData('macro:snapshot', loadMacroSnapshot, 900, forceRefresh);
+    snapshot = await getCachedData('macro:snapshot:v2', loadMacroSnapshot, 900, forceRefresh);
   } catch (error) {
     console.warn('Macro providers and cached snapshots are unavailable; serving reference macro levels.', error);
     snapshot = getFallbackSnapshot();
