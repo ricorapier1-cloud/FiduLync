@@ -8,7 +8,6 @@ const macroEngine = read('../lib/macroEngine.ts');
 const dashboard = read('../app/components/MacroIntelligenceDashboard.tsx');
 const crossAsset = read('../app/analytics/page.tsx');
 const homePage = read('../app/page.tsx');
-const macroTypes = read('../types/macro.ts');
 const aiBrief = read('../lib/aiBrief.ts');
 const envExample = read('../.env.example');
 const macroContextApi = read('../app/api/v1/macro-context/route.ts');
