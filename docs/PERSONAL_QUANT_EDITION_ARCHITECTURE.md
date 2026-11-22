@@ -1,3 +1,7 @@
+> **SUPERSEDED — 2026-11-22.** This file is retained as historical implementation/audit context only. Its previous references to QuantLync technical analysis, RiskLync trade supervision, AlgoLync broker telemetry, EA approvals, risk ceilings, browser Owner Console workflows and MT5 market-data ingestion are not the current product contract. The binding scope is now **macro-economic and fundamental research only**; independent MT5 EAs own all technical analysis, trade decisions, order execution and broker-side risk protection. See [the current MacroLync mandate](FIDULYNC_MACROLYNC_FUNDAMENTAL_MANDATE.md) and the repository README. Do not revive superseded routes or features based on the historical sections below.
+
+---
+
 # FiduLync Personal Quant Edition — Architecture Audit & Implementation Plan
 
 **Status:** Approved product direction; implementation in progress on `feat/personal-quant-edition`  
