@@ -404,6 +404,9 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
         </div>
       </section>
 
+      <p className="text-[10px] text-slate-500 font-mono mb-4">
+        BIS Statistics: central-bank policy rates (WS_CBPOL) and consumer-price annual changes (WS_LONG_CPI). Observation dates indicate the latest published period; these are not tick-by-tick market prices.
+      </p>
       <section className="macro-section" aria-labelledby="us-drivers-title">
         <div className="macro-section-heading">
           <div><span className="eyebrow">01A / UNITED STATES MACRO DRIVERS</span><h2 id="us-drivers-title">Growth, Labour &amp; Wage Impulse</h2></div>

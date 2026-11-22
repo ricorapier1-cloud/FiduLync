@@ -23,21 +23,21 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
   const eur = snapshot.currencies.find((item) => item.code === 'EUR');
   const gbp = snapshot.currencies.find((item) => item.code === 'GBP');
   const cad = snapshot.currencies.find((item) => item.code === 'CAD');
-  const worldBankCurrencies = snapshot.currencies.filter((item) => item.inflationSource === 'provider' && item.inflationObservationDate);
+  const worldBankCurrencies = snapshot.currencies.filter((item) => item.inflationProvider === 'World Bank' && item.inflationObservationDate);
   const fredKeyPresent = Boolean(process.env.FRED_API_KEY?.trim());
   const fredStorageAllowed = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true';
   const finnhubConfigured = Boolean(process.env.FINNHUB_API_KEY?.trim()) && process.env.FINNHUB_COMMERCIAL_USE_APPROVED === 'true';
-  const bls = feedStatus(Boolean(usd?.unemploymentObservationDate && usd.wageGrowthObservationDate),
+  const bls = feedStatus(usd?.unemploymentProvider === 'BLS' && usd.wageGrowthProvider === 'BLS',
     isFresh(usd?.unemploymentObservationDate, 120) && isFresh(usd?.wageGrowthObservationDate, 120), Boolean(process.env.BLS_API_KEY?.trim()));
-  const bea = feedStatus(Boolean(usd?.gdpObservationDate), Boolean(usd?.gdpObservationDate), Boolean(process.env.BEA_API_KEY?.trim()));
+  const bea = feedStatus(usd?.gdpProvider === 'BEA' && Boolean(usd.gdpObservationDate), Boolean(usd?.gdpObservationDate), Boolean(process.env.BEA_API_KEY?.trim()));
 
   const fred = feedStatus(fredStorageAllowed && Boolean(usd?.policyRateProvider === 'FRED' && usd.inflationProvider === 'FRED'),
     fredStorageAllowed && isFresh(usd?.policyRateObservationDate, 180) && isFresh(usd?.inflationObservationDate, 120), fredKeyPresent);
-  const ecb = feedStatus(Boolean(eur?.policyRateObservationDate && eur.inflationObservationDate),
+  const ecb = feedStatus(eur?.policyRateProvider === 'ECB' && eur.inflationProvider === 'ECB',
     isFresh(eur?.policyRateObservationDate, 180) && isFresh(eur?.inflationObservationDate, 120), true);
-  const boe = feedStatus(Boolean(gbp?.policyRateObservationDate),
+  const boe = feedStatus(gbp?.policyRateProvider === 'Bank of England' && Boolean(gbp.policyRateObservationDate),
     isFresh(gbp?.policyRateObservationDate, 180), true);
-  const boc = feedStatus(Boolean(cad?.policyRateObservationDate && cad.inflationObservationDate),
+  const boc = feedStatus(cad?.policyRateProvider === 'Bank of Canada' && cad.inflationProvider === 'Bank of Canada',
     isFresh(cad?.policyRateObservationDate, 180) && isFresh(cad?.inflationObservationDate, 120), true);
   const cftc = feedStatus(snapshot.cotSource === 'provider' && snapshot.cot.length > 0,
     snapshot.cot.some((item) => isFresh(item.reportDate, 14)), true);

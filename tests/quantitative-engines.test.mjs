@@ -94,3 +94,11 @@ test('dossier distinguishes real policy-rate proxies from market real yields', (
   assert.match(contextRoute, /real_policy_rate_diff_bps/);
   assert.match(contextRoute, /real_yield_diff_bps: null/);
 });
+
+test('provider health is attributed to the actual source, not any provider flag', () => {
+  const telemetry = read('../lib/macro/providerTelemetry.ts');
+  assert.match(telemetry, /policyRateProvider === 'ECB'/);
+  assert.match(telemetry, /inflationProvider === 'World Bank'/);
+  assert.match(telemetry, /policyRateProvider === 'Bank of Canada'/);
+  assert.match(telemetry, /BIS Statistics \/ G8 policy rates & CPI/);
+});
