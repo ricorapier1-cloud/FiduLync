@@ -82,8 +82,23 @@ export async function GET(request: Request) {
     const quoteVerified = Boolean(quote && quote.policyRateSource === 'provider'
       && quote.inflationSource === 'provider' && isFresh(quote.policyRateAsOf, 10)
       && isFresh(quote.inflationAsOf, 60));
-    const evidenceVerified = snapshot.source !== 'fallback' && baseVerified && quoteVerified;
-    const assessment = evidenceVerified ? getFundamentalSignal(snapshot, symbol) : null;
+    const pairRatesVerified = snapshot.source !== 'fallback' && baseVerified && quoteVerified;
+    const requiredRiskCurrencies = ['AUD', 'NZD', 'CAD', 'JPY', 'CHF'];
+    const riskCurrencyCoverage = requiredRiskCurrencies.every((code) => {
+      const item = snapshot.currencies.find((currency) => currency.code === code);
+      return Boolean(item && item.policyRateSource === 'provider' && item.inflationSource === 'provider'
+        && isFresh(item.policyRateAsOf, 10) && isFresh(item.inflationAsOf, 60));
+    });
+    const twoYearYieldCoverage = Boolean(base && quote
+      && base.twoYearYieldSource === 'provider' && quote.twoYearYieldSource === 'provider'
+      && isFresh(base.twoYearYieldAsOf, 10) && isFresh(quote.twoYearYieldAsOf, 10));
+    const cotCoverage = snapshot.cotSource === 'provider'
+      && snapshot.cot.some((item) => item.market === baseCode)
+      && snapshot.cot.some((item) => item.market === quoteCode);
+    const compositeEvidenceVerified = pairRatesVerified && riskCurrencyCoverage
+      && twoYearYieldCoverage && cotCoverage;
+    const assessment = compositeEvidenceVerified ? getFundamentalSignal(snapshot, symbol) : null;
+    const evidenceVerified = compositeEvidenceVerified && assessment !== null;
 
     const highImpactEvents = snapshot.catalysts
       .filter((event) => {
@@ -129,14 +144,22 @@ export async function GET(request: Request) {
       product: 'FiduLync MacroLync',
       symbol,
       generated_at_utc: new Date(now).toISOString(),
-      data_status: evidenceVerified ? snapshot.source.toUpperCase() : 'INSUFFICIENT_EVIDENCE',
+      data_status: pairRatesVerified ? snapshot.source.toUpperCase() : 'INSUFFICIENT_EVIDENCE',
       fundamental_bias: bias,
+      bias_status: evidenceVerified ? 'FULL_FACTOR_COVERAGE_UNCALIBRATED' : 'INSUFFICIENT_EVIDENCE',
       fundamental_score: score,
-      score_method: 'Uncalibrated policy, inflation, positioning and cross-asset heuristic; not a probability or execution signal.',
-      macro_regime: evidenceVerified && policyDiffBps !== null && Math.abs(policyDiffBps) >= 50
-        ? 'POLICY_DIVERGENCE' : evidenceVerified ? 'MIXED_OR_UNCONFIRMED' : 'INSUFFICIENT_EVIDENCE',
-      policy_rate_differential_bps: evidenceVerified ? policyDiffBps : null,
-      policy_real_rate_proxy_differential_bps: evidenceVerified ? realRateDiffBps : null,
+      score_method: 'Uncalibrated multi-factor heuristic; emitted only with full pair, two-year yield, COT and risk-currency coverage. Not a probability or execution signal.',
+      evidence_coverage: {
+        pair_policy_and_inflation: pairRatesVerified,
+        matched_currency_two_year_yields: twoYearYieldCoverage,
+        base_and_quote_cot: cotCoverage,
+        risk_on_and_risk_off_currency_profiles: riskCurrencyCoverage,
+        composite_bias_available: evidenceVerified,
+      },
+      macro_regime: pairRatesVerified && policyDiffBps !== null && Math.abs(policyDiffBps) >= 50
+        ? 'POLICY_DIVERGENCE' : pairRatesVerified ? 'MIXED_OR_UNCONFIRMED' : 'INSUFFICIENT_EVIDENCE',
+      policy_rate_differential_bps: pairRatesVerified ? policyDiffBps : null,
+      policy_real_rate_proxy_differential_bps: pairRatesVerified ? realRateDiffBps : null,
       event_risk: {
         high_impact_lockout: !calendarVerified || Boolean(activeLockout),
         lockout_rule: '30 minutes before through 15 minutes after scheduled high-impact events',
