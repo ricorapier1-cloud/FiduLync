@@ -110,8 +110,9 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
     || Object.keys(snapshot.ecbRates ?? {}).length > 0
   );
 
-  const policySpread = currencies.length > 1
-    ? Math.max(...currencies.map((currency) => currency.policyRate)) - Math.min(...currencies.map((currency) => currency.policyRate))
+  const verifiedPolicyRates = currencies.filter((currency) => currency.policyRateSource === 'provider').map((currency) => currency.policyRate);
+  const policySpread = verifiedPolicyRates.length > 1
+    ? Math.max(...verifiedPolicyRates) - Math.min(...verifiedPolicyRates)
     : null;
 
   useEffect(() => {
@@ -238,7 +239,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
             {liveReferenceAvailable && currencies.length === 0
               ? 'ECB reference exchange rates active; official statistical feeds pending.'
               : snapshot.source === 'fallback'
-              ? 'Reference levels displayed while upstream providers synchronize.'
+              ? 'No verified macro provider observations are currently available.'
               : snapshot.source === 'partial'
               ? 'Live and reference inputs synthesized; verify release vintages before positioning.'
               : 'Provider payload validated across edge gateways.'}
@@ -346,17 +347,19 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
             </thead>
             <tbody>
               {currencies.map((currency) => {
-                const realRate = currency.policyRate - currency.inflation;
+                const verifiedPolicy = currency.policyRateSource === 'provider';
+                const verifiedInflation = currency.inflationSource === 'provider';
+                const realRate = verifiedPolicy && verifiedInflation ? currency.policyRate - currency.inflation : null;
                 return (
                   <tr key={currency.code}>
                     <td><span className="macro-currency-code mono">{currency.code}</span></td>
                     <td>{currency.centralBank}</td>
                     <td className="mono">
-                      {formatRate(currency.policyRate)}
+                      {verifiedPolicy ? formatRate(currency.policyRate) : 'UNAVAILABLE'}
                       <small>{currency.policyRateSource === 'provider' ? 'PROVIDER' : 'REFERENCE'}</small>
                     </td>
                     <td>
-                      <span className="mono">{formatRate(currency.inflation)}</span>
+                      <span className="mono">{verifiedInflation ? formatRate(currency.inflation) : 'UNAVAILABLE'}</span>
                       <small>{currency.corePce !== undefined && currency.cpi !== undefined ? `Core PCE ${formatRate(currency.corePce)} · CPI ${formatRate(currency.cpi)}` : currency.inflationLabel}</small>
                     </td>
                     <td className="mono">
@@ -368,7 +371,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
                       )}
                     </td>
                     <td className={`mono ${realRate >= 0 ? 'macro-positive' : 'macro-negative'}`}>
-                      {realRate > 0 ? '+' : ''}{formatRate(realRate)}
+                      {realRate === null ? '—' : `${realRate > 0 ? '+' : ''}${formatRate(realRate)}`}
                     </td>
                     <td><span className="macro-stance">{currency.stance}</span></td>
                   </tr>
