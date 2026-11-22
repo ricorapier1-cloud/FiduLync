@@ -11,5 +11,6 @@ export type G8Currency = (typeof G8_CURRENCIES)[number];
 export const BASELINE_COUNTRY_PROFILES: Record<string, never> = {};
 
 export function getCountryProfiles(_snapshot: MacroSnapshot): CountryFundamentalProfile[] {
+  void _snapshot;
   return [];
 }
