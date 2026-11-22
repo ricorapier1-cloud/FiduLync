@@ -18,6 +18,13 @@ export const G8_PAIRS = [
   'XAUUSD',
 ] as const;
 
+function isFreshObservation(date: string | undefined, maxAgeDays: number): boolean {
+  if (!date) return false;
+  const timestamp = Date.parse(date);
+  const age = Date.now() - timestamp;
+  return Number.isFinite(timestamp) && age >= -5 * 60_000 && age <= maxAgeDays * 86_400_000;
+}
+
 export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): PairDossier {
   const normSymbol = symbol.trim().toUpperCase();
   const isGold = normSymbol === 'XAUUSD';
@@ -43,10 +50,14 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
   if (!baseCot) missingComponents += 1;
   if (!quoteCot) missingComponents += 1;
 
-  const quoteVerified = quoteCcy?.policyRateSource === 'provider' && quoteCcy.inflationSource === 'provider';
+  const quoteVerified = quoteCcy?.policyRateSource === 'provider' && quoteCcy.inflationSource === 'provider'
+    && isFreshObservation(quoteCcy.policyRateObservationDate, 180)
+    && isFreshObservation(quoteCcy.inflationObservationDate, 120);
   const baseVerified = isGold
     ? false
-    : baseCcy?.policyRateSource === 'provider' && baseCcy.inflationSource === 'provider';
+    : baseCcy?.policyRateSource === 'provider' && baseCcy.inflationSource === 'provider'
+      && isFreshObservation(baseCcy.policyRateObservationDate, 180)
+      && isFreshObservation(baseCcy.inflationObservationDate, 120);
   const essentialEvidenceVerified = quoteVerified && baseVerified;
   let confidence: ConfidenceLevel = 'INSUFFICIENT_EVIDENCE';
   if (essentialEvidenceVerified && missingComponents === 0) confidence = 'HIGH';

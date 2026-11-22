@@ -78,6 +78,9 @@ function isCurrency(value: unknown): value is MacroCurrency {
     && (value.twoYearYieldSource === undefined || value.twoYearYieldSource === 'provider' || value.twoYearYieldSource === 'reference')
     && (value.policyRateSource === undefined || value.policyRateSource === 'provider' || value.policyRateSource === 'reference')
     && (value.inflationSource === undefined || value.inflationSource === 'provider' || value.inflationSource === 'reference')
+    && (value.policyRateObservationDate === undefined || typeof value.policyRateObservationDate === 'string')
+    && (value.inflationObservationDate === undefined || typeof value.inflationObservationDate === 'string')
+    && (value.twoYearYieldObservationDate === undefined || typeof value.twoYearYieldObservationDate === 'string')
     && typeof value.stance === 'string';
 }
 
@@ -144,10 +147,8 @@ async function getFredObservations(seriesId: string, apiKey: string): Promise<Ob
 
 async function getFredUsdUpdates(apiKey: string) {
   const [rateResult, pceResult, cpiResult, twoYearResult] = await Promise.allSettled([
-    getFredObservations('DFF', apiKey),
-    getFredObservations('PCEPILFE', apiKey),
-    getFredObservations('CPIAUCSL', apiKey),
-    getFredObservations('DGS2', apiKey),
+    getFredObservations('DFF', apiKey), getFredObservations('PCEPILFE', apiKey),
+    getFredObservations('CPIAUCSL', apiKey), getFredObservations('DGS2', apiKey),
   ]);
   const latestYearOverYear = (observations: Observation[]) => {
     const latest = observations[0];
@@ -161,9 +162,13 @@ async function getFredUsdUpdates(apiKey: string) {
   if (twoYearResult.status === 'rejected') console.warn('FRED 2-Year Treasury yield is unavailable:', twoYearResult.reason);
   return {
     policyRate: rateResult.status === 'fulfilled' ? rateResult.value[0]?.value : undefined,
+    policyRateObservationDate: rateResult.status === 'fulfilled' ? rateResult.value[0]?.date : undefined,
     corePce: pceResult.status === 'fulfilled' ? latestYearOverYear(pceResult.value) : undefined,
+    corePceObservationDate: pceResult.status === 'fulfilled' ? pceResult.value[0]?.date : undefined,
     cpi: cpiResult.status === 'fulfilled' ? latestYearOverYear(cpiResult.value) : undefined,
+    cpiObservationDate: cpiResult.status === 'fulfilled' ? cpiResult.value[0]?.date : undefined,
     twoYearYield: twoYearResult.status === 'fulfilled' ? twoYearResult.value[0]?.value : undefined,
+    twoYearYieldObservationDate: twoYearResult.status === 'fulfilled' ? twoYearResult.value[0]?.date : undefined,
   };
 }
 
@@ -291,7 +296,7 @@ async function getAlphaVantageUsdUpdates(apiKey: string) {
   const inflation = latestCpi && priorCpi && priorCpi.value !== 0
     ? (latestCpi.value / priorCpi.value - 1) * 100
     : undefined;
-  return { policyRate, inflation };
+  return { policyRate, policyRateObservationDate: rates[0]?.date, inflation, inflationObservationDate: latestCpi?.date };
 }
 
 async function getFmpCatalysts(apiKey: string): Promise<EconomicCatalyst[]> {
@@ -483,6 +488,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
       if (isFiniteNumber(fredResult.value.policyRate)) {
         usd.policyRate = fredResult.value.policyRate;
         usd.policyRateSource = 'provider';
+        usd.policyRateObservationDate = fredResult.value.policyRateObservationDate;
         hasLiveData = true;
       }
       if (isFiniteNumber(fredResult.value.corePce)) {
@@ -490,16 +496,19 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
         usd.inflationLabel = 'Core PCE';
         usd.corePce = fredResult.value.corePce;
         usd.inflationSource = 'provider';
+        usd.inflationObservationDate = fredResult.value.corePceObservationDate;
         hasLiveData = true;
       }
       if (isFiniteNumber(fredResult.value.cpi)) {
         usd.cpi = fredResult.value.cpi;
         usd.inflationSource = 'provider';
+        usd.inflationObservationDate = fredResult.value.cpiObservationDate;
         hasLiveData = true;
       }
       if (isFiniteNumber(fredResult.value.twoYearYield)) {
         usd.twoYearYield = fredResult.value.twoYearYield;
         usd.twoYearYieldSource = 'provider';
+        usd.twoYearYieldObservationDate = fredResult.value.twoYearYieldObservationDate;
         hasLiveData = true;
       }
       if (!isFiniteNumber(fredResult.value.corePce) && isFiniteNumber(fredResult.value.cpi)) {
@@ -540,17 +549,20 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
       if (isFiniteNumber(ecbResult.value.policyRate)) {
         eur.policyRate = ecbResult.value.policyRate;
         eur.policyRateSource = 'provider';
+        eur.policyRateObservationDate = ecbResult.value.policyRateObservationDate;
         hasLiveData = true;
       }
       if (isFiniteNumber(ecbResult.value.inflation)) {
         eur.inflation = ecbResult.value.inflation;
         eur.inflationLabel = 'HICP';
         eur.inflationSource = 'provider';
+        eur.inflationObservationDate = ecbResult.value.inflationObservationDate;
         hasLiveData = true;
       }
       if (isFiniteNumber(ecbResult.value.twoYearYield)) {
         eur.twoYearYield = ecbResult.value.twoYearYield;
         eur.twoYearYieldSource = 'provider';
+        eur.twoYearYieldObservationDate = ecbResult.value.twoYearYieldObservationDate;
         hasLiveData = true;
       }
     }
@@ -563,12 +575,14 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
       if (isFiniteNumber(bocResult.value.policyRate)) {
         cad.policyRate = bocResult.value.policyRate;
         cad.policyRateSource = 'provider';
+        cad.policyRateObservationDate = bocResult.value.policyRateObservationDate;
         hasLiveData = true;
       }
       if (isFiniteNumber(bocResult.value.inflation)) {
         cad.inflation = bocResult.value.inflation;
         cad.inflationLabel = 'CPI';
         cad.inflationSource = 'provider';
+        cad.inflationObservationDate = bocResult.value.inflationObservationDate;
         hasLiveData = true;
       }
     }
@@ -578,8 +592,9 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
   if (boeResult.status === 'fulfilled') {
     const gbp = snapshot.currencies.find((currency) => currency.code === 'GBP');
     if (gbp) {
-      gbp.policyRate = boeResult.value;
+      gbp.policyRate = boeResult.value.value;
       gbp.policyRateSource = 'provider';
+      gbp.policyRateObservationDate = boeResult.value.date;
       hasLiveData = true;
     }
   } else {
@@ -592,6 +607,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
       currency.inflation = observation.inflation;
       currency.inflationLabel = `CPI (annual, ${observation.year})`;
       currency.inflationSource = 'provider';
+      currency.inflationObservationDate = observation.observationDate;
       hasLiveData = true;
     }
   } else {
@@ -621,6 +637,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
         if (isFiniteNumber(alphaResult.value.policyRate)) {
           usd.policyRate = alphaResult.value.policyRate;
           usd.policyRateSource = 'provider';
+          usd.policyRateObservationDate = alphaResult.value.policyRateObservationDate;
           hasLiveData = true;
         }
         if (isFiniteNumber(alphaResult.value.inflation)) {
@@ -628,6 +645,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
           usd.cpi = alphaResult.value.inflation;
           usd.inflationLabel = 'CPI';
           usd.inflationSource = 'provider';
+          usd.inflationObservationDate = alphaResult.value.inflationObservationDate;
           hasLiveData = true;
         }
       }

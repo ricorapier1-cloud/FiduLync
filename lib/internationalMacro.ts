@@ -3,7 +3,7 @@ import 'server-only';
 import { getCachedData } from '@/lib/redisCache';
 
 type Observation = { date: string; value: number };
-export type WorldBankInflation = { currency: string; inflation: number; year: string };
+export type WorldBankInflation = { currency: string; inflation: number; year: string; observationDate: string };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -39,19 +39,21 @@ function parseCsvRow(row: string): string[] {
   return cells;
 }
 
-async function getEcbSeries(series: string): Promise<number | undefined> {
+async function getEcbSeries(series: string): Promise<{ value: number; date?: string } | undefined> {
   const url = new URL(`https://data-api.ecb.europa.eu/service/data/${series.replace('.', '/')}`);
   url.searchParams.set('lastNObservations', '1');
   url.searchParams.set('format', 'csvdata');
   const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8_000) });
   if (!response.ok) throw new Error(`ECB returned ${response.status} for ${series}.`);
   const rows = (await response.text()).trim().split(/\r?\n/);
-  const valueColumn = parseCsvRow(rows[0] ?? '').indexOf('OBS_VALUE');
-  const value = Number(parseCsvRow(rows.at(-1) ?? '')[valueColumn]);
-  if (valueColumn < 0 || !Number.isFinite(value)) {
-    throw new Error(`ECB returned no usable observation for ${series}.`);
-  }
-  return value;
+  const header = parseCsvRow(rows[0] ?? '');
+  const valueColumn = header.indexOf('OBS_VALUE');
+  const dateColumn = header.indexOf('TIME_PERIOD');
+  const last = parseCsvRow(rows.at(-1) ?? '');
+  const value = Number(last[valueColumn]);
+  const date = dateColumn >= 0 ? last[dateColumn] : undefined;
+  if (valueColumn < 0 || !Number.isFinite(value)) throw new Error(`ECB returned no usable observation for ${series}.`);
+  return { value, date };
 }
 
 export async function getEcbMacroInputs() {
@@ -64,9 +66,12 @@ export async function getEcbMacroInputs() {
   if (inflationResult.status === 'rejected') console.warn('ECB HICP is unavailable:', inflationResult.reason);
   if (yieldResult.status === 'rejected') console.warn('ECB 2-year benchmark yield is unavailable:', yieldResult.reason);
   return {
-    policyRate: policyResult.status === 'fulfilled' ? policyResult.value : undefined,
-    inflation: inflationResult.status === 'fulfilled' ? inflationResult.value : undefined,
-    twoYearYield: yieldResult.status === 'fulfilled' ? yieldResult.value : undefined,
+    policyRate: policyResult.status === 'fulfilled' ? policyResult.value?.value : undefined,
+    policyRateObservationDate: policyResult.status === 'fulfilled' ? policyResult.value?.date : undefined,
+    inflation: inflationResult.status === 'fulfilled' ? inflationResult.value?.value : undefined,
+    inflationObservationDate: inflationResult.status === 'fulfilled' ? inflationResult.value?.date : undefined,
+    twoYearYield: yieldResult.status === 'fulfilled' ? yieldResult.value?.value : undefined,
+    twoYearYieldObservationDate: yieldResult.status === 'fulfilled' ? yieldResult.value?.date : undefined,
   };
 }
 
@@ -76,10 +81,10 @@ function formatBankOfEnglandDate(date: Date) {
   return `${day}/${month}/${date.getUTCFullYear()}`;
 }
 
-export async function getBankOfEnglandPolicyRate() {
+export async function getBankOfEnglandPolicyRate(): Promise<{ value: number; date?: string }> {
   const url = new URL('https://www.bankofengland.co.uk/boeapps/database/_iadb-fromshowcolumns.asp');
   url.searchParams.set('csv.x', 'show');
-  url.searchParams.set('Datefrom', formatBankOfEnglandDate(new Date(Date.now() - 14 * 24 * 60 * 60 * 1_000)));
+  url.searchParams.set('Datefrom', formatBankOfEnglandDate(new Date(Date.now() - 180 * 24 * 60 * 60 * 1_000)));
   url.searchParams.set('Dateto', formatBankOfEnglandDate(new Date()));
   url.searchParams.set('SeriesCodes', 'IUDBEDR');
   url.searchParams.set('CSVF', 'TN');
@@ -89,10 +94,13 @@ export async function getBankOfEnglandPolicyRate() {
   const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8_000) });
   if (!response.ok) throw new Error(`Bank of England returned ${response.status} for official Bank Rate.`);
   const rows = (await response.text()).trim().split(/\r?\n/);
-  const valueColumn = parseCsvRow(rows[0] ?? '').indexOf('IUDBEDR');
+  const header = parseCsvRow(rows[0] ?? '');
+  const valueColumn = header.indexOf('IUDBEDR');
+  const dateColumn = header.findIndex((name) => name.toUpperCase() === 'DATE');
   for (const row of rows.slice(1).reverse()) {
-    const value = Number(parseCsvRow(row)[valueColumn]);
-    if (valueColumn >= 0 && Number.isFinite(value)) return value;
+    const cells = parseCsvRow(row);
+    const value = Number(cells[valueColumn]);
+    if (valueColumn >= 0 && Number.isFinite(value)) return { value, date: dateColumn >= 0 ? cells[dateColumn] : undefined };
   }
   throw new Error('Bank of England returned no usable official Bank Rate observation.');
 }
@@ -128,7 +136,9 @@ export async function getBankOfCanadaMacroInputs() {
   const cpi = cpiResult.status === 'fulfilled' ? cpiResult.value : [];
   return {
     policyRate: policy[0]?.value,
+    policyRateObservationDate: policy[0]?.date,
     inflation: latestYearOverYear(cpi),
+    inflationObservationDate: cpi[0]?.date,
   };
 }
 
@@ -149,7 +159,7 @@ async function getWorldBankInflation(countryCode: string, currency: string): Pro
       || typeof observation.value !== 'number' || !Number.isFinite(observation.value)) {
       throw new Error(`World Bank returned no usable ${countryCode} CPI observation.`);
     }
-    return { currency, inflation: observation.value, year: observation.date };
+    return { currency, inflation: observation.value, year: observation.date, observationDate: observation.date };
   }, 86_400);
 }
 
