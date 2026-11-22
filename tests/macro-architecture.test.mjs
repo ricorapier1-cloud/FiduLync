@@ -7,6 +7,8 @@ const storePage = readFileSync(new URL('../app/store/page.tsx', import.meta.url)
 const accountPage = readFileSync(new URL('../app/account/page.tsx', import.meta.url), 'utf8');
 const analyticsPage = readFileSync(new URL('../app/analytics/page.tsx', import.meta.url), 'utf8');
 const macroContextRoute = readFileSync(new URL('../app/api/v1/macro-context/route.ts', import.meta.url), 'utf8');
+const notebookPage = readFileSync(new URL('../app/notebook/page.tsx', import.meta.url), 'utf8');
+const providerTelemetry = readFileSync(new URL('../lib/macro/providerTelemetry.ts', import.meta.url), 'utf8');
 
 test('security: /owner returns a genuine 404 via notFound()', () => {
   assert.match(ownerPage, /notFound\(\)/);
@@ -24,11 +26,31 @@ test('architecture: /analytics redirects to /workbench', () => {
   assert.match(analyticsPage, /redirect\('\/workbench'\)/);
 });
 
-test('architecture: /api/v1/macro-context is read-only and strictly contains no trade execution', () => {
+test('security: macro context API fails closed when its secret is absent', () => {
+  assert.match(macroContextRoute, /if \(!expectedSecret\)/);
+  assert.match(macroContextRoute, /status: 503/);
+  assert.doesNotMatch(macroContextRoute, /if \(!macroSecret\) return true/);
+  assert.doesNotMatch(macroContextRoute, /isLocalhost/);
+  assert.match(macroContextRoute, /timingSafeEqual/);
+});
+
+test('architecture: /api/v1/macro-context is read-only and contains no trade execution', () => {
   assert.match(macroContextRoute, /export async function GET/);
   assert.doesNotMatch(macroContextRoute, /export async function POST/);
-  assert.doesNotMatch(macroContextRoute, /OrderSend|buy|sell|executeOrder|brokerPassword|tradeLot/i);
+  assert.doesNotMatch(macroContextRoute, /OrderSend|executeOrder|brokerPassword|tradeLot/i);
   assert.match(macroContextRoute, /checkRateLimit/);
+});
+
+test('research notebook starts empty and does not inject a fabricated demo thesis', () => {
+  assert.match(notebookPage, /useState<ResearchHypothesis\[]>\(\[\]\)/);
+  assert.doesNotMatch(notebookPage, /INITIAL_DEMO_HYPOTHESIS|hyp-sample-01/);
+  assert.match(notebookPage, /scenarioTotal !== 100/);
+});
+
+test('provider telemetry never reports health based on credential presence alone', () => {
+  assert.match(providerTelemetry, /status: provider\.configured \? 'DEGRADED' : 'UNCONFIGURED'/);
+  assert.match(providerTelemetry, /lastSuccessfulSyncUtc: null/);
+  assert.match(providerTelemetry, /latencyMs: null/);
 });
 
 test('architecture: research notebook and workbench pages exist', () => {
