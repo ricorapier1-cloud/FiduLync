@@ -62,8 +62,16 @@ class PersonalQuantSecurityContractTests(unittest.TestCase):
 
     def test_broker_ingestion_and_ea_supervisor_are_retired(self):
         routes = (
+            "app/api/mt5/ingest/route.ts",
+            "app/api/owner/portfolio-risk/route.ts",
+            "app/api/owner/artifacts/route.ts",
+            "app/api/owner/artifacts/upload-url/route.ts",
+            "app/api/owner/artifacts/register/route.ts",
+            "app/api/macro/quotes/route.ts",
             "app/api/v1/market-data/ingest/route.ts",
             "app/api/v1/ea-supervisor/decision/route.ts",
+            "app/api/v1/ea-heartbeat/route.ts",
+            "app/api/v1/trade-log/route.ts",
         )
         for route in routes:
             with self.subTest(route=route):
@@ -89,8 +97,6 @@ class PersonalQuantSecurityContractTests(unittest.TestCase):
                 self.assertFalse((ROOT / path).exists())
         for route in (
             "app/api/owner/mt5-installations/route.ts",
-            "app/api/owner/artifacts/upload-url/route.ts",
-            "app/api/owner/artifacts/register/route.ts",
         ):
             with self.subTest(route=route):
                 source = self.read(route)
@@ -102,11 +108,11 @@ class PersonalQuantSecurityContractTests(unittest.TestCase):
     def test_personal_risk_policy_discloses_research_only_boundary(self):
         terms = self.read("app/terms/page.tsx")
         readme = self.read("README.md")
-        self.assertIn("Personal Quant Edition", terms)
-        self.assertIn("not investment advice", terms)
-        self.assertIn("does not place, modify or close broker orders", terms)
+        self.assertIn("FiduLync / MacroLync", terms)
+        self.assertIn("research tools only", terms)
+        self.assertIn("never places, modifies or closes broker orders", terms)
         self.assertIn("FRED", terms)
-        self.assertIn("No user login or owner-console interface", readme)
+        self.assertIn("No browser Owner Console", readme)
 
 
 if __name__ == "__main__":
