@@ -32,7 +32,7 @@ export default function MacroResearchNotebook() {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed: unknown = JSON.parse(stored);
-        if (Array.isArray(parsed)) setHypotheses(parsed as ResearchHypothesis[]);
+        if (Array.isArray(parsed)) queueMicrotask(() => setHypotheses(parsed as ResearchHypothesis[]));
       }
     } catch {
       // An unreadable local notebook must not be replaced with fabricated sample research.
