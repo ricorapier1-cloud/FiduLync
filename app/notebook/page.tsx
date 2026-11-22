@@ -16,9 +16,9 @@ const STORAGE_KEY = 'macrolync_research_notebook_v1';
 export default function MacroResearchNotebook() {
   const [hypotheses, setHypotheses] = useState<ResearchHypothesis[]>([]);
   const [selectedPair, setSelectedPair] = useState<string>('EURUSD');
-  const [selectedRegime, setSelectedRegime] = useState<MacroRegime>('POLICY_DIVERGENCE_CARRY');
-  const [selectedBias, setSelectedBias] = useState<FundamentalBias>('BEARISH');
-  const [selectedConfidence, setSelectedConfidence] = useState<ConfidenceLevel>('HIGH');
+  const [selectedRegime, setSelectedRegime] = useState<MacroRegime>('INSUFFICIENT_EVIDENCE');
+  const [selectedBias, setSelectedBias] = useState<FundamentalBias>('NEUTRAL');
+  const [selectedConfidence, setSelectedConfidence] = useState<ConfidenceLevel>('INSUFFICIENT_EVIDENCE');
   const [thesisText, setThesisText] = useState('');
   const [supportingEvidence, setSupportingEvidence] = useState('');
   const [invalidationText, setInvalidationText] = useState('');
