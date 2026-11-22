@@ -10,6 +10,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function isFreshObservation(date: string | undefined, maxAgeDays: number): boolean {
+  if (!date) return false;
+  const timestamp = Date.parse(date);
+  const age = Date.now() - timestamp;
+  return Number.isFinite(timestamp) && age >= -5 * 60_000 && age <= maxAgeDays * 86_400_000;
+}
+
 function ruleBasedBrief(snapshot: Awaited<ReturnType<typeof getMacroSnapshot>>): MacroBrief {
   const strengths = getCurrencyStrengthIndex(snapshot);
   const strongest = strengths[0];
@@ -44,7 +51,9 @@ async function generateGeminiBrief(
   if (!apiKey) return fallback;
 
   const inputs = {
-    rateDifferentials: snapshot.currencies.filter((currency) => currency.policyRateSource === 'provider' && currency.inflationSource === 'provider').map((currency) => ({
+    rateDifferentials: snapshot.currencies.filter((currency) => currency.policyRateSource === 'provider' && currency.inflationSource === 'provider'
+      && isFreshObservation(currency.policyRateObservationDate, 180)
+      && isFreshObservation(currency.inflationObservationDate, 120)).map((currency) => ({
       currency: currency.code,
       policyRatePct: currency.policyRate,
       inflationPct: currency.inflation,
@@ -56,6 +65,9 @@ async function generateGeminiBrief(
     tierOneCalendar: snapshot.catalysts.filter((item) => item.impact === 'High')
       .sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt)).slice(0, 5),
   };
+  if (inputs.rateDifferentials.length < 2 && inputs.csi.length < 2 && inputs.cotExtremes.length === 0 && inputs.tierOneCalendar.length === 0) {
+    return fallback;
+  }
   const url = new URL('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent');
   url.searchParams.set('key', apiKey);
   const response = await fetch(url, {

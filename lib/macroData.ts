@@ -607,7 +607,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
       currency.inflation = observation.inflation;
       currency.inflationLabel = `CPI (annual, ${observation.year})`;
       currency.inflationSource = 'provider';
-      currency.inflationObservationDate = observation.observationDate;
+      currency.inflationObservationDate = observation.observationDate || observation.year;
       hasLiveData = true;
     }
   } else {

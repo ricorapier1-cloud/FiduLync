@@ -73,10 +73,12 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
   const quoteInflation = quoteCcy?.inflation ?? 2.8;
   const baseReal = isGold ? -crossAsset.usTenYearRealYield : (basePolicy - baseInflation);
   const quoteReal = quotePolicy - quoteInflation;
-  const realYieldDiffBps = Math.round((baseReal - quoteReal) * 100);
+  const realYieldDiffBps = essentialEvidenceVerified ? Math.round((baseReal - quoteReal) * 100) : 0;
 
-  const base2Y = isGold ? null : (baseCcy?.twoYearYield ?? null);
-  const quote2Y = quoteCcy?.twoYearYield ?? null;
+  const base2Y = !isGold && baseCcy?.twoYearYieldSource === 'provider' && isFreshObservation(baseCcy.twoYearYieldObservationDate, 60)
+    ? baseCcy.twoYearYield ?? null : null;
+  const quote2Y = quoteCcy?.twoYearYieldSource === 'provider' && isFreshObservation(quoteCcy.twoYearYieldObservationDate, 60)
+    ? quoteCcy.twoYearYield ?? null : null;
   const twoYearYieldDiffBps = base2Y !== null && quote2Y !== null
     ? Math.round((base2Y - quote2Y) * 100)
     : null;

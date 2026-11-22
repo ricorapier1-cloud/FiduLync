@@ -70,9 +70,11 @@ export function getFundamentalSignal(snapshot: MacroSnapshot, pair: string): Fun
     ? Math.round(((base.policyRate - base.inflation) - (quote.policyRate - quote.inflation)) * 100)
     : Math.round(-(quote.policyRate - quote.inflation) * 100);
   const cotPositionDiff = baseCot && quoteCot ? Math.round(baseCot.percentile - quoteCot.percentile) : 0;
-  const twoYearDiffBps = base?.twoYearYield !== undefined && quote.twoYearYield !== undefined
-    ? Math.round((base.twoYearYield - quote.twoYearYield) * 100)
-    : null;
+  const twoYearDiffBps = base.twoYearYieldSource === 'provider' && quote.twoYearYieldSource === 'provider'
+    && isFreshMacroObservation(base.twoYearYieldObservationDate, 60)
+    && isFreshMacroObservation(quote.twoYearYieldObservationDate, 60)
+    && base.twoYearYield !== undefined && quote.twoYearYield !== undefined
+      ? Math.round((base.twoYearYield - quote.twoYearYield) * 100) : null;
   // Cross-asset risk appetite is unavailable until synchronized market feeds exist.
   const roroScore = 0;
   const rawScore = (base.policyRate - quote.policyRate) * 12
