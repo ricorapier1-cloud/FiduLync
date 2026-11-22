@@ -809,7 +809,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
 }
 
 async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) return null;
+  if (!(process.env.SUPABASE_SECRET_KEY?.trim() || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim())) return null;
   try {
     const { data, error } = await getSupabaseAdmin().from('macro_snapshot_payloads')
       .select('payload,refreshed_at')
@@ -847,7 +847,7 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
 }
 
 async function persistMacroSnapshot(snapshot: MacroSnapshot): Promise<void> {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) return;
+  if (!(process.env.SUPABASE_SECRET_KEY?.trim() || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim())) return;
   const refreshedAt = snapshot.asOf && Number.isFinite(Date.parse(snapshot.asOf))
     ? snapshot.asOf
     : new Date().toISOString();
