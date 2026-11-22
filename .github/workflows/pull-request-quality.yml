@@ -24,6 +24,8 @@ jobs:
         run: npx tsc --noEmit
       - name: Lint
         run: npm run lint
+      - name: Unit and architecture tests
+        run: npm test
       - name: Production build
         run: npm run build
       - name: Setup Python for MT5 publisher syntax check
