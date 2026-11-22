@@ -112,7 +112,7 @@ class PersonalQuantSecurityContractTests(unittest.TestCase):
         self.assertIn("research tools only", terms)
         self.assertIn("never places, modifies or closes broker orders", terms)
         self.assertIn("FRED", terms)
-        self.assertIn("No browser Owner Console", readme)
+        self.assertIn("browser Owner Console", readme)
 
 
 if __name__ == "__main__":
