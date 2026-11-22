@@ -13,35 +13,8 @@ const G8_PAIRS = [
 
 const STORAGE_KEY = 'macrolync_research_notebook_v1';
 
-const INITIAL_DEMO_HYPOTHESIS: ResearchHypothesis = {
-  id: 'hyp-sample-01',
-  pair: 'USDJPY',
-  regime: 'POLICY_DIVERGENCE_CARRY',
-  bias: 'BULLISH',
-  confidence: 'HIGH',
-  thesis: 'Fed restrictive terminal hold (4.75%) against BoJ measured gradualism (0.25%) preserves wide rate carry differential in favor of USD, bounded by Japanese MoF rhetorical intervention thresholds near 158.00.',
-  supportingEvidence: [
-    'Nominal policy rate spread of +450 bps favors USD.',
-    'US 2Y sovereign bond yield holds above 4.25% vs JGB 2Y yield at 0.55%.',
-    'CFTC COT reports commercial hedging absorbing speculative JPY longs.',
-  ],
-  invalidationConditions: [
-    'BoJ surprise inter-meeting hike > 25 bps.',
-    'US Core PCE deceleration dropping below 2.2% triggering accelerated Fed cuts.',
-    'Direct physical FX intervention confirmation by Japan Ministry of Finance.',
-  ],
-  scenarios: {
-    bullPct: 60,
-    basePct: 25,
-    bearPct: 15,
-  },
-  status: 'ACTIVE',
-  createdAtUtc: new Date().toISOString(),
-  updatedAtUtc: new Date().toISOString(),
-};
-
 export default function MacroResearchNotebook() {
-  const [hypotheses, setHypotheses] = useState<ResearchHypothesis[]>([INITIAL_DEMO_HYPOTHESIS]);
+  const [hypotheses, setHypotheses] = useState<ResearchHypothesis[]>([]);
   const [selectedPair, setSelectedPair] = useState<string>('EURUSD');
   const [selectedRegime, setSelectedRegime] = useState<MacroRegime>('POLICY_DIVERGENCE_CARRY');
   const [selectedBias, setSelectedBias] = useState<FundamentalBias>('BEARISH');
@@ -59,20 +32,24 @@ export default function MacroResearchNotebook() {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           queueMicrotask(() => {
             setHypotheses(parsed);
           });
         }
       }
     } catch {
-      // Use initial state
+      // Preserve an empty notebook when stored data cannot be parsed.
     }
   }, []);
 
   const saveHypothesis = (e: React.FormEvent) => {
     e.preventDefault();
     if (!thesisText.trim()) return;
+    if ([bullPct, basePct, bearPct].some((value) => !Number.isFinite(value) || value < 0 || value > 100) || bullPct + basePct + bearPct !== 100) {
+      window.alert('Bull, base and bear scenario probabilities must total exactly 100%.');
+      return;
+    }
 
     const newHypothesis: ResearchHypothesis = {
       id: `hyp-${Date.now()}`,
