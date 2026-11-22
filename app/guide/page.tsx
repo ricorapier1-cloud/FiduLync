@@ -46,7 +46,7 @@ export default function MacroLyncGuidePage() {
 
         <section className="rounded-xl border border-white/10 bg-[#0c1016] p-5 sm:p-6">
           <h2 className="text-base font-semibold">Important data limitations</h2>
-          <p className="mt-3 text-sm leading-6 text-slate-300">A configured API key does not prove that a provider subscription or display entitlement is active. OIS/futures repricing, options-implied volatility, forwards and cross-currency basis remain unavailable unless a suitable licensed feed is connected and verified. Economic observations update on their publishers' release schedules; they are not tick-by-tick data.</p>
+          <p className="mt-3 text-sm leading-6 text-slate-300">A configured API key does not prove that a provider subscription or display entitlement is active. OIS/futures repricing, options-implied volatility, forwards and cross-currency basis remain unavailable unless a suitable licensed feed is connected and verified. Economic observations update on their publishers&apos; release schedules; they are not tick-by-tick data.</p>
           <p className="mt-3 text-sm leading-6 text-slate-400">Never interpret a reference exchange rate, cached observation, model estimate or stale value as a live tradable quote. FiduLync is a research tool, not a broker, signal guarantee or trade execution service.</p>
         </section>
       </div>
