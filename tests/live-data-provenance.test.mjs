@@ -115,7 +115,7 @@ test('MT5 macro context is installation-authenticated and read-only', () => {
   assert.match(macroContextApi, /createHash\('sha256'\)/);
   assert.match(macroContextApi, /token_hash=eq\./);
   assert.match(macroContextApi, /status=eq\.active/);
-  assert.match(macroContextApi, /X-MT5-Timestamp/);
+  assert.match(macroContextApi, /x-mt5-timestamp/);
   assert.match(macroContextApi, /enforceDistributedRateLimit/);
   assert.match(macroContextApi, /high_impact_lockout: !calendarVerified/);
   assert.match(macroContextApi, /INSUFFICIENT_EVIDENCE/);
