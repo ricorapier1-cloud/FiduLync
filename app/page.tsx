@@ -1,24 +1,9 @@
-import MacroDashboard from '@/app/components/MacroDashboard';
+import MacroIntelligenceDashboard from '@/app/components/MacroIntelligenceDashboard';
 import { getMacroSnapshot } from '@/lib/macroEngine';
-import { getMarketQuotes } from '@/lib/marketFeeds';
-import type { MarketQuote } from '@/types/macro';
 
 export const dynamic = 'force-dynamic';
 
 export default async function Home() {
-  const [initialSnapshot, initialQuotes] = await Promise.all([
-    getMacroSnapshot(),
-    getMarketQuotes().catch((error: unknown) => {
-      console.warn('Initial market quotes are unavailable; the dashboard will retry.', error);
-      return [] as MarketQuote[];
-    }),
-  ]);
-  return (
-    <MacroDashboard
-      initialSnapshot={initialSnapshot}
-      initialQuotes={initialQuotes}
-    />
-  );
+  const snapshot = await getMacroSnapshot();
+  return <MacroIntelligenceDashboard snapshot={snapshot} />;
 }
-
-// Cache-bust timestamp: 1794746778579
