@@ -488,7 +488,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
       if (isFiniteNumber(fredResult.value.policyRate)) {
         usd.policyRate = fredResult.value.policyRate;
         usd.policyRateSource = 'provider';
-        usd.policyRateObservationDate = fredResult.value.policyRateObservationDate;
+        usd.policyRateObservationDate = typeof fredResult.value.policyRateObservationDate === 'string' ? fredResult.value.policyRateObservationDate : undefined;
         hasLiveData = true;
       }
       if (isFiniteNumber(fredResult.value.corePce)) {
@@ -496,19 +496,19 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
         usd.inflationLabel = 'Core PCE';
         usd.corePce = fredResult.value.corePce;
         usd.inflationSource = 'provider';
-        usd.inflationObservationDate = fredResult.value.corePceObservationDate;
+        usd.inflationObservationDate = typeof fredResult.value.corePceObservationDate === 'string' ? fredResult.value.corePceObservationDate : undefined;
         hasLiveData = true;
       }
       if (isFiniteNumber(fredResult.value.cpi)) {
         usd.cpi = fredResult.value.cpi;
         usd.inflationSource = 'provider';
-        usd.inflationObservationDate = fredResult.value.cpiObservationDate;
+        usd.inflationObservationDate = typeof fredResult.value.cpiObservationDate === 'string' ? fredResult.value.cpiObservationDate : undefined;
         hasLiveData = true;
       }
       if (isFiniteNumber(fredResult.value.twoYearYield)) {
         usd.twoYearYield = fredResult.value.twoYearYield;
         usd.twoYearYieldSource = 'provider';
-        usd.twoYearYieldObservationDate = fredResult.value.twoYearYieldObservationDate;
+        usd.twoYearYieldObservationDate = typeof fredResult.value.twoYearYieldObservationDate === 'string' ? fredResult.value.twoYearYieldObservationDate : undefined;
         hasLiveData = true;
       }
       if (!isFiniteNumber(fredResult.value.corePce) && isFiniteNumber(fredResult.value.cpi)) {
@@ -637,7 +637,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
         if (isFiniteNumber(alphaResult.value.policyRate)) {
           usd.policyRate = alphaResult.value.policyRate;
           usd.policyRateSource = 'provider';
-          usd.policyRateObservationDate = alphaResult.value.policyRateObservationDate;
+          usd.policyRateObservationDate = typeof alphaResult.value.policyRateObservationDate === 'string' ? alphaResult.value.policyRateObservationDate : undefined;
           hasLiveData = true;
         }
         if (isFiniteNumber(alphaResult.value.inflation)) {
@@ -645,7 +645,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
           usd.cpi = alphaResult.value.inflation;
           usd.inflationLabel = 'CPI';
           usd.inflationSource = 'provider';
-          usd.inflationObservationDate = alphaResult.value.inflationObservationDate;
+          usd.inflationObservationDate = typeof alphaResult.value.inflationObservationDate === 'string' ? alphaResult.value.inflationObservationDate : undefined;
           hasLiveData = true;
         }
       }
