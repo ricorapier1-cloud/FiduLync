@@ -42,7 +42,11 @@ export async function supabaseQuery<T = unknown>(
     throw new Error(`Supabase ${table} error (${response.status}): ${text}`);
   }
 
-  return (await response.json()) as T;
+  const responseText = await response.text();
+  if (!responseText) return {} as T;
+  try { return JSON.parse(responseText) as T; } catch {
+    throw new Error(`Supabase ${table} returned an invalid JSON response.`);
+  }
 }
 
 export async function supabaseInsert<T = unknown>(
@@ -70,17 +74,21 @@ export async function supabaseRead<T = unknown>(
 
 export type LicenseRecord = {
   license_key: string;
-  mt5_account: number;
+  mt5_account: number | null;
   email: string;
   tier?: string;
   status?: string;
   expires_at?: string | null;
+  ea_slug?: string;
+  included_live_seats?: number;
+  included_demo_seats?: number;
+  extra_live_seats?: number;
 };
 
 export async function persistLicense(license: LicenseRecord) {
   return supabaseQuery('licenses', {
     method: 'POST',
-    prefer: 'resolution=merge-duplicates',
+    prefer: 'resolution=merge-duplicates,return=representation',
     body: {
       license_key: license.license_key,
       mt5_account: license.mt5_account,
@@ -88,6 +96,10 @@ export async function persistLicense(license: LicenseRecord) {
       tier: license.tier || 'INSTITUTIONAL_PRO',
       status: license.status || 'active',
       expires_at: license.expires_at ?? null,
+      ea_slug: license.ea_slug ?? null,
+      included_live_seats: license.included_live_seats ?? 1,
+      included_demo_seats: license.included_demo_seats ?? 2,
+      extra_live_seats: license.extra_live_seats ?? 0,
       created_at: new Date().toISOString(),
     },
   });

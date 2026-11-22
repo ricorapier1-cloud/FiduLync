@@ -9,23 +9,24 @@ const jetBrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jet
 
 export const metadata: Metadata = {
   metadataBase: getAppBaseUrl(),
-  applicationName: 'MacroLync & AlgoLync Terminal',
+  applicationName: 'FiduLync MacroLync',
   title: {
-    default: 'MacroLync & AlgoLync | Institutional Trading Terminal',
-    template: '%s | MacroLync & AlgoLync',
+    default: 'FiduLync MacroLync | Fundamental Intelligence',
+    template: '%s | FiduLync MacroLync',
   },
-  description: 'MacroLync quantitative FX and macro research with the AlgoLync strategy vault and MT5 telemetry bridge.',
+  description: 'Private institutional macroeconomic, monetary-policy, cross-asset and fundamental FX research with source provenance and a read-only MT5 macro context bridge.',
+  robots: { index: false, follow: false, noarchive: true },
   openGraph: {
     type: 'website',
-    siteName: 'MacroLync & AlgoLync',
-    title: 'MacroLync & AlgoLync | Institutional Trading Terminal',
-    description: 'MacroLync quantitative FX and macro research with the AlgoLync strategy vault and MT5 telemetry bridge.',
+    siteName: 'FiduLync MacroLync',
+    title: 'FiduLync MacroLync | Fundamental Intelligence',
+    description: 'Macroeconomic and fundamental FX research with source provenance. No broker order execution.',
     images: ['/opengraph-image.png'],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'MacroLync & AlgoLync | Institutional Trading Terminal',
-    description: 'MacroLync FX research, AlgoLync strategies, event risk, and MT5 fleet telemetry.',
+    title: 'FiduLync MacroLync | Fundamental Intelligence',
+    description: 'Macroeconomic and fundamental FX research with source provenance. No broker order execution.',
     images: ['/opengraph-image.png'],
   },
 };

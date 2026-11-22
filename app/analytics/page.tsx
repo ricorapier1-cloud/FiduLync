@@ -1,79 +1,126 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
+import { getMacroSnapshot } from '@/lib/macroEngine';
 
-const REGIME_HISTORY = [
-  { quarter: '2026 Q3', regime: 'POLICY DIVERGENCE', topSpread: 'USD / JPY (+145)', winRate: '64.2%', profitFactor: '1.94', maxDd: '4.1%' },
-  { quarter: '2026 Q2', regime: 'CARRY COMPRESSION', topSpread: 'NOK / CHF (+108)', winRate: '61.8%', profitFactor: '1.78', maxDd: '4.8%' },
-  { quarter: '2026 Q1', regime: 'DISINFLATION PIVOT', topSpread: 'GBP / JPY (+122)', winRate: '66.0%', profitFactor: '2.11', maxDd: '3.6%' },
-  { quarter: '2025 Q4', regime: 'RATE HOLD PLATEAU', topSpread: 'AUD / CHF (+96)', winRate: '59.4%', profitFactor: '1.65', maxDd: '5.2%' },
-];
+export const dynamic = 'force-dynamic';
+export const metadata: Metadata = {
+  title: 'Cross-Asset Macro Research',
+  description: 'Source-attributed cross-asset macro observations and G8 monetary-policy context.',
+};
 
-export default function AnalyticsPage() {
+function valueLabel(value: number | undefined, suffix = '') {
+  return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) + suffix : 'UNAVAILABLE';
+}
+
+function dateLabel(value: string | undefined) {
+  if (!value) return 'Timestamp unavailable';
+  const time = Date.parse(value);
+  return Number.isFinite(time) ? new Date(time).toISOString().replace('T', ' ').replace('.000Z', ' UTC') : 'Timestamp invalid';
+}
+
+export default async function CrossAssetMacroPage() {
+  const snapshot = await getMacroSnapshot();
+  const us = snapshot.usIndicators;
+  const assets = [
+    { name: 'US 10Y nominal Treasury yield', value: us?.tenYearTreasuryYieldPct, asOf: us?.tenYearTreasuryYieldAsOf, unit: '%' },
+    { name: 'US 10Y TIPS real yield', value: us?.tenYearRealYieldPct, asOf: us?.tenYearRealYieldAsOf, unit: '%' },
+    { name: 'US 10Y breakeven inflation', value: us?.tenYearBreakevenInflationPct, asOf: us?.tenYearBreakevenInflationAsOf, unit: '%' },
+    { name: 'US broad trade-weighted USD index', value: us?.usdBroadIndex, asOf: us?.usdBroadIndexAsOf, unit: '' },
+    { name: 'VIX', value: us?.vixIndex, asOf: us?.vixIndexAsOf, unit: '' },
+    { name: 'S&P 500 index', value: us?.sp500Index, asOf: us?.sp500IndexAsOf, unit: '' },
+    { name: 'WTI crude oil', value: us?.wtiOilUsd, asOf: us?.wtiOilAsOf, unit: ' USD' },
+    { name: 'Brent crude oil', value: us?.brentOilUsd, asOf: us?.brentOilAsOf, unit: ' USD' },
+    { name: 'US high-yield credit spread', value: us?.usHighYieldSpreadPct, asOf: us?.usHighYieldSpreadAsOf, unit: '%' },
+  ];
+  const catalysts = [...snapshot.catalysts].sort((a, b) => Date.parse(a.scheduledAt) - Date.parse(b.scheduledAt));
+  const sourceLabel = snapshot.source === 'provider' ? 'PROVIDER' : snapshot.source === 'partial' ? 'PARTIAL' : 'UNAVAILABLE';
+
   return (
-    <main className="min-h-screen bg-[#030A08] text-emerald-50 px-4 py-10 pb-36">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-8 flex items-center justify-between">
-          <Link href="/" className="text-xs font-mono text-emerald-400 hover:underline">
-            ← BACK TO MACRO TERMINAL
-          </Link>
-          <Link href="/store" className="text-xs font-mono px-3 py-1.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20">
-            OPEN ALGOLYNX VAULT →
-          </Link>
-        </div>
+    <div className="min-h-screen bg-[#050b10] px-4 py-8 pb-24 text-slate-100 sm:px-6">
+      <div className="mx-auto max-w-7xl space-y-8">
+        <Link href="/" className="font-mono text-xs text-emerald-300 hover:underline">← BACK TO MACRO TERMINAL</Link>
+        <header className="border-b border-white/10 pb-6">
+          <p className="font-mono text-[10px] tracking-[0.2em] text-emerald-300">MACROLYNC / CROSS-ASSET RESEARCH</p>
+          <h1 className="mt-3 text-3xl font-semibold">Cross-asset macro observations</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">Source-attributed observations for macro research. These are not executable quotes. Each value retains its publisher observation date; unavailable fields remain blank rather than being estimated.</p>
+          <div className="mt-4 flex flex-wrap gap-4 font-mono text-[10px] text-slate-400">
+            <span>SNAPSHOT: {sourceLabel}</span>
+            <span>AS OF: {dateLabel(snapshot.asOf)}</span>
+            <span>RETRIEVED: {dateLabel(us?.retrievedAt)}</span>
+          </div>
+        </header>
 
-        <div className="mb-8">
-          <p className="text-xs font-mono text-emerald-400 tracking-widest mb-2">QUANTITATIVE VALIDATION / G10 REGIMES</p>
-          <h1 className="text-3xl font-bold tracking-tight mb-2">Regime History & Execution Telemetry</h1>
-          <p className="text-sm text-emerald-200/70">
-            Historical policy-divergence spread performance filtered by COT percentile extremes and rollover risk shields.
-          </p>
-        </div>
+        <section>
+          <h2 className="mb-3 text-lg font-semibold">Cross-asset observations</h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {assets.map((asset) => (
+              <article key={asset.name} className="rounded-xl border border-white/10 bg-[#0b141c] p-4">
+                <p className="text-xs text-slate-400">{asset.name}</p>
+                <p className="mt-2 font-mono text-2xl font-semibold">{valueLabel(asset.value, asset.unit)}</p>
+                <p className="mt-2 text-[10px] text-slate-500">{dateLabel(asset.asOf)}</p>
+                <p className="mt-1 text-[10px] text-slate-500">{us?.sources?.join(' · ') || 'Source manifest unavailable'}</p>
+              </article>
+            ))}
+          </div>
+        </section>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-          <div className="bg-[#06120E] border border-emerald-500/20 rounded-lg p-4">
-            <p className="text-[10px] font-mono text-emerald-400/70">AGGREGATE PF</p>
-            <p className="text-2xl font-mono font-bold text-emerald-400 mt-1">1.87</p>
+        <section>
+          <h2 className="mb-3 text-lg font-semibold">G8 policy and inflation differential context</h2>
+          <div className="overflow-x-auto rounded-xl border border-white/10">
+            <table className="w-full min-w-[760px] text-left text-xs">
+              <thead className="bg-white/[0.04] text-slate-400">
+                <tr><th className="p-3">Currency</th><th className="p-3">Central bank</th><th className="p-3">Policy rate</th><th className="p-3">Inflation</th><th className="p-3">Policy − inflation proxy</th><th className="p-3">As of</th></tr>
+              </thead>
+              <tbody>
+                {snapshot.currencies.filter((item) => ['USD','EUR','GBP','JPY','CHF','CAD','AUD','NZD'].includes(item.code)).map((item) => (
+                  <tr key={item.code} className="border-t border-white/[0.06]">
+                    <td className="p-3 font-mono font-semibold">{item.code}</td><td className="p-3">{item.centralBank}</td>
+                    <td className="p-3 font-mono">{valueLabel(item.policyRate, '%')} <span className="text-[10px] text-slate-500">{item.policyRateProvider ?? item.policyRateSource ?? ''}</span></td>
+                    <td className="p-3 font-mono">{valueLabel(item.inflation, '%')} <span className="text-[10px] text-slate-500">{item.inflationProvider ?? item.inflationSource ?? ''}</span></td>
+                    <td className="p-3 font-mono">{valueLabel(item.policyRate - item.inflation, ' pp')}</td>
+                    <td className="p-3 text-slate-500">{dateLabel(item.policyRateAsOf)}</td>
+                  </tr>
+                ))}
+                {snapshot.currencies.filter((item) => ['USD','EUR','GBP','JPY','CHF','CAD','AUD','NZD'].includes(item.code)).length === 0 && (
+                  <tr><td className="p-4 text-slate-500" colSpan={6}>No verified G8 currency observations are currently available.</td></tr>
+                )}
+              </tbody>
+            </table>
           </div>
-          <div className="bg-[#06120E] border border-emerald-500/20 rounded-lg p-4">
-            <p className="text-[10px] font-mono text-emerald-400/70">MEAN WIN RATE</p>
-            <p className="text-2xl font-mono font-bold text-white mt-1">62.8%</p>
-          </div>
-          <div className="bg-[#06120E] border border-emerald-500/20 rounded-lg p-4">
-            <p className="text-[10px] font-mono text-emerald-400/70">PEAK DRAWDOWN</p>
-            <p className="text-2xl font-mono font-bold text-emerald-300 mt-1">5.2%</p>
-          </div>
-          <div className="bg-[#06120E] border border-emerald-500/20 rounded-lg p-4">
-            <p className="text-[10px] font-mono text-emerald-400/70">POLICY INPUTS</p>
-            <p className="text-2xl font-mono font-bold text-emerald-400 mt-1">11 / 11</p>
-          </div>
-        </div>
+          <p className="mt-2 text-[10px] leading-5 text-slate-500">Policy minus inflation is a simple ex-post proxy, not a matched-maturity market real yield or an OIS-implied policy path.</p>
+        </section>
 
-        <div className="bg-[#06120E] border border-emerald-500/25 rounded-xl overflow-x-auto">
-          <table className="w-full text-left font-mono text-xs">
-            <thead className="border-b border-emerald-500/20 text-emerald-400/80 bg-black/30">
-              <tr>
-                <th className="p-3.5">WINDOW</th>
-                <th className="p-3.5">DOMINANT REGIME</th>
-                <th className="p-3.5">TOP CSI SPREAD</th>
-                <th className="p-3.5">WIN RATE</th>
-                <th className="p-3.5">PROFIT FACTOR</th>
-                <th className="p-3.5">MAX DD</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-emerald-500/10">
-              {REGIME_HISTORY.map((row) => (
-                <tr key={row.quarter} className="hover:bg-emerald-500/5">
-                  <td className="p-3.5 font-bold text-emerald-300">{row.quarter}</td>
-                  <td className="p-3.5">{row.regime}</td>
-                  <td className="p-3.5 text-emerald-400">{row.topSpread}</td>
-                  <td className="p-3.5">{row.winRate}</td>
-                  <td className="p-3.5 font-bold">{row.profitFactor}</td>
-                  <td className="p-3.5 text-emerald-200/70">{row.maxDd}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <section>
+          <h2 className="mb-3 text-lg font-semibold">CFTC positioning context</h2>
+          <div className="overflow-x-auto rounded-xl border border-white/10">
+            <table className="w-full min-w-[620px] text-left text-xs">
+              <thead className="bg-white/[0.04] text-slate-400"><tr><th className="p-3">Market</th><th className="p-3">Net contracts</th><th className="p-3">Historical percentile</th><th className="p-3">Weekly change</th><th className="p-3">Observation</th></tr></thead>
+              <tbody>
+                {snapshot.cot.map((item) => (
+                  <tr key={item.market} className="border-t border-white/[0.06]"><td className="p-3 font-mono">{item.market}</td><td className="p-3 font-mono">{item.netContracts.toLocaleString('en-US')}</td><td className="p-3 font-mono">{item.percentile.toFixed(1)}%</td><td className="p-3 font-mono">{item.weeklyChange.toLocaleString('en-US')}</td><td className="p-3 text-slate-500">{dateLabel(item.asOf)}</td></tr>
+                ))}
+                {snapshot.cot.length === 0 && <tr><td className="p-4 text-slate-500" colSpan={5}>COT positioning is unavailable or not verified under the current provider policy.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-[10px] text-slate-500">COT is weekly positioning data, not live order flow or dealer positioning.</p>
+        </section>
+
+        <section>
+          <h2 className="mb-3 text-lg font-semibold">Economic catalysts</h2>
+          <div className="space-y-2">
+            {catalysts.map((event) => (
+              <article key={event.id} className="rounded-lg border border-white/10 bg-[#0b141c] p-3 sm:flex sm:items-center sm:justify-between">
+                <div><p className="text-sm font-medium">{event.title}</p><p className="mt-1 text-xs text-slate-500">{event.region} · {event.impact} impact</p></div>
+                <div className="mt-2 text-left font-mono text-[10px] text-slate-400 sm:mt-0 sm:text-right">{dateLabel(event.scheduledAt)}<p>Consensus: {event.consensus} · Actual: {event.actual ?? 'Pending'}</p></div>
+              </article>
+            ))}
+            {catalysts.length === 0 && <p className="rounded-lg border border-white/10 p-4 text-xs text-slate-500">No verified calendar events are currently available.</p>}
+          </div>
+        </section>
+
+        <p className="rounded-lg border border-amber-300/20 bg-amber-300/[0.04] p-4 text-xs leading-5 text-amber-100/80">Correlation matrices, lead/lag estimates and structural-break tests are intentionally not displayed until synchronized historical observations with consistent timestamps and source coverage are available. This page does not invent those statistics.</p>
       </div>
-    </main>
+    </div>
   );
 }

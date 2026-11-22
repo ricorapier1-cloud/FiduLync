@@ -45,6 +45,7 @@ async function getFinnhubQuotes(apiKey: string): Promise<MarketQuote[]> {
 }
 
 async function getFrankfurterQuotes(): Promise<MarketQuote[]> {
+  // Frankfurter is a public reference-rate service; these values are never executable quotes.
   const response = await fetch('https://api.frankfurter.app/latest?from=EUR&to=USD,GBP,JPY', {
     cache: 'no-store',
     signal: AbortSignal.timeout(5_000),
@@ -59,7 +60,8 @@ async function getFrankfurterQuotes(): Promise<MarketQuote[]> {
     || ![usd, gbp, jpy].every((rate) => Number.isFinite(rate) && rate > 0)) {
     throw new Error('Frankfurter did not return the required currency rates.');
   }
-  const timestamp = typeof payload.date === 'string' ? `${payload.date}T16:00:00.000Z` : new Date().toISOString();
+  const timestamp = typeof payload.date === 'string' ? `${payload.date}T00:00:00.000Z` : ''; 
+  if (!timestamp || !Number.isFinite(Date.parse(timestamp))) throw new Error('Frankfurter did not provide a valid reference-rate date.');
   return [
     { symbol: 'EURUSD', price: usd, changePercent: null, timestamp, source: 'frankfurter' },
     { symbol: 'GBPUSD', price: usd / gbp, changePercent: null, timestamp, source: 'frankfurter' },
@@ -68,6 +70,7 @@ async function getFrankfurterQuotes(): Promise<MarketQuote[]> {
 }
 
 async function getExchangeRateQuotes(): Promise<MarketQuote[]> {
+  if (process.env.EXCHANGERATE_API_PERSONAL_USE_ENABLED !== 'true') throw new Error('ExchangeRate-API reference quotes are disabled pending personal-use permission.');
   const response = await fetch('https://open.er-api.com/v6/latest/USD', {
     cache: 'no-store',
     signal: AbortSignal.timeout(5_000),
@@ -95,6 +98,7 @@ async function getExchangeRateQuotes(): Promise<MarketQuote[]> {
 }
 
 async function getGoldQuote(): Promise<MarketQuote> {
+  if (process.env.GOLD_API_PERSONAL_USE_ENABLED !== 'true') throw new Error('Gold-API reference quotes are disabled pending personal-use permission.');
   const response = await fetch('https://api.gold-api.com/price/XAU', {
     cache: 'no-store',
     signal: AbortSignal.timeout(5_000),
@@ -121,21 +125,26 @@ type StoredMt5Quote = {
   ask: number;
   quote_time: string;
   received_at: string;
+  spread_points: number | null;
+  point: number | null;
+  broker: string | null;
+  server: string | null;
   installation: { status: string } | { status: string }[];
 };
 
-async function getMt5Quotes(): Promise<MarketQuote[]> {
+async function getMt5Quotes(installationId?: string): Promise<MarketQuote[]> {
   const query = new URLSearchParams({
-    select: 'symbol,bid,ask,quote_time,received_at,installation:mt5_installations!inner(status)',
+    select: 'symbol,bid,ask,quote_time,received_at,spread_points,point,broker,server,installation:mt5_installations!inner(status)',
     'installation.status': 'eq.active',
     order: 'quote_time.desc',
     limit: '100',
   });
+  if (installationId) query.set('installation_id', `eq.${installationId}`);
   const rows = await supabaseRead<StoredMt5Quote[]>('mt5_market_quotes', query.toString());
   if (!rows?.length) return [];
   const latestBySymbol = new Map<string, StoredMt5Quote>();
   for (const row of rows) {
-    if (!['EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD'].includes(row.symbol)) continue;
+    if (!/^[A-Z]{6}$/.test(row.symbol) && !['XAUUSD', 'XAGUSD', 'DXY', 'USOIL', 'SPX500'].includes(row.symbol)) continue;
     if (Date.now() - Date.parse(row.quote_time) > 120_000) continue;
     if (!latestBySymbol.has(row.symbol)) latestBySymbol.set(row.symbol, row);
   }
@@ -145,20 +154,34 @@ async function getMt5Quotes(): Promise<MarketQuote[]> {
     changePercent: null,
     timestamp: new Date(row.quote_time).toISOString(),
     source: 'mt5' as const,
+    bid: Number(row.bid),
+    ask: Number(row.ask),
+    spread_points: typeof row.spread_points === 'number' ? row.spread_points : null,
+    point: typeof row.point === 'number' ? row.point : null,
+    broker: row.broker ?? undefined,
+    server: row.server ?? undefined,
   }));
 }
 
-async function fetchMarketQuotes(): Promise<MarketQuote[]> {
-  const mt5Quotes = await getMt5Quotes().catch((error) => {
+async function fetchMarketQuotes(installationId?: string): Promise<MarketQuote[]> {
+  const failures: unknown[] = [];
+  const mt5Quotes = await getMt5Quotes(installationId).catch((error) => {
+    failures.push(error);
     console.warn('MT5 broker quotes are unavailable:', error);
     return [];
   });
-  const apiKey = process.env.FINNHUB_API_KEY?.trim();
+  if (installationId) return mt5Quotes;
+
+  const finnhubPersonalPlanActive = process.env.FINNHUB_PERSONAL_PLAN_ACTIVE === 'true';
+  const apiKey = finnhubPersonalPlanActive ? process.env.FINNHUB_API_KEY?.trim() : undefined;
   let liveQuotes: MarketQuote[] = [];
-  if (apiKey) {
+  if (finnhubPersonalPlanActive && !apiKey) {
+    failures.push(new Error('Finnhub is approved but FINNHUB_API_KEY is not configured.'));
+  } else if (apiKey) {
     try {
       liveQuotes = await getFinnhubQuotes(apiKey);
     } catch (error) {
+      failures.push(error);
       console.warn('Finnhub live FX quotes are unavailable:', error);
     }
   }
@@ -166,31 +189,64 @@ async function fetchMarketQuotes(): Promise<MarketQuote[]> {
   const bySymbol = new Map<MarketQuote['symbol'], MarketQuote>();
   for (const quote of mt5Quotes) bySymbol.set(quote.symbol, quote);
   for (const quote of liveQuotes) if (!bySymbol.has(quote.symbol)) bySymbol.set(quote.symbol, quote);
-  if (bySymbol.size === finnhubSymbols.length) return [...bySymbol.values()];
-  const failures: unknown[] = [];
-  for (const provider of [getFrankfurterQuotes, getExchangeRateQuotes]) {
+  if (bySymbol.size >= finnhubSymbols.length) return [...bySymbol.values()];
+
+  // Never call an optional provider until its personal-use plan permits this display.
+  // An intentionally disabled provider is not an outage and must not create a
+  // runtime error on every dashboard request.
+  const referenceProviders: Array<() => Promise<MarketQuote[]>> = [];
+  referenceProviders.push(getFrankfurterQuotes);
+  if (process.env.EXCHANGERATE_API_PERSONAL_USE_ENABLED === 'true') {
+    referenceProviders.push(getExchangeRateQuotes);
+  }
+  for (const provider of referenceProviders) {
     try {
       for (const quote of await provider()) {
         if (!bySymbol.has(quote.symbol)) bySymbol.set(quote.symbol, quote);
       }
     } catch (error) {
       failures.push(error);
-      console.warn('An FX reference quote provider is unavailable:', error);
+      console.warn('An approved FX reference quote provider is unavailable:', error);
     }
     if (bySymbol.size >= 3 && liveQuotes.length === 0) break;
   }
-  if (!bySymbol.has('XAUUSD')) {
+
+  if (!bySymbol.has('XAUUSD') && process.env.GOLD_API_PERSONAL_USE_ENABLED === 'true') {
     try {
       bySymbol.set('XAUUSD', await getGoldQuote());
     } catch (error) {
       failures.push(error);
-      console.warn('Gold reference quote provider is unavailable:', error);
+      console.warn('Approved gold reference quote provider is unavailable:', error);
     }
   }
   if (bySymbol.size) return [...bySymbol.values()];
-  throw new AggregateError(failures, 'No configured FX quote provider returned usable data.');
+
+  // A completely unconfigured feed is an honest offline state, not an exception.
+  // Keep real upstream failures visible when at least one provider was attempted.
+  if (failures.length === 0) return [];
+  throw new AggregateError(failures, 'Configured market quote providers returned no usable data.');
 }
 
-export function getMarketQuotes(): Promise<MarketQuote[]> {
-  return getCachedData('market:live-quotes', fetchMarketQuotes, QUOTE_CACHE_TTL_SECONDS);
+export async function getMarketQuotes(installationId?: string): Promise<MarketQuote[]> {
+  // Execution-quality quotes must bypass shared cache so the 2-second policy is meaningful.
+  const quotes = installationId
+    ? await fetchMarketQuotes(installationId)
+    : await getCachedData('market:live-quotes:active', () => fetchMarketQuotes(), QUOTE_CACHE_TTL_SECONDS);
+  const now = Date.now();
+  return quotes.filter((quote) => {
+    const timestamp = Date.parse(quote.timestamp);
+    const ageMs = now - timestamp;
+    if (!Number.isFinite(timestamp) || ageMs < -5 * 60_000) return false;
+    if (quote.source === 'mt5') return ageMs <= 120_000;
+    if (quote.source === 'finnhub') {
+      return process.env.FINNHUB_PERSONAL_PLAN_ACTIVE === 'true' && ageMs <= 120_000;
+    }
+    if (quote.source === 'frankfurter') {
+      return ageMs <= 48 * 60 * 60_000;
+    }
+    if (quote.source === 'exchangerate-api') {
+      return process.env.EXCHANGERATE_API_PERSONAL_USE_ENABLED === 'true' && ageMs <= 48 * 60 * 60_000;
+    }
+    return process.env.GOLD_API_PERSONAL_USE_ENABLED === 'true' && ageMs <= 48 * 60 * 60_000;
+  });
 }

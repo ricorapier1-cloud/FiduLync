@@ -32,6 +32,14 @@ export type TechnicalSignal = {
   execution_filter: ExecutionFilter;
   atr_stop_pips: number | null;
   atr_take_profit_pips: number | null;
+  rsi14: number | null;
+  alma20: number | null;
+  kama10: number | null;
+  hurst_exponent: number | null;
+  trend_r_squared: number | null;
+  adr20_pips: number | null;
+  current_daily_range_adr: number | null;
+  atr_expansion_ratio: number | null;
 };
 
 const LIVE_PRICE_TTL_SECONDS = 60;
@@ -51,6 +59,14 @@ function unavailableSignal(): TechnicalSignal {
     execution_filter: { allow_buys: false, allow_sells: false, recommended_lot_multiplier: 0 },
     atr_stop_pips: null,
     atr_take_profit_pips: null,
+    rsi14: null,
+    alma20: null,
+    kama10: null,
+    hurst_exponent: null,
+    trend_r_squared: null,
+    adr20_pips: null,
+    current_daily_range_adr: null,
+    atr_expansion_ratio: null,
   };
 }
 
@@ -85,9 +101,8 @@ function parseCandle(value: unknown): Candle | null {
 
 async function fetchTwelveDataCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promise<Candle[]> {
   const apiKey = process.env.TWELVE_DATA_API_KEY?.trim();
-  // Individual/free plans are not licensed for commercial third-party display.
-  // Enable only after the required business tier, exchange rights and display terms are approved.
-  if (!apiKey || process.env.TWELVE_DATA_COMMERCIAL_USE_APPROVED !== 'true') return [];
+  // Personal display requires an eligible Twelve Data individual plan and any applicable exchange entitlements.
+  if (!apiKey || process.env.TWELVE_DATA_PERSONAL_DISPLAY_PLAN_ACTIVE !== 'true') return [];
 
   const interval = timeframe === 'H1' ? '1h' : timeframe === 'H4' ? '4h' : '1day';
   const symbol = pair === 'XAUUSD' ? 'XAU/USD' : `${pair.slice(0, 3)}/${pair.slice(3)}`;
@@ -140,7 +155,7 @@ async function fetchTwelveDataCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1
 }
 
 async function fetchCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promise<Candle[]> {
-  const endpoint = process.env.MARKET_DATA_PROVIDER_LICENSE_APPROVED === 'true' ? process.env.MARKET_DATA_PROVIDER_URL?.trim() : undefined;
+  const endpoint = process.env.MARKET_DATA_PROVIDER_PERSONAL_USE_ENABLED === 'true' ? process.env.MARKET_DATA_PROVIDER_URL?.trim() : undefined;
   if (!endpoint) return [];
 
   const providerUrl = new URL(endpoint);
@@ -181,7 +196,7 @@ type StoredCandle = {
   close: number;
 };
 
-async function fetchActiveMt5Candles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promise<Candle[]> {
+async function fetchActiveMt5Candles(pair: string, timeframe: 'H1' | 'H4' | 'D1', installationId?: string): Promise<Candle[]> {
   const query = new URLSearchParams({
     select: 'installation_id,bar_time,open,high,low,close,installation:mt5_installations!inner(status)',
     symbol: `eq.${pair}`,
@@ -191,6 +206,7 @@ async function fetchActiveMt5Candles(pair: string, timeframe: 'H1' | 'H4' | 'D1'
     order: 'bar_time.desc',
     limit: String(MAX_CANDLES * 3),
   });
+  if (installationId) query.set('installation_id', `eq.${installationId}`);
   const rows = await supabaseRead<Array<StoredCandle>>('mt5_market_candles', query.toString());
   if (!rows?.length) return [];
 
@@ -224,10 +240,12 @@ async function fetchActiveMt5Candles(pair: string, timeframe: 'H1' | 'H4' | 'D1'
 type CandleSource = 'mt5' | 'configured_provider' | 'twelve_data' | 'unavailable';
 type CandleSeries = { candles: Candle[]; source: CandleSource };
 
-async function getCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promise<CandleSeries> {
-  return getCachedData(`market:candles:${pair}:${timeframe}`, async () => {
-    const mt5Candles = await fetchActiveMt5Candles(pair, timeframe);
+async function getCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1', installationId?: string): Promise<CandleSeries> {
+  const cached = await getCachedData(`market:candles:${installationId ?? 'active'}:${pair}:${timeframe}`, async () => {
+    const mt5Candles = await fetchActiveMt5Candles(pair, timeframe, installationId);
     if (mt5Candles.length >= 200) return { candles: mt5Candles, source: 'mt5' as const };
+    // An authenticated supervisor must never fall back to another terminal or provider feed.
+    if (installationId) return { candles: [], source: 'unavailable' as const };
     // Keep providers isolated: never splice OHLC bars from different feeds into one indicator series.
     const configuredProvider = await fetchCandles(pair, timeframe).catch((error) => {
       console.warn(`Configured market data provider unavailable for ${pair} ${timeframe}.`, error);
@@ -242,6 +260,29 @@ async function getCandles(pair: string, timeframe: 'H1' | 'H4' | 'D1'): Promise<
       ? { candles: twelveData, source: 'twelve_data' as const }
       : { candles: [], source: 'unavailable' as const };
   }, LIVE_PRICE_TTL_SECONDS);
+
+  // Re-apply licensing and freshness gates after cache reads too: cached values must
+  // not survive a revoked data entitlement or a stale upstream feed.
+  if (cached.source === 'configured_provider' && process.env.MARKET_DATA_PROVIDER_PERSONAL_USE_ENABLED !== 'true') {
+    return { candles: [], source: 'unavailable' };
+  }
+  if (cached.source === 'twelve_data' && process.env.TWELVE_DATA_PERSONAL_DISPLAY_PLAN_ACTIVE !== 'true') {
+    return { candles: [], source: 'unavailable' };
+  }
+  const barSeconds = timeframe === 'H1' ? 60 * 60 : timeframe === 'H4' ? 4 * 60 * 60 : 24 * 60 * 60;
+  const nowSeconds = Date.now() / 1000;
+  const maxAgeSeconds = timeframe === 'H1' ? 2 * 60 * 60 : timeframe === 'H4' ? 8 * 60 * 60 : 48 * 60 * 60;
+  const closedCandles = cached.candles
+    .filter((candle) => cached.source === 'mt5' || candle.timestamp + barSeconds <= nowSeconds)
+    .sort((left, right) => left.timestamp - right.timestamp)
+    .slice(-MAX_CANDLES);
+  const latest = closedCandles.at(-1)?.timestamp;
+  if (closedCandles.length < 200 || latest === undefined
+    || nowSeconds - (latest + (cached.source === 'mt5' ? 0 : barSeconds)) > maxAgeSeconds
+    || latest > nowSeconds + 300) {
+    return { candles: [], source: 'unavailable' };
+  }
+  return { candles: closedCandles, source: cached.source };
 }
 
 function ema(values: number[], period: number): number | null {
@@ -289,8 +330,11 @@ function trueRanges(candles: Candle[]) {
 }
 
 function averageTrueRange(candles: Candle[], period = 14) {
-  const window = trueRanges(candles).slice(-period);
-  return window.length < period ? null : window.reduce((sum, value) => sum + value, 0) / period;
+  const ranges = trueRanges(candles);
+  if (ranges.length < period) return null;
+  let value = ranges.slice(0, period).reduce((sum, item) => sum + item, 0) / period;
+  for (const range of ranges.slice(period)) value = (value * (period - 1) + range) / period;
+  return value;
 }
 
 function averageDirectionalIndex(candles: Candle[], period = 14) {
@@ -330,6 +374,106 @@ function averageDirectionalIndex(candles: Candle[], period = 14) {
   return adx;
 }
 
+function wilderRsi(values: number[], period = 14): number | null {
+  if (values.length < period + 1) return null;
+  let gains = 0;
+  let losses = 0;
+  for (let index = 1; index <= period; index += 1) {
+    const change = values[index] - values[index - 1];
+    gains += Math.max(0, change);
+    losses += Math.max(0, -change);
+  }
+  let averageGain = gains / period;
+  let averageLoss = losses / period;
+  for (let index = period + 1; index < values.length; index += 1) {
+    const change = values[index] - values[index - 1];
+    averageGain = (averageGain * (period - 1) + Math.max(0, change)) / period;
+    averageLoss = (averageLoss * (period - 1) + Math.max(0, -change)) / period;
+  }
+  if (averageLoss === 0) return averageGain === 0 ? 50 : 100;
+  const relativeStrength = averageGain / averageLoss;
+  return 100 - 100 / (1 + relativeStrength);
+}
+
+function alma(values: number[], period = 20, offset = 0.85, sigma = 6): number | null {
+  if (values.length < period) return null;
+  const window = values.slice(-period);
+  const center = offset * (period - 1);
+  const width = period / sigma;
+  let weighted = 0;
+  let weightTotal = 0;
+  for (let index = 0; index < period; index += 1) {
+    const weight = Math.exp(-((index - center) ** 2) / (2 * width ** 2));
+    weighted += window[index] * weight;
+    weightTotal += weight;
+  }
+  return weightTotal > 0 ? weighted / weightTotal : null;
+}
+
+function kamaSeries(values: number[], period = 10, fast = 2, slow = 30): number[] {
+  if (values.length < period + 1) return [];
+  const output = new Array<number>(values.length).fill(Number.NaN);
+  output[period] = values[period];
+  const fastConstant = 2 / (fast + 1);
+  const slowConstant = 2 / (slow + 1);
+  for (let index = period + 1; index < values.length; index += 1) {
+    const change = Math.abs(values[index] - values[index - period]);
+    let volatility = 0;
+    for (let offset = index - period + 1; offset <= index; offset += 1) {
+      volatility += Math.abs(values[offset] - values[offset - 1]);
+    }
+    const efficiency = volatility > 0 ? change / volatility : 0;
+    const smoothing = (efficiency * (fastConstant - slowConstant) + slowConstant) ** 2;
+    output[index] = output[index - 1] + smoothing * (values[index] - output[index - 1]);
+  }
+  return output.filter(Number.isFinite);
+}
+
+function hurstExponent(values: number[]): number | null {
+  if (values.length < 100 || values.some((value) => value <= 0)) return null;
+  const logs = values.map(Math.log);
+  const lags = [2, 4, 8, 16];
+  const points: Array<{ x: number; y: number }> = [];
+  for (const lag of lags) {
+    const differences: number[] = [];
+    for (let index = lag; index < logs.length; index += 1) differences.push(logs[index] - logs[index - lag]);
+    if (differences.length < 30) continue;
+    const mean = differences.reduce((sum, value) => sum + value, 0) / differences.length;
+    const variance = differences.reduce((sum, value) => sum + (value - mean) ** 2, 0) / differences.length;
+    if (variance > 0) points.push({ x: Math.log(lag), y: Math.log(variance) });
+  }
+  if (points.length < 3) return null;
+  const meanX = points.reduce((sum, point) => sum + point.x, 0) / points.length;
+  const meanY = points.reduce((sum, point) => sum + point.y, 0) / points.length;
+  const denominator = points.reduce((sum, point) => sum + (point.x - meanX) ** 2, 0);
+  if (denominator <= 0) return null;
+  const slope = points.reduce((sum, point) => sum + (point.x - meanX) * (point.y - meanY), 0) / denominator;
+  return Math.max(0, Math.min(1, slope / 2));
+}
+
+function trendRSquared(values: number[], period = 100): number | null {
+  if (values.length < period || values.some((value) => value <= 0)) return null;
+  const logs = values.slice(-period).map(Math.log);
+  const meanY = logs.reduce((sum, value) => sum + value, 0) / period;
+  const meanX = (period - 1) / 2;
+  let covariance = 0;
+  let varianceX = 0;
+  let varianceY = 0;
+  for (let index = 0; index < period; index += 1) {
+    covariance += (index - meanX) * (logs[index] - meanY);
+    varianceX += (index - meanX) ** 2;
+    varianceY += (logs[index] - meanY) ** 2;
+  }
+  if (varianceX <= 0 || varianceY <= 0) return 0;
+  return Math.max(0, Math.min(1, (covariance ** 2) / (varianceX * varianceY)));
+}
+
+function averageDailyRange(d1: Candle[], period = 20): number | null {
+  if (d1.length < period) return null;
+  const window = d1.slice(-period);
+  return window.reduce((sum, candle) => sum + candle.high - candle.low, 0) / period;
+}
+
 function median(values: number[]) {
   const sorted = [...values].sort((left, right) => left - right);
   const middle = Math.floor(sorted.length / 2);
@@ -360,29 +504,44 @@ export function calculateTechnicalSignal(pair: string, h1: Candle[], h4: Candle[
   const ker = kaufmanEfficiencyRatio(h1Values);
   const adx = averageDirectionalIndex(h1);
   const atr = averageTrueRange(h1);
-  if (adx === null || atr === null) return unavailableSignal();
+  const rsi = wilderRsi(h1Values);
+  const almaValue = alma(h1Values);
+  const kamaValues = kamaSeries(h1Values);
+  const kamaValue = kamaValues.at(-1) ?? null;
+  const previousKama = kamaValues.at(-2) ?? null;
+  const hurst = hurstExponent(h1Values);
+  const rSquared = trendRSquared(h1Values);
+  const adr = averageDailyRange(d1);
+  const pipSize = pair.endsWith('JPY') ? 0.01 : pair.startsWith('XAU') ? 0.1 : 0.0001;
+  const adrPips = adr === null ? null : adr / pipSize;
+  const currentDailyRangeAdr = adr && d1.at(-1) ? (d1.at(-1)!.high - d1.at(-1)!.low) / adr : null;
+  if (adx === null || atr === null || rsi === null || almaValue === null || kamaValue === null
+    || hurst === null || rSquared === null || adr === null) return unavailableSignal();
 
   const currentNormalizedAtr = atr / h1Values.at(-1)!;
   const typicalNormalizedAtr = median(normalizedAtrHistory(h1));
   const highVolatility = typicalNormalizedAtr > 0 && currentNormalizedAtr > typicalNormalizedAtr * 1.5;
   const regime: MarketRegime = adx < 18 && highVolatility
     ? 'HIGH_VOL_CHOP'
-    : adx >= 22 && ker >= 0.35
+    : adx >= 22 && ker >= 0.35 && hurst >= 0.52 && rSquared >= 0.25
       ? 'TRENDING_EXPANSION'
       : 'MEAN_REVERTING';
 
   const normalizedZ = Math.max(-3, Math.min(3, h1ZScore * 0.6 + h4ZScore * 0.4));
   const trendDirection = Math.sign(h1Values.at(-1)! - h1Values.at(-11)!);
+  const maConfluence = (h1Values.at(-1)! >= almaValue ? 4 : -4)
+    + (kamaValue >= (previousKama ?? kamaValue) ? 4 : -4);
+  const rsiMomentum = rsi >= 55 ? 5 : rsi <= 45 ? -5 : 0;
   const directionalScore = h4Alignment * 20 + d1Alignment * 25
-    + trendDirection * ker * 20 + normalizedZ * 10;
-  const reversionScore = -normalizedZ * 25 + (h1Alignment + h4Alignment) * 5;
+    + trendDirection * ker * 20 + normalizedZ * 10 + maConfluence + rsiMomentum + (rSquared >= 0.35 ? 5 : 0);
+  const reversionScore = -normalizedZ * 25 + (h1Alignment + h4Alignment) * 5
+    + (hurst <= 0.48 ? 5 : 0) - (rSquared >= 0.55 ? 5 : 0);
   const rawScore = regime === 'TRENDING_EXPANSION'
     ? directionalScore
     : regime === 'MEAN_REVERTING'
       ? reversionScore
       : Math.round(reversionScore * 0.25);
   const score = Math.max(-100, Math.min(100, Math.round(rawScore)));
-  const pipSize = pair.endsWith('JPY') ? 0.01 : pair.startsWith('XAU') ? 0.1 : 0.0001;
   const atrPips = atr / pipSize;
   const allowBuys = regime !== 'HIGH_VOL_CHOP'
     && score >= 35
@@ -413,16 +572,24 @@ export function calculateTechnicalSignal(pair: string, h1: Candle[], h4: Candle[
     },
     atr_stop_pips: Number((atrPips * stopMultiplier).toFixed(1)),
     atr_take_profit_pips: Number((atrPips * targetMultiplier).toFixed(1)),
+    rsi14: Number(rsi.toFixed(2)),
+    alma20: Number(almaValue.toFixed(8)),
+    kama10: Number(kamaValue.toFixed(8)),
+    hurst_exponent: Number(hurst.toFixed(3)),
+    trend_r_squared: Number(rSquared.toFixed(3)),
+    adr20_pips: Number(adrPips!.toFixed(1)),
+    current_daily_range_adr: currentDailyRangeAdr === null ? null : Number(currentDailyRangeAdr.toFixed(3)),
+    atr_expansion_ratio: typicalNormalizedAtr > 0 ? Number((currentNormalizedAtr / typicalNormalizedAtr).toFixed(3)) : null,
   };
 }
 
-export async function getTechnicalSignal(pair: string): Promise<TechnicalSignal> {
+export async function getTechnicalSignal(pair: string, installationId?: string): Promise<TechnicalSignal> {
   try {
-    return await getCachedData(`technical:signal:${pair}`, async () => {
+    return await getCachedData(`technical:signal:${installationId ?? 'active'}:${pair}`, async () => {
       const [h1Series, h4Series, d1Series] = await Promise.all([
-        getCandles(pair, 'H1'),
-        getCandles(pair, 'H4'),
-        getCandles(pair, 'D1'),
+        getCandles(pair, 'H1', installationId),
+        getCandles(pair, 'H4', installationId),
+        getCandles(pair, 'D1', installationId),
       ]);
       const candleCounts = {
         h1: h1Series.candles.length,

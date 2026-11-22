@@ -1,0 +1,58 @@
+name: MT5 MetaEditor Compile Gate
+
+on:
+  push:
+    branches: [feat/personal-quant-edition]
+    paths:
+      - "MQL5/**/*.mq5"
+      - "MQL5/**/*.mqh"
+      - "scripts/compile_mt5.ps1"
+      - ".github/workflows/mt5-metaeditor-compile.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fidulync-mt5-compile
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    # This job intentionally runs only on an owner-controlled Windows runner
+    # with MetaEditor installed. It is never triggered by pull_request events.
+    if: github.ref == 'refs/heads/feat/personal-quant-edition'
+    runs-on: [self-hosted, windows, mt5]
+    timeout-minutes: 15
+    steps:
+      - name: Checkout reviewed Personal Quant branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Verify MetaEditor path
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:METAEDITOR64_PATH)) {
+            throw "Set the repository Actions variable METAEDITOR64_PATH to the full path of metaeditor64.exe on this runner."
+          }
+          if (-not (Test-Path -LiteralPath $env:METAEDITOR64_PATH -PathType Leaf)) {
+            throw "MetaEditor not found at METAEDITOR64_PATH."
+          }
+        env:
+          METAEDITOR64_PATH: ${{ vars.METAEDITOR64_PATH }}
+
+      - name: Compile MT5 supervisor and telemetry integrations
+        shell: pwsh
+        run: ./scripts/compile_mt5.ps1 -MetaEditorPath "$env:METAEDITOR64_PATH"
+        env:
+          METAEDITOR64_PATH: ${{ vars.METAEDITOR64_PATH }}
+
+      - name: Upload compiler logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fidulync-mt5-compiler-logs
+          path: MQL5/Experts/*.log
+          if-no-files-found: warn
+          retention-days: 14

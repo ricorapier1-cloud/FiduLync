@@ -1,11 +1,16 @@
 import 'server-only';
-import type { CotPosition, EconomicCatalyst, MacroCurrency, MacroSnapshot } from '@/types/macro';
+import type { CotPosition, EconomicCatalyst, MacroCurrency, MacroSnapshot, OfficialUsMacroIndicators } from '@/types/macro';
+import { fetchOfficialUsMacro } from '@/lib/officialUsMacroAdapters';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
 import {
   getBankOfCanadaMacroInputs,
   getBankOfEnglandPolicyRate,
   getEcbMacroInputs,
   getWorldBankG10Inflation,
+  getBankOfJapanPolicyRate,
+  getReserveBankOfAustraliaPolicyRate,
+  getReserveBankOfNewZealandPolicyRate,
+  getSwissNationalBankPolicyRate,
 } from '@/lib/internationalMacro';
 import { getCachedData } from '@/lib/redisCache';
 
@@ -20,28 +25,35 @@ export const EMPTY_SNAPSHOT: MacroSnapshot = {
 };
 
 export function getFallbackSnapshot(): MacroSnapshot {
+  // An unavailable provider must never be replaced with invented or stale levels.
+  // Empty observations and an empty timestamp force downstream consumers to abstain.
   return {
-    asOf: new Date().toISOString(),
+    asOf: '',
     source: 'fallback',
     cotSource: 'unavailable',
     calendarSource: 'reference',
-    currencies: [
-      { code: 'USD', centralBank: 'Federal Reserve', policyRate: 3.75, inflation: 2.8, twoYearYield: 4, twoYearYieldSource: 'reference', inflationLabel: 'Core PCE', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Restrictive' },
-      { code: 'EUR', centralBank: 'European Central Bank', policyRate: 2.15, inflation: 2.1, inflationLabel: 'HICP', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Neutral' },
-      { code: 'GBP', centralBank: 'Bank of England', policyRate: 4, inflation: 2.8, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Cautious' },
-      { code: 'JPY', centralBank: 'Bank of Japan', policyRate: 0.5, inflation: 3, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Normalising' },
-      { code: 'AUD', centralBank: 'Reserve Bank of Australia', policyRate: 3.6, inflation: 3.4, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Restrictive' },
-      { code: 'CHF', centralBank: 'Swiss National Bank', policyRate: 0, inflation: 0.2, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Accommodative' },
-      { code: 'CAD', centralBank: 'Bank of Canada', policyRate: 2.25, inflation: 2.4, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Neutral' },
-      { code: 'NZD', centralBank: 'Reserve Bank of New Zealand', policyRate: 2.5, inflation: 2.7, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Neutral' },
-      { code: 'SEK', centralBank: 'Sveriges Riksbank', policyRate: 1.75, inflation: 1.8, inflationLabel: 'CPIF', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Neutral' },
-      { code: 'NOK', centralBank: 'Norges Bank', policyRate: 4, inflation: 2.4, inflationLabel: 'CPI-ATE', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Restrictive' },
-      { code: 'XAU', centralBank: 'Global Reserve Asset', policyRate: 0.0, inflation: 0.0, twoYearYield: 0.0, twoYearYieldSource: 'reference', inflationLabel: 'Real Yield Proxy', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Sovereign Hedge' },
-    ],
+    currencies: [],
     cot: [],
-    // No fabricated or stale economic events in reference/offline mode.
     catalysts: [],
   };
+}
+
+// Structural rows let independent provider adapters populate a currency even when
+// no previous snapshot exists. These zero values are internal sentinels only and
+// are filtered out before any snapshot leaves this module.
+function getProviderCurrencySeed(): MacroCurrency[] {
+  const authorities = [
+    ['USD', 'Federal Reserve'], ['EUR', 'European Central Bank'],
+    ['GBP', 'Bank of England'], ['JPY', 'Bank of Japan'],
+    ['CHF', 'Swiss National Bank'], ['CAD', 'Bank of Canada'],
+    ['AUD', 'Reserve Bank of Australia'], ['NZD', 'Reserve Bank of New Zealand'],
+    ['SEK', 'Sveriges Riksbank'], ['NOK', 'Norges Bank'],
+  ] as const;
+  return authorities.map(([code, centralBank]) => ({
+    code, centralBank, policyRate: 0, inflation: 0,
+    inflationLabel: 'Not yet verified', policyRateSource: 'reference',
+    inflationSource: 'reference', stance: 'Not yet verified',
+  }));
 }
 
 function mergeWithFallback(snapshot: MacroSnapshot): MacroSnapshot {
@@ -65,6 +77,10 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
+function isNumericRecord(value: unknown): value is Record<string, number> {
+  return isRecord(value) && Object.values(value).every(isFiniteNumber);
+}
+
 function isCurrency(value: unknown): value is MacroCurrency {
   return isRecord(value)
     && typeof value.code === 'string'
@@ -73,11 +89,20 @@ function isCurrency(value: unknown): value is MacroCurrency {
     && isFiniteNumber(value.inflation)
     && typeof value.inflationLabel === 'string'
     && (value.corePce === undefined || isFiniteNumber(value.corePce))
+    && (value.corePceAsOf === undefined || (typeof value.corePceAsOf === 'string' && Number.isFinite(Date.parse(value.corePceAsOf))))
     && (value.cpi === undefined || isFiniteNumber(value.cpi))
+    && (value.cpiAsOf === undefined || (typeof value.cpiAsOf === 'string' && Number.isFinite(Date.parse(value.cpiAsOf))))
     && (value.twoYearYield === undefined || isFiniteNumber(value.twoYearYield))
+    && (value.twoYearYieldAsOf === undefined || (typeof value.twoYearYieldAsOf === 'string' && Number.isFinite(Date.parse(value.twoYearYieldAsOf))))
     && (value.twoYearYieldSource === undefined || value.twoYearYieldSource === 'provider' || value.twoYearYieldSource === 'reference')
     && (value.policyRateSource === undefined || value.policyRateSource === 'provider' || value.policyRateSource === 'reference')
     && (value.inflationSource === undefined || value.inflationSource === 'provider' || value.inflationSource === 'reference')
+    && (value.policyRateProvider === undefined || ['fred', 'alpha-vantage', 'macro-provider', 'ecb', 'bank-of-canada', 'bank-of-england', 'bank-of-japan', 'reserve-bank-of-australia', 'reserve-bank-of-new-zealand', 'swiss-national-bank'].includes(String(value.policyRateProvider)))
+    && (value.inflationProvider === undefined || ['fred', 'alpha-vantage', 'macro-provider', 'ecb', 'bank-of-canada', 'world-bank'].includes(String(value.inflationProvider)))
+    && (value.policyRateAsOf === undefined || (typeof value.policyRateAsOf === 'string' && Number.isFinite(Date.parse(value.policyRateAsOf))))
+    && (value.inflationAsOf === undefined || (typeof value.inflationAsOf === 'string' && Number.isFinite(Date.parse(value.inflationAsOf))))
+    && (value.policyRateSourceUrl === undefined || (typeof value.policyRateSourceUrl === 'string' && value.policyRateSourceUrl.startsWith('https://')))
+    && (value.inflationSourceUrl === undefined || (typeof value.inflationSourceUrl === 'string' && value.inflationSourceUrl.startsWith('https://')))
     && typeof value.stance === 'string';
 }
 
@@ -88,7 +113,8 @@ function isCotPosition(value: unknown): value is CotPosition {
     && isFiniteNumber(value.percentile)
     && value.percentile >= 0
     && value.percentile <= 100
-    && isFiniteNumber(value.weeklyChange);
+    && isFiniteNumber(value.weeklyChange)
+    && (value.asOf === undefined || (typeof value.asOf === 'string' && Number.isFinite(Date.parse(value.asOf))));
 }
 
 function isCatalyst(value: unknown): value is EconomicCatalyst {
@@ -103,17 +129,29 @@ function isCatalyst(value: unknown): value is EconomicCatalyst {
     && (typeof value.actual === 'string' || value.actual === null);
 }
 
-function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies' | 'cot' | 'catalysts'> | null {
+function isUsIndicators(value: unknown): value is OfficialUsMacroIndicators {
+  if (!isRecord(value) || typeof value.retrievedAt !== 'string' || !Number.isFinite(Date.parse(value.retrievedAt))
+    || !Array.isArray(value.sources) || !value.sources.every((source) => typeof source === 'string')) return false;
+  const numericKeys = ['cpiYearOverYearPct', 'coreCpiYearOverYearPct', 'unemploymentRatePct', 'nonfarmPayrollMonthlyChangeThousands', 'realGdpAnnualizedQuarterlyPct', 'tenYearTreasuryYieldPct', 'tenYearRealYieldPct', 'tenYearBreakevenInflationPct', 'usdBroadIndex', 'vixIndex', 'sp500Index', 'wtiOilUsd', 'brentOilUsd', 'usHighYieldSpreadPct'];
+  const dateKeys = ['cpiPeriod', 'coreCpiPeriod', 'unemploymentPeriod', 'payrollPeriod', 'realGdpPeriod', 'tenYearTreasuryYieldAsOf', 'tenYearRealYieldAsOf', 'tenYearBreakevenInflationAsOf', 'usdBroadIndexAsOf', 'vixIndexAsOf', 'sp500IndexAsOf', 'wtiOilAsOf', 'brentOilAsOf', 'usHighYieldSpreadAsOf'];
+  return numericKeys.every((key) => value[key] === undefined || isFiniteNumber(value[key]))
+    && dateKeys.every((key) => value[key] === undefined || typeof value[key] === 'string');
+}
+
+function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies' | 'cot' | 'catalysts' | 'usIndicators'> | null {
   if (!isRecord(value)
     || !Array.isArray(value.currencies)
     || !Array.isArray(value.cot)
     || !Array.isArray(value.catalysts)) return null;
 
-  if (!value.currencies.every(isCurrency) || !value.cot.every(isCotPosition) || !value.catalysts.every(isCatalyst)) return null;
+  const usIndicators = value.usIndicators;
+  if (!value.currencies.every(isCurrency) || !value.cot.every(isCotPosition) || !value.catalysts.every(isCatalyst)
+    || (usIndicators !== undefined && !isUsIndicators(usIndicators))) return null;
   return {
     currencies: value.currencies,
     cot: value.cot,
     catalysts: value.catalysts,
+    ...(usIndicators === undefined ? {} : isUsIndicators(usIndicators) ? { usIndicators } : {}),
   };
 }
 
@@ -143,11 +181,21 @@ async function getFredObservations(seriesId: string, apiKey: string): Promise<Ob
 }
 
 async function getFredUsdUpdates(apiKey: string) {
-  const [rateResult, pceResult, cpiResult, twoYearResult] = await Promise.allSettled([
+  const [rateResult, pceResult, cpiResult, twoYearResult, tenYearResult, realYieldResult, breakevenResult,
+    usdBroadResult, vixResult, sp500Result, wtiResult, brentResult, creditSpreadResult] = await Promise.allSettled([
     getFredObservations('DFF', apiKey),
     getFredObservations('PCEPILFE', apiKey),
     getFredObservations('CPIAUCSL', apiKey),
     getFredObservations('DGS2', apiKey),
+    getFredObservations('DGS10', apiKey),
+    getFredObservations('DFII10', apiKey),
+    getFredObservations('T10YIE', apiKey),
+    getFredObservations('DTWEXBGS', apiKey),
+    getFredObservations('VIXCLS', apiKey),
+    getFredObservations('SP500', apiKey),
+    getFredObservations('DCOILWTICO', apiKey),
+    getFredObservations('DCOILBRENTEU', apiKey),
+    getFredObservations('BAMLH0A0HYM2', apiKey),
   ]);
   const latestYearOverYear = (observations: Observation[]) => {
     const latest = observations[0];
@@ -159,11 +207,42 @@ async function getFredUsdUpdates(apiKey: string) {
   if (pceResult.status === 'rejected') console.warn('FRED Core PCE is unavailable:', pceResult.reason);
   if (cpiResult.status === 'rejected') console.warn('FRED CPI is unavailable:', cpiResult.reason);
   if (twoYearResult.status === 'rejected') console.warn('FRED 2-Year Treasury yield is unavailable:', twoYearResult.reason);
+  if (tenYearResult.status === 'rejected') console.warn('FRED 10-Year Treasury yield is unavailable:', tenYearResult.reason);
+  if (realYieldResult.status === 'rejected') console.warn('FRED 10-Year TIPS real yield is unavailable:', realYieldResult.reason);
+  if (breakevenResult.status === 'rejected') console.warn('FRED 10-Year breakeven inflation is unavailable:', breakevenResult.reason);
+  if (usdBroadResult.status === 'rejected') console.warn('FRED broad trade-weighted USD index is unavailable:', usdBroadResult.reason);
+  if (vixResult.status === 'rejected') console.warn('FRED VIX is unavailable:', vixResult.reason);
+  if (sp500Result.status === 'rejected') console.warn('FRED S&P 500 is unavailable:', sp500Result.reason);
+  if (wtiResult.status === 'rejected') console.warn('FRED WTI oil is unavailable:', wtiResult.reason);
+  if (brentResult.status === 'rejected') console.warn('FRED Brent oil is unavailable:', brentResult.reason);
+  if (creditSpreadResult.status === 'rejected') console.warn('FRED US high-yield credit spread is unavailable:', creditSpreadResult.reason);
   return {
     policyRate: rateResult.status === 'fulfilled' ? rateResult.value[0]?.value : undefined,
+    policyRateAsOf: rateResult.status === 'fulfilled' ? rateResult.value[0]?.date : undefined,
     corePce: pceResult.status === 'fulfilled' ? latestYearOverYear(pceResult.value) : undefined,
+    corePceAsOf: pceResult.status === 'fulfilled' ? pceResult.value[0]?.date : undefined,
     cpi: cpiResult.status === 'fulfilled' ? latestYearOverYear(cpiResult.value) : undefined,
+    cpiAsOf: cpiResult.status === 'fulfilled' ? cpiResult.value[0]?.date : undefined,
     twoYearYield: twoYearResult.status === 'fulfilled' ? twoYearResult.value[0]?.value : undefined,
+    twoYearYieldAsOf: twoYearResult.status === 'fulfilled' ? twoYearResult.value[0]?.date : undefined,
+    tenYearTreasuryYieldPct: tenYearResult.status === 'fulfilled' ? tenYearResult.value[0]?.value : undefined,
+    tenYearTreasuryYieldAsOf: tenYearResult.status === 'fulfilled' ? tenYearResult.value[0]?.date : undefined,
+    tenYearRealYieldPct: realYieldResult.status === 'fulfilled' ? realYieldResult.value[0]?.value : undefined,
+    tenYearRealYieldAsOf: realYieldResult.status === 'fulfilled' ? realYieldResult.value[0]?.date : undefined,
+    tenYearBreakevenInflationPct: breakevenResult.status === 'fulfilled' ? breakevenResult.value[0]?.value : undefined,
+    tenYearBreakevenInflationAsOf: breakevenResult.status === 'fulfilled' ? breakevenResult.value[0]?.date : undefined,
+    usdBroadIndex: usdBroadResult.status === 'fulfilled' ? usdBroadResult.value[0]?.value : undefined,
+    usdBroadIndexAsOf: usdBroadResult.status === 'fulfilled' ? usdBroadResult.value[0]?.date : undefined,
+    vixIndex: vixResult.status === 'fulfilled' ? vixResult.value[0]?.value : undefined,
+    vixIndexAsOf: vixResult.status === 'fulfilled' ? vixResult.value[0]?.date : undefined,
+    sp500Index: sp500Result.status === 'fulfilled' ? sp500Result.value[0]?.value : undefined,
+    sp500IndexAsOf: sp500Result.status === 'fulfilled' ? sp500Result.value[0]?.date : undefined,
+    wtiOilUsd: wtiResult.status === 'fulfilled' ? wtiResult.value[0]?.value : undefined,
+    wtiOilAsOf: wtiResult.status === 'fulfilled' ? wtiResult.value[0]?.date : undefined,
+    brentOilUsd: brentResult.status === 'fulfilled' ? brentResult.value[0]?.value : undefined,
+    brentOilAsOf: brentResult.status === 'fulfilled' ? brentResult.value[0]?.date : undefined,
+    usHighYieldSpreadPct: creditSpreadResult.status === 'fulfilled' ? creditSpreadResult.value[0]?.value : undefined,
+    usHighYieldSpreadAsOf: creditSpreadResult.status === 'fulfilled' ? creditSpreadResult.value[0]?.date : undefined,
   };
 }
 
@@ -359,6 +438,7 @@ async function getCftcCot(): Promise<CotPosition[]> {
     'AUSTRALIAN DOLLAR',
     'SWISS FRANC',
     'CANADIAN DOLLAR',
+    'NEW ZEALAND DOLLAR',
     'GOLD',
   ];
   const marketFilter = markets.map((market) => `market_and_exchange_names like '%${market}%'`).join(' OR ');
@@ -389,6 +469,7 @@ async function getCftcCot(): Promise<CotPosition[]> {
     ['AUSTRALIAN DOLLAR - CHICAGO MERCANTILE EXCHANGE', 'AUD'],
     ['SWISS FRANC - CHICAGO MERCANTILE EXCHANGE', 'CHF'],
     ['CANADIAN DOLLAR - CHICAGO MERCANTILE EXCHANGE', 'CAD'],
+    ['NEW ZEALAND DOLLAR - CHICAGO MERCANTILE EXCHANGE', 'NZD'],
     ['GOLD - COMMODITY EXCHANGE INC.', 'GOLD'],
   ];
   const byMarket = new Map<string, Array<{ date: string; netContracts: number; weeklyChange: number }>>();
@@ -424,40 +505,51 @@ async function getCftcCot(): Promise<CotPosition[]> {
     const percentile = history.length
       ? Math.round(((below + equal / 2) / history.length) * 100)
       : 50;
-    return [{ market, netContracts: latest.netContracts, percentile, weeklyChange: latest.weeklyChange }];
+    return [{ market, netContracts: latest.netContracts, percentile, weeklyChange: latest.weeklyChange, asOf: latest.date }];
   });
   if (!positions.length) throw new Error('CFTC returned no supported currency or gold positions.');
   return positions;
 }
 
-async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallbackSnapshot()): Promise<MacroSnapshot | null> {
-  const fredApiKey = process.env.FRED_COMMERCIAL_USE_APPROVED === 'true' ? process.env.FRED_API_KEY?.trim() : undefined;
-  const finnhubApiKey = process.env.FINNHUB_COMMERCIAL_USE_APPROVED === 'true' ? process.env.FINNHUB_API_KEY?.trim() : undefined;
-  const alphaVantageKey = process.env.ALPHA_VANTAGE_COMMERCIAL_USE_APPROVED === 'true' ? process.env.ALPHA_VANTAGE_API_KEY?.trim() : undefined;
-  const fmpKey = process.env.FMP_COMMERCIAL_USE_APPROVED === 'true' ? process.env.FMP_API_KEY?.trim() : undefined;
-  const cotProviderUrl = process.env.COT_DATA_PROVIDER_LICENSE_APPROVED === 'true' ? process.env.COT_DATA_PROVIDER_URL?.trim() : undefined;
+async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
+  // FRED permits personal, non-commercial research with attribution; FRED-derived inputs are kept out of external AI prompts.
+  const fredApiKey = process.env.FRED_API_KEY?.trim();
+  const finnhubApiKey = process.env.FINNHUB_PERSONAL_PLAN_ACTIVE === 'true' ? process.env.FINNHUB_API_KEY?.trim() : undefined;
+  const alphaVantageKey = process.env.ALPHA_VANTAGE_PERSONAL_PLAN_ACTIVE === 'true' ? process.env.ALPHA_VANTAGE_API_KEY?.trim() : undefined;
+  const fmpKey = process.env.FMP_PERSONAL_PLAN_ACTIVE === 'true' ? process.env.FMP_API_KEY?.trim() : undefined;
+  const cotProviderUrl = process.env.COT_DATA_PROVIDER_PERSONAL_USE_ENABLED === 'true' ? process.env.COT_DATA_PROVIDER_URL?.trim() : undefined;
   const cotProviderToken = process.env.COT_DATA_PROVIDER_TOKEN?.trim();
 
+  // Never mix an old provider observation into a newly refreshed partial snapshot.
+  // If an adapter fails, that input stays unavailable; persisted snapshots are used
+  // separately with their original timestamp and a strict 24-hour freshness limit.
   const snapshot: MacroSnapshot = {
-    ...cachedSnapshot,
-    currencies: cachedSnapshot.currencies.map((currency) => ({ ...currency })),
-    cot: cachedSnapshot.cot.map((position) => ({ ...position })),
-    catalysts: cachedSnapshot.catalysts.map((catalyst) => ({ ...catalyst })),
+    ...getFallbackSnapshot(),
+    currencies: getProviderCurrencySeed(),
+    cot: [],
+    catalysts: [],
+    cotSource: 'unavailable',
+    calendarSource: 'reference',
     asOf: new Date().toISOString(),
-    source: cachedSnapshot.source === 'fallback' ? 'fallback' : 'partial',
+    source: 'fallback',
   };
-  const [fredResult, finnhubResult, alphaResult, fmpResult, cotResult, frankfurterResult, calendarResult, ecbResult, bocResult, boeResult, worldBankResult] = await Promise.allSettled([
+  const [fredResult, finnhubResult, alphaResult, fmpResult, cotResult, frankfurterResult, calendarResult, ecbResult, bocResult, boeResult, worldBankResult, bojResult, rbaResult, rbnzResult, snbResult, usMacroResult] = await Promise.allSettled([
     fredApiKey ? getFredUsdUpdates(fredApiKey) : Promise.resolve(null),
     finnhubApiKey ? getFinnhubCatalysts(finnhubApiKey) : Promise.resolve(null),
     alphaVantageKey ? getAlphaVantageUsdUpdates(alphaVantageKey) : Promise.resolve(null),
     fmpKey ? getFmpCatalysts(fmpKey) : Promise.resolve(null),
-    cotProviderUrl ? getCotProvider(cotProviderUrl, cotProviderToken) : getCftcCot(),
-    getFrankfurterRates(),
-    process.env.FAIRECONOMY_COMMERCIAL_USE_APPROVED === 'true' ? getFairEconomyCatalysts() : Promise.resolve([]),
+    cotProviderUrl ? getCotProvider(cotProviderUrl, cotProviderToken) : getCachedData('macro:cftc-cot', getCftcCot, 6 * 60 * 60),
+    getCachedData('macro:frankfurter-reference', getFrankfurterRates, 6 * 60 * 60),
+    process.env.FAIRECONOMY_PERSONAL_PLAN_ACTIVE === 'true' ? getFairEconomyCatalysts() : Promise.resolve([]),
     getEcbMacroInputs(),
     getBankOfCanadaMacroInputs(),
     getBankOfEnglandPolicyRate(),
     getWorldBankG10Inflation(),
+    getBankOfJapanPolicyRate(),
+    getReserveBankOfAustraliaPolicyRate(),
+    getReserveBankOfNewZealandPolicyRate(),
+    process.env.SNB_DATA_SOURCE_ENABLED === 'true' ? getSwissNationalBankPolicyRate() : Promise.reject(new Error('SNB data source is disabled.')),
+    getCachedData('macro:official-us-statistics', fetchOfficialUsMacro, 6 * 60 * 60),
   ]);
   let hasLiveData = false;
   if (fredResult.status === 'fulfilled' && isRecord(fredResult.value)) {
@@ -483,56 +575,66 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
       if (isFiniteNumber(fredResult.value.policyRate)) {
         usd.policyRate = fredResult.value.policyRate;
         usd.policyRateSource = 'provider';
+        usd.policyRateProvider = 'fred';
+        usd.policyRateAsOf = typeof fredResult.value.policyRateAsOf === 'string' ? fredResult.value.policyRateAsOf : undefined;
         hasLiveData = true;
       }
       if (isFiniteNumber(fredResult.value.corePce)) {
         usd.inflation = fredResult.value.corePce;
         usd.inflationLabel = 'Core PCE';
         usd.corePce = fredResult.value.corePce;
+        usd.corePceAsOf = typeof fredResult.value.corePceAsOf === 'string' ? fredResult.value.corePceAsOf : undefined;
         usd.inflationSource = 'provider';
+        usd.inflationProvider = 'fred';
+        usd.inflationAsOf = typeof fredResult.value.corePceAsOf === 'string' ? fredResult.value.corePceAsOf : undefined;
         hasLiveData = true;
       }
       if (isFiniteNumber(fredResult.value.cpi)) {
         usd.cpi = fredResult.value.cpi;
-        usd.inflationSource = 'provider';
+        usd.cpiAsOf = typeof fredResult.value.cpiAsOf === 'string' ? fredResult.value.cpiAsOf : undefined;
         hasLiveData = true;
       }
       if (isFiniteNumber(fredResult.value.twoYearYield)) {
         usd.twoYearYield = fredResult.value.twoYearYield;
         usd.twoYearYieldSource = 'provider';
+        usd.twoYearYieldAsOf = typeof fredResult.value.twoYearYieldAsOf === 'string' ? fredResult.value.twoYearYieldAsOf : undefined;
         hasLiveData = true;
       }
       if (!isFiniteNumber(fredResult.value.corePce) && isFiniteNumber(fredResult.value.cpi)) {
         usd.inflation = fredResult.value.cpi;
         usd.inflationLabel = 'CPI';
         usd.inflationSource = 'provider';
+        usd.inflationAsOf = typeof fredResult.value.cpiAsOf === 'string' ? fredResult.value.cpiAsOf : undefined;
       }
     }
   } else if (fredResult.status === 'rejected') {
-    console.warn('FRED macro series unavailable; retaining cached USD observations:', fredResult.reason);
+    console.warn('FRED macro series unavailable; USD provider observations are unavailable:', fredResult.reason);
   }
   if (finnhubResult.status === 'rejected') {
     console.warn('Finnhub economic calendar unavailable; checking configured calendar adapters:', finnhubResult.reason);
   }
-  if (frankfurterResult.status === 'fulfilled' && isRecord(frankfurterResult.value)) {
+  if (frankfurterResult.status === 'fulfilled' && isNumericRecord(frankfurterResult.value)) {
     snapshot.ecbRates = frankfurterResult.value;
     hasLiveData = true;
   } else if (frankfurterResult.status === 'rejected') {
     console.warn('ECB benchmark exchange rates are unavailable:', frankfurterResult.reason);
   }
-  const providerCalendar = calendarResult.status === 'fulfilled' && calendarResult.value.length > 0
-    ? calendarResult.value
-    : finnhubResult.status === 'fulfilled' && finnhubResult.value?.length
-      ? finnhubResult.value
-      : fmpResult.status === 'fulfilled' && fmpResult.value?.length
-        ? fmpResult.value
-        : null;
-  if (providerCalendar) {
-    snapshot.catalysts = providerCalendar;
+  const calendarCandidates = [
+    { provider: 'fair-economy' as const, events: calendarResult.status === 'fulfilled' ? calendarResult.value : [] },
+    { provider: 'finnhub' as const, events: finnhubResult.status === 'fulfilled' ? (finnhubResult.value ?? []) : [] },
+    { provider: 'fmp' as const, events: fmpResult.status === 'fulfilled' ? (fmpResult.value ?? []) : [] },
+  ];
+  const selectedCalendar = calendarCandidates.find((candidate) => candidate.events.length > 0);
+  if (selectedCalendar) {
+    snapshot.catalysts = selectedCalendar.events;
     snapshot.calendarSource = 'provider';
+    snapshot.calendarProvider = selectedCalendar.provider;
     hasLiveData = true;
-  } else if (calendarResult.status === 'rejected') {
-    console.warn('FairEconomy calendar is unavailable; using configured provider calendars or curated reference events:', calendarResult.reason);
+  } else {
+    snapshot.catalysts = [];
+    snapshot.calendarSource = 'reference';
+    snapshot.calendarProvider = undefined;
+    if (calendarResult.status === 'rejected') console.warn('FairEconomy calendar unavailable; no synthetic calendar fallback is used:', calendarResult.reason);
   }
   if (ecbResult.status === 'fulfilled') {
     const eur = snapshot.currencies.find((currency) => currency.code === 'EUR');
@@ -540,17 +642,22 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
       if (isFiniteNumber(ecbResult.value.policyRate)) {
         eur.policyRate = ecbResult.value.policyRate;
         eur.policyRateSource = 'provider';
+        eur.policyRateProvider = 'ecb';
+        eur.policyRateAsOf = ecbResult.value.policyRateAsOf;
         hasLiveData = true;
       }
       if (isFiniteNumber(ecbResult.value.inflation)) {
         eur.inflation = ecbResult.value.inflation;
         eur.inflationLabel = 'HICP';
         eur.inflationSource = 'provider';
+        eur.inflationProvider = 'ecb';
+        eur.inflationAsOf = ecbResult.value.inflationAsOf;
         hasLiveData = true;
       }
       if (isFiniteNumber(ecbResult.value.twoYearYield)) {
         eur.twoYearYield = ecbResult.value.twoYearYield;
         eur.twoYearYieldSource = 'provider';
+        eur.twoYearYieldAsOf = ecbResult.value.twoYearYieldAsOf;
         hasLiveData = true;
       }
     }
@@ -563,12 +670,16 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
       if (isFiniteNumber(bocResult.value.policyRate)) {
         cad.policyRate = bocResult.value.policyRate;
         cad.policyRateSource = 'provider';
+        cad.policyRateProvider = 'bank-of-canada';
+        cad.policyRateAsOf = bocResult.value.policyRateAsOf;
         hasLiveData = true;
       }
       if (isFiniteNumber(bocResult.value.inflation)) {
         cad.inflation = bocResult.value.inflation;
         cad.inflationLabel = 'CPI';
         cad.inflationSource = 'provider';
+        cad.inflationProvider = 'bank-of-canada';
+        cad.inflationAsOf = bocResult.value.inflationAsOf;
         hasLiveData = true;
       }
     }
@@ -578,13 +689,36 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
   if (boeResult.status === 'fulfilled') {
     const gbp = snapshot.currencies.find((currency) => currency.code === 'GBP');
     if (gbp) {
-      gbp.policyRate = boeResult.value;
+      gbp.policyRate = boeResult.value.value;
       gbp.policyRateSource = 'provider';
+      gbp.policyRateProvider = 'bank-of-england';
+      gbp.policyRateAsOf = boeResult.value.asOf;
+      gbp.policyRateSourceUrl = boeResult.value.sourceUrl;
       hasLiveData = true;
     }
   } else {
     console.warn('Bank of England official Bank Rate is unavailable:', boeResult.reason);
   }
+
+  const officialPolicyResults: Array<{ code: string; result: PromiseSettledResult<import('@/lib/internationalMacro').OfficialPolicyObservation> }> = [
+    { code: 'JPY', result: bojResult }, { code: 'AUD', result: rbaResult },
+    { code: 'NZD', result: rbnzResult }, { code: 'CHF', result: snbResult },
+  ];
+  for (const item of officialPolicyResults) {
+    if (item.result.status !== 'fulfilled') {
+      console.warn(`Official ${item.code} central-bank policy-rate source unavailable:`, item.result.reason);
+      continue;
+    }
+    const currency = snapshot.currencies.find((entry) => entry.code === item.code);
+    if (!currency || !Number.isFinite(item.result.value.value)) continue;
+    currency.policyRate = item.result.value.value;
+    currency.policyRateSource = 'provider';
+    currency.policyRateProvider = item.code === 'JPY' ? 'bank-of-japan' : item.code === 'AUD' ? 'reserve-bank-of-australia' : item.code === 'NZD' ? 'reserve-bank-of-new-zealand' : 'swiss-national-bank';
+    currency.policyRateAsOf = item.result.value.asOf;
+    currency.policyRateSourceUrl = item.result.value.sourceUrl;
+    hasLiveData = true;
+  }
+
   if (worldBankResult.status === 'fulfilled') {
     for (const observation of worldBankResult.value) {
       const currency = snapshot.currencies.find((item) => item.code === observation.currency);
@@ -592,6 +726,9 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
       currency.inflation = observation.inflation;
       currency.inflationLabel = `CPI (annual, ${observation.year})`;
       currency.inflationSource = 'provider';
+      currency.inflationProvider = 'world-bank';
+      currency.inflationAsOf = observation.year;
+      currency.inflationSourceUrl = `https://api.worldbank.org/v2/country/${({ GBP: 'GBR', JPY: 'JPN', CHF: 'CHE', AUD: 'AUS', NZD: 'NZL', SEK: 'SWE', NOK: 'NOR' } as Record<string, string>)[observation.currency]}/indicator/FP.CPI.TOTL.ZG`;
       hasLiveData = true;
     }
   } else {
@@ -621,6 +758,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
         if (isFiniteNumber(alphaResult.value.policyRate)) {
           usd.policyRate = alphaResult.value.policyRate;
           usd.policyRateSource = 'provider';
+          usd.policyRateProvider = 'alpha-vantage';
           hasLiveData = true;
         }
         if (isFiniteNumber(alphaResult.value.inflation)) {
@@ -628,23 +766,75 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
           usd.cpi = alphaResult.value.inflation;
           usd.inflationLabel = 'CPI';
           usd.inflationSource = 'provider';
+          usd.inflationProvider = 'alpha-vantage';
           hasLiveData = true;
         }
       }
     } else if (alphaResult.status === 'rejected') {
-      console.error('Alpha Vantage unavailable; retaining cached USD macro values:', alphaResult.reason);
+      console.error('Alpha Vantage unavailable; USD provider observations are unavailable:', alphaResult.reason);
     }
   }
   if (fmpResult.status === 'rejected') {
-    console.error('Financial Modeling Prep unavailable; retaining available calendar events:', fmpResult.reason);
+    console.error('Financial Modeling Prep calendar unavailable:', fmpResult.reason);
+  }
+  if (usMacroResult.status === 'fulfilled' && usMacroResult.value) {
+    snapshot.usIndicators = usMacroResult.value;
+    hasLiveData = true;
+  } else if (usMacroResult.status === 'rejected') {
+    console.warn('Official BLS/BEA macro indicators are unavailable:', usMacroResult.reason);
+  }
+  if (!snapshot.usIndicators && fredResult.status === 'fulfilled') {
+    snapshot.usIndicators = { retrievedAt: new Date().toISOString(), sources: [] };
+  }
+  if (snapshot.usIndicators && fredResult.status === 'fulfilled' && fredResult.value) {
+    const fred = fredResult.value;
+    snapshot.usIndicators = {
+      ...snapshot.usIndicators,
+      tenYearTreasuryYieldPct: isFiniteNumber(fred.tenYearTreasuryYieldPct) ? fred.tenYearTreasuryYieldPct : undefined,
+      tenYearTreasuryYieldAsOf: fred.tenYearTreasuryYieldAsOf,
+      tenYearRealYieldPct: isFiniteNumber(fred.tenYearRealYieldPct) ? fred.tenYearRealYieldPct : undefined,
+      tenYearRealYieldAsOf: fred.tenYearRealYieldAsOf,
+      tenYearBreakevenInflationPct: isFiniteNumber(fred.tenYearBreakevenInflationPct) ? fred.tenYearBreakevenInflationPct : undefined,
+      tenYearBreakevenInflationAsOf: fred.tenYearBreakevenInflationAsOf,
+      usdBroadIndex: isFiniteNumber(fred.usdBroadIndex) ? fred.usdBroadIndex : undefined,
+      usdBroadIndexAsOf: fred.usdBroadIndexAsOf,
+      vixIndex: isFiniteNumber(fred.vixIndex) ? fred.vixIndex : undefined,
+      vixIndexAsOf: fred.vixIndexAsOf,
+      sp500Index: isFiniteNumber(fred.sp500Index) ? fred.sp500Index : undefined,
+      sp500IndexAsOf: fred.sp500IndexAsOf,
+      wtiOilUsd: isFiniteNumber(fred.wtiOilUsd) ? fred.wtiOilUsd : undefined,
+      wtiOilAsOf: fred.wtiOilAsOf,
+      brentOilUsd: isFiniteNumber(fred.brentOilUsd) ? fred.brentOilUsd : undefined,
+      brentOilAsOf: fred.brentOilAsOf,
+      usHighYieldSpreadPct: isFiniteNumber(fred.usHighYieldSpreadPct) ? fred.usHighYieldSpreadPct : undefined,
+      usHighYieldSpreadAsOf: fred.usHighYieldSpreadAsOf,
+      sources: [...new Set([
+        ...snapshot.usIndicators.sources,
+        ...([
+          fred.tenYearTreasuryYieldPct, fred.tenYearRealYieldPct, fred.tenYearBreakevenInflationPct,
+          fred.usdBroadIndex, fred.vixIndex, fred.sp500Index, fred.wtiOilUsd, fred.brentOilUsd,
+          fred.usHighYieldSpreadPct,
+        ].some(isFiniteNumber) ? ['Federal Reserve Bank of St. Louis (FRED)'] : []),
+      ])],
+    };
+    if ([
+      fred.tenYearTreasuryYieldPct, fred.tenYearRealYieldPct, fred.tenYearBreakevenInflationPct,
+      fred.usdBroadIndex, fred.vixIndex, fred.sp500Index, fred.wtiOilUsd, fred.brentOilUsd,
+      fred.usHighYieldSpreadPct,
+    ].some(isFiniteNumber)) hasLiveData = true;
   }
   if (cotResult.status === 'fulfilled' && Array.isArray(cotResult.value) && cotResult.value.every(isCotPosition)) {
     snapshot.cot = cotResult.value;
     snapshot.cotSource = 'provider';
+    snapshot.cotProvider = cotProviderUrl ? 'custom' : 'cftc';
     hasLiveData = true;
   } else if (cotResult.status === 'rejected') {
-    console.error('COT provider unavailable; retaining cached positioning:', cotResult.reason);
+    console.error('COT provider unavailable; no cached positioning is substituted:', cotResult.reason);
   }
+  // Never return structural seed values or mixed reference/provider rows as live inputs.
+  snapshot.currencies = snapshot.currencies.filter((currency) =>
+    currency.policyRateSource === 'provider' && currency.inflationSource === 'provider');
+
   if (hasLiveData) {
     const coreG10 = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'SEK', 'NOK'];
     const completeG10MacroCoverage = coreG10.every((code) => {
@@ -659,9 +849,9 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
 }
 
 async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) return null;
+  if (!(process.env.SUPABASE_SECRET_KEY?.trim() || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim())) return null;
   try {
-    const { data, error } = await getSupabaseAdmin().from('macro_snapshots')
+    const { data, error } = await getSupabaseAdmin().from('macro_snapshot_payloads')
       .select('payload,refreshed_at')
       .eq('snapshot_key', 'global')
       .maybeSingle();
@@ -672,7 +862,9 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
     if (!data || !isRecord(data.payload)) return null;
     if (data.payload.source !== 'provider' && data.payload.source !== 'partial') return null;
     const parsed = parseProviderSnapshot(data.payload);
-    if (!parsed || !Number.isFinite(Date.parse(data.refreshed_at))) return null;
+    const refreshedAt = Date.parse(data.refreshed_at);
+    const snapshotAgeMs = Date.now() - refreshedAt;
+    if (!parsed || !Number.isFinite(refreshedAt) || snapshotAgeMs < -5 * 60_000 || snapshotAgeMs > 24 * 60 * 60_000) return null;
     const ecbRates = isRecord(data.payload.ecbRates)
       ? Object.fromEntries(Object.entries(data.payload.ecbRates)
         .filter((entry): entry is [string, number] => /^[A-Z]{3}$/.test(entry[0])
@@ -686,7 +878,9 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
           ? 'provider'
           : 'fallback',
       cotSource: data.payload.cotSource === 'provider' ? 'provider' : 'unavailable',
+      cotProvider: data.payload.cotProvider === 'cftc' || data.payload.cotProvider === 'custom' ? data.payload.cotProvider : undefined,
       calendarSource: data.payload.calendarSource === 'provider' ? 'provider' : 'reference',
+      calendarProvider: ['fair-economy', 'finnhub', 'fmp', 'macro-provider'].includes(String(data.payload.calendarProvider)) ? data.payload.calendarProvider as MacroSnapshot['calendarProvider'] : undefined,
       asOf: data.refreshed_at,
       ...(ecbRates && Object.keys(ecbRates).length > 0 ? { ecbRates } : {}),
     };
@@ -696,10 +890,25 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
   }
 }
 
+async function persistMacroSnapshot(snapshot: MacroSnapshot): Promise<void> {
+  if (snapshot.source !== 'provider' && snapshot.source !== 'partial') return;
+  try {
+    const { error } = await getSupabaseAdmin().from('macro_snapshot_payloads').upsert({
+      snapshot_key: 'global',
+      payload: snapshot,
+      refreshed_at: snapshot.asOf,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'snapshot_key' });
+    if (error) throw error;
+  } catch (error) {
+    // Provider data remains usable for this request even if persistence is unavailable.
+    console.warn('Macro snapshot persistence failed:', error);
+  }
+}
+
 export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
   const persisted = await getPersistedSnapshot();
-  const baseline = mergeWithFallback(persisted ?? getFallbackSnapshot());
-  const endpoint = process.env.MACRO_DATA_PROVIDER_LICENSE_APPROVED === 'true' ? process.env.MACRO_DATA_PROVIDER_URL?.trim() : undefined;
+  const endpoint = process.env.MACRO_DATA_PROVIDER_PERSONAL_USE_ENABLED === 'true' ? process.env.MACRO_DATA_PROVIDER_URL?.trim() : undefined;
   if (endpoint) {
     try {
       const providerUrl = new URL(endpoint);
@@ -716,39 +925,52 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
       const parsed = parseProviderSnapshot(await response.json() as unknown);
       if (!parsed) throw new Error('Macro provider payload failed validation.');
       let ecbRates = persisted?.ecbRates;
-      try {
-        ecbRates = await getFrankfurterRates();
-      } catch (error) {
-        console.warn('ECB benchmark exchange rates are unavailable:', error);
+      {
+        try {
+          ecbRates = await getCachedData('macro:frankfurter-reference', getFrankfurterRates, 6 * 60 * 60);
+        } catch (error) {
+          console.warn('ECB benchmark exchange rates are unavailable:', error);
+        }
       }
-      return mergeWithFallback({
-        ...baseline,
+      const providerSnapshot = mergeWithFallback({
+        ...getFallbackSnapshot(),
         ...parsed,
-        currencies: [
-          ...baseline.currencies,
-          ...parsed.currencies.map((currency) => ({
-            ...currency,
-            policyRateSource: 'provider' as const,
-            inflationSource: 'provider' as const,
-          })),
-        ],
-        cot: parsed.cot.length > 0 ? parsed.cot : baseline.cot,
-        catalysts: parsed.catalysts.length > 0 ? parsed.catalysts : baseline.catalysts,
-        source: 'provider',
-        cotSource: 'provider',
+        currencies: parsed.currencies.map((currency) => ({
+          ...currency,
+          policyRateSource: 'provider' as const,
+          inflationSource: 'provider' as const,
+          policyRateProvider: 'macro-provider' as const,
+          inflationProvider: 'macro-provider' as const,
+        })),
+        cot: parsed.cot,
+        catalysts: parsed.catalysts,
+        source: 'partial',
+        cotSource: parsed.cot.length > 0 ? 'provider' : 'unavailable',
+        cotProvider: parsed.cot.length > 0 ? 'custom' : undefined,
         calendarSource: parsed.catalysts.length > 0 ? 'provider' : 'reference',
+        calendarProvider: parsed.catalysts.length > 0 ? 'macro-provider' : undefined,
         asOf: new Date().toISOString(),
         ...(ecbRates ? { ecbRates } : {}),
       });
+      const coreG10 = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'SEK', 'NOK'];
+      const completeG10MacroCoverage = coreG10.every((code) => {
+        const currency = providerSnapshot.currencies.find((item) => item.code === code);
+        return currency?.policyRateSource === 'provider' && currency.inflationSource === 'provider';
+      });
+      providerSnapshot.source = completeG10MacroCoverage ? 'provider' : 'partial';
+      await persistMacroSnapshot(providerSnapshot);
+      return providerSnapshot;
     } catch (error) {
       console.error('Macro data provider unavailable; checking live API adapters:', error);
     }
   }
 
   try {
-    const liveSnapshot = await getLiveProviderSnapshot(baseline);
+    const liveSnapshot = await getLiveProviderSnapshot();
     if (liveSnapshot) {
-      return mergeWithFallback(liveSnapshot);
+      const merged = mergeWithFallback(liveSnapshot);
+      await persistMacroSnapshot(merged);
+      return merged;
     }
   } catch (error) {
     console.error('Live macro APIs unavailable; checking the persisted snapshot:', error);

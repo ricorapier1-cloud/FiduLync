@@ -1,0 +1,253 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import quant from '../.quant-test/quantGovernance.js';
+
+const { evaluateRiskProposal, calculateBrokerAwareVolume, calculateTrueRangeAtr, isRiskAnchorFresh } = quant;
+
+function proposal(overrides = {}) {
+  return {
+    requestId: 'req-001',
+    installationId: 'mt5-install-001',
+    symbol: 'EURUSD',
+    side: 'BUY',
+    entryPrice: 1.1002,
+    stopLoss: 1.0982,
+    takeProfit: 1.1042,
+    requestedRiskPct: 0.5,
+    ...overrides,
+  };
+}
+
+function context(overrides = {}) {
+  return {
+    bid: 1.1000,
+    ask: 1.1002,
+    quoteAgeMs: 250,
+    spreadPoints: 20,
+    atrPrice: 0.002,
+    equity: 10000,
+    freeMargin: 9000,
+    usedMargin: 1000,
+    estimatedMargin: 500,
+    currentOpenRiskCash: 100,
+    dailyStartEquity: 10000,
+    weeklyStartEquity: 10000,
+    highWaterMarkEquity: 10000,
+    consecutiveLosses: 0,
+    regime: 'TRENDING_EXPANSION',
+    marketDataHealth: 'LIVE',
+    macroDataHealth: 'LIVE',
+    newsLockout: false,
+    symbolSpec: {
+      symbol: 'EURUSD',
+      tickSize: 0.00001,
+      tickValuePerLot: 1,
+      volumeMin: 0.01,
+      volumeMax: 100,
+      volumeStep: 0.01,
+      contractSize: 100000,
+      stopLevelPoints: 0,
+      point: 0.00001,
+      verified: true,
+    },
+    ...overrides,
+  };
+}
+
+function policy(overrides = {}) {
+  return {
+    policyVersion: 'personal-v1',
+    executionEnabled: true,
+    modelValidated: true,
+    executionQualityVerified: true,
+    maxPerTradeRiskPct: 0.5,
+    maxPortfolioRiskPct: 2,
+    maxDailyDrawdownPct: 4,
+    maxWeeklyDrawdownPct: 8,
+    maxHighWaterDrawdownPct: 15,
+    maxMarginUsagePct: 20,
+    maxSpreadPoints: 30,
+    maxSpreadAtrRatio: 0.12,
+    maxQuoteAgeMs: 2000,
+    maxConsecutiveLosses: 3,
+    rewardRiskMinimum: 1.5,
+    ...overrides,
+  };
+}
+
+test('approves a verified proposal and floors volume to broker step', () => {
+  const result = evaluateRiskProposal(proposal(), context(), policy(), Date.UTC(2026, 10, 18));
+  assert.equal(result.decision, 'APPROVE');
+  assert.equal(result.approvedRiskPct, 0.5);
+  assert.equal(result.approvedVolume, 0.25);
+  assert.equal(result.estimatedRiskCash, 50);
+  assert.deepEqual(result.blockers, []);
+});
+
+test('EA cannot override server-built account context with proposal fields', () => {
+  const result = evaluateRiskProposal(
+    proposal({ equity: 1, marketDataHealth: 'STALE', executionEnabled: true }),
+    context(),
+    policy(),
+  );
+  assert.equal(result.decision, 'APPROVE');
+  assert.equal(result.approvedVolume, 0.25);
+  assert.equal(result.estimatedRiskCash, 50);
+});
+
+test('server-owned policy caps requested risk', () => {
+  const result = evaluateRiskProposal(proposal({ requestedRiskPct: 5 }), context(), policy());
+  assert.equal(result.decision, 'APPROVE');
+  assert.equal(result.approvedRiskPct, 0.5);
+  assert.equal(result.approvedVolume, 0.25);
+});
+
+test('fails closed while owner execution permission is disabled', () => {
+  const result = evaluateRiskProposal(proposal(), context(), policy({ executionEnabled: false }));
+  assert.equal(result.decision, 'REJECT');
+  assert.equal(result.approvedVolume, 0);
+  assert.ok(result.blockers.includes('EXECUTION_NOT_ENABLED_BY_OWNER'));
+});
+
+test('fails closed until model validation evidence is server-approved', () => {
+  const result = evaluateRiskProposal(proposal(), context(), policy({ modelValidated: false }));
+  assert.equal(result.decision, 'REJECT');
+  assert.equal(result.approvedVolume, 0);
+  assert.ok(result.blockers.includes('MODEL_NOT_OUT_OF_SAMPLE_VALIDATED'));
+});
+
+test('abstains on a future-dated quote or negative spread', () => {
+  const result = evaluateRiskProposal(proposal(), context({ quoteAgeMs: -1 }), policy());
+  assert.equal(result.decision, 'ABSTAIN');
+  assert.ok(result.blockers.includes('MARKET_OR_ACCOUNT_CONTEXT_INVALID'));
+});
+
+test('abstains on non-positive stop or target prices', () => {
+  const result = evaluateRiskProposal(proposal({ takeProfit: 0 }), context(), policy());
+  assert.equal(result.decision, 'ABSTAIN');
+  assert.ok(result.blockers.includes('PROPOSAL_PRICE_OR_RISK_INVALID'));
+});
+
+test('degrades when market data is not live', () => {
+  const result = evaluateRiskProposal(proposal(), context({ marketDataHealth: 'REFERENCE' }), policy());
+  assert.equal(result.decision, 'DEGRADED');
+  assert.equal(result.approvedRiskPct, 0);
+  assert.ok(result.blockers.includes('MARKET_DATA_NOT_LIVE'));
+});
+
+test('blocks daily drawdown breach and does not issue volume', () => {
+  const result = evaluateRiskProposal(proposal(), context({ equity: 9500 }), policy());
+  assert.equal(result.decision, 'REJECT');
+  assert.equal(result.approvedVolume, 0);
+  assert.ok(result.blockers.includes('DAILY_DRAWDOWN_LIMIT_REACHED'));
+});
+
+test('rejects minimum broker volume when it would exceed the risk budget', () => {
+  const result = calculateBrokerAwareVolume({
+    equity: 100,
+    riskPct: 0.1,
+    entryPrice: 1.1,
+    stopLoss: 1.098,
+    specification: context().symbolSpec,
+  });
+  assert.equal(result.valid, false);
+  assert.equal(result.volume, 0);
+  assert.equal(result.reason, 'MINIMUM_VOLUME_EXCEEDS_RISK_BUDGET');
+});
+
+test('uses existing margin plus proposed margin for the margin ceiling', () => {
+  const result = evaluateRiskProposal(
+    proposal(),
+    context({ usedMargin: 1500, estimatedMargin: 1000 }),
+    policy({ maxMarginUsagePct: 20 }),
+  );
+  assert.equal(result.decision, 'REJECT');
+  assert.ok(result.blockers.includes('MARGIN_USAGE_LIMIT_EXCEEDED'));
+});
+
+
+
+test('returns DEGRADED for a stale broker quote', () => {
+  const result = evaluateRiskProposal(proposal(), context({ quoteAgeMs: 5000 }), policy());
+  assert.equal(result.decision, 'DEGRADED');
+  assert.equal(result.approvedVolume, 0);
+  assert.ok(result.blockers.includes('QUOTE_STALE'));
+});
+
+test('rejects a proposal during a high-impact news lockout', () => {
+  const result = evaluateRiskProposal(proposal(), context({ newsLockout: true }), policy());
+  assert.equal(result.decision, 'REJECT');
+  assert.equal(result.approvedVolume, 0);
+  assert.ok(result.blockers.includes('HIGH_IMPACT_NEWS_LOCKOUT'));
+});
+
+test('rejects an excessive spread before granting any volume', () => {
+  const result = evaluateRiskProposal(proposal(), context({ spreadPoints: 31 }), policy());
+  assert.equal(result.decision, 'REJECT');
+  assert.equal(result.approvedVolume, 0);
+  assert.ok(result.blockers.includes('SPREAD_LIMIT_EXCEEDED'));
+});
+
+test('abstains when broker metadata belongs to a different symbol', () => {
+  const result = evaluateRiskProposal(
+    proposal(),
+    context({ symbolSpec: { ...context().symbolSpec, symbol: 'XAUUSD' } }),
+    policy(),
+  );
+  assert.equal(result.decision, 'ABSTAIN');
+  assert.equal(result.approvedVolume, 0);
+  assert.ok(result.blockers.includes('BROKER_SYMBOL_MISMATCH'));
+});
+
+test('rejects protective stops on the wrong side of a buy entry', () => {
+  const result = evaluateRiskProposal(proposal({ stopLoss: 1.1010 }), context(), policy());
+  assert.equal(result.decision, 'REJECT');
+  assert.equal(result.approvedVolume, 0);
+  assert.ok(result.blockers.includes('ENTRY_OR_PROTECTIVE_STOPS_INVALID'));
+});
+
+test('rejects when projected open risk breaches the portfolio ceiling', () => {
+  const result = evaluateRiskProposal(
+    proposal(),
+    context({ currentOpenRiskCash: 175 }),
+    policy({ maxPortfolioRiskPct: 2 }),
+  );
+  assert.equal(result.decision, 'REJECT');
+  assert.equal(result.approvedVolume, 0);
+  assert.ok(result.blockers.includes('PORTFOLIO_RISK_LIMIT_EXCEEDED'));
+});
+
+test('rejects when the proposed margin exceeds available free margin', () => {
+  const result = evaluateRiskProposal(
+    proposal(),
+    context({ freeMargin: 100, estimatedMargin: 500 }),
+    policy(),
+  );
+  assert.equal(result.decision, 'REJECT');
+  assert.equal(result.approvedVolume, 0);
+  assert.ok(result.blockers.includes('INSUFFICIENT_FREE_MARGIN'));
+});
+
+
+test('dynamic spread guard rejects abnormal spread relative to ATR', () => {
+  const result = evaluateRiskProposal(proposal(), context({ spreadPoints: 25, atrPrice: 0.001 }), policy());
+  assert.equal(result.decision, 'REJECT');
+  assert.ok(result.blockers.includes('SPREAD_TO_ATR_LIMIT_EXCEEDED'));
+});
+
+test('closed-bar ATR requires sufficient valid history', () => {
+  const bars = Array.from({ length: 15 }, (_, index) => ({ high: 1.102 + index * 0.0001, low: 1.100 + index * 0.0001, close: 1.101 + index * 0.0001 }));
+  assert.ok(calculateTrueRangeAtr(bars, 14) > 0);
+  assert.equal(calculateTrueRangeAtr(bars.slice(0, 14), 14), null);
+  assert.equal(calculateTrueRangeAtr([{ high: 1, low: 2, close: 1 }], 2), null);
+});
+
+
+test('risk anchors must be fresh and synchronized with the account snapshot', () => {
+  const now = Date.UTC(2026, 10, 18, 12, 0, 0);
+  const iso = (offset) => new Date(now + offset).toISOString();
+  assert.equal(isRiskAnchorFresh(iso(-1000), iso(-1000), iso(-1500), now), true);
+  assert.equal(isRiskAnchorFresh(iso(-31_000), iso(-1000), iso(-1000), now), false);
+  assert.equal(isRiskAnchorFresh(iso(1000), iso(-1000), iso(-1000), now), false);
+  assert.equal(isRiskAnchorFresh(iso(-1000), iso(-1000), iso(-10_000), now), false);
+});

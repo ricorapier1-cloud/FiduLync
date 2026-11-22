@@ -1,0 +1,18 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+
+const read = (path) => readFile(new URL('../' + path, import.meta.url), 'utf8');
+
+test('MT5 macro context is installation-authenticated, read-only and fail-closed', async () => {
+  const route = await read('app/api/v1/macro-context/route.ts');
+  assert.match(route, /createHash\('sha256'\)/);
+  assert.match(route, /token_hash=eq\./);
+  assert.match(route, /status=eq\.active/);
+  assert.match(route, /enforceDistributedRateLimit/);
+  assert.match(route, /Cache-Control/);
+  assert.match(route, /INSUFFICIENT_EVIDENCE/);
+  assert.match(route, /high_impact_lockout/);
+  assert.doesNotMatch(route, /OrderSend|order_send|trade\/modify|trade\/close/i);
+  assert.doesNotMatch(route, /getMacroSignal|technicalScore|atr_sl|atr_tp|approvedVolume/i);
+});

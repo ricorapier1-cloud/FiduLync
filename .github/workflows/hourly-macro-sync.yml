@@ -1,29 +1,40 @@
-name: Hourly MacroLync Telemetry Sync
+name: Hourly Macro Data Refresh
 
 on:
   schedule:
-    - cron: '0 * * * *'
+    # GitHub Actions runs scheduled workflows from the default branch.
+    # Keep this workflow in the release PR so hourly refresh resumes after merge.
+    - cron: '17 * * * *'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: fidulync-hourly-macro-refresh
+  cancel-in-progress: false
+
 jobs:
-  sync:
+  refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 3
     steps:
-      - name: Validate cron secret
+      - name: Require the server-side cron secret
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           if [ -z "$CRON_SECRET" ]; then
-            echo "CRON_SECRET is not configured in GitHub Actions secrets."
+            echo "::error::CRON_SECRET is not configured in GitHub Actions secrets."
             exit 1
           fi
-      - name: Ping MacroLync Cron Endpoint
+
+      - name: Trigger authenticated macro refresh
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
+          set -euo pipefail
           curl --fail-with-body --show-error --silent \
             --retry 3 --retry-all-errors --retry-delay 5 \
-            --max-time 30 \
+            --max-time 45 \
             -H "Authorization: Bearer $CRON_SECRET" \
             https://fidulync.vercel.app/api/cron/sync-macro
