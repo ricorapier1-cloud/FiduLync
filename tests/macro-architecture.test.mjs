@@ -42,6 +42,9 @@ test('architecture: macro context API is read-only and contains no order executi
   assert.doesNotMatch(macroContextRoute, /export async function POST/);
   assert.doesNotMatch(macroContextRoute, /OrderSend|executeOrder|brokerPassword|tradeLot/i);
   assert.match(macroContextRoute, /consume_api_rate_limit/);
+  assert.match(macroContextRoute, /decision_status/);
+  assert.match(macroContextRoute, /UNVERIFIED_CALENDAR/);
+  assert.match(macroContextRoute, /news_lockout: dossier\.eventRiskLockout \|\| snapshot\.calendarSource !== 'provider'/);
   assert.match(macroContextRoute, /Retry-After/);
 });
 

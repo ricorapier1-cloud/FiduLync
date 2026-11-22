@@ -2,7 +2,6 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { getMacroSnapshot } from '@/lib/macroEngine';
 import { generatePairDossier } from '@/lib/macro/dossierEngine';
-import { getClientIp } from '@/lib/rateLimit';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
 
 export const runtime = 'nodejs';
@@ -82,7 +81,9 @@ export async function GET(request: Request) {
     );
   }
 
-  const ip = getClientIp(request);
+  const ip = request.headers.get('x-real-ip')?.trim()
+    || request.headers.get('x-forwarded-for')?.split(',').at(-1)?.trim()
+    || 'unknown';
   try {
     const [ipLimit, identityLimit] = await Promise.all([
       consumePersistentRateLimit(`ip:${ip}`, 60),
@@ -112,14 +113,17 @@ export async function GET(request: Request) {
       quote: dossier.quote,
       macro_regime: dossier.macroRegime,
       fundamental_bias: dossier.fundamentalBias,
-      bias_score: dossier.biasScore,
+      decision_status: dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? 'INSUFFICIENT_EVIDENCE' : 'RESEARCH_CONTEXT_AVAILABLE',
+      bias_score: dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier.biasScore,
       confidence: dossier.confidence,
-      policy_diff_bps: dossier.policyDiffBps,
-      real_yield_diff_bps: dossier.realYieldDiffBps,
+      policy_diff_bps: dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier.policyDiffBps,
+      real_yield_diff_bps: dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier.realYieldDiffBps,
       two_year_yield_diff_bps: dossier.twoYearYieldDiffBps,
-      cot_percentile_diff: dossier.cotPercentileDiff,
+      cot_percentile_diff: snapshot.cotSource === 'provider' ? dossier.cotPercentileDiff : null,
       cross_asset_confirmation: dossier.crossAssetConfirmation,
-      news_lockout: dossier.eventRiskLockout,
+      calendar_verified: snapshot.calendarSource === 'provider',
+      event_risk_status: snapshot.calendarSource === 'provider' ? 'PROVIDER_CALENDAR' : 'UNVERIFIED_CALENDAR',
+      news_lockout: dossier.eventRiskLockout || snapshot.calendarSource !== 'provider',
       next_catalyst: dossier.nextCatalyst ? {
         title: dossier.nextCatalyst.title,
         scheduled_at_utc: dossier.nextCatalyst.scheduledAt,
