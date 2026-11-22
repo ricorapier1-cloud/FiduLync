@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import BrandGlyph from '@/components/BrandGlyph';
-import TopPairBanner from '@/components/TopPairBanner';
 import { getCurrencyStrengthIndex } from '@/lib/currencyStrength';
 import { generatePairDossier } from '@/lib/macro/dossierEngine';
 import type { MacroSnapshot, MarketQuote, PairDossier } from '@/types/macro';
@@ -293,7 +292,6 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
       </section>
 
       {/* Top Macro Divergence Banner */}
-      <TopPairBanner />
 
       {/* Currency Strength Index & AI Desk Brief */}
       <section className="macro-intelligence-grid" aria-label="Currency strength and AI desk brief">

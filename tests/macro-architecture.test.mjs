@@ -67,3 +67,19 @@ test('legacy macro-signal endpoint is retired and macro scoring fails closed', (
   assert.match(macroEngine, /if \(!verified\(base\) \|\| !verified\(quote\)\) return null/);
 });
 
+
+test('legacy storefront, licensing, payments and execution APIs are blocked at the application edge', () => {
+  const proxy = read('../proxy.ts');
+  assert.match(proxy, /export function proxy/);
+  assert.match(proxy, /status: 410/);
+  for (const route of [
+    '/api/v1/create-checkout',
+    '/api/v1/customer-portal',
+    '/api/v1/paystack-webhook',
+    '/api/v1/license-bind',
+    '/api/v1/trade-log',
+    '/api/v1/top-pairs',
+    '/api/mt5/ingest',
+  ]) assert.ok(proxy.includes(route), route);
+  assert.doesNotMatch(read('../app/components/MacroDashboard.tsx'), /TopPairBanner|top-pairs/);
+});
