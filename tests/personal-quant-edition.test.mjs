@@ -29,15 +29,13 @@ test('macro refresh has hourly authenticated scheduling plus a Vercel fallback',
   assert.ok(vercel.crons.some((cron) => cron.path === '/api/cron/sync-macro'));
 });
 
-test('Quant Lab is a distinct technical research surface', () => {
-  const page = source('../app/research/page.tsx');
-  const component = source('../app/components/QuantResearchLab.tsx');
-  assert.match(page, /QuantResearchLab/);
-  for (const indicator of ['rsi14', 'adx', 'hurst_exponent', 'trend_r_squared', 'gaussian_z_score', 'kaufman_efficiency_ratio']) {
-    assert.ok(component.includes(indicator), `Quant Lab must display ${indicator}`);
-  }
-  assert.match(component, /technical_data_verified/);
-  assert.match(component, /macro_data_verified/);
+test('technical research and strategy-risk surfaces are no longer active FiduLync pages', () => {
+  const research = source('../app/research/page.tsx');
+  const risk = source('../app/risk/page.tsx');
+  const validation = source('../app/research/validation/page.tsx');
+  assert.match(research, /redirect\('\/'\)/);
+  assert.match(risk, /redirect\('\/'\)/);
+  assert.match(validation, /redirect\('\/analytics'\)/);
 });
 
 test('macro relative-value ranking never invents a pair or claims execution eligibility', () => {
