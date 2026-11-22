@@ -36,7 +36,7 @@ export default async function CrossAssetMacroPage() {
   const sourceLabel = snapshot.source === 'provider' ? 'PROVIDER' : snapshot.source === 'partial' ? 'PARTIAL' : 'UNAVAILABLE';
 
   return (
-    <main className="min-h-screen bg-[#050b10] px-4 py-8 pb-24 text-slate-100 sm:px-6">
+    <div className="min-h-screen bg-[#050b10] px-4 py-8 pb-24 text-slate-100 sm:px-6">
       <div className="mx-auto max-w-7xl space-y-8">
         <Link href="/" className="font-mono text-xs text-emerald-300 hover:underline">← BACK TO MACRO TERMINAL</Link>
         <header className="border-b border-white/10 pb-6">
@@ -121,6 +121,6 @@ export default async function CrossAssetMacroPage() {
 
         <p className="rounded-lg border border-amber-300/20 bg-amber-300/[0.04] p-4 text-xs leading-5 text-amber-100/80">Correlation matrices, lead/lag estimates and structural-break tests are intentionally not displayed until synchronized historical observations with consistent timestamps and source coverage are available. This page does not invent those statistics.</p>
       </div>
-    </main>
+    </div>
   );
 }
