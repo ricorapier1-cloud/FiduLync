@@ -429,7 +429,7 @@ async function getCftcCot(): Promise<CotPosition[]> {
     const percentile = history.length
       ? Math.round(((below + equal / 2) / history.length) * 100)
       : 50;
-    return [{ market, netContracts: latest.netContracts, percentile, weeklyChange: latest.weeklyChange }];
+    return [{ market, netContracts: latest.netContracts, percentile, weeklyChange: latest.weeklyChange, reportDate: latest.date, freshness: 'LATEST PUBLISHED' }];
   });
   if (!positions.length) throw new Error('CFTC returned no supported currency or gold positions.');
   return positions;

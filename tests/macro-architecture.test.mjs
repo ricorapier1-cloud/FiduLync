@@ -9,6 +9,8 @@ const accountPage = read('../app/account/page.tsx');
 const analyticsPage = read('../app/analytics/page.tsx');
 const macroContextRoute = read('../app/api/v1/macro-context/route.ts');
 const notebookPage = read('../app/notebook/page.tsx');
+const legacySignalRoute = read('../app/api/v1/macro-signal/route.ts');
+const macroEngine = read('../lib/macroEngine.ts');
 
 test('security: /owner returns a genuine 404 via notFound()', () => {
   assert.match(ownerPage, /notFound\(\)/);
@@ -52,3 +54,12 @@ test('research pages exist', () => {
   assert.ok(existsSync(new URL('../app/notebook/page.tsx', import.meta.url)));
   assert.ok(existsSync(new URL('../app/workbench/page.tsx', import.meta.url)));
 });
+
+test('legacy macro-signal endpoint is retired and macro scoring fails closed', () => {
+  assert.match(legacySignalRoute, /status: 410/);
+  assert.match(legacySignalRoute, /api\/v1\/macro-context/);
+  assert.match(macroEngine, /policyRateObservationDate/);
+  assert.match(macroEngine, /inflationObservationDate/);
+  assert.match(macroEngine, /if \(!verified\(base\) \|\| !verified\(quote\)\) return null/);
+});
+

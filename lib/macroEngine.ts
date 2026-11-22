@@ -29,7 +29,7 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
   const crossAsset = getCrossAssetTelemetry(snapshot);
   const regime = classifyMacroRegime(snapshot, crossAsset);
   const countryProfiles = getCountryProfiles(snapshot);
-  const providerStatus = getProviderTelemetry();
+  const providerStatus = getProviderTelemetry(snapshot);
 
   return {
     ...snapshot,
@@ -40,6 +40,13 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
   };
 }
 
+function isFreshMacroObservation(date: string | undefined, maxAgeDays: number): boolean {
+  if (!date) return false;
+  const timestamp = Date.parse(date);
+  const age = Date.now() - timestamp;
+  return Number.isFinite(timestamp) && age >= -5 * 60_000 && age <= maxAgeDays * 86_400_000;
+}
+
 export function getFundamentalSignal(snapshot: MacroSnapshot, pair: string): FundamentalSignal | null {
   const normalizedPair = pair.toUpperCase();
   if (!/^[A-Z]{6}$/.test(normalizedPair)) return null;
@@ -48,9 +55,13 @@ export function getFundamentalSignal(snapshot: MacroSnapshot, pair: string): Fun
   const quoteCode = normalizedPair.slice(3);
   const quote = snapshot.currencies.find((currency) => currency.code === quoteCode);
   const base = baseCode === 'XAU' ? null : snapshot.currencies.find((currency) => currency.code === baseCode);
-  if (!quote || (baseCode !== 'XAU' && !base)) return null;
-  const baseCotMarket = baseCode === 'XAU' ? 'GOLD' : baseCode;
-  const baseCot = snapshot.cot.find((position) => position.market === baseCotMarket);
+  if (!quote || !base || baseCode === 'XAU') return null;
+  const verified = (currency: NonNullable<typeof base>) => currency.policyRateSource === 'provider'
+    && currency.inflationSource === 'provider'
+    && isFreshMacroObservation(currency.policyRateObservationDate, 180)
+    && isFreshMacroObservation(currency.inflationObservationDate, 120);
+  if (!verified(base) || !verified(quote)) return null;
+  const baseCot = snapshot.cot.find((position) => position.market === baseCode);
   const quoteCot = snapshot.cot.find((position) => position.market === quoteCode);
   const policyDiffBps = base
     ? Math.round((base.policyRate - quote.policyRate) * 100)
@@ -58,25 +69,16 @@ export function getFundamentalSignal(snapshot: MacroSnapshot, pair: string): Fun
   const realYieldDiffBps = base
     ? Math.round(((base.policyRate - base.inflation) - (quote.policyRate - quote.inflation)) * 100)
     : Math.round(-(quote.policyRate - quote.inflation) * 100);
-  const cotPositionDiff = Math.round((baseCot?.percentile ?? 50) - (quoteCot?.percentile ?? 50));
+  const cotPositionDiff = baseCot && quoteCot ? Math.round(baseCot.percentile - quoteCot.percentile) : 0;
   const twoYearDiffBps = base?.twoYearYield !== undefined && quote.twoYearYield !== undefined
     ? Math.round((base.twoYearYield - quote.twoYearYield) * 100)
     : null;
-  const riskOn = ['AUD', 'NZD', 'CAD'].reduce((sum, code) => {
-    const currency = snapshot.currencies.find((item) => item.code === code);
-    return sum + (currency ? currency.policyRate - currency.inflation : 0);
-  }, 0) / 3;
-  const riskOff = ['JPY', 'CHF'].reduce((sum, code) => {
-    const currency = snapshot.currencies.find((item) => item.code === code);
-    return sum + (currency ? currency.policyRate - currency.inflation : 0);
-  }, 0) / 2;
-  const roroScore = Math.max(-100, Math.min(100, Math.round((riskOn - riskOff) * 12)));
-  const rawScore = base
-    ? (base.policyRate - quote.policyRate) * 12
-      + ((base.policyRate - base.inflation) - (quote.policyRate - quote.inflation)) * 9
-      + (twoYearDiffBps ?? 0) * 0.05
-      + cotPositionDiff * 0.18
-    : (quote.policyRate - quote.inflation) * -18 + cotPositionDiff * 0.18;
+  // Cross-asset risk appetite is unavailable until synchronized market feeds exist.
+  const roroScore = 0;
+  const rawScore = (base.policyRate - quote.policyRate) * 12
+    + ((base.policyRate - base.inflation) - (quote.policyRate - quote.inflation)) * 9
+    + (twoYearDiffBps ?? 0) * 0.05
+    + (baseCot && quoteCot ? cotPositionDiff * 0.18 : 0);
 
   return {
     score: Math.max(-100, Math.min(100, Math.round(rawScore + roroScore * 0.1))),
