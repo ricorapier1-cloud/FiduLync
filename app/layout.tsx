@@ -9,24 +9,24 @@ const jetBrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jet
 
 export const metadata: Metadata = {
   metadataBase: getAppBaseUrl(),
-  applicationName: 'FiduLync Personal Quant Edition',
+  applicationName: 'FiduLync MacroLync',
   title: {
-    default: 'FiduLync Personal Quant | Private Trading Intelligence',
-    template: '%s | FiduLync Personal Quant',
+    default: 'FiduLync MacroLync | Fundamental Intelligence',
+    template: '%s | FiduLync MacroLync',
   },
-  description: 'Private quantitative market research, disciplined risk planning and MT5 EA supervision for personal trading.',
+  description: 'Private institutional macroeconomic, monetary-policy, cross-asset and fundamental FX research with source provenance and a read-only MT5 macro context bridge.',
   robots: { index: false, follow: false, noarchive: true },
   openGraph: {
     type: 'website',
-    siteName: 'FiduLync Personal Quant',
-    title: 'FiduLync Personal Quant | Private Trading Intelligence',
-    description: 'Private quantitative market research, disciplined risk planning and MT5 EA supervision for personal trading.',
+    siteName: 'FiduLync MacroLync',
+    title: 'FiduLync MacroLync | Fundamental Intelligence',
+    description: 'Macroeconomic and fundamental FX research with source provenance. No broker order execution.',
     images: ['/opengraph-image.png'],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'FiduLync Personal Quant | Private Trading Intelligence',
-    description: 'Private quantitative market research, disciplined risk planning and MT5 EA supervision for personal trading.',
+    title: 'FiduLync MacroLync | Fundamental Intelligence',
+    description: 'Macroeconomic and fundamental FX research with source provenance. No broker order execution.',
     images: ['/opengraph-image.png'],
   },
 };
