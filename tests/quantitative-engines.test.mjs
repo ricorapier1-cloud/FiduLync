@@ -65,3 +65,11 @@ test('US BLS and BEA adapters preserve observation dates and do not synthesize v
   assert.match(macroData, /gdpObservationDate/);
   assert.match(types, /wageGrowthYoY\?: number/);
 });
+
+test('macro snapshot persistence uses the protected payload table and preserves source snapshots', () => {
+  const macroData = read('../lib/macroData.ts');
+  assert.match(macroData, /from\('macro_snapshot_payloads'\)/);
+  assert.match(macroData, /upsert\(/);
+  assert.match(macroData, /snapshot_key: 'global'/);
+  assert.doesNotMatch(macroData, /from\('macro_snapshots'\)\s*\.select\('payload,refreshed_at'\)/);
+});

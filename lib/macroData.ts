@@ -811,7 +811,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
 async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) return null;
   try {
-    const { data, error } = await getSupabaseAdmin().from('macro_snapshots')
+    const { data, error } = await getSupabaseAdmin().from('macro_snapshot_payloads')
       .select('payload,refreshed_at')
       .eq('snapshot_key', 'global')
       .maybeSingle();
@@ -846,6 +846,25 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
   }
 }
 
+async function persistMacroSnapshot(snapshot: MacroSnapshot): Promise<void> {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) return;
+  const refreshedAt = snapshot.asOf && Number.isFinite(Date.parse(snapshot.asOf))
+    ? snapshot.asOf
+    : new Date().toISOString();
+  try {
+    const { error } = await getSupabaseAdmin().from('macro_snapshot_payloads').upsert({
+      snapshot_key: 'global',
+      payload: snapshot,
+      refreshed_at: refreshedAt,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'snapshot_key' });
+    if (error) throw error;
+  } catch (error) {
+    // Persistence failure must not turn a valid live provider response into a failed refresh.
+    console.error('Macro snapshot persistence failed:', error);
+  }
+}
+
 export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
   const persisted = await getPersistedSnapshot();
   const baseline = mergeWithFallback(persisted ?? getFallbackSnapshot());
@@ -871,7 +890,7 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
       } catch (error) {
         console.warn('ECB benchmark exchange rates are unavailable:', error);
       }
-      return mergeWithFallback({
+      const merged = mergeWithFallback({
         ...baseline,
         ...parsed,
         currencies: [
@@ -890,6 +909,8 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
         asOf: new Date().toISOString(),
         ...(ecbRates ? { ecbRates } : {}),
       });
+      await persistMacroSnapshot(merged);
+      return merged;
     } catch (error) {
       console.error('Macro data provider unavailable; checking live API adapters:', error);
     }
@@ -898,7 +919,9 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
   try {
     const liveSnapshot = await getLiveProviderSnapshot(baseline);
     if (liveSnapshot) {
-      return mergeWithFallback(liveSnapshot);
+      const merged = mergeWithFallback(liveSnapshot);
+      await persistMacroSnapshot(merged);
+      return merged;
     }
   } catch (error) {
     console.error('Live macro APIs unavailable; checking the persisted snapshot:', error);
