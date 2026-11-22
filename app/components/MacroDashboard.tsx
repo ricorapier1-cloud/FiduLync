@@ -100,6 +100,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
     .sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt));
   const nextHighImpactCatalyst = sortedCatalysts.find((catalyst) => catalyst.impact === 'High');
   const currencies = snapshot.currencies;
+  const verifiedCurrencyCount = currencies.filter((currency) => currency.policyRateSource === 'provider' && currency.inflationSource === 'provider').length;
 
   const liveQuoteAvailable = liveFeed && now !== null && quotes.some((quote) => {
     const age = now - Date.parse(quote.timestamp);
@@ -185,7 +186,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
         <span><span className={`macro-pulse${liveQuoteAvailable ? ' macro-pulse-live' : ''}`} /> MACROLYNC / INSTITUTIONAL RESEARCH TERMINAL</span>
         <span className="macro-status-right">
           <span className={`macro-feed-badge${liveQuoteAvailable || liveReferenceAvailable ? ' macro-feed-live' : ''}`}>
-            {liveQuoteAvailable ? 'LIVE FEED' : liveReferenceAvailable ? 'LIVE REFERENCE FEED' : snapshot.source === 'provider' ? 'PROVIDER FEED' : snapshot.source === 'partial' ? 'PARTIAL FEED' : 'OFFLINE'}
+            {liveQuoteAvailable ? 'LIVE FX QUOTES' : liveReferenceAvailable ? 'REFERENCE FX DATA' : snapshot.source === 'provider' ? 'MACRO PROVIDERS' : snapshot.source === 'partial' ? 'PARTIAL MACRO' : 'NO VERIFIED FEED'}
           </span>
           <button type="button" className="macro-refresh" aria-label="Refresh macro data" onClick={() => window.location.reload()}>
             <BrandGlyph name="refresh" size={13} className={refreshing ? 'macro-spin' : ''} /> REFRESH
@@ -251,12 +252,12 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
       <section className="macro-kpis" aria-label="Macro overview">
         <article className="macro-kpi">
           <span className="macro-kpi-label">POLICY SPREAD <span>G8 DISPERSION</span></span>
-          <strong className="mono">{policySpread === null ? '—' : formatRate(policySpread)}</strong>
+          <strong className="mono">{policySpread === null ? '—' : `${Math.round(policySpread * 100)} bps`}</strong>
           <small>Highest to lowest central bank policy rate</small>
         </article>
         <article className="macro-kpi">
           <span className="macro-kpi-label">POLICY INPUTS <span>AUTHENTICATED</span></span>
-          <strong className="mono">{String(currencies.length).padStart(2, '0')} <em>/ 11</em></strong>
+          <strong className="mono">{String(verifiedCurrencyCount).padStart(2, '0')} <em>/ 11</em></strong>
           <small>{currencies.length >= 11 ? 'Currency records received; verify source status per field' : 'Incomplete provider coverage'}</small>
         </article>
         <article className="macro-kpi">
