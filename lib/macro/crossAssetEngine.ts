@@ -37,7 +37,7 @@ function isFreshObservation(date: string | undefined, maxAgeDays: number): boole
   return Number.isFinite(timestamp) && age >= -5 * 60_000 && age <= maxAgeDays * 86_400_000;
 }
 
-export function classifyMacroRegime(snapshot: MacroSnapshot, _crossAsset: CrossAssetTelemetry): MacroRegime {
+export function classifyMacroRegime(snapshot: MacroSnapshot): MacroRegime {
   const highImpactSoon = snapshot.catalysts.some((event) => {
     if (event.impact !== 'High') return false;
     const time = Date.parse(event.scheduledAt);

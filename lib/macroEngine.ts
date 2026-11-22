@@ -27,7 +27,7 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
 
   // Enrich with cross-asset telemetry, country profiles, regime classification, and provider diagnostics
   const crossAsset = getCrossAssetTelemetry(snapshot);
-  const regime = classifyMacroRegime(snapshot, crossAsset);
+  const regime = classifyMacroRegime(snapshot);
   const countryProfiles = getCountryProfiles(snapshot);
   const providerStatus = getProviderTelemetry(snapshot);
 

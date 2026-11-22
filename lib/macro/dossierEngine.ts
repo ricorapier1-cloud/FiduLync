@@ -36,7 +36,7 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
   const quote = isGold ? 'USD' : normSymbol.slice(3, 6);
 
   const crossAsset = getCrossAssetTelemetry(snapshot);
-  const macroRegime = classifyMacroRegime(snapshot, crossAsset);
+  const macroRegime = classifyMacroRegime(snapshot);
   const profiles = getCountryProfiles(snapshot);
 
   const baseProfile = isGold ? null : profiles.find((p) => p.currency === base);
