@@ -44,6 +44,9 @@ export type MacroCurrency = {
   policyRateProvider?: string;
   inflationObservationDate?: string;
   inflationProvider?: string;
+  gdpProvider?: string;
+  unemploymentProvider?: string;
+  wageGrowthProvider?: string;
   twoYearYieldObservationDate?: string;
   stance: string;
   gdpGrowthYoY?: number;
@@ -134,7 +137,7 @@ export type PairDossier = {
   biasScore: number; // -100 to +100
   confidence: ConfidenceLevel;
   policyDiffBps: number;
-  realYieldDiffBps: number;
+  realPolicyRateDiffBps: number;
   twoYearYieldDiffBps: number | null;
   cotPercentileDiff: number;
   crossAssetConfirmation: string;

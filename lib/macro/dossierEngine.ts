@@ -25,6 +25,10 @@ function isFreshObservation(date: string | undefined, maxAgeDays: number): boole
   return Number.isFinite(timestamp) && age >= -5 * 60_000 && age <= maxAgeDays * 86_400_000;
 }
 
+function inflationFreshnessDays(currencyCode: string): number {
+  return currencyCode === 'AUD' ? 180 : 120;
+}
+
 export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): PairDossier {
   const normSymbol = symbol.trim().toUpperCase();
   const isGold = normSymbol === 'XAUUSD';
@@ -52,12 +56,12 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
 
   const quoteVerified = quoteCcy?.policyRateSource === 'provider' && quoteCcy.inflationSource === 'provider'
     && isFreshObservation(quoteCcy.policyRateObservationDate, 180)
-    && isFreshObservation(quoteCcy.inflationObservationDate, 120);
+    && isFreshObservation(quoteCcy.inflationObservationDate, inflationFreshnessDays(quoteCcy.code));
   const baseVerified = isGold
     ? false
     : baseCcy?.policyRateSource === 'provider' && baseCcy.inflationSource === 'provider'
       && isFreshObservation(baseCcy.policyRateObservationDate, 180)
-      && isFreshObservation(baseCcy.inflationObservationDate, 120);
+      && isFreshObservation(baseCcy.inflationObservationDate, inflationFreshnessDays(baseCcy.code));
   const essentialEvidenceVerified = quoteVerified && baseVerified;
   let confidence: ConfidenceLevel = 'INSUFFICIENT_EVIDENCE';
   if (essentialEvidenceVerified && missingComponents === 0) confidence = 'HIGH';
@@ -73,7 +77,7 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
   const quoteInflation = quoteCcy?.inflation ?? 2.8;
   const baseReal = isGold ? -crossAsset.usTenYearRealYield : (basePolicy - baseInflation);
   const quoteReal = quotePolicy - quoteInflation;
-  const realYieldDiffBps = essentialEvidenceVerified ? Math.round((baseReal - quoteReal) * 100) : 0;
+  const realPolicyRateDiffBps = essentialEvidenceVerified ? Math.round((baseReal - quoteReal) * 100) : 0;
 
   const base2Y = !isGold && baseCcy?.twoYearYieldSource === 'provider' && isFreshObservation(baseCcy.twoYearYieldObservationDate, 60)
     ? baseCcy.twoYearYield ?? null : null;

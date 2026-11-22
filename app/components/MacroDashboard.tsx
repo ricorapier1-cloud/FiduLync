@@ -27,6 +27,16 @@ const pairs = [
   { symbol: 'XAUUSD', base: 'XAU', quote: 'USD' },
 ] as const;
 
+function inflationFreshnessDays(currencyCode: string) { return currencyCode === 'AUD' ? 180 : 120; }
+
+function isFreshQuarter(period: string | undefined) {
+  const match = period?.match(/^(\\d{4})Q([1-4])$/);
+  if (!match) return false;
+  const quarterEnd = Date.UTC(Number(match[1]), Number(match[2]) * 3, 0);
+  const age = Date.now() - quarterEnd;
+  return age >= -5 * 60_000 && age <= 180 * 86_400_000;
+}
+
 function isFreshObservation(date: string | undefined, maxAgeDays: number) {
   if (!date) return false;
   const timestamp = Date.parse(date);
@@ -356,7 +366,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
             <tbody>
               {currencies.map((currency) => {
                 const verifiedPolicy = currency.policyRateSource === 'provider' && isFreshObservation(currency.policyRateObservationDate, 180);
-                const verifiedInflation = currency.inflationSource === 'provider' && isFreshObservation(currency.inflationObservationDate, 120);
+                const verifiedInflation = currency.inflationSource === 'provider' && isFreshObservation(currency.inflationObservationDate, inflationFreshnessDays(currency.code));
                 const realRate = verifiedPolicy && verifiedInflation ? currency.policyRate - currency.inflation : null;
                 return (
                   <tr key={currency.code}>
@@ -364,11 +374,11 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
                     <td>{currency.centralBank}</td>
                     <td className="mono">
                       {verifiedPolicy ? formatRate(currency.policyRate) : 'UNAVAILABLE'}
-                      <small>{verifiedPolicy ? `PROVIDER ${currency.policyRateProvider ?? ''} · OBS ${currency.policyRateObservationDate}` : currency.policyRateSource === 'provider' ? `STALE / DATE ${currency.policyRateObservationDate ?? 'UNKNOWN'}` : 'REFERENCE / NOT SCORED'}</small>
+                      <small>{verifiedPolicy ? `PROVIDER ${currency.policyRateProvider ?? 'UNSPECIFIED'} · OBS ${currency.policyRateObservationDate}` : currency.policyRateSource === 'provider' ? `STALE / DATE ${currency.policyRateObservationDate ?? 'UNKNOWN'}` : 'REFERENCE / NOT SCORED'}</small>
                     </td>
                     <td>
                       <span className="mono">{verifiedInflation ? formatRate(currency.inflation) : 'UNAVAILABLE'}</span>
-                      <small>{verifiedInflation ? `PROVIDER ${currency.inflationProvider ?? ''} · OBS ${currency.inflationObservationDate}` : currency.inflationSource === 'provider' ? `STALE / DATE ${currency.inflationObservationDate ?? 'UNKNOWN'}` : 'REFERENCE / NOT SCORED'}</small>
+                      <small>{verifiedInflation ? `PROVIDER ${currency.inflationProvider ?? 'UNSPECIFIED'} · OBS ${currency.inflationObservationDate}` : currency.inflationSource === 'provider' ? `STALE / DATE ${currency.inflationObservationDate ?? 'UNKNOWN'}` : 'REFERENCE / NOT SCORED'}</small>
                     </td>
                     <td className="mono">
                       {currency.twoYearYield === undefined || currency.twoYearYieldSource !== 'provider' || !isFreshObservation(currency.twoYearYieldObservationDate, 60) ? '—' : (
@@ -401,7 +411,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
         </div>
         {(() => {
           const usd = currencies.find((currency) => currency.code === 'USD');
-          const gdpFresh = usd?.gdpSource === 'provider' && Boolean(usd.gdpObservationDate);
+          const gdpFresh = usd?.gdpSource === 'provider' && isFreshQuarter(usd.gdpObservationDate);
           const unemploymentFresh = usd?.unemploymentSource === 'provider' && isFreshObservation(usd.unemploymentObservationDate, 120);
           const wagesFresh = usd?.wageGrowthSource === 'provider' && isFreshObservation(usd.wageGrowthObservationDate, 120);
           return (
@@ -470,7 +480,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
               </div>
               <div>
                 <span>REAL YIELD DIFF</span>
-                <strong className="mono">{dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? '—' : formatBasisPoints(dossier.realYieldDiffBps)}</strong>
+                <strong className="mono">{dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? '—' : formatBasisPoints(dossier.realPolicyRateDiffBps)}</strong>
               </div>
               <div>
                 <span>2Y YIELD SPREAD</span>

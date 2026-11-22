@@ -59,7 +59,7 @@ export function getFundamentalSignal(snapshot: MacroSnapshot, pair: string): Fun
   const verified = (currency: NonNullable<typeof base>) => currency.policyRateSource === 'provider'
     && currency.inflationSource === 'provider'
     && isFreshMacroObservation(currency.policyRateObservationDate, 180)
-    && isFreshMacroObservation(currency.inflationObservationDate, 120);
+    && isFreshMacroObservation(currency.inflationObservationDate, currency.code === 'AUD' ? 180 : 120);
   if (!verified(base) || !verified(quote)) return null;
   const baseCot = snapshot.cot.find((position) => position.market === baseCode);
   const quoteCot = snapshot.cot.find((position) => position.market === quoteCode);

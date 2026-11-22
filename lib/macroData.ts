@@ -86,6 +86,9 @@ function isCurrency(value: unknown): value is MacroCurrency {
     && (value.gdpObservationDate === undefined || typeof value.gdpObservationDate === 'string')
     && (value.unemploymentObservationDate === undefined || typeof value.unemploymentObservationDate === 'string')
     && (value.wageGrowthObservationDate === undefined || typeof value.wageGrowthObservationDate === 'string')
+    && (value.gdpProvider === undefined || typeof value.gdpProvider === 'string')
+    && (value.unemploymentProvider === undefined || typeof value.unemploymentProvider === 'string')
+    && (value.wageGrowthProvider === undefined || typeof value.wageGrowthProvider === 'string')
     && (value.gdpSource === undefined || value.gdpSource === 'provider' || value.gdpSource === 'reference')
     && (value.unemploymentSource === undefined || value.unemploymentSource === 'provider' || value.unemploymentSource === 'reference')
     && (value.wageGrowthSource === undefined || value.wageGrowthSource === 'provider' || value.wageGrowthSource === 'reference')
@@ -191,13 +194,13 @@ async function getBlsUsdUpdates(apiKey: string) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      seriesid: ['CUSR0000SA0', 'LNS14000000', 'CES0500000003'],
+      seriesid: ['CUSR0000SA0', 'CUUR0000SA0', 'LNS14000000', 'CES0500000003'],
       startyear: String(currentYear - 2),
       endyear: String(currentYear),
       registrationkey: apiKey,
     }),
     cache: 'no-store',
-    signal: AbortSignal.timeout(10_000),
+    signal: AbortSignal.timeout(8_000),
   });
   if (!response.ok) throw new Error(`BLS returned ${response.status}.`);
   const payload: unknown = await response.json();
@@ -217,7 +220,7 @@ async function getBlsUsdUpdates(apiKey: string) {
     seriesMap.set(rawSeries.seriesID, observations);
   }
 
-  const cpi = seriesMap.get('CUSR0000SA0') ?? [];
+  const cpi = (seriesMap.get('CUSR0000SA0')?.length ? seriesMap.get('CUSR0000SA0') : seriesMap.get('CUUR0000SA0')) ?? [];
   const unemployment = seriesMap.get('LNS14000000') ?? [];
   const wages = seriesMap.get('CES0500000003') ?? [];
   const yoy = (items: Observation[]) => {
@@ -285,7 +288,7 @@ function parseBisCsvRow(line: string): string[] {
 }
 
 async function fetchBisCsv(url: URL): Promise<Array<Record<string, string>>> {
-  const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(15_000) });
+  const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8_000) });
   if (!response.ok) throw new Error(`BIS Data Portal returned ${response.status}.`);
   const text = (await response.text()).replace(/^\uFEFF/, '').trim();
   const lines = text.split(/\r?\n/);
@@ -617,7 +620,7 @@ async function getCftcCot(): Promise<CotPosition[]> {
 }
 
 async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallbackSnapshot()): Promise<MacroSnapshot | null> {
-  const fredApiKey = process.env.FRED_COMMERCIAL_USE_APPROVED === 'true' ? process.env.FRED_API_KEY?.trim() : undefined;
+  const fredApiKey = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true' ? process.env.FRED_API_KEY?.trim() : undefined;
   const finnhubApiKey = process.env.FINNHUB_COMMERCIAL_USE_APPROVED === 'true' ? process.env.FINNHUB_API_KEY?.trim() : undefined;
   const alphaVantageKey = process.env.ALPHA_VANTAGE_COMMERCIAL_USE_APPROVED === 'true' ? process.env.ALPHA_VANTAGE_API_KEY?.trim() : undefined;
   const fmpKey = process.env.FMP_COMMERCIAL_USE_APPROVED === 'true' ? process.env.FMP_API_KEY?.trim() : undefined;
@@ -819,12 +822,14 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
       if (isFiniteNumber(blsResult.value.unemploymentRate)) {
         usd.unemploymentRate = blsResult.value.unemploymentRate;
         usd.unemploymentSource = 'provider';
+        usd.unemploymentProvider = 'BLS';
         usd.unemploymentObservationDate = typeof blsResult.value.unemploymentObservationDate === 'string' ? blsResult.value.unemploymentObservationDate : undefined;
         hasLiveData = true;
       }
       if (isFiniteNumber(blsResult.value.wageGrowthYoY)) {
         usd.wageGrowthYoY = blsResult.value.wageGrowthYoY;
         usd.wageGrowthSource = 'provider';
+        usd.wageGrowthProvider = 'BLS';
         usd.wageGrowthObservationDate = typeof blsResult.value.wageGrowthObservationDate === 'string' ? blsResult.value.wageGrowthObservationDate : undefined;
         hasLiveData = true;
       }
@@ -837,6 +842,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     if (usd && isFiniteNumber(beaResult.value.gdpGrowthYoY)) {
       usd.gdpGrowthYoY = beaResult.value.gdpGrowthYoY;
       usd.gdpSource = 'provider';
+      usd.gdpProvider = 'BEA';
       usd.gdpObservationDate = typeof beaResult.value.gdpObservationDate === 'string' ? beaResult.value.gdpObservationDate : undefined;
       hasLiveData = true;
     }

@@ -4,6 +4,10 @@ export const MAJOR_CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD'
 export type MajorCurrency = (typeof MAJOR_CURRENCIES)[number];
 export type CurrencyStrength = { currency: MajorCurrency; score: number };
 
+function inflationFreshnessDays(currencyCode: string): number {
+  return currencyCode === 'AUD' ? 180 : 120;
+}
+
 function isFreshObservation(date: string | undefined, maxAgeDays: number): boolean {
   if (!date) return false;
   const timestamp = Date.parse(date);
@@ -17,7 +21,7 @@ export function getCurrencyStrengthIndex(snapshot: MacroSnapshot): CurrencyStren
     && item.policyRateSource === 'provider'
     && item.inflationSource === 'provider'
     && isFreshObservation(item.policyRateObservationDate, 180)
-    && isFreshObservation(item.inflationObservationDate, 120));
+    && isFreshObservation(item.inflationObservationDate, inflationFreshnessDays(item.code)));
   if (!currencies.length) return [];
   const cot = new Map(snapshot.cot.map((item) => [item.market, item.percentile]));
   const rawScores = currencies.map((currency) => ({

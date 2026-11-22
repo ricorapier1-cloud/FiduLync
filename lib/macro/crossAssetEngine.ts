@@ -26,6 +26,10 @@ export function getCrossAssetTelemetry(snapshot: MacroSnapshot): CrossAssetTelem
   };
 }
 
+function inflationFreshnessDays(currencyCode: string): number {
+  return currencyCode === 'AUD' ? 180 : 120;
+}
+
 function isFreshObservation(date: string | undefined, maxAgeDays: number): boolean {
   if (!date) return false;
   const timestamp = Date.parse(date);
@@ -45,7 +49,7 @@ export function classifyMacroRegime(snapshot: MacroSnapshot, _crossAsset: CrossA
   const verified = g8.map((code) => snapshot.currencies.find((currency) => currency.code === code))
     .filter((currency) => currency?.policyRateSource === 'provider' && currency.inflationSource === 'provider'
       && isFreshObservation(currency.policyRateObservationDate, 180)
-      && isFreshObservation(currency.inflationObservationDate, 120));
+      && isFreshObservation(currency.inflationObservationDate, inflationFreshnessDays(currency.code)));
   if (verified.length < 4) return 'INSUFFICIENT_EVIDENCE';
 
   const rates = verified.map((currency) => currency!.policyRate);

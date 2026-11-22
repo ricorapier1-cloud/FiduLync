@@ -84,3 +84,13 @@ test('BIS policy rates and CPI are connected for G8 with source provenance', () 
   assert.match(macroTypes, /policyRateProvider\?: string/);
   assert.match(macroTypes, /inflationProvider\?: string/);
 });
+
+test('dossier distinguishes real policy-rate proxies from market real yields', () => {
+  const types = read('../types/macro.ts');
+  const dossier = read('../lib/macro/dossierEngine.ts');
+  const contextRoute = read('../app/api/v1/macro-context/route.ts');
+  assert.match(types, /realPolicyRateDiffBps: number/);
+  assert.match(dossier, /realPolicyRateDiffBps/);
+  assert.match(contextRoute, /real_policy_rate_diff_bps/);
+  assert.match(contextRoute, /real_yield_diff_bps: null/);
+});

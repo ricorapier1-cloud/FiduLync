@@ -24,14 +24,15 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
   const gbp = snapshot.currencies.find((item) => item.code === 'GBP');
   const cad = snapshot.currencies.find((item) => item.code === 'CAD');
   const worldBankCurrencies = snapshot.currencies.filter((item) => item.inflationSource === 'provider' && item.inflationObservationDate);
-  const fredConfigured = Boolean(process.env.FRED_API_KEY?.trim()) && process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true';
+  const fredKeyPresent = Boolean(process.env.FRED_API_KEY?.trim());
+  const fredStorageAllowed = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true';
   const finnhubConfigured = Boolean(process.env.FINNHUB_API_KEY?.trim()) && process.env.FINNHUB_COMMERCIAL_USE_APPROVED === 'true';
   const bls = feedStatus(Boolean(usd?.unemploymentObservationDate && usd.wageGrowthObservationDate),
     isFresh(usd?.unemploymentObservationDate, 120) && isFresh(usd?.wageGrowthObservationDate, 120), Boolean(process.env.BLS_API_KEY?.trim()));
   const bea = feedStatus(Boolean(usd?.gdpObservationDate), Boolean(usd?.gdpObservationDate), Boolean(process.env.BEA_API_KEY?.trim()));
 
-  const fred = feedStatus(Boolean(usd?.policyRateObservationDate && usd.inflationObservationDate),
-    isFresh(usd?.policyRateObservationDate, 180) && isFresh(usd?.inflationObservationDate, 120), fredConfigured);
+  const fred = feedStatus(fredStorageAllowed && Boolean(usd?.policyRateProvider === 'FRED' && usd.inflationProvider === 'FRED'),
+    fredStorageAllowed && isFresh(usd?.policyRateObservationDate, 180) && isFresh(usd?.inflationObservationDate, 120), fredKeyPresent);
   const ecb = feedStatus(Boolean(eur?.policyRateObservationDate && eur.inflationObservationDate),
     isFresh(eur?.policyRateObservationDate, 180) && isFresh(eur?.inflationObservationDate, 120), true);
   const boe = feedStatus(Boolean(gbp?.policyRateObservationDate),

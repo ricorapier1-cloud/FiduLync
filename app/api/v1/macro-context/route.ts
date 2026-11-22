@@ -117,7 +117,8 @@ export async function GET(request: Request) {
       bias_score: dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier.biasScore,
       confidence: dossier.confidence,
       policy_diff_bps: dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier.policyDiffBps,
-      real_yield_diff_bps: dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier.realYieldDiffBps,
+      real_policy_rate_diff_bps: dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier.realPolicyRateDiffBps,
+      real_yield_diff_bps: null,
       two_year_yield_diff_bps: dossier.twoYearYieldDiffBps,
       cot_percentile_diff: snapshot.cotSource === 'provider'
         && snapshot.cot.some((position) => position.market === (dossier.base === 'XAU' ? 'GOLD' : dossier.base))
