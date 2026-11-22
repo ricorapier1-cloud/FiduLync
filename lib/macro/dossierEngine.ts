@@ -43,14 +43,15 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
   if (!baseCot) missingComponents += 1;
   if (!quoteCot) missingComponents += 1;
 
-  let confidence: ConfidenceLevel = 'HIGH';
-  if (missingComponents >= 4) {
-    confidence = 'INSUFFICIENT_EVIDENCE';
-  } else if (missingComponents >= 2) {
-    confidence = 'MODERATE';
-  } else if (missingComponents === 1) {
-    confidence = 'LOW';
-  }
+  const quoteVerified = quoteCcy?.policyRateSource === 'provider' && quoteCcy.inflationSource === 'provider';
+  const baseVerified = isGold
+    ? false
+    : baseCcy?.policyRateSource === 'provider' && baseCcy.inflationSource === 'provider';
+  const essentialEvidenceVerified = quoteVerified && baseVerified;
+  let confidence: ConfidenceLevel = 'INSUFFICIENT_EVIDENCE';
+  if (essentialEvidenceVerified && missingComponents === 0) confidence = 'HIGH';
+  else if (essentialEvidenceVerified && missingComponents <= 2) confidence = 'MODERATE';
+  else if (essentialEvidenceVerified) confidence = 'LOW';
 
   // Rate differentials
   const basePolicy = isGold ? 0.0 : (baseCcy?.policyRate ?? 3.5);
@@ -64,7 +65,7 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
   const realYieldDiffBps = Math.round((baseReal - quoteReal) * 100);
 
   const base2Y = isGold ? null : (baseCcy?.twoYearYield ?? null);
-  const quote2Y = quoteCcy?.twoYearYield ?? crossAsset.usTwoYearYield;
+  const quote2Y = quoteCcy?.twoYearYield ?? null;
   const twoYearYieldDiffBps = base2Y !== null && quote2Y !== null
     ? Math.round((base2Y - quote2Y) * 100)
     : null;
@@ -73,31 +74,15 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
   const quoteCotPct = quoteCot?.percentile ?? 50;
   const cotPercentileDiff = Math.round(baseCotPct - quoteCotPct);
 
-  // Pillar calculations: Growth, Inflation gap, Labour, Policy, Real Yield, Cross-asset, Terms of Trade, COT
+  // Directional scoring uses only sourced policy, inflation, sovereign-yield and COT observations.
+  // Country-profile baseline assumptions and hardcoded cross-asset constants are excluded.
   let rawScore = 0;
-  if (isGold) {
-    // Gold model: inversely related to US 10Y real yield, supported by central bank buying & lower real rates
-    const realYieldDrag = -crossAsset.usTenYearRealYield * 28;
-    const safeHavenLift = crossAsset.vixRegime === 'STRESS' ? 30 : crossAsset.vixRegime === 'ELEVATED' ? 15 : 0;
-    const cotLift = ((baseCotPct - 50) / 50) * 15;
-    rawScore = Math.round(realYieldDrag + safeHavenLift + cotLift);
-  } else {
-    // Growth momentum differential (15% weight)
-    const growthDiff = ((baseProfile?.gdpGrowthYoY ?? 1.0) - (quoteProfile?.gdpGrowthYoY ?? 1.5)) * 12;
-    // Policy differential (25% weight)
+  if (essentialEvidenceVerified) {
     const policyImpact = (policyDiffBps / 100) * 14;
-    // Real yield differential (25% weight)
     const realYieldImpact = (realYieldDiffBps / 100) * 16;
-    // Labour momentum (10% weight)
-    const labourDiff = (((quoteProfile?.unemploymentRate ?? 4.0) - (baseProfile?.unemploymentRate ?? 4.0))) * 6;
-    // COT positioning pressure (10% weight - anti-crowding at extremes)
-    const cotImpact = (cotPercentileDiff / 100) * 12;
-    // Cross-asset confirmation (15% weight)
-    let crossAssetImpact = 0;
-    if (quote === 'USD') {
-      crossAssetImpact = crossAsset.globalRiskAppetite === 'RISK_ON' ? 8 : -8;
-    }
-    rawScore = Math.round(growthDiff + policyImpact + realYieldImpact + labourDiff + cotImpact + crossAssetImpact);
+    const twoYearImpact = twoYearYieldDiffBps === null ? 0 : (twoYearYieldDiffBps / 100) * 10;
+    const cotImpact = (baseCot && quoteCot) ? (cotPercentileDiff / 100) * 12 : 0;
+    rawScore = Math.round(policyImpact + realYieldImpact + twoYearImpact + cotImpact);
   }
 
   // Apply penalty factor for missing components
@@ -148,9 +133,7 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
   }
 
   // Cross-asset confirmation
-  const crossAssetConfirmation = isGold
-    ? `US 10Y real yield at ${crossAsset.usTenYearRealYield}% with VIX at ${crossAsset.vix}.`
-    : `Broad USD index at ${crossAsset.broadTradeWeightedUsd} with global risk regime ${crossAsset.globalRiskAppetite}.`;
+  const crossAssetConfirmation = 'UNAVAILABLE — verified cross-asset observations are not yet connected to this dossier.';
 
   // Upcoming catalysts
   const now = Date.now();
@@ -178,9 +161,9 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
   ];
 
   // Scenarios
-  const bullProb = biasScore > 0 ? Math.min(75, 45 + Math.round(biasScore / 3)) : Math.max(15, 30 + Math.round(biasScore / 3));
-  const bearProb = biasScore < 0 ? Math.min(75, 45 + Math.round(Math.abs(biasScore) / 3)) : Math.max(15, 30 - Math.round(biasScore / 3));
-  const neutralProb = Math.max(15, 100 - bullProb - bearProb);
+  const bullProb = confidence === 'INSUFFICIENT_EVIDENCE' ? 0 : biasScore > 0 ? Math.min(75, 45 + Math.round(biasScore / 3)) : Math.max(15, 30 + Math.round(biasScore / 3));
+  const bearProb = confidence === 'INSUFFICIENT_EVIDENCE' ? 0 : biasScore < 0 ? Math.min(75, 45 + Math.round(Math.abs(biasScore) / 3)) : Math.max(15, 30 - Math.round(biasScore / 3));
+  const neutralProb = confidence === 'INSUFFICIENT_EVIDENCE' ? 0 : Math.max(15, 100 - bullProb - bearProb);
 
   const scenarios = {
     bullish: {
@@ -210,7 +193,7 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
   };
 
   const summary = confidence === 'INSUFFICIENT_EVIDENCE'
-    ? 'INSUFFICIENT EVIDENCE — NO RELIABLE CONCLUSION. Multiple macro data components are missing; do not draw directional inferences.'
+    ? 'INSUFFICIENT EVIDENCE — NO RELIABLE CONCLUSION. Both currencies require provider-sourced policy-rate and inflation observations before a directional macro assessment is permitted.'
     : `${normSymbol} fundamental bias is ${fundamentalBias.replace('_', ' ')} (${biasScore > 0 ? '+' : ''}${biasScore}/100) under the ${macroRegime.replace(/_/g, ' ')} regime with ${confidence} confidence.`;
 
   return {
@@ -227,8 +210,8 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
     cotPercentileDiff,
     crossAssetConfirmation,
     summary,
-    supportingEvidence: supporting.length ? supporting : ['Data levels remain within standard historical equilibrium bands.'],
-    contradictingEvidence: contradicting.length ? contradicting : ['No immediate counter-trend macro divergence detected in current observations.'],
+    supportingEvidence: supporting.length ? supporting : ['No verified supporting observations available.'],
+    contradictingEvidence: contradicting.length ? contradicting : ['No verified contradicting observations available.'],
     scenarios,
     invalidationTriggers,
     nextCatalyst,
