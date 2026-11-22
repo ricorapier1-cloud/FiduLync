@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { getMacroSnapshot } from '@/lib/macroEngine';
 import { generatePairDossier } from '@/lib/macro/dossierEngine';
@@ -5,36 +6,57 @@ import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
-function isAuthorized(request: Request): boolean {
-  const isLocalhost = Boolean(
-    request.headers.get('host')?.includes('localhost') ||
-    request.headers.get('host')?.includes('127.0.0.1')
-  );
-  if (isLocalhost) return true;
-
-  const macroSecret = process.env.MACROLYNC_API_SECRET?.trim() || process.env.ALGO_PRIVATE_API_KEY?.trim();
-  if (!macroSecret) return true; // Fail safe for private demo terminal if unconfigured
-
-  const xMacroKey = request.headers.get('x-macro-key')?.trim();
-  const authHeader = request.headers.get('authorization')?.trim();
-  const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
-
-  return xMacroKey === macroSecret || bearerToken === macroSecret;
+function constantTimeEqual(candidate: string, expected: string): boolean {
+  const candidateBytes = Buffer.from(candidate, 'utf8');
+  const expectedBytes = Buffer.from(expected, 'utf8');
+  if (candidateBytes.length !== expectedBytes.length || expectedBytes.length === 0) return false;
+  return timingSafeEqual(candidateBytes, expectedBytes);
 }
 
+function getExpectedSecret(): string | null {
+  const secret = process.env.MACROLYNC_API_SECRET?.trim()
+    || process.env.ALGO_PRIVATE_API_KEY?.trim();
+  return secret && secret.length >= 32 ? secret : null;
+}
+
+function isAuthorized(request: Request, expectedSecret: string): boolean {
+  const macroKey = request.headers.get('x-macro-key')?.trim() ?? '';
+  const authorization = request.headers.get('authorization')?.trim() ?? '';
+  const bearerToken = authorization.startsWith('Bearer ')
+    ? authorization.slice(7).trim()
+    : '';
+
+  return constantTimeEqual(macroKey, expectedSecret)
+    || constantTimeEqual(bearerToken, expectedSecret);
+}
+
+const noStoreHeaders = {
+  'Cache-Control': 'no-store, max-age=0',
+  'X-Content-Type-Options': 'nosniff',
+};
+
 export async function GET(request: Request) {
+  const expectedSecret = getExpectedSecret();
+  if (!expectedSecret) {
+    console.error('Macro context API unavailable: no valid server authentication secret is configured.');
+    return NextResponse.json(
+      { error: 'Macro context API is not configured for authenticated access.' },
+      { status: 503, headers: noStoreHeaders }
+    );
+  }
+
+  if (!isAuthorized(request, expectedSecret)) {
+    return NextResponse.json(
+      { error: 'Unauthorized. Provide a valid x-macro-key or Bearer token.' },
+      { status: 401, headers: noStoreHeaders }
+    );
+  }
+
   const ip = getClientIp(request);
   if (!checkRateLimit(ip, 30, 60_000)) {
     return NextResponse.json(
       { error: 'Rate limit exceeded. Maximum 30 requests per minute.' },
-      { status: 429, headers: { 'Cache-Control': 'no-store' } }
-    );
-  }
-
-  if (!isAuthorized(request)) {
-    return NextResponse.json(
-      { error: 'Unauthorized. Provide a valid x-macro-key or Bearer token.' },
-      { status: 401, headers: { 'Cache-Control': 'no-store' } }
+      { status: 429, headers: noStoreHeaders }
     );
   }
 
@@ -44,7 +66,7 @@ export async function GET(request: Request) {
   if (!/^[A-Z]{6}$/.test(symbol) && symbol !== 'XAUUSD') {
     return NextResponse.json(
       { error: 'Invalid currency pair or symbol format. Must be a 6-character G8 pair (e.g., EURUSD) or XAUUSD.' },
-      { status: 400, headers: { 'Cache-Control': 'no-store' } }
+      { status: 400, headers: noStoreHeaders }
     );
   }
 
@@ -83,18 +105,12 @@ export async function GET(request: Request) {
       disclaimer: 'Read-only macroeconomic intelligence context. No technical trade execution or broker order routing.',
     };
 
-    return NextResponse.json(payload, {
-      status: 200,
-      headers: {
-        'Cache-Control': 'no-store, max-age=0',
-        'X-Content-Type-Options': 'nosniff',
-      },
-    });
+    return NextResponse.json(payload, { status: 200, headers: noStoreHeaders });
   } catch (error) {
     console.error('Macro context query failed:', error);
     return NextResponse.json(
       { error: 'Macro context service is temporarily unavailable.' },
-      { status: 503, headers: { 'Cache-Control': 'no-store' } }
+      { status: 503, headers: noStoreHeaders }
     );
   }
 }
