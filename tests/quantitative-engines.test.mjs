@@ -55,3 +55,13 @@ test('dashboard marks cross-asset values unavailable until verified feeds exist'
   assert.doesNotMatch(dashboard, /FRED \(St\. Louis Fed\)[\s\S]{0,200}HEALTHY/);
   assert.doesNotMatch(dashboard, /4\.35%|2\.05%|14\.80|\$76\.40|\$2,740/);
 });
+
+test('US BLS and BEA adapters preserve observation dates and do not synthesize values', () => {
+  const macroData = read('../lib/macroData.ts');
+  const types = read('../types/macro.ts');
+  assert.match(macroData, /getBlsUsdUpdates/);
+  assert.match(macroData, /getBeaRealGdpYoY/);
+  assert.match(macroData, /unemploymentObservationDate/);
+  assert.match(macroData, /gdpObservationDate/);
+  assert.match(types, /wageGrowthYoY\?: number/);
+});

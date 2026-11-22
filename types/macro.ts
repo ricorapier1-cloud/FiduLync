@@ -45,7 +45,14 @@ export type MacroCurrency = {
   twoYearYieldObservationDate?: string;
   stance: string;
   gdpGrowthYoY?: number;
+  gdpObservationDate?: string;
+  gdpSource?: 'provider' | 'reference';
   unemploymentRate?: number;
+  unemploymentObservationDate?: string;
+  unemploymentSource?: 'provider' | 'reference';
+  wageGrowthYoY?: number;
+  wageGrowthObservationDate?: string;
+  wageGrowthSource?: 'provider' | 'reference';
   freshness?: DataFreshness;
   lastUpdatedUtc?: string;
 };

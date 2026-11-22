@@ -81,6 +81,12 @@ function isCurrency(value: unknown): value is MacroCurrency {
     && (value.policyRateObservationDate === undefined || typeof value.policyRateObservationDate === 'string')
     && (value.inflationObservationDate === undefined || typeof value.inflationObservationDate === 'string')
     && (value.twoYearYieldObservationDate === undefined || typeof value.twoYearYieldObservationDate === 'string')
+    && (value.gdpObservationDate === undefined || typeof value.gdpObservationDate === 'string')
+    && (value.unemploymentObservationDate === undefined || typeof value.unemploymentObservationDate === 'string')
+    && (value.wageGrowthObservationDate === undefined || typeof value.wageGrowthObservationDate === 'string')
+    && (value.gdpSource === undefined || value.gdpSource === 'provider' || value.gdpSource === 'reference')
+    && (value.unemploymentSource === undefined || value.unemploymentSource === 'provider' || value.unemploymentSource === 'reference')
+    && (value.wageGrowthSource === undefined || value.wageGrowthSource === 'provider' || value.wageGrowthSource === 'reference')
     && typeof value.stance === 'string';
 }
 
@@ -169,6 +175,93 @@ async function getFredUsdUpdates(apiKey: string) {
     cpiObservationDate: cpiResult.status === 'fulfilled' ? cpiResult.value[0]?.date : undefined,
     twoYearYield: twoYearResult.status === 'fulfilled' ? twoYearResult.value[0]?.value : undefined,
     twoYearYieldObservationDate: twoYearResult.status === 'fulfilled' ? twoYearResult.value[0]?.date : undefined,
+  };
+}
+
+function blsPeriodDate(year: string, period: string): string | undefined {
+  if (!/^M(0[1-9]|1[0-2])$/.test(period)) return undefined;
+  return `${year}-${period.slice(1)}`;
+}
+
+async function getBlsUsdUpdates(apiKey: string) {
+  const currentYear = new Date().getUTCFullYear();
+  const response = await fetch('https://api.bls.gov/publicAPI/v2/timeseries/data/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      seriesid: ['CUSR0000SA0', 'LNS14000000', 'CES0500000003'],
+      startyear: String(currentYear - 2),
+      endyear: String(currentYear),
+      registrationkey: apiKey,
+    }),
+    cache: 'no-store',
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!response.ok) throw new Error(`BLS returned ${response.status}.`);
+  const payload: unknown = await response.json();
+  if (!isRecord(payload) || payload.status !== 'REQUEST_SUCCEEDED' || !isRecord(payload.Results) || !Array.isArray(payload.Results.series)) {
+    throw new Error('BLS returned an unsuccessful or invalid response.');
+  }
+
+  const seriesMap = new Map<string, Observation[]>();
+  for (const rawSeries of payload.Results.series) {
+    if (!isRecord(rawSeries) || typeof rawSeries.seriesID !== 'string' || !Array.isArray(rawSeries.data)) continue;
+    const observations = rawSeries.data.flatMap((raw): Observation[] => {
+      if (!isRecord(raw) || typeof raw.year !== 'string' || typeof raw.period !== 'string' || typeof raw.value !== 'string') return [];
+      const date = blsPeriodDate(raw.year, raw.period);
+      const value = Number(raw.value);
+      return date && Number.isFinite(value) ? [{ date, value }] : [];
+    }).sort((a, b) => b.date.localeCompare(a.date));
+    seriesMap.set(rawSeries.seriesID, observations);
+  }
+
+  const cpi = seriesMap.get('CUSR0000SA0') ?? [];
+  const unemployment = seriesMap.get('LNS14000000') ?? [];
+  const wages = seriesMap.get('CES0500000003') ?? [];
+  const yoy = (items: Observation[]) => {
+    const latest = items[0];
+    if (!latest) return undefined;
+    const prior = items.find((item) => item.date.slice(0, 4) === String(Number(latest.date.slice(0, 4)) - 1)
+      && item.date.slice(5, 7) === latest.date.slice(5, 7));
+    return prior && prior.value !== 0 ? (latest.value / prior.value - 1) * 100 : undefined;
+  };
+  return {
+    inflation: yoy(cpi),
+    inflationObservationDate: cpi[0]?.date,
+    unemploymentRate: unemployment[0]?.value,
+    unemploymentObservationDate: unemployment[0]?.date,
+    wageGrowthYoY: yoy(wages),
+    wageGrowthObservationDate: wages[0]?.date,
+  };
+}
+
+async function getBeaRealGdpYoY(apiKey: string) {
+  const currentYear = new Date().getUTCFullYear();
+  const url = new URL('https://apps.bea.gov/api/data/');
+  url.searchParams.set('UserID', apiKey);
+  url.searchParams.set('method', 'GetData');
+  url.searchParams.set('datasetname', 'NIPA');
+  url.searchParams.set('TableName', 'T10106');
+  url.searchParams.set('Frequency', 'Q');
+  url.searchParams.set('Year', Array.from({ length: 6 }, (_, index) => String(currentYear - 5 + index)).join(','));
+  url.searchParams.set('ResultFormat', 'JSON');
+  const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(10_000) });
+  if (!response.ok) throw new Error(`BEA returned ${response.status}.`);
+  const payload: unknown = await response.json();
+  if (!isRecord(payload) || !isRecord(payload.BEAAPI) || !isRecord(payload.BEAAPI.Results)
+    || !Array.isArray(payload.BEAAPI.Results.Data)) throw new Error('BEA returned an invalid NIPA response.');
+  const rows = payload.BEAAPI.Results.Data.flatMap((raw): Array<{ period: string; value: number }> => {
+    if (!isRecord(raw) || String(raw.LineNumber) !== '1' || typeof raw.TimePeriod !== 'string'
+      || typeof raw.DataValue !== 'string' || !/^\d{4}Q[1-4]$/.test(raw.TimePeriod)) return [];
+    const value = Number(raw.DataValue.replace(/,/g, ''));
+    return Number.isFinite(value) ? [{ period: raw.TimePeriod, value }] : [];
+  }).sort((a, b) => a.period.localeCompare(b.period));
+  const latest = rows.at(-1);
+  if (!latest) throw new Error('BEA returned no usable real GDP observations.');
+  const yearAgo = rows.find((item) => item.period === `${Number(latest.period.slice(0, 4)) - 1}${latest.period.slice(4)}`);
+  return {
+    gdpGrowthYoY: yearAgo && yearAgo.value !== 0 ? (latest.value / yearAgo.value - 1) * 100 : undefined,
+    gdpObservationDate: latest.period,
   };
 }
 
@@ -451,7 +544,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     asOf: new Date().toISOString(),
     source: cachedSnapshot.source === 'fallback' ? 'fallback' : 'partial',
   };
-  const [fredResult, finnhubResult, alphaResult, fmpResult, cotResult, frankfurterResult, calendarResult, ecbResult, bocResult, boeResult, worldBankResult] = await Promise.allSettled([
+  const [fredResult, finnhubResult, alphaResult, fmpResult, cotResult, frankfurterResult, calendarResult, ecbResult, bocResult, boeResult, worldBankResult, blsResult, beaResult] = await Promise.allSettled([
     fredApiKey ? getFredUsdUpdates(fredApiKey) : Promise.resolve(null),
     finnhubApiKey ? getFinnhubCatalysts(finnhubApiKey) : Promise.resolve(null),
     alphaVantageKey ? getAlphaVantageUsdUpdates(alphaVantageKey) : Promise.resolve(null),
@@ -463,6 +556,8 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     getBankOfCanadaMacroInputs(),
     getBankOfEnglandPolicyRate(),
     getWorldBankG10Inflation(),
+    process.env.BLS_API_KEY?.trim() ? getBlsUsdUpdates(process.env.BLS_API_KEY.trim()) : Promise.resolve(null),
+    process.env.BEA_API_KEY?.trim() ? getBeaRealGdpYoY(process.env.BEA_API_KEY.trim()) : Promise.resolve(null),
   ]);
   let hasLiveData = false;
   if (fredResult.status === 'fulfilled' && isRecord(fredResult.value)) {
@@ -612,6 +707,43 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     }
   } else {
     console.warn('World Bank G10 inflation data is unavailable:', worldBankResult.reason);
+  }
+  if (blsResult.status === 'fulfilled' && isRecord(blsResult.value)) {
+    const usd = snapshot.currencies.find((currency) => currency.code === 'USD');
+    if (usd) {
+      if (isFiniteNumber(blsResult.value.inflation) && usd.inflationSource !== 'provider') {
+        usd.inflation = blsResult.value.inflation;
+        usd.inflationLabel = 'CPI-U (annual)';
+        usd.inflationSource = 'provider';
+        usd.inflationObservationDate = typeof blsResult.value.inflationObservationDate === 'string' ? blsResult.value.inflationObservationDate : undefined;
+        hasLiveData = true;
+      }
+      if (isFiniteNumber(blsResult.value.unemploymentRate)) {
+        usd.unemploymentRate = blsResult.value.unemploymentRate;
+        usd.unemploymentSource = 'provider';
+        usd.unemploymentObservationDate = typeof blsResult.value.unemploymentObservationDate === 'string' ? blsResult.value.unemploymentObservationDate : undefined;
+        hasLiveData = true;
+      }
+      if (isFiniteNumber(blsResult.value.wageGrowthYoY)) {
+        usd.wageGrowthYoY = blsResult.value.wageGrowthYoY;
+        usd.wageGrowthSource = 'provider';
+        usd.wageGrowthObservationDate = typeof blsResult.value.wageGrowthObservationDate === 'string' ? blsResult.value.wageGrowthObservationDate : undefined;
+        hasLiveData = true;
+      }
+    }
+  } else if (blsResult.status === 'rejected') {
+    console.warn('BLS CPI, unemployment or wage data unavailable:', blsResult.reason);
+  }
+  if (beaResult.status === 'fulfilled' && isRecord(beaResult.value)) {
+    const usd = snapshot.currencies.find((currency) => currency.code === 'USD');
+    if (usd && isFiniteNumber(beaResult.value.gdpGrowthYoY)) {
+      usd.gdpGrowthYoY = beaResult.value.gdpGrowthYoY;
+      usd.gdpSource = 'provider';
+      usd.gdpObservationDate = typeof beaResult.value.gdpObservationDate === 'string' ? beaResult.value.gdpObservationDate : undefined;
+      hasLiveData = true;
+    }
+  } else if (beaResult.status === 'rejected') {
+    console.warn('BEA real GDP data unavailable:', beaResult.reason);
   }
   if (!fredApiKey && alphaVantageKey) {
     if (alphaResult.status === 'fulfilled' && isRecord(alphaResult.value)) {

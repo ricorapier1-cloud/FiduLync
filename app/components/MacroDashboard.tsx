@@ -394,6 +394,26 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
         </div>
       </section>
 
+      <section className="macro-section" aria-labelledby="us-drivers-title">
+        <div className="macro-section-heading">
+          <div><span className="eyebrow">01A / UNITED STATES MACRO DRIVERS</span><h2 id="us-drivers-title">Growth, Labour &amp; Wage Impulse</h2></div>
+          <span className="macro-section-note mono">BEA / BLS OBSERVATIONS</span>
+        </div>
+        {(() => {
+          const usd = currencies.find((currency) => currency.code === 'USD');
+          const gdpFresh = usd?.gdpSource === 'provider' && Boolean(usd.gdpObservationDate);
+          const unemploymentFresh = usd?.unemploymentSource === 'provider' && isFreshObservation(usd.unemploymentObservationDate, 120);
+          const wagesFresh = usd?.wageGrowthSource === 'provider' && isFreshObservation(usd.wageGrowthObservationDate, 120);
+          return (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="macro-panel p-4"><span className="text-[10px] font-mono text-slate-400">REAL GDP GROWTH / YOY</span><strong className="block text-xl mono mt-2">{gdpFresh && usd?.gdpGrowthYoY !== undefined ? `${usd.gdpGrowthYoY.toFixed(2)}%` : 'UNAVAILABLE'}</strong><small className="text-[10px] text-slate-500 font-mono">{gdpFresh ? `BEA · ${usd?.gdpObservationDate}` : 'No verified BEA observation'}</small></div>
+              <div className="macro-panel p-4"><span className="text-[10px] font-mono text-slate-400">UNEMPLOYMENT RATE</span><strong className="block text-xl mono mt-2">{unemploymentFresh && usd?.unemploymentRate !== undefined ? `${usd.unemploymentRate.toFixed(2)}%` : 'UNAVAILABLE'}</strong><small className="text-[10px] text-slate-500 font-mono">{unemploymentFresh ? `BLS · ${usd?.unemploymentObservationDate}` : 'No fresh BLS observation'}</small></div>
+              <div className="macro-panel p-4"><span className="text-[10px] font-mono text-slate-400">AVERAGE HOURLY EARNINGS / YOY</span><strong className="block text-xl mono mt-2">{wagesFresh && usd?.wageGrowthYoY !== undefined ? `${usd.wageGrowthYoY.toFixed(2)}%` : 'UNAVAILABLE'}</strong><small className="text-[10px] text-slate-500 font-mono">{wagesFresh ? `BLS · ${usd?.wageGrowthObservationDate}` : 'No fresh BLS observation'}</small></div>
+            </div>
+          );
+        })()}
+      </section>
+
       {/* Two Column: Pair-Level Fundamental Dossier & Economic Catalysts */}
       <div className="macro-two-column">
         {/* Pair-Level Fundamental Dossier */}
