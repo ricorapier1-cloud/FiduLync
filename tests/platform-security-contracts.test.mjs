@@ -35,7 +35,7 @@ test('commercial routes are explicitly retired in the personal edition', async (
   }
 });
 
-test('private owner and research-governance routes independently verify owner identity', async () => {
+test('sensitive installation and governance APIs remain server-authorized', async () => {
   for (const path of [
     'app/api/owner/operations/route.ts',
     'app/api/owner/mt5-installations/route.ts',
@@ -85,13 +85,19 @@ test('retired account and customer pages route to the public research terminal',
   }
 });
 
-test('public navigation contains no owner console or sign-in entry', async () => {
+test('public navigation contains only macro research surfaces', async () => {
   const shell = await read('components/PlatformShell.tsx');
   const footer = await read('components/PlatformFooter.tsx');
-  assert.match(shell, /href: '\/research\/validation'/);
+  assert.match(shell, /href: '\/analytics'/);
+  assert.match(shell, /href: '\/research\/notebook'/);
   assert.match(shell, /No sign-in required/);
-  assert.doesNotMatch(shell, /href: '\/owner'/);
-  assert.doesNotMatch(shell, /href: '\/store'/);
-  assert.match(footer, /Strategy validation & risk lab/);
-  assert.doesNotMatch(footer, /Owner Console|\/store/);
+  assert.doesNotMatch(shell, /href: '\/owner'|href: '\/risk'|href: '\/research'|href: '\/research\/validation'/);
+  assert.match(footer, /Fundamental research notebook/);
+  assert.doesNotMatch(footer, /Strategy validation|Risk planning|Owner Console|QuantSupervisor/);
+});
+
+test('the legacy technical signal endpoint is retired', async () => {
+  const route = await read('app/api/v1/macro-signal/route.ts');
+  assert.match(route, /status:\s*410/);
+  assert.match(route, /technical decisions belong inside independent MT5 EAs/);
 });
