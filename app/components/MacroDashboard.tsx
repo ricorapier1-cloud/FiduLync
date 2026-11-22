@@ -446,11 +446,11 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
             <div className="macro-bias-drivers">
               <div>
                 <span>POLICY DIFF</span>
-                <strong className="mono">{formatBasisPoints(dossier.policyDiffBps)}</strong>
+                <strong className="mono">{dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? '—' : formatBasisPoints(dossier.policyDiffBps)}</strong>
               </div>
               <div>
                 <span>REAL YIELD DIFF</span>
-                <strong className="mono">{formatBasisPoints(dossier.realYieldDiffBps)}</strong>
+                <strong className="mono">{dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? '—' : formatBasisPoints(dossier.realYieldDiffBps)}</strong>
               </div>
               <div>
                 <span>2Y YIELD SPREAD</span>

@@ -25,6 +25,8 @@ test('pair dossier requires provider-sourced policy and inflation observations',
   assert.match(dossier, /policyRateObservationDate/);
   assert.match(dossier, /inflationObservationDate/);
   assert.match(dossier, /isFreshObservation/);
+  assert.match(dossier, /policyDiffBps = essentialEvidenceVerified/);
+  assert.match(dossier, /cotPercentileDiff = baseCot && quoteCot/);
   assert.match(dossier, /INSUFFICIENT EVIDENCE — NO RELIABLE CONCLUSION/);
   assert.doesNotMatch(dossier, /gdpGrowthYoY \?\? 1\.0|unemploymentRate \?\? 4\.0/);
 });

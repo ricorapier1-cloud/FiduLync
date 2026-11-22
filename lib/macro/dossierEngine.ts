@@ -67,7 +67,7 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
   // Rate differentials
   const basePolicy = isGold ? 0.0 : (baseCcy?.policyRate ?? 3.5);
   const quotePolicy = quoteCcy?.policyRate ?? 4.75;
-  const policyDiffBps = Math.round((basePolicy - quotePolicy) * 100);
+  const policyDiffBps = essentialEvidenceVerified ? Math.round((basePolicy - quotePolicy) * 100) : 0;
 
   const baseInflation = isGold ? 0.0 : (baseCcy?.inflation ?? 2.5);
   const quoteInflation = quoteCcy?.inflation ?? 2.8;
@@ -85,7 +85,7 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
 
   const baseCotPct = baseCot?.percentile ?? 50;
   const quoteCotPct = quoteCot?.percentile ?? 50;
-  const cotPercentileDiff = Math.round(baseCotPct - quoteCotPct);
+  const cotPercentileDiff = baseCot && quoteCot ? Math.round(baseCotPct - quoteCotPct) : 0;
 
   // Directional scoring uses only sourced policy, inflation, sovereign-yield and COT observations.
   // Country-profile baseline assumptions and hardcoded cross-asset constants are excluded.
