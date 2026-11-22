@@ -35,16 +35,15 @@ test('commercial routes are explicitly retired in the personal edition', async (
   }
 });
 
-test('sensitive installation and governance APIs remain server-authorized', async () => {
+test('sensitive installation and macro research APIs remain server-authorized', async () => {
   for (const path of [
     'app/api/owner/operations/route.ts',
     'app/api/owner/mt5-installations/route.ts',
+    'app/api/owner/market-intelligence/route.ts',
     'app/api/owner/research-governance/route.ts',
     'app/api/owner/research-governance/models/route.ts',
     'app/api/owner/research-governance/validate/route.ts',
-    'app/api/owner/artifacts/route.ts',
-    'app/api/owner/artifacts/upload-url/route.ts',
-    'app/api/owner/artifacts/register/route.ts',
+    'app/api/owner/research-hypotheses/route.ts',
   ]) {
     const source = await read(path);
     assert.match(source, /requireOwner\(request\)/, path);
@@ -54,11 +53,23 @@ test('sensitive installation and governance APIs remain server-authorized', asyn
   assert.match(review, /enforceDistributedRateLimit/);
 });
 
-test('legacy Paystack provisioning is not reachable through active route handlers', async () => {
-  const checkout = await read('app/api/v1/create-checkout/route.ts');
-  const webhook = await read('app/api/v1/paystack-webhook/route.ts');
-  assert.match(checkout, /status:\s*410/);
-  assert.match(webhook, /status:\s*410/);
+test('legacy trade, broker ingestion, portfolio risk and EA artifact APIs are retired', async () => {
+  for (const path of [
+    'app/api/mt5/ingest/route.ts',
+    'app/api/owner/portfolio-risk/route.ts',
+    'app/api/owner/artifacts/route.ts',
+    'app/api/owner/artifacts/upload-url/route.ts',
+    'app/api/owner/artifacts/register/route.ts',
+    'app/api/v1/ea-heartbeat/route.ts',
+    'app/api/v1/trade-log/route.ts',
+    'app/api/v1/ea-supervisor/decision/route.ts',
+    'app/api/v1/market-data/ingest/route.ts',
+    'app/api/v1/macro-signal/route.ts',
+    'app/api/macro/quotes/route.ts',
+  ]) {
+    const source = await read(path);
+    assert.match(source, /status:\s*410/, path);
+  }
 });
 
 test('database enforces global MT5 seat uniqueness across LIVE and DEMO types', async () => {
@@ -68,7 +79,7 @@ test('database enforces global MT5 seat uniqueness across LIVE and DEMO types', 
   assert.match(migration, /WHERE mt5_login IS NOT NULL/);
 });
 
-test('browser owner console is removed while sensitive management APIs remain protected', async () => {
+test('browser owner console is removed while sensitive installation APIs remain protected', async () => {
   const { existsSync } = await import('node:fs');
   assert.equal(existsSync(new URL('../app/owner/page.tsx', import.meta.url)), false);
   assert.equal(existsSync(new URL('../app/owner/OwnerOperations.tsx', import.meta.url)), false);
@@ -96,7 +107,7 @@ test('public navigation contains only macro research surfaces', async () => {
   assert.doesNotMatch(footer, /Strategy validation|Risk planning|Owner Console|QuantSupervisor/);
 });
 
-test('the legacy technical signal endpoint is retired', async () => {
+test('legacy technical signal endpoint is retired', async () => {
   const route = await read('app/api/v1/macro-signal/route.ts');
   assert.match(route, /status:\s*410/);
   assert.match(route, /technical decisions belong inside independent MT5 EAs/);
