@@ -1,22 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
-const workbench = readFileSync('app/components/ValidationWorkbench.tsx', 'utf8');
-
-test('validation workbench is available without login and runs locally', () => {
-  assert.ok(!workbench.includes('@supabase/supabase-js'));
-  assert.ok(!workbench.includes('/api/owner/verify'));
-  assert.ok(!workbench.toLowerCase().includes('sign in'));
-  assert.ok(workbench.includes('runValidation'));
-  assert.ok(workbench.includes('Analysis completed locally'));
+test('legacy trade validation workbench is removed from the active macro product', () => {
+  const page = readFileSync(new URL('../app/research/validation/page.tsx', import.meta.url), 'utf8');
+  assert.match(page, /redirect\('\/analytics'\)/);
+  assert.equal(existsSync(new URL('../app/components/ValidationWorkbench.tsx', import.meta.url)), false);
+  assert.equal(existsSync(new URL('../components/ManualRiskPlanner.tsx', import.meta.url)), false);
 });
 
-test('validation imports are bounded and calculations remain local', () => {
-  assert.ok(workbench.includes('file.size > 2 * 1024 * 1024'));
-  assert.ok(workbench.includes('await file.text()'));
-  assert.ok(workbench.includes('calculateTradeMetrics'));
-  assert.ok(workbench.includes('monteCarloBootstrap'));
-  assert.ok(!workbench.includes("method: 'POST'"));
-  assert.ok(!workbench.includes('SUPABASE_SERVICE_ROLE_KEY'));
+test('the macro workbench does not expose technical trade metrics or broker execution inputs', () => {
+  const crossAsset = readFileSync(new URL('../app/analytics/page.tsx', import.meta.url), 'utf8');
+  assert.match(crossAsset, /Cross-asset observations/);
+  assert.match(crossAsset, /snapshot\.cot/);
+  assert.doesNotMatch(crossAsset, /calculateTradeMetrics|PositionClose|OrderSend|stop.loss|lot size/i);
 });
