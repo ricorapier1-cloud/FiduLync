@@ -364,11 +364,11 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
                     <td>{currency.centralBank}</td>
                     <td className="mono">
                       {verifiedPolicy ? formatRate(currency.policyRate) : 'UNAVAILABLE'}
-                      <small>{verifiedPolicy ? `PROVIDER · OBS ${currency.policyRateObservationDate}` : currency.policyRateSource === 'provider' ? `STALE / DATE ${currency.policyRateObservationDate ?? 'UNKNOWN'}` : 'REFERENCE / NOT SCORED'}</small>
+                      <small>{verifiedPolicy ? `PROVIDER ${currency.policyRateProvider ?? ''} · OBS ${currency.policyRateObservationDate}` : currency.policyRateSource === 'provider' ? `STALE / DATE ${currency.policyRateObservationDate ?? 'UNKNOWN'}` : 'REFERENCE / NOT SCORED'}</small>
                     </td>
                     <td>
                       <span className="mono">{verifiedInflation ? formatRate(currency.inflation) : 'UNAVAILABLE'}</span>
-                      <small>{verifiedInflation ? `PROVIDER · OBS ${currency.inflationObservationDate}` : currency.inflationSource === 'provider' ? `STALE / DATE ${currency.inflationObservationDate ?? 'UNKNOWN'}` : 'REFERENCE / NOT SCORED'}</small>
+                      <small>{verifiedInflation ? `PROVIDER ${currency.inflationProvider ?? ''} · OBS ${currency.inflationObservationDate}` : currency.inflationSource === 'provider' ? `STALE / DATE ${currency.inflationObservationDate ?? 'UNKNOWN'}` : 'REFERENCE / NOT SCORED'}</small>
                     </td>
                     <td className="mono">
                       {currency.twoYearYield === undefined || currency.twoYearYieldSource !== 'provider' || !isFreshObservation(currency.twoYearYieldObservationDate, 60) ? '—' : (
@@ -397,7 +397,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
       <section className="macro-section" aria-labelledby="us-drivers-title">
         <div className="macro-section-heading">
           <div><span className="eyebrow">01A / UNITED STATES MACRO DRIVERS</span><h2 id="us-drivers-title">Growth, Labour &amp; Wage Impulse</h2></div>
-          <span className="macro-section-note mono">BEA / BLS OBSERVATIONS</span>
+          <span className="macro-section-note mono">BEA / BLS / BIS OBSERVATIONS</span>
         </div>
         {(() => {
           const usd = currencies.find((currency) => currency.code === 'USD');

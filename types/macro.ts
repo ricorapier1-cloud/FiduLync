@@ -41,7 +41,9 @@ export type MacroCurrency = {
   policyRateSource?: 'provider' | 'reference';
   inflationSource?: 'provider' | 'reference';
   policyRateObservationDate?: string;
+  policyRateProvider?: string;
   inflationObservationDate?: string;
+  inflationProvider?: string;
   twoYearYieldObservationDate?: string;
   stance: string;
   gdpGrowthYoY?: number;

@@ -73,3 +73,14 @@ test('macro snapshot persistence uses the protected payload table and preserves 
   assert.match(macroData, /snapshot_key: 'global'/);
   assert.doesNotMatch(macroData, /from\('macro_snapshots'\)\s*\.select\('payload,refreshed_at'\)/);
 });
+
+test('BIS policy rates and CPI are connected for G8 with source provenance', () => {
+  const macroData = read('../lib/macroData.ts');
+  const macroTypes = read('../types/macro.ts');
+  assert.match(macroData, /WS_CBPOL/);
+  assert.match(macroData, /WS_LONG_CPI/);
+  assert.match(macroData, /policyRateProvider = 'BIS'/);
+  assert.match(macroData, /inflationProvider = 'BIS'/);
+  assert.match(macroTypes, /policyRateProvider\?: string/);
+  assert.match(macroTypes, /inflationProvider\?: string/);
+});

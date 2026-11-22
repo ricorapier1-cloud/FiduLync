@@ -79,7 +79,9 @@ function isCurrency(value: unknown): value is MacroCurrency {
     && (value.policyRateSource === undefined || value.policyRateSource === 'provider' || value.policyRateSource === 'reference')
     && (value.inflationSource === undefined || value.inflationSource === 'provider' || value.inflationSource === 'reference')
     && (value.policyRateObservationDate === undefined || typeof value.policyRateObservationDate === 'string')
+    && (value.policyRateProvider === undefined || typeof value.policyRateProvider === 'string')
     && (value.inflationObservationDate === undefined || typeof value.inflationObservationDate === 'string')
+    && (value.inflationProvider === undefined || typeof value.inflationProvider === 'string')
     && (value.twoYearYieldObservationDate === undefined || typeof value.twoYearYieldObservationDate === 'string')
     && (value.gdpObservationDate === undefined || typeof value.gdpObservationDate === 'string')
     && (value.unemploymentObservationDate === undefined || typeof value.unemploymentObservationDate === 'string')
@@ -263,6 +265,92 @@ async function getBeaRealGdpYoY(apiKey: string) {
     gdpGrowthYoY: yearAgo && yearAgo.value !== 0 ? (latest.value / yearAgo.value - 1) * 100 : undefined,
     gdpObservationDate: latest.period,
   };
+}
+
+function parseBisCsvRow(line: string): string[] {
+  const cells: string[] = [];
+  let value = '';
+  let quoted = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    if (char === '"') {
+      if (quoted && line[i + 1] === '"') { value += '"'; i += 1; }
+      else quoted = !quoted;
+    } else if (char === ',' && !quoted) {
+      cells.push(value.trim()); value = '';
+    } else value += char;
+  }
+  cells.push(value.trim());
+  return cells;
+}
+
+async function fetchBisCsv(url: URL): Promise<Array<Record<string, string>>> {
+  const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(15_000) });
+  if (!response.ok) throw new Error(`BIS Data Portal returned ${response.status}.`);
+  const text = (await response.text()).replace(/^\uFEFF/, '').trim();
+  const lines = text.split(/\r?\n/);
+  if (lines.length < 2) throw new Error('BIS Data Portal returned no observation rows.');
+  const headers = parseBisCsvRow(lines[0]);
+  return lines.slice(1).flatMap((line) => {
+    const cells = parseBisCsvRow(line);
+    if (cells.length !== headers.length) return [];
+    return [Object.fromEntries(headers.map((header, index) => [header, cells[index]]))];
+  });
+}
+
+async function getBisG8MacroInputs() {
+  const startPolicy = new Date(Date.now() - 120 * 24 * 60 * 60 * 1_000).toISOString().slice(0, 10);
+  const startCpi = `${new Date().getUTCFullYear() - 2}-01-01`;
+  const policyDailyUrl = new URL('https://stats.bis.org/api/v2/data/dataflow/BIS/WS_CBPOL/1.0/D.');
+  policyDailyUrl.searchParams.set('startPeriod', startPolicy);
+  policyDailyUrl.searchParams.set('format', 'csvfile');
+  const policyMonthlyUrl = new URL('https://stats.bis.org/api/v2/data/dataflow/BIS/WS_CBPOL/1.0/M.');
+  policyMonthlyUrl.searchParams.set('startPeriod', startPolicy);
+  policyMonthlyUrl.searchParams.set('format', 'csvfile');
+  const cpiUrl = new URL('https://stats.bis.org/api/v2/data/dataflow/BIS/WS_LONG_CPI/1.0/M..771');
+  cpiUrl.searchParams.set('startPeriod', startCpi);
+  cpiUrl.searchParams.set('format', 'csvfile');
+
+  const [dailyResult, monthlyResult, cpiResult] = await Promise.allSettled([
+    fetchBisCsv(policyDailyUrl), fetchBisCsv(policyMonthlyUrl), fetchBisCsv(cpiUrl),
+  ]);
+  const currencyMap: Record<string, string> = {
+    US: 'USD', XM: 'EUR', GB: 'GBP', JP: 'JPY',
+    CH: 'CHF', CA: 'CAD', AU: 'AUD', NZ: 'NZD',
+  };
+  const policies = [
+    ...(dailyResult.status === 'fulfilled' ? dailyResult.value : []),
+    ...(monthlyResult.status === 'fulfilled' ? monthlyResult.value : []),
+  ];
+  const inflationRows = cpiResult.status === 'fulfilled' ? cpiResult.value : [];
+  const latest = new Map<string, { policyRate?: number; policyDate?: string; inflation?: number; inflationDate?: string }>();
+  for (const row of policies) {
+    const code = currencyMap[row.REF_AREA];
+    const date = row.TIME_PERIOD;
+    const value = Number(row.OBS_VALUE);
+    if (!code || !date || !Number.isFinite(value)) continue;
+    const current = latest.get(code) ?? {};
+    if (!current.policyDate || date > current.policyDate) {
+      latest.set(code, { ...current, policyRate: value, policyDate: date });
+    }
+  }
+  for (const row of inflationRows) {
+    const code = currencyMap[row.REF_AREA];
+    const date = row.TIME_PERIOD;
+    const value = Number(row.OBS_VALUE);
+    if (!code || !date || !Number.isFinite(value)) continue;
+    const current = latest.get(code) ?? {};
+    if (!current.inflationDate || date > current.inflationDate) {
+      latest.set(code, { ...current, inflation: value, inflationDate: date });
+    }
+  }
+  const result = [...latest.entries()].map(([code, values]) => ({ code, ...values }));
+  if (result.length === 0) {
+    const reasons = [dailyResult, monthlyResult, cpiResult].filter((item) => item.status === 'rejected')
+      .map((item) => item.status === 'rejected' ? String(item.reason) : '');
+    throw new Error(`BIS did not return usable G8 observations. ${reasons.join('; ')}`);
+  }
+  return result;
 }
 
 async function getFrankfurterRates(): Promise<Record<string, number>> {
@@ -544,7 +632,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     asOf: new Date().toISOString(),
     source: cachedSnapshot.source === 'fallback' ? 'fallback' : 'partial',
   };
-  const [fredResult, finnhubResult, alphaResult, fmpResult, cotResult, frankfurterResult, calendarResult, ecbResult, bocResult, boeResult, worldBankResult, blsResult, beaResult] = await Promise.allSettled([
+  const [fredResult, finnhubResult, alphaResult, fmpResult, cotResult, frankfurterResult, calendarResult, ecbResult, bocResult, boeResult, worldBankResult, blsResult, beaResult, bisResult] = await Promise.allSettled([
     fredApiKey ? getFredUsdUpdates(fredApiKey) : Promise.resolve(null),
     finnhubApiKey ? getFinnhubCatalysts(finnhubApiKey) : Promise.resolve(null),
     alphaVantageKey ? getAlphaVantageUsdUpdates(alphaVantageKey) : Promise.resolve(null),
@@ -558,6 +646,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     getWorldBankG10Inflation(),
     process.env.BLS_API_KEY?.trim() ? getBlsUsdUpdates(process.env.BLS_API_KEY.trim()) : Promise.resolve(null),
     process.env.BEA_API_KEY?.trim() ? getBeaRealGdpYoY(process.env.BEA_API_KEY.trim()) : Promise.resolve(null),
+    getBisG8MacroInputs(),
   ]);
   let hasLiveData = false;
   if (fredResult.status === 'fulfilled' && isRecord(fredResult.value)) {
@@ -592,12 +681,14 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
         usd.corePce = fredResult.value.corePce;
         usd.inflationSource = 'provider';
         usd.inflationObservationDate = typeof fredResult.value.corePceObservationDate === 'string' ? fredResult.value.corePceObservationDate : undefined;
+        usd.inflationProvider = 'FRED';
         hasLiveData = true;
       }
       if (isFiniteNumber(fredResult.value.cpi)) {
         usd.cpi = fredResult.value.cpi;
         usd.inflationSource = 'provider';
         usd.inflationObservationDate = typeof fredResult.value.cpiObservationDate === 'string' ? fredResult.value.cpiObservationDate : undefined;
+        usd.inflationProvider = 'FRED';
         hasLiveData = true;
       }
       if (isFiniteNumber(fredResult.value.twoYearYield)) {
@@ -645,6 +736,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
         eur.policyRate = ecbResult.value.policyRate;
         eur.policyRateSource = 'provider';
         eur.policyRateObservationDate = ecbResult.value.policyRateObservationDate;
+        eur.policyRateProvider = 'ECB';
         hasLiveData = true;
       }
       if (isFiniteNumber(ecbResult.value.inflation)) {
@@ -652,6 +744,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
         eur.inflationLabel = 'HICP';
         eur.inflationSource = 'provider';
         eur.inflationObservationDate = ecbResult.value.inflationObservationDate;
+        eur.inflationProvider = 'ECB';
         hasLiveData = true;
       }
       if (isFiniteNumber(ecbResult.value.twoYearYield)) {
@@ -671,6 +764,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
         cad.policyRate = bocResult.value.policyRate;
         cad.policyRateSource = 'provider';
         cad.policyRateObservationDate = bocResult.value.policyRateObservationDate;
+        cad.policyRateProvider = 'Bank of Canada';
         hasLiveData = true;
       }
       if (isFiniteNumber(bocResult.value.inflation)) {
@@ -678,6 +772,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
         cad.inflationLabel = 'CPI';
         cad.inflationSource = 'provider';
         cad.inflationObservationDate = bocResult.value.inflationObservationDate;
+        cad.inflationProvider = 'Bank of Canada';
         hasLiveData = true;
       }
     }
@@ -690,6 +785,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
       gbp.policyRate = boeResult.value.value;
       gbp.policyRateSource = 'provider';
       gbp.policyRateObservationDate = boeResult.value.date;
+      gbp.policyRateProvider = 'Bank of England';
       hasLiveData = true;
     }
   } else {
@@ -703,6 +799,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
       currency.inflationLabel = `CPI (annual, ${observation.year})`;
       currency.inflationSource = 'provider';
       currency.inflationObservationDate = observation.observationDate || observation.year;
+      currency.inflationProvider = 'World Bank';
       hasLiveData = true;
     }
   } else {
@@ -716,6 +813,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
         usd.inflationLabel = 'CPI-U (annual)';
         usd.inflationSource = 'provider';
         usd.inflationObservationDate = typeof blsResult.value.inflationObservationDate === 'string' ? blsResult.value.inflationObservationDate : undefined;
+        usd.inflationProvider = 'BLS';
         hasLiveData = true;
       }
       if (isFiniteNumber(blsResult.value.unemploymentRate)) {
@@ -744,6 +842,33 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     }
   } else if (beaResult.status === 'rejected') {
     console.warn('BEA real GDP data unavailable:', beaResult.reason);
+  }
+  if (bisResult.status === 'fulfilled') {
+    for (const observation of bisResult.value) {
+      const currency = snapshot.currencies.find((item) => item.code === observation.code);
+      if (!currency) continue;
+      if (isFiniteNumber(observation.policyRate)
+        && observation.policyDate
+        && (!currency.policyRateObservationDate || Date.parse(observation.policyDate) > Date.parse(currency.policyRateObservationDate))) {
+        currency.policyRate = observation.policyRate;
+        currency.policyRateSource = 'provider';
+        currency.policyRateProvider = 'BIS';
+        currency.policyRateObservationDate = observation.policyDate;
+        hasLiveData = true;
+      }
+      if (isFiniteNumber(observation.inflation)
+        && observation.inflationDate
+        && (!currency.inflationObservationDate || Date.parse(observation.inflationDate) > Date.parse(currency.inflationObservationDate))) {
+        currency.inflation = observation.inflation;
+        currency.inflationLabel = 'CPI annual change';
+        currency.inflationSource = 'provider';
+        currency.inflationProvider = 'BIS';
+        currency.inflationObservationDate = observation.inflationDate;
+        hasLiveData = true;
+      }
+    }
+  } else {
+    console.warn('BIS G8 policy-rate and CPI observations are unavailable:', bisResult.reason);
   }
   if (!fredApiKey && alphaVantageKey) {
     if (alphaResult.status === 'fulfilled' && isRecord(alphaResult.value)) {

@@ -24,7 +24,7 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
   const gbp = snapshot.currencies.find((item) => item.code === 'GBP');
   const cad = snapshot.currencies.find((item) => item.code === 'CAD');
   const worldBankCurrencies = snapshot.currencies.filter((item) => item.inflationSource === 'provider' && item.inflationObservationDate);
-  const fredConfigured = Boolean(process.env.FRED_API_KEY?.trim()) && process.env.FRED_COMMERCIAL_USE_APPROVED === 'true';
+  const fredConfigured = Boolean(process.env.FRED_API_KEY?.trim()) && process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true';
   const finnhubConfigured = Boolean(process.env.FINNHUB_API_KEY?.trim()) && process.env.FINNHUB_COMMERCIAL_USE_APPROVED === 'true';
   const bls = feedStatus(Boolean(usd?.unemploymentObservationDate && usd.wageGrowthObservationDate),
     isFresh(usd?.unemploymentObservationDate, 120) && isFresh(usd?.wageGrowthObservationDate, 120), Boolean(process.env.BLS_API_KEY?.trim()));
@@ -42,15 +42,18 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
     snapshot.cot.some((item) => isFresh(item.reportDate, 14)), true);
   const calendar = feedStatus(snapshot.calendarSource === 'provider' && snapshot.catalysts.length > 0,
     snapshot.catalysts.some((item) => Date.parse(item.scheduledAt) >= Date.now() - 24 * 60 * 60 * 1000), finnhubConfigured);
+  const bisCoverage = snapshot.currencies.filter((item) => item.policyRateProvider === 'BIS' && item.inflationProvider === 'BIS').length;
+  const bis = feedStatus(bisCoverage >= 4, bisCoverage >= 4, true);
   const worldBank = feedStatus(worldBankCurrencies.length > 0,
     worldBankCurrencies.some((item) => isFresh(item.inflationObservationDate, 365)), true);
 
   return [
-    { name: 'FRED / US macro', endpoint: 'https://api.stlouisfed.org/fred/series/observations', ...fred, latencyMs: null, lastSuccessfulSyncUtc: fred.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
+    { name: 'FRED / US macro (storage permission gated)', endpoint: 'Disabled until data storage permission is confirmed', ...fred, latencyMs: null, lastSuccessfulSyncUtc: fred.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'ECB Data Portal', endpoint: 'https://data-api.ecb.europa.eu/service/data', ...ecb, latencyMs: null, lastSuccessfulSyncUtc: ecb.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'Bank of England', endpoint: 'https://www.bankofengland.co.uk/boeapps/database/_iadb-fromshowcolumns.asp', ...boe, latencyMs: null, lastSuccessfulSyncUtc: boe.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'Bank of Canada Valet', endpoint: 'https://www.bankofcanada.ca/valet/observations', ...boc, latencyMs: null, lastSuccessfulSyncUtc: boc.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'CFTC Commitments of Traders', endpoint: 'https://publicreporting.cftc.gov/resource/6dca-aqww.json', ...cftc, latencyMs: null, lastSuccessfulSyncUtc: cftc.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
+    { name: 'BIS Statistics / G8 policy rates & CPI', endpoint: 'https://stats.bis.org/api/v2/data/dataflow/BIS', ...bis, latencyMs: null, lastSuccessfulSyncUtc: bis.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'World Bank CPI', endpoint: 'https://api.worldbank.org/v2/country', ...worldBank, latencyMs: null, lastSuccessfulSyncUtc: worldBank.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'US Bureau of Labor Statistics', endpoint: 'https://api.bls.gov/publicAPI/v2/timeseries/data/', ...bls, latencyMs: null, lastSuccessfulSyncUtc: bls.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'US Bureau of Economic Analysis', endpoint: 'https://apps.bea.gov/api/data/', ...bea, latencyMs: null, lastSuccessfulSyncUtc: bea.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
