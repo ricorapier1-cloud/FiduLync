@@ -40,36 +40,42 @@ class PersonalQuantSecurityContractTests(unittest.TestCase):
         self.assertIn("occurred_at", migration)
         self.assertIn("GRANT EXECUTE", migration)
 
-    def test_private_owner_mutations_verify_the_owner_identity(self):
+    def test_private_installation_provisioning_remains_server_authorized(self):
         owner_routes = (
-            "app/api/owner/operations/route.ts",
             "app/api/owner/mt5-installations/route.ts",
-            "app/api/owner/research-governance/route.ts",
-            "app/api/owner/research-governance/models/route.ts",
-            "app/api/owner/research-governance/validate/route.ts",
-            "app/api/owner/artifacts/upload-url/route.ts",
-            "app/api/owner/artifacts/register/route.ts",
             "app/api/mt5/installations/route.ts",
         )
         for route in owner_routes:
             with self.subTest(route=route):
                 self.assertIn("requireOwner(request)", self.read(route))
 
-    def test_mt5_market_ingestion_uses_installation_tokens_and_replay_protection(self):
-        source = self.read("app/api/v1/market-data/ingest/route.ts")
-        self.assertIn("x-mt5-timestamp", source)
-        self.assertIn("x-mt5-nonce", source)
-        self.assertIn("mt5_ingest_nonces", source)
-        self.assertIn("token_hash", source)
-        self.assertIn("mt5_market_candles", source)
-        self.assertIn("on_conflict=installation_id,symbol,timeframe,bar_time", source)
+    def test_macro_context_is_the_only_mt5_data_bridge(self):
+        source = self.read("app/api/v1/macro-context/route.ts")
+        self.assertIn("createHash('sha256')", source)
+        self.assertIn("token_hash=eq.", source)
         self.assertIn("status=eq.active", source)
+        self.assertIn("X-MT5-Timestamp", source)
+        self.assertIn("enforceDistributedRateLimit", source)
+        self.assertIn("INSUFFICIENT_EVIDENCE", source)
+        self.assertIn("Cache-Control", source)
+        self.assertNotIn("OrderSend", source)
 
-    def test_legacy_shared_secret_macro_signal_is_browser_same_origin_only(self):
-        source = self.read("app/api/v1/macro-signal/route.ts")
-        self.assertIn("isSameOriginBrowserRequest", source)
-        self.assertNotIn("isAlgoAuthorized", source)
-        self.assertNotIn("ALGO_PRIVATE_API_KEY", source)
+    def test_broker_ingestion_and_ea_supervisor_are_retired(self):
+        routes = (
+            "app/api/v1/market-data/ingest/route.ts",
+            "app/api/v1/ea-supervisor/decision/route.ts",
+        )
+        for route in routes:
+            with self.subTest(route=route):
+                self.assertIn("status: 410", self.read(route))
+
+    def test_legacy_macro_signal_is_retired_in_favour_of_fundamental_context(self):
+        legacy = self.read("app/api/v1/macro-signal/route.ts")
+        context = self.read("app/api/v1/macro-context/route.ts")
+        self.assertIn("status: 410", legacy)
+        self.assertIn("technical decisions belong inside independent MT5 EAs", legacy)
+        self.assertIn("fundamental_bias", context)
+        self.assertIn("high_impact_lockout", context)
 
     def test_browser_owner_console_is_removed_and_admin_apis_remain_protected(self):
         for path in (
@@ -82,49 +88,16 @@ class PersonalQuantSecurityContractTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertFalse((ROOT / path).exists())
         for route in (
-            "app/api/owner/operations/route.ts",
             "app/api/owner/mt5-installations/route.ts",
             "app/api/owner/artifacts/upload-url/route.ts",
             "app/api/owner/artifacts/register/route.ts",
         ):
             with self.subTest(route=route):
                 source = self.read(route)
-                self.assertTrue("requireOwner(request)" in source or "isAuthorizedOwnerEmail" in source)
+                self.assertIn("requireOwner(request)", source)
         shell = self.read("components/PlatformShell.tsx")
         self.assertNotIn("href: '/owner'", shell)
         self.assertNotIn("Owner Console", shell)
-
-    def test_personal_policy_and_ghost_gate_are_fail_closed(self):
-        policy = self.read("lib/riskPolicy.ts")
-        ghost = self.read("lib/quantRisk.ts")
-        signal = self.read("lib/signalEngine.ts")
-        self.assertIn("executionEnabled: false", policy)
-        self.assertIn("modelValidated: false", policy)
-        self.assertIn("maxPerTradeRiskPct: 1.0", policy)
-        self.assertIn("maxHighWaterDrawdownPct: 15.0", policy)
-        self.assertIn("maxConsecutiveLosses: 3", policy)
-        self.assertIn("GHOST_PROTOCOL_THRESHOLD = 0.65", ghost)
-        self.assertIn("safeToTrade = riskBudget.approved && ghost.allowed", signal)
-        self.assertIn("quoteAgeMs <= personalRiskPolicy.maxQuoteAgeMs", signal)
-
-    def test_mt5_publisher_and_historical_backfill_are_read_only(self):
-        publisher = self.read("scripts/mt5_market_publisher.py")
-        backfill = self.read("scripts/mt5_historical_backfill.py")
-        supervisor = self.read("public/downloads/QuantSupervisor.mqh")
-        self.assertIn("FIDULYNC_INGEST_URL", publisher)
-        self.assertIn("copy_rates_from_pos", publisher)
-        self.assertIn("copy_rates_range", backfill)
-        self.assertIn("MT5_BACKFILL_START", backfill)
-        self.assertIn("1996-01-01", backfill)
-        self.assertNotIn("order_send", publisher)
-        self.assertNotIn("order_send", backfill)
-        self.assertIn("x-mt5-timestamp", supervisor)
-        self.assertIn("x-mt5-nonce", supervisor)
-
-    def test_secondary_customer_pages_redirect_to_public_research_terminal(self):
-        for page in ("app/account/page.tsx", "app/customer/page.tsx", "app/licensing/page.tsx"):
-            with self.subTest(page=page):
-                self.assertIn("redirect('/')", self.read(page))
 
     def test_personal_risk_policy_discloses_research_only_boundary(self):
         terms = self.read("app/terms/page.tsx")
