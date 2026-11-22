@@ -250,26 +250,26 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
       <section className="macro-kpis" aria-label="Macro overview">
         <article className="macro-kpi">
           <span className="macro-kpi-label">POLICY SPREAD <span>G8 DISPERSION</span></span>
-          <strong className="mono">{policySpread === null ? '425 bps' : formatRate(policySpread)}</strong>
+          <strong className="mono">{policySpread === null ? '—' : formatRate(policySpread)}</strong>
           <small>Highest to lowest central bank policy rate</small>
         </article>
         <article className="macro-kpi">
           <span className="macro-kpi-label">POLICY INPUTS <span>AUTHENTICATED</span></span>
           <strong className="mono">{String(currencies.length).padStart(2, '0')} <em>/ 11</em></strong>
-          <small>{currencies.length >= 11 ? 'All 11 central bank & reserve inputs active' : 'Live and reference statistical inputs'}</small>
+          <small>{currencies.length >= 11 ? 'Currency records received; verify source status per field' : 'Incomplete provider coverage'}</small>
         </article>
         <article className="macro-kpi">
           <span className="macro-kpi-label">NEXT CATALYST <span>HIGH IMPACT</span></span>
-          <strong className="mono">{nextHighImpactCatalyst ? <CatalystCountdownDisplay target={nextHighImpactCatalyst.scheduledAt} /> : 'US Non-Farm Payrolls'}</strong>
-          <small>{nextHighImpactCatalyst?.title ?? 'Tier-1 Catalyst • 13:30 UTC'}</small>
+          <strong className="mono">{nextHighImpactCatalyst ? <CatalystCountdownDisplay target={nextHighImpactCatalyst.scheduledAt} />  : 'UNAVAILABLE'}</strong>
+          <small>{nextHighImpactCatalyst?.title ?? 'No verified calendar event'}</small>
         </article>
         <article className="macro-kpi macro-kpi-source">
           <span className="macro-kpi-label">DATA PROVENANCE <span>STATUS</span></span>
           <strong className="macro-source-value">
             <span className={currencies.length >= 11 ? 'macro-source-dot macro-source-live' : 'macro-source-dot'} />
-            {currencies.length >= 11 ? 'LIVE' : snapshot.source === 'provider' ? 'LIVE' : snapshot.source === 'partial' ? 'PARTIAL' : 'REFERENCE'}
+            {snapshot.source === 'provider' ? 'PROVIDER' : snapshot.source === 'partial' ? 'PARTIAL' : 'UNAVAILABLE'}
           </strong>
-          <small>{refreshing ? 'Polling provider telemetry…' : currencies.length >= 11 ? 'All 11 inputs verified' : 'Audited reference cache active'}</small>
+          <small>{refreshing ? 'Polling provider telemetry…' : currencies.length >= 11 ? 'All 11 currency inputs present' : 'Provider coverage incomplete'}</small>
         </article>
       </section>
 
@@ -378,7 +378,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
           </table>
           <div className="macro-panel-foot">
             <span>Real rate = nominal policy rate − headline inflation. Yield spreads reflect 2-year sovereign debt obligations.</span>
-            <span className="mono">VERIFIED DATA VINTAGE</span>
+            <span className="mono">SOURCE VINTAGE NOT YET VERIFIED</span>
           </div>
         </div>
       </section>
@@ -539,37 +539,14 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
           <span className="macro-section-note mono">BONDS / COMMODITIES / VOLATILITY</span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <div className="macro-panel p-3">
-            <span className="text-[10px] font-mono text-slate-400 block">US 10Y BENCHMARK</span>
-            <strong className="text-sm font-mono text-slate-100 block mt-1">4.35%</strong>
-            <small className="text-[10px] text-emerald-400 font-mono">+4 bps (D/D)</small>
-          </div>
-          <div className="macro-panel p-3">
-            <span className="text-[10px] font-mono text-slate-400 block">US 2S10S CURVE</span>
-            <strong className="text-sm font-mono text-slate-100 block mt-1">+15 bps</strong>
-            <small className="text-[10px] text-slate-400 font-mono">Disinverting</small>
-          </div>
-          <div className="macro-panel p-3">
-            <span className="text-[10px] font-mono text-slate-400 block">10Y TIPS REAL YIELD</span>
-            <strong className="text-sm font-mono text-emerald-400 block mt-1">2.05%</strong>
-            <small className="text-[10px] text-slate-400 font-mono">Restrictive</small>
-          </div>
-          <div className="macro-panel p-3">
-            <span className="text-[10px] font-mono text-slate-400 block">CBOE VIX INDEX</span>
-            <strong className="text-sm font-mono text-slate-100 block mt-1">14.80</strong>
-            <small className="text-[10px] text-emerald-400 font-mono">Sub-18 Normal</small>
-          </div>
-          <div className="macro-panel p-3">
-            <span className="text-[10px] font-mono text-slate-400 block">WTI CRUDE OIL</span>
-            <strong className="text-sm font-mono text-slate-100 block mt-1">$76.40</strong>
-            <small className="text-[10px] text-amber-400 font-mono">Energy Baseline</small>
-          </div>
-          <div className="macro-panel p-3">
-            <span className="text-[10px] font-mono text-slate-400 block">GOLD SPOT (XAU)</span>
-            <strong className="text-sm font-mono text-emerald-400 block mt-1">$2,740</strong>
-            <small className="text-[10px] text-emerald-400 font-mono">Central Bank Flow</small>
-          </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {['US 10Y benchmark', 'US 2s10s curve', '10Y TIPS real yield', 'CBOE VIX', 'WTI crude oil', 'Gold spot'].map((label) => (
+            <div className="macro-panel p-3" key={label}>
+              <span className="text-[10px] font-mono text-slate-400 block">{label.toUpperCase()}</span>
+              <strong className="text-sm font-mono text-slate-100 block mt-1">UNAVAILABLE</strong>
+              <small className="text-[10px] text-amber-400 font-mono">No verified live adapter</small>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -612,7 +589,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
               </div>
             ))}
             <div className="macro-panel-foot">
-              <span>CFTC report data validated; positioning releases occur weekly on Fridays at 15:30 EST.</span>
+              <span>CFTC observations are published weekly; verify report date and vintage for each record.</span>
               <span className="mono">POSITIONING ≠ EXECUTION TRIGGER</span>
             </div>
           </div>
@@ -628,7 +605,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
               <strong className="mono">
                 {snapshot.cot.length > 0
                   ? `${snapshot.cot.reduce((highest, current) => current.percentile > highest.percentile ? current : highest, snapshot.cot[0]).market} ${Math.max(...snapshot.cot.map((position) => position.percentile))}%ile`
-                  : 'USD (82%ile)'}
+                  : 'Unavailable'}
               </strong>
             </div>
           </aside>
