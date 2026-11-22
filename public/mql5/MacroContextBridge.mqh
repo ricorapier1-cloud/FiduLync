@@ -57,8 +57,28 @@ string FMC_JsonString(const string json, const string key)
 
 bool FMC_Number(const string value)
 {
-   if(value == "" || value == "null") return false;
-   return StringToDouble(value) == StringToDouble(value);
+   int length = StringLen(value);
+   if(length == 0) return false;
+   int start = StringGetCharacter(value, 0) == '-' ? 1 : 0;
+   if(start == length) return false;
+   bool has_digit = false;
+   bool has_decimal = false;
+   for(int index = start; index < length; index++)
+   {
+      ushort ch = StringGetCharacter(value, index);
+      if(ch >= '0' && ch <= '9')
+      {
+         has_digit = true;
+         continue;
+      }
+      if(ch == '.' && !has_decimal)
+      {
+         has_decimal = true;
+         continue;
+      }
+      return false;
+   }
+   return has_digit;
 }
 
 string FMC_UtcTimestamp()
