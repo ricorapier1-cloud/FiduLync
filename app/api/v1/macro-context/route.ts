@@ -119,12 +119,15 @@ export async function GET(request: Request) {
       policy_diff_bps: dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier.policyDiffBps,
       real_yield_diff_bps: dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier.realYieldDiffBps,
       two_year_yield_diff_bps: dossier.twoYearYieldDiffBps,
-      cot_percentile_diff: snapshot.cotSource === 'provider' ? dossier.cotPercentileDiff : null,
+      cot_percentile_diff: snapshot.cotSource === 'provider'
+        && snapshot.cot.some((position) => position.market === (dossier.base === 'XAU' ? 'GOLD' : dossier.base))
+        && snapshot.cot.some((position) => position.market === dossier.quote)
+          ? dossier.cotPercentileDiff : null,
       cross_asset_confirmation: dossier.crossAssetConfirmation,
       calendar_verified: snapshot.calendarSource === 'provider',
       event_risk_status: snapshot.calendarSource === 'provider' ? 'PROVIDER_CALENDAR' : 'UNVERIFIED_CALENDAR',
       news_lockout: dossier.eventRiskLockout || snapshot.calendarSource !== 'provider',
-      next_catalyst: dossier.nextCatalyst ? {
+      next_catalyst: snapshot.calendarSource === 'provider' && dossier.nextCatalyst ? {
         title: dossier.nextCatalyst.title,
         scheduled_at_utc: dossier.nextCatalyst.scheduledAt,
         region: dossier.nextCatalyst.region,
