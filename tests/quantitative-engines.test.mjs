@@ -1,31 +1,49 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
-test('validation engine: historical regime cycles enforce point-in-time integrity', async () => {
-  // Read validationEngine dynamically or inspect its rules
-  const { HISTORICAL_REGIME_CYCLES, getRegimeValidationSummary } = await import('../lib/macro/validationEngine.ts');
-  const summary = getRegimeValidationSummary();
+const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
+const validation = read('../lib/macro/validationEngine.ts');
+const dossier = read('../lib/macro/dossierEngine.ts');
+const crossAsset = read('../lib/macro/crossAssetEngine.ts');
+const profiles = read('../lib/macro/countryProfiles.ts');
+const strength = read('../lib/currencyStrength.ts');
+const dashboard = read('../app/components/MacroDashboard.tsx');
 
-  assert.ok(summary.totalCycles >= 5, 'Must contain historical cycles across multiple quarters');
-  assert.ok(summary.winRatePct >= 0 && summary.winRatePct <= 100);
-
-  // Check sample size warning logic
-  const lowSampleCycle = HISTORICAL_REGIME_CYCLES.find((c) => c.sampleObservations < 30);
-  if (lowSampleCycle) {
-    assert.equal(lowSampleCycle.sampleSizeAdequate, false, 'Cycles with N < 30 must flag inadequate sample size');
-  }
-
-  // Check vintage integrity
-  HISTORICAL_REGIME_CYCLES.forEach((c) => {
-    assert.ok(
-      c.vintageIntegrity === 'POINT_IN_TIME_VERIFIED' || c.vintageIntegrity === 'REVISION_ADJUSTED',
-      'Cycle must have explicit vintage classification'
-    );
-  });
+test('validation engine withholds unsupported historical performance claims', () => {
+  assert.match(validation, /NOT_VALIDATED/);
+  assert.match(validation, /HISTORICAL_REGIME_CYCLES: RegimeBacktestCycle\[\] = \[\]/);
+  assert.match(validation, /winRatePct: null/);
+  assert.match(validation, /avgReturnPct: null/);
+  assert.match(validation, /avgDrawdownPct: null/);
 });
 
-test('country profiles: all G8 currencies are represented', async () => {
-  const { G8_CURRENCIES } = await import('../lib/macro/countryProfiles.ts');
-  const expected = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD'];
-  assert.deepEqual([...G8_CURRENCIES], expected);
+test('pair dossier requires provider-sourced policy and inflation observations', () => {
+  assert.match(dossier, /policyRateSource === 'provider'/);
+  assert.match(dossier, /inflationSource === 'provider'/);
+  assert.match(dossier, /essentialEvidenceVerified/);
+  assert.match(dossier, /INSUFFICIENT EVIDENCE — NO RELIABLE CONCLUSION/);
+  assert.doesNotMatch(dossier, /gdpGrowthYoY \?\? 1\.0|unemploymentRate \?\? 4\.0/);
+});
+
+test('cross-asset engine does not embed fabricated market levels', () => {
+  for (const value of ['4.45', '1.95', '124.8', '14.6', '2680.0', '71.4', '75.2', '4.12', '312']) {
+    assert.doesNotMatch(crossAsset, new RegExp(value.replace('.', '\\.'), 'g'));
+  }
+  assert.match(crossAsset, /freshness: 'UNAVAILABLE'/);
+});
+
+test('country profile engine does not publish hardcoded macro baselines', () => {
+  assert.match(profiles, /return \[\]/);
+  assert.doesNotMatch(profiles, /gdpGrowthYoY: 2\.7|unemploymentRate: 4\.1/);
+});
+
+test('currency strength uses only provider-sourced policy and inflation data', () => {
+  assert.match(strength, /policyRateSource === 'provider'/);
+  assert.match(strength, /inflationSource === 'provider'/);
+});
+
+test('dashboard marks cross-asset values unavailable until verified feeds exist', () => {
+  assert.match(dashboard, /No verified live adapter/);
+  assert.doesNotMatch(dashboard, /4\.35%|2\.05%|14\.80|\$76\.40|\$2,740/);
 });

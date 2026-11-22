@@ -2,18 +2,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 
-const ownerPage = readFileSync(new URL('../app/owner/page.tsx', import.meta.url), 'utf8');
-const storePage = readFileSync(new URL('../app/store/page.tsx', import.meta.url), 'utf8');
-const accountPage = readFileSync(new URL('../app/account/page.tsx', import.meta.url), 'utf8');
-const analyticsPage = readFileSync(new URL('../app/analytics/page.tsx', import.meta.url), 'utf8');
-const macroContextRoute = readFileSync(new URL('../app/api/v1/macro-context/route.ts', import.meta.url), 'utf8');
+const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
+const ownerPage = read('../app/owner/page.tsx');
+const storePage = read('../app/store/page.tsx');
+const accountPage = read('../app/account/page.tsx');
+const analyticsPage = read('../app/analytics/page.tsx');
+const macroContextRoute = read('../app/api/v1/macro-context/route.ts');
+const notebookPage = read('../app/notebook/page.tsx');
 
 test('security: /owner returns a genuine 404 via notFound()', () => {
   assert.match(ownerPage, /notFound\(\)/);
   assert.doesNotMatch(ownerPage, /password|auth|login|Supabase/i);
 });
 
-test('security: /store and /account cleanly redirect to the main research terminal', () => {
+test('security: commercial account/store surfaces redirect to the research terminal', () => {
   assert.match(storePage, /redirect\('\/'\)/);
   assert.match(accountPage, /redirect\('\/'\)/);
   assert.doesNotMatch(storePage, /PaystackCheckout|paystack/i);
@@ -24,14 +26,29 @@ test('architecture: /analytics redirects to /workbench', () => {
   assert.match(analyticsPage, /redirect\('\/workbench'\)/);
 });
 
-test('architecture: /api/v1/macro-context is read-only and strictly contains no trade execution', () => {
+test('security: macro context API fails closed and validates installation tokens', () => {
+  assert.match(macroContextRoute, /candidate\.startsWith\('flmt5_'\)/);
+  assert.match(macroContextRoute, /createHash\('sha256'\)/);
+  assert.match(macroContextRoute, /from\('mt5_installations'\)/);
+  assert.match(macroContextRoute, /status: 503/);
+  assert.match(macroContextRoute, /timingSafeEqual/);
+  assert.doesNotMatch(macroContextRoute, /isLocalhost|if \(!macroSecret\) return true/);
+});
+
+test('architecture: macro context API is read-only and contains no order execution', () => {
   assert.match(macroContextRoute, /export async function GET/);
   assert.doesNotMatch(macroContextRoute, /export async function POST/);
-  assert.doesNotMatch(macroContextRoute, /OrderSend|buy|sell|executeOrder|brokerPassword|tradeLot/i);
+  assert.doesNotMatch(macroContextRoute, /OrderSend|executeOrder|brokerPassword|tradeLot/i);
   assert.match(macroContextRoute, /checkRateLimit/);
 });
 
-test('architecture: research notebook and workbench pages exist', () => {
+test('research notebook starts empty and defaults to insufficient evidence', () => {
+  assert.match(notebookPage, /useState<ResearchHypothesis\[]>\(\[\]\)/);
+  assert.doesNotMatch(notebookPage, /INITIAL_DEMO_HYPOTHESIS|hyp-sample-01/);
+  assert.match(notebookPage, /INSUFFICIENT_EVIDENCE/);
+});
+
+test('research pages exist', () => {
   assert.ok(existsSync(new URL('../app/notebook/page.tsx', import.meta.url)));
   assert.ok(existsSync(new URL('../app/workbench/page.tsx', import.meta.url)));
 });

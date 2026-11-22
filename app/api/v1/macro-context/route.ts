@@ -1,8 +1,9 @@
-import { timingSafeEqual } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { getMacroSnapshot } from '@/lib/macroEngine';
 import { generatePairDossier } from '@/lib/macro/dossierEngine';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { getSupabaseAdmin } from '@/lib/serverSupabase';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,15 +14,31 @@ function safeEqual(left: string, right: string): boolean {
   return a.length > 0 && a.length === b.length && timingSafeEqual(a, b);
 }
 
-function isAuthorized(request: Request): boolean {
+async function authenticate(request: Request): Promise<string | null> {
+  const authorization = request.headers.get('authorization')?.trim() ?? '';
+  const bearer = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
+  const candidate = (request.headers.get('x-macro-key')?.trim() || bearer).trim();
+  if (!candidate) return null;
+
+  // Installation credentials are random, one-time-issued flmt5_ tokens.
+  // Only their SHA-256 hashes are stored in Supabase.
+  if (candidate.startsWith('flmt5_')) {
+    if (candidate.length < 40) return null;
+    const tokenHash = createHash('sha256').update(candidate).digest('hex');
+    const { data, error } = await getSupabaseAdmin()
+      .from('mt5_installations')
+      .select('id')
+      .eq('token_hash', tokenHash)
+      .eq('status', 'active')
+      .maybeSingle();
+    if (error) throw error;
+    return data?.id ? `installation:${data.id}` : null;
+  }
+
   const secret = process.env.MACROLYNC_API_SECRET?.trim()
     || process.env.ALGO_PRIVATE_API_KEY?.trim();
-  if (!secret || secret.length < 32) return false;
-
-  const header = request.headers.get('authorization')?.trim() ?? '';
-  const bearer = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
-  const macroKey = request.headers.get('x-macro-key')?.trim() ?? '';
-  return safeEqual(macroKey, secret) || safeEqual(bearer, secret);
+  if (!secret || secret.length < 32 || !safeEqual(candidate, secret)) return null;
+  return `service:${createHash('sha256').update(secret).digest('hex').slice(0, 16)}`;
 }
 
 const headers = {
@@ -30,19 +47,25 @@ const headers = {
 };
 
 export async function GET(request: Request) {
-  const secret = process.env.MACROLYNC_API_SECRET?.trim()
-    || process.env.ALGO_PRIVATE_API_KEY?.trim();
-  if (!secret || secret.length < 32) {
-    console.error('Macro Context API disabled: a 32-character server secret is not configured.');
-    return NextResponse.json({ error: 'Macro context API is not configured for authenticated access.' }, { status: 503, headers });
+  let identity: string | null;
+  try {
+    identity = await authenticate(request);
+  } catch (error) {
+    console.error('Macro Context authentication store unavailable:', error);
+    return NextResponse.json({ error: 'Authentication service is temporarily unavailable.' }, { status: 503, headers });
   }
 
-  if (!isAuthorized(request)) {
-    return NextResponse.json({ error: 'Unauthorized.' }, { status: 401, headers });
+  if (!identity) {
+    const secret = process.env.MACROLYNC_API_SECRET?.trim() || process.env.ALGO_PRIVATE_API_KEY?.trim();
+    const status = !secret || secret.length < 32 ? 503 : 401;
+    return NextResponse.json(
+      { error: status === 503 ? 'Macro context API is not configured for authenticated access.' : 'Unauthorized.' },
+      { status, headers }
+    );
   }
 
   const ip = getClientIp(request);
-  if (!checkRateLimit(ip, 30, 60_000)) {
+  if (!checkRateLimit(`ip:${ip}`, 60, 60_000) || !checkRateLimit(identity, 30, 60_000)) {
     return NextResponse.json({ error: 'Rate limit exceeded.' }, { status: 429, headers });
   }
 
