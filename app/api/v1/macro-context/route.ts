@@ -2,7 +2,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { getMacroSnapshot } from '@/lib/macroEngine';
 import { generatePairDossier } from '@/lib/macro/dossierEngine';
-import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { getClientIp } from '@/lib/rateLimit';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
 
 export const runtime = 'nodejs';
@@ -41,6 +41,24 @@ async function authenticate(request: Request): Promise<string | null> {
   return `service:${createHash('sha256').update(secret).digest('hex').slice(0, 16)}`;
 }
 
+async function consumePersistentRateLimit(key: string, limit: number): Promise<{ allowed: boolean; retryAfterSeconds: number }> {
+  const keyHash = createHash('sha256').update(key).digest('hex');
+  const { data, error } = await getSupabaseAdmin().rpc('consume_api_rate_limit', {
+    p_key_hash: keyHash,
+    p_limit: limit,
+    p_window_seconds: 60,
+  });
+  if (error) throw error;
+  if (!data || typeof data !== 'object') throw new Error('Rate-limit service returned an invalid response.');
+  const result = data as Record<string, unknown>;
+  return {
+    allowed: result.allowed === true,
+    retryAfterSeconds: Number.isInteger(result.retry_after_seconds)
+      ? Math.max(1, Number(result.retry_after_seconds))
+      : 60,
+  };
+}
+
 const headers = {
   'Cache-Control': 'no-store, max-age=0',
   'X-Content-Type-Options': 'nosniff',
@@ -65,8 +83,18 @@ export async function GET(request: Request) {
   }
 
   const ip = getClientIp(request);
-  if (!checkRateLimit(`ip:${ip}`, 60, 60_000) || !checkRateLimit(identity, 30, 60_000)) {
-    return NextResponse.json({ error: 'Rate limit exceeded.' }, { status: 429, headers });
+  try {
+    const [ipLimit, identityLimit] = await Promise.all([
+      consumePersistentRateLimit(`ip:${ip}`, 60),
+      consumePersistentRateLimit(identity, 30),
+    ]);
+    if (!ipLimit.allowed || !identityLimit.allowed) {
+      const retryAfter = Math.max(ipLimit.allowed ? 0 : ipLimit.retryAfterSeconds, identityLimit.allowed ? 0 : identityLimit.retryAfterSeconds);
+      return NextResponse.json({ error: 'Rate limit exceeded.' }, { status: 429, headers: { ...headers, 'Retry-After': String(retryAfter) } });
+    }
+  } catch (error) {
+    console.error('Macro Context rate-limit store unavailable:', error);
+    return NextResponse.json({ error: 'Request protection service is temporarily unavailable.' }, { status: 503, headers });
   }
 
   const { searchParams } = new URL(request.url);

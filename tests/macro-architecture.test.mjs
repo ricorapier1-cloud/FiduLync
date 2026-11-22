@@ -41,7 +41,8 @@ test('architecture: macro context API is read-only and contains no order executi
   assert.match(macroContextRoute, /export async function GET/);
   assert.doesNotMatch(macroContextRoute, /export async function POST/);
   assert.doesNotMatch(macroContextRoute, /OrderSend|executeOrder|brokerPassword|tradeLot/i);
-  assert.match(macroContextRoute, /checkRateLimit/);
+  assert.match(macroContextRoute, /consume_api_rate_limit/);
+  assert.match(macroContextRoute, /Retry-After/);
 });
 
 test('research notebook starts empty and defaults to insufficient evidence', () => {
