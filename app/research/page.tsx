@@ -1,11 +1,5 @@
-import type { Metadata } from 'next';
-import QuantResearchLab from '@/app/components/QuantResearchLab';
+import { redirect } from 'next/navigation';
 
-export const metadata: Metadata = {
-  title: 'QuantLync Research Lab',
-  description: 'Private multi-timeframe technical and statistical research with verified data provenance and risk diagnostics.',
-};
-
-export default function QuantResearchLabPage() {
-  return <QuantResearchLab />;
+export default function LegacyTechnicalResearchRoute() {
+  redirect('/');
 }
