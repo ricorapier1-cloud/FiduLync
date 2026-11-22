@@ -1,72 +1,28 @@
 import type { ProviderStatus } from '@/types/macro';
 
+/**
+ * Credential presence is configuration, not proof of provider availability.
+ * A provider becomes HEALTHY only after a real monitored ingestion result is
+ * persisted; this module deliberately makes no synthetic health claims.
+ */
 export function getProviderTelemetry(): ProviderStatus[] {
-  const now = new Date().toISOString();
-
-  const fredKey = process.env.FRED_API_KEY;
-  const finnhubKey = process.env.FINNHUB_API_KEY;
-  const upstashUrl = process.env.UPSTASH_REDIS_REST_URL;
-
-  return [
-    {
-      name: 'FRED (Federal Reserve Bank of St. Louis)',
-      endpoint: 'https://api.stlouisfed.org/fred/series/observations',
-      status: fredKey ? 'HEALTHY' : 'UNCONFIGURED',
-      latencyMs: fredKey ? 240 : null,
-      lastSuccessfulSyncUtc: now,
-      rateLimitRemaining: fredKey ? 118 : null,
-      circuitBreakerTripped: false,
-      freshness: fredKey ? 'LIVE' : 'LATEST PUBLISHED',
-    },
-    {
-      name: 'European Central Bank (ECB Data Portal)',
-      endpoint: 'https://data-api.ecb.europa.eu/service/data',
-      status: 'HEALTHY',
-      latencyMs: 185,
-      lastSuccessfulSyncUtc: now,
-      rateLimitRemaining: null,
-      circuitBreakerTripped: false,
-      freshness: 'LIVE',
-    },
-    {
-      name: 'CFTC Commitments of Traders (Socrata Open Data)',
-      endpoint: 'https://publicreporting.cftc.gov/resource/6dca-aqww.json',
-      status: 'HEALTHY',
-      latencyMs: 310,
-      lastSuccessfulSyncUtc: now,
-      rateLimitRemaining: null,
-      circuitBreakerTripped: false,
-      freshness: 'LATEST PUBLISHED',
-    },
-    {
-      name: 'Bank of Canada (Valet API)',
-      endpoint: 'https://www.bankofcanada.ca/valet/observations',
-      status: 'HEALTHY',
-      latencyMs: 290,
-      lastSuccessfulSyncUtc: now,
-      rateLimitRemaining: null,
-      circuitBreakerTripped: false,
-      freshness: 'LIVE',
-    },
-    {
-      name: 'Finnhub Live FX & Real-Time Quotes',
-      endpoint: 'https://finnhub.io/api/v1/quote',
-      status: finnhubKey ? 'HEALTHY' : 'UNCONFIGURED',
-      latencyMs: finnhubKey ? 120 : null,
-      lastSuccessfulSyncUtc: now,
-      rateLimitRemaining: finnhubKey ? 58 : null,
-      circuitBreakerTripped: false,
-      freshness: finnhubKey ? 'LIVE' : 'DELAYED',
-    },
-    {
-      name: 'Upstash Redis Distributed Telemetry Cache',
-      endpoint: upstashUrl ? 'Configured Rest Endpoint' : 'Local Memory Cache',
-      status: upstashUrl ? 'HEALTHY' : 'DEGRADED',
-      latencyMs: upstashUrl ? 45 : null,
-      lastSuccessfulSyncUtc: now,
-      rateLimitRemaining: null,
-      circuitBreakerTripped: false,
-      freshness: 'CACHED',
-    },
+  const providers = [
+    { name: 'FRED', endpoint: 'https://api.stlouisfed.org/fred/series/observations', configured: Boolean(process.env.FRED_API_KEY?.trim()) },
+    { name: 'ECB Data Portal', endpoint: 'https://data-api.ecb.europa.eu/service/data', configured: true },
+    { name: 'CFTC Commitments of Traders', endpoint: 'https://publicreporting.cftc.gov/resource/6dca-aqww.json', configured: true },
+    { name: 'Bank of Canada Valet', endpoint: 'https://www.bankofcanada.ca/valet/observations', configured: true },
+    { name: 'Finnhub Economic Calendar', endpoint: 'https://finnhub.io/api/v1/calendar/economic', configured: Boolean(process.env.FINNHUB_API_KEY?.trim()) },
+    { name: 'Upstash Redis', endpoint: 'Upstash REST', configured: Boolean(process.env.UPSTASH_REDIS_REST_URL?.trim() && process.env.UPSTASH_REDIS_REST_TOKEN?.trim()) },
   ];
+
+  return providers.map((provider) => ({
+    name: provider.name,
+    endpoint: provider.endpoint,
+    status: provider.configured ? 'DEGRADED' : 'UNCONFIGURED',
+    latencyMs: null,
+    lastSuccessfulSyncUtc: null,
+    rateLimitRemaining: null,
+    circuitBreakerTripped: false,
+    freshness: 'UNAVAILABLE',
+  }));
 }
