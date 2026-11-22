@@ -4,7 +4,7 @@ import { getSupabaseUrl } from '@/lib/serverConfig';
 
 export function getSupabaseAdmin(): SupabaseClient {
   const url = getSupabaseUrl();
-  const serviceRoleKey = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+  const serviceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || '').trim();
 
   if (!url || !serviceRoleKey) {
     throw new Error('Supabase server credentials are missing or invalid.');
