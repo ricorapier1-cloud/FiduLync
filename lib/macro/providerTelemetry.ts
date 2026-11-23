@@ -23,6 +23,8 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
   const eur = snapshot.currencies.find((item) => item.code === 'EUR');
   const gbp = snapshot.currencies.find((item) => item.code === 'GBP');
   const cad = snapshot.currencies.find((item) => item.code === 'CAD');
+  const sek = snapshot.currencies.find((item) => item.code === 'SEK');
+  const nok = snapshot.currencies.find((item) => item.code === 'NOK');
   const worldBankCurrencies = snapshot.currencies.filter((item) => item.inflationProvider === 'World Bank' && item.inflationObservationDate);
   const fredKeyPresent = Boolean(process.env.FRED_API_KEY?.trim());
   const fredStorageAllowed = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true';
@@ -45,6 +47,10 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
     snapshot.catalysts.some((item) => Date.parse(item.scheduledAt) >= Date.now() - 24 * 60 * 60 * 1000), finnhubConfigured);
   const bisCoverage = snapshot.currencies.filter((item) => item.policyRateProvider === 'BIS' && item.inflationProvider === 'BIS').length;
   const bis = feedStatus(bisCoverage >= 4, bisCoverage >= 4, true);
+  const riksbank = feedStatus(sek?.policyRateProvider === 'Sveriges Riksbank',
+    isFresh(sek?.policyRateObservationDate, 180), true);
+  const norgesBank = feedStatus(nok?.policyRateProvider === 'Norges Bank',
+    isFresh(nok?.policyRateObservationDate, 180), true);
   const worldBank = feedStatus(worldBankCurrencies.length > 0,
     worldBankCurrencies.some((item) => isFresh(item.inflationObservationDate, 365)), true);
 
@@ -56,6 +62,8 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
     { name: 'CFTC Commitments of Traders', endpoint: 'https://publicreporting.cftc.gov/resource/6dca-aqww.json', ...cftc, latencyMs: null, lastSuccessfulSyncUtc: cftc.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'BIS Statistics / G8 policy rates & CPI', endpoint: 'https://stats.bis.org/api/v2/data/dataflow/BIS', ...bis, latencyMs: null, lastSuccessfulSyncUtc: bis.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'World Bank CPI', endpoint: 'https://api.worldbank.org/v2/country', ...worldBank, latencyMs: null, lastSuccessfulSyncUtc: worldBank.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
+    { name: 'Sveriges Riksbank policy rate', endpoint: 'https://api.riksbank.se/swea/v1/Observations/Latest/SECBREPOEFF', ...riksbank, latencyMs: null, lastSuccessfulSyncUtc: riksbank.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
+    { name: 'Norges Bank policy rate', endpoint: 'https://data.norges-bank.no/api/data/IR/B.KPRA.SD.R', ...norgesBank, latencyMs: null, lastSuccessfulSyncUtc: norgesBank.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'US Bureau of Labor Statistics', endpoint: 'https://api.bls.gov/publicAPI/v2/timeseries/data/', ...bls, latencyMs: null, lastSuccessfulSyncUtc: bls.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'US Bureau of Economic Analysis', endpoint: 'https://apps.bea.gov/api/data/', ...bea, latencyMs: null, lastSuccessfulSyncUtc: bea.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'Economic Calendar', endpoint: 'Provider calendar adapter', ...calendar, latencyMs: null, lastSuccessfulSyncUtc: calendar.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
