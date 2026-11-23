@@ -15,16 +15,22 @@ export async function GET(req: Request) {
 
   try {
     const snapshot = await getMacroSnapshot(true);
-    const isFallbackOnly = snapshot.source === 'fallback';
-    const provenance = snapshot.source === 'provider' && snapshot.calendarSource === 'provider'
-      ? 'LIVE_PROVIDER'
-      : snapshot.source === 'partial'
-        ? 'PARTIAL_LIVE'
-        : 'REFERENCE_FALLBACK';
+    const hasLiveMacroData = snapshot.source === 'provider' || snapshot.source === 'partial';
+    const hasLiveCalendar = snapshot.calendarSource === 'provider';
+    const provenance = !hasLiveMacroData
+      ? 'REFERENCE_FALLBACK'
+      : hasLiveCalendar
+        ? 'LIVE_PROVIDER'
+        : 'LIVE_MACRO_REFERENCE_CALENDAR';
+    const status = !hasLiveMacroData
+      ? 'degraded'
+      : snapshot.source === 'partial' || !hasLiveCalendar
+        ? 'partial'
+        : 'success';
 
-    if (isFallbackOnly) {
+    if (!hasLiveMacroData) {
       return NextResponse.json({
-        status: 'degraded',
+        status,
         message: 'No live macro provider data was available; reference values were not represented as live.',
         source: snapshot.source,
         calendarSource: snapshot.calendarSource,
@@ -36,8 +42,10 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json({
-      status: 'success',
-      message: 'Macro telemetry refresh completed.',
+      status,
+      message: status === 'partial'
+        ? 'Live macro observations refreshed. One or more independent data domains remain reference-only or incomplete.'
+        : 'Live macro and economic-calendar feeds refreshed.',
       source: snapshot.source,
       calendarSource: snapshot.calendarSource,
       cotSource: snapshot.cotSource,
