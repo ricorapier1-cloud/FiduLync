@@ -6,6 +6,8 @@ import {
   getBankOfEnglandPolicyRate,
   getEcbMacroInputs,
   getWorldBankG10Inflation,
+  getRiksbankPolicyRate,
+  getNorgesBankPolicyRate,
 } from '@/lib/internationalMacro';
 import { getCachedData } from '@/lib/redisCache';
 import { persistMacroObservations } from '@/lib/macro/observationPersistence';
@@ -636,7 +638,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     asOf: new Date().toISOString(),
     source: cachedSnapshot.source === 'fallback' ? 'fallback' : 'partial',
   };
-  const [fredResult, finnhubResult, alphaResult, fmpResult, cotResult, frankfurterResult, calendarResult, ecbResult, bocResult, boeResult, worldBankResult, blsResult, beaResult, bisResult] = await Promise.allSettled([
+  const [fredResult, finnhubResult, alphaResult, fmpResult, cotResult, frankfurterResult, calendarResult, ecbResult, bocResult, boeResult, worldBankResult, blsResult, beaResult, bisResult, riksbankResult, norgesBankResult] = await Promise.allSettled([
     fredApiKey ? getFredUsdUpdates(fredApiKey) : Promise.resolve(null),
     finnhubApiKey ? getFinnhubCatalysts(finnhubApiKey) : Promise.resolve(null),
     alphaVantageKey ? getAlphaVantageUsdUpdates(alphaVantageKey) : Promise.resolve(null),
@@ -651,6 +653,8 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     process.env.BLS_API_KEY?.trim() ? getBlsUsdUpdates(process.env.BLS_API_KEY.trim()) : Promise.resolve(null),
     process.env.BEA_API_KEY?.trim() ? getBeaRealGdpYoY(process.env.BEA_API_KEY.trim()) : Promise.resolve(null),
     getBisG8MacroInputs(),
+    getRiksbankPolicyRate(),
+    getNorgesBankPolicyRate(),
   ]);
   let hasLiveData = false;
   if (fredResult.status === 'fulfilled' && isRecord(fredResult.value)) {
@@ -795,6 +799,30 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     }
   } else {
     console.warn('Bank of England official Bank Rate is unavailable:', boeResult.reason);
+  }
+  if (riksbankResult.status === 'fulfilled') {
+    const sek = snapshot.currencies.find((currency) => currency.code === 'SEK');
+    if (sek && isFiniteNumber(riksbankResult.value.value)) {
+      sek.policyRate = riksbankResult.value.value;
+      sek.policyRateSource = 'provider';
+      sek.policyRateObservationDate = riksbankResult.value.date;
+      sek.policyRateProvider = 'Sveriges Riksbank';
+      hasLiveData = true;
+    }
+  } else {
+    console.warn('Sveriges Riksbank policy rate is unavailable:', riksbankResult.reason);
+  }
+  if (norgesBankResult.status === 'fulfilled') {
+    const nok = snapshot.currencies.find((currency) => currency.code === 'NOK');
+    if (nok && isFiniteNumber(norgesBankResult.value.value)) {
+      nok.policyRate = norgesBankResult.value.value;
+      nok.policyRateSource = 'provider';
+      nok.policyRateObservationDate = norgesBankResult.value.date;
+      nok.policyRateProvider = 'Norges Bank';
+      hasLiveData = true;
+    }
+  } else {
+    console.warn('Norges Bank policy rate is unavailable:', norgesBankResult.reason);
   }
   if (worldBankResult.status === 'fulfilled') {
     for (const observation of worldBankResult.value) {
