@@ -581,7 +581,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
           <span className="macro-section-note mono">BONDS / COMMODITIES / VOLATILITY</span>
         </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
             { label: 'US 10Y benchmark', observation: null, source: 'No verified live adapter' },
             { label: 'US 2s10s curve', observation: null, source: 'No verified live adapter' },
@@ -592,7 +592,20 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
           ].map(({ label, observation, source }) => (
             <div className="macro-panel p-3" key={label}>
               <span className="text-[10px] font-mono text-slate-400 block">{label.toUpperCase()}</span>
-              <strong className="text-sm font-mono text-slate-100 block mt-1">{observation ? '
+              <strong className="text-sm font-mono text-slate-100 block mt-1">
+                {observation ? '$' + observation.valueUsdPerBarrel.toFixed(2) : 'UNAVAILABLE'}
+              </strong>
+              <small className="text-[10px] text-amber-400 font-mono">
+                {observation ? source + ' · OBS ' + observation.observationDate : source}
+              </small>
+            </div>
+          ))}
+        </div>
+        {snapshot.energyMarkets && (
+          <p className="text-[10px] text-slate-500 font-mono mt-2">
+            EIA Brent–WTI spot spread: ${snapshot.energyMarkets.brentWtiSpreadUsd.toFixed(2)}/barrel · Retrieved {snapshot.energyMarkets.wti.retrievedAtUtc} · Daily published spot observations, not intraday futures or live ticks.
+          </p>
+        )}
       </section>
 
       {/* COT Speculative Positioning */}
