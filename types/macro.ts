@@ -171,6 +171,9 @@ export type ProviderStatus = {
   freshness: DataFreshness;
 };
 
+export type EnergyMarketObservation = { valueUsdPerBarrel: number; observationDate: string; retrievedAtUtc: string; source: 'EIA'; freshness: 'LATEST PUBLISHED' | 'STALE' };
+export type EnergyMarkets = { wti: EnergyMarketObservation; brent: EnergyMarketObservation; brentWtiSpreadUsd: number };
+
 export type MacroSnapshot = {
   asOf: string;
   source: 'fallback' | 'provider' | 'partial';
@@ -184,6 +187,7 @@ export type MacroSnapshot = {
   regime?: MacroRegime;
   countryProfiles?: CountryFundamentalProfile[];
   providerStatus?: ProviderStatus[];
+  energyMarkets?: EnergyMarkets;
 };
 
 export type MarketQuote = {
