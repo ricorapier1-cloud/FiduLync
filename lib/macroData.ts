@@ -64,6 +64,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function isFreshProviderObservation(date: string | undefined, maxAgeDays: number): boolean {
+  if (!date) return false;
+  const timestamp = Date.parse(date);
+  const age = Date.now() - timestamp;
+  return Number.isFinite(timestamp) && age >= -5 * 60_000 && age <= maxAgeDays * 86_400_000;
+}
+
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
@@ -960,7 +967,10 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     const coreG10 = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'SEK', 'NOK'];
     const completeG10MacroCoverage = coreG10.every((code) => {
       const currency = snapshot.currencies.find((item) => item.code === code);
-      return currency?.policyRateSource === 'provider' && currency.inflationSource === 'provider';
+      return currency?.policyRateSource === 'provider'
+        && currency.inflationSource === 'provider'
+        && isFreshProviderObservation(currency.policyRateObservationDate, 180)
+        && isFreshProviderObservation(currency.inflationObservationDate, currency.code === 'AUD' ? 180 : 120);
     });
     // A live calendar, COT report or reference FX rate cannot make a partial
     // macro snapshot look fully provider-verified.
