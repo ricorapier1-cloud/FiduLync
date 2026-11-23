@@ -238,8 +238,8 @@ export async function getNorgesBankPolicyRate(): Promise<OfficialPolicyRate> {
       signal: AbortSignal.timeout(8_000),
     });
     if (!response.ok) throw new Error(`Norges Bank returned ${response.status} for its key policy rate.`);
-    const csv = (await response.text()).replace(/^\\uFEFF/, '').trim();
-    const lines = csv.split(/\\r?\\n/).filter(Boolean);
+    const csv = (await response.text()).replace(/^\uFEFF/, '').trim();
+    const lines = csv.split(/\r?\n/).filter(Boolean);
     if (lines.length < 2) throw new Error('Norges Bank returned no policy-rate rows.');
     const delimiter = lines[0].includes(';') ? ';' : ',';
     const headers = parseProviderCsvRow(lines[0], delimiter).map((header) => header.toUpperCase());
