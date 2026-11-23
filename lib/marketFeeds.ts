@@ -9,6 +9,10 @@ const finnhubSymbols = [
   ['EURUSD', 'OANDA:EUR_USD'],
   ['GBPUSD', 'OANDA:GBP_USD'],
   ['USDJPY', 'OANDA:USD_JPY'],
+  ['AUDUSD', 'OANDA:AUD_USD'],
+  ['USDCAD', 'OANDA:USD_CAD'],
+  ['USDCHF', 'OANDA:USD_CHF'],
+  ['NZDUSD', 'OANDA:NZD_USD'],
   ['XAUUSD', 'OANDA:XAU_USD'],
 ] as const;
 
@@ -45,26 +49,25 @@ async function getFinnhubQuotes(apiKey: string): Promise<MarketQuote[]> {
 }
 
 async function getFrankfurterQuotes(): Promise<MarketQuote[]> {
-  const response = await fetch('https://api.frankfurter.app/latest?from=EUR&to=USD,GBP,JPY', {
+  const response = await fetch('https://api.frankfurter.app/latest?from=USD&to=EUR,GBP,JPY,AUD,CAD,CHF,NZD', {
     cache: 'no-store',
     signal: AbortSignal.timeout(5_000),
   });
   if (!response.ok) throw new Error(`Frankfurter returned ${response.status}.`);
   const payload: unknown = await response.json();
   if (!isRecord(payload) || !isRecord(payload.rates)) throw new Error('Frankfurter rates payload is invalid.');
-  const usd = payload.rates.USD;
-  const gbp = payload.rates.GBP;
-  const jpy = payload.rates.JPY;
-  if (typeof usd !== 'number' || typeof gbp !== 'number' || typeof jpy !== 'number'
-    || ![usd, gbp, jpy].every((rate) => Number.isFinite(rate) && rate > 0)) {
-    throw new Error('Frankfurter did not return the required currency rates.');
-  }
+  const rates = payload.rates;
   const timestamp = typeof payload.date === 'string' ? `${payload.date}T16:00:00.000Z` : new Date().toISOString();
-  return [
-    { symbol: 'EURUSD', price: usd, changePercent: null, timestamp, source: 'frankfurter' },
-    { symbol: 'GBPUSD', price: usd / gbp, changePercent: null, timestamp, source: 'frankfurter' },
-    { symbol: 'USDJPY', price: jpy / usd, changePercent: null, timestamp, source: 'frankfurter' },
-  ];
+  const quotes: MarketQuote[] = [];
+  if (typeof rates.EUR === 'number' && rates.EUR > 0) quotes.push({ symbol: 'EURUSD', price: 1 / rates.EUR, changePercent: null, timestamp, source: 'frankfurter' });
+  if (typeof rates.GBP === 'number' && rates.GBP > 0) quotes.push({ symbol: 'GBPUSD', price: 1 / rates.GBP, changePercent: null, timestamp, source: 'frankfurter' });
+  if (typeof rates.JPY === 'number' && rates.JPY > 0) quotes.push({ symbol: 'USDJPY', price: rates.JPY, changePercent: null, timestamp, source: 'frankfurter' });
+  if (typeof rates.AUD === 'number' && rates.AUD > 0) quotes.push({ symbol: 'AUDUSD', price: 1 / rates.AUD, changePercent: null, timestamp, source: 'frankfurter' });
+  if (typeof rates.CAD === 'number' && rates.CAD > 0) quotes.push({ symbol: 'USDCAD', price: rates.CAD, changePercent: null, timestamp, source: 'frankfurter' });
+  if (typeof rates.CHF === 'number' && rates.CHF > 0) quotes.push({ symbol: 'USDCHF', price: rates.CHF, changePercent: null, timestamp, source: 'frankfurter' });
+  if (typeof rates.NZD === 'number' && rates.NZD > 0) quotes.push({ symbol: 'NZDUSD', price: 1 / rates.NZD, changePercent: null, timestamp, source: 'frankfurter' });
+  if (!quotes.length) throw new Error('Frankfurter returned no usable currency quotes.');
+  return quotes;
 }
 
 async function getExchangeRateQuotes(): Promise<MarketQuote[]> {

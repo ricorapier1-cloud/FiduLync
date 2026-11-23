@@ -181,3 +181,29 @@ test('CFTC COT retrieval is cached between weekly publications and tolerates slo
   assert.match(cftc, /6 \* 60 \* 60/);
   assert.match(cftc, /reportDate: latest\.date/);
 });
+
+test('fallback snapshot does not embed fabricated policy rates or inflation levels', () => {
+  const macroData = read('../lib/macroData.ts');
+  const fallbackFn = macroData.slice(macroData.indexOf('export function getFallbackSnapshot()'), macroData.indexOf('function mergeWithFallback'));
+  assert.doesNotMatch(fallbackFn, /policyRate: 3\.75|policyRate: 2\.15|policyRate: 4|policyRate: 0\.5|policyRate: 3\.6/);
+  assert.doesNotMatch(fallbackFn, /inflation: 2\.8|inflation: 2\.1|inflation: 3|inflation: 3\.4/);
+  assert.match(fallbackFn, /Awaiting Provider Feed/);
+});
+
+test('pair dossier does not fabricate fallback policy or inflation rates when missing', () => {
+  const dossier = read('../lib/macro/dossierEngine.ts');
+  assert.doesNotMatch(dossier, /\?\? 3\.5|\?\? 4\.75|\?\? 2\.5|\?\? 2\.8/);
+});
+
+test('market quote feeds include G8 currency pairs for Finnhub and Frankfurter', () => {
+  const marketFeeds = read('../lib/marketFeeds.ts');
+  for (const symbol of ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF', 'NZDUSD', 'XAUUSD']) {
+    assert.match(marketFeeds, new RegExp(symbol));
+  }
+});
+
+test('FRED and Finnhub API keys are directly utilized without artificial gate blockers', () => {
+  const macroData = read('../lib/macroData.ts');
+  assert.match(macroData, /process\.env\.FRED_API_KEY\?\.trim\(\)/);
+  assert.match(macroData, /process\.env\.FINNHUB_API_KEY\?\.trim\(\)/);
+});

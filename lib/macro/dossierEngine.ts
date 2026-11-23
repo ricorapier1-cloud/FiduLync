@@ -69,12 +69,12 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
   else if (essentialEvidenceVerified) confidence = 'LOW';
 
   // Rate differentials
-  const basePolicy = isGold ? 0.0 : (baseCcy?.policyRate ?? 3.5);
-  const quotePolicy = quoteCcy?.policyRate ?? 4.75;
+  const basePolicy = isGold ? 0.0 : (baseCcy?.policyRate ?? 0);
+  const quotePolicy = quoteCcy?.policyRate ?? 0;
   const policyDiffBps = essentialEvidenceVerified ? Math.round((basePolicy - quotePolicy) * 100) : 0;
 
-  const baseInflation = isGold ? 0.0 : (baseCcy?.inflation ?? 2.5);
-  const quoteInflation = quoteCcy?.inflation ?? 2.8;
+  const baseInflation = isGold ? 0.0 : (baseCcy?.inflation ?? 0);
+  const quoteInflation = quoteCcy?.inflation ?? 0;
   const baseRealPolicyRate = isGold ? -crossAsset.usTenYearRealYield : (basePolicy - baseInflation);
   const quoteRealPolicyRate = quotePolicy - quoteInflation;
   const realPolicyRateDiffBps = essentialEvidenceVerified ? Math.round((baseRealPolicyRate - quoteRealPolicyRate) * 100) : 0;
@@ -87,9 +87,7 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
     ? Math.round((base2Y - quote2Y) * 100)
     : null;
 
-  const baseCotPct = baseCot?.percentile ?? 50;
-  const quoteCotPct = quoteCot?.percentile ?? 50;
-  const cotPercentileDiff = baseCot && quoteCot ? Math.round(baseCotPct - quoteCotPct) : 0;
+  const cotPercentileDiff = baseCot && quoteCot ? Math.round(baseCot.percentile - quoteCot.percentile) : 0;
 
   // Directional scoring uses only sourced policy, inflation, sovereign-yield and COT observations.
   // Country-profile baseline assumptions and hardcoded cross-asset constants are excluded.
@@ -143,10 +141,10 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
     }
   }
 
-  if (baseCotPct > 75) {
-    contradicting.push(`Speculative positioning on ${base} is crowded (${baseCotPct}%ile); vulnerable to unwind.`);
-  } else if (baseCotPct < 25) {
-    supporting.push(`Speculative short positioning on ${base} is exhausted (${baseCotPct}%ile); short-covering potential.`);
+  if (baseCot && baseCot.percentile > 75) {
+    contradicting.push(`Speculative positioning on ${base} is crowded (${baseCot.percentile}%ile); vulnerable to unwind.`);
+  } else if (baseCot && baseCot.percentile < 25) {
+    supporting.push(`Speculative short positioning on ${base} is exhausted (${baseCot.percentile}%ile); short-covering potential.`);
   }
 
   // Cross-asset confirmation

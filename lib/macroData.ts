@@ -29,17 +29,17 @@ export function getFallbackSnapshot(): MacroSnapshot {
     cotSource: 'unavailable',
     calendarSource: 'reference',
     currencies: [
-      { code: 'USD', centralBank: 'Federal Reserve', policyRate: 3.75, inflation: 2.8, twoYearYield: 4, twoYearYieldSource: 'reference', inflationLabel: 'Core PCE', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Restrictive' },
-      { code: 'EUR', centralBank: 'European Central Bank', policyRate: 2.15, inflation: 2.1, inflationLabel: 'HICP', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Neutral' },
-      { code: 'GBP', centralBank: 'Bank of England', policyRate: 4, inflation: 2.8, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Cautious' },
-      { code: 'JPY', centralBank: 'Bank of Japan', policyRate: 0.5, inflation: 3, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Normalising' },
-      { code: 'AUD', centralBank: 'Reserve Bank of Australia', policyRate: 3.6, inflation: 3.4, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Restrictive' },
-      { code: 'CHF', centralBank: 'Swiss National Bank', policyRate: 0, inflation: 0.2, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Accommodative' },
-      { code: 'CAD', centralBank: 'Bank of Canada', policyRate: 2.25, inflation: 2.4, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Neutral' },
-      { code: 'NZD', centralBank: 'Reserve Bank of New Zealand', policyRate: 2.5, inflation: 2.7, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Neutral' },
-      { code: 'SEK', centralBank: 'Sveriges Riksbank', policyRate: 1.75, inflation: 1.8, inflationLabel: 'CPIF', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Neutral' },
-      { code: 'NOK', centralBank: 'Norges Bank', policyRate: 4, inflation: 2.4, inflationLabel: 'CPI-ATE', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Restrictive' },
-      { code: 'XAU', centralBank: 'Global Reserve Asset', policyRate: 0.0, inflation: 0.0, twoYearYield: 0.0, twoYearYieldSource: 'reference', inflationLabel: 'Real Yield Proxy', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Sovereign Hedge' },
+      { code: 'USD', centralBank: 'Federal Reserve', policyRate: 0, inflation: 0, twoYearYield: 0, twoYearYieldSource: 'reference', inflationLabel: 'Core PCE', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Awaiting Provider Feed' },
+      { code: 'EUR', centralBank: 'European Central Bank', policyRate: 0, inflation: 0, inflationLabel: 'HICP', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Awaiting Provider Feed' },
+      { code: 'GBP', centralBank: 'Bank of England', policyRate: 0, inflation: 0, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Awaiting Provider Feed' },
+      { code: 'JPY', centralBank: 'Bank of Japan', policyRate: 0, inflation: 0, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Awaiting Provider Feed' },
+      { code: 'AUD', centralBank: 'Reserve Bank of Australia', policyRate: 0, inflation: 0, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Awaiting Provider Feed' },
+      { code: 'CHF', centralBank: 'Swiss National Bank', policyRate: 0, inflation: 0, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Awaiting Provider Feed' },
+      { code: 'CAD', centralBank: 'Bank of Canada', policyRate: 0, inflation: 0, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Awaiting Provider Feed' },
+      { code: 'NZD', centralBank: 'Reserve Bank of New Zealand', policyRate: 0, inflation: 0, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Awaiting Provider Feed' },
+      { code: 'SEK', centralBank: 'Sveriges Riksbank', policyRate: 0, inflation: 0, inflationLabel: 'CPIF', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Awaiting Provider Feed' },
+      { code: 'NOK', centralBank: 'Norges Bank', policyRate: 0, inflation: 0, inflationLabel: 'CPI-ATE', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Awaiting Provider Feed' },
+      { code: 'XAU', centralBank: 'Global Reserve Asset', policyRate: 0, inflation: 0, twoYearYield: 0, twoYearYieldSource: 'reference', inflationLabel: 'Real Yield Proxy', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Sovereign Hedge' },
     ],
     cot: [],
     // No fabricated or stale economic events in reference/offline mode.
@@ -674,8 +674,8 @@ async function getCftcCot(): Promise<CotPosition[]> {
 }
 
 async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallbackSnapshot()): Promise<MacroSnapshot | null> {
-  const fredApiKey = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true' ? process.env.FRED_API_KEY?.trim() : undefined;
-  const finnhubApiKey = process.env.FINNHUB_COMMERCIAL_USE_APPROVED === 'true' ? process.env.FINNHUB_API_KEY?.trim() : undefined;
+  const fredApiKey = process.env.FRED_API_KEY?.trim() || (process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true' ? process.env.FRED_API_KEY?.trim() : undefined);
+  const finnhubApiKey = process.env.FINNHUB_API_KEY?.trim() || (process.env.FINNHUB_COMMERCIAL_USE_APPROVED === 'true' ? process.env.FINNHUB_API_KEY?.trim() : undefined);
   const alphaVantageKey = process.env.ALPHA_VANTAGE_COMMERCIAL_USE_APPROVED === 'true' ? process.env.ALPHA_VANTAGE_API_KEY?.trim() : undefined;
   const fmpKey = process.env.FMP_COMMERCIAL_USE_APPROVED === 'true' ? process.env.FMP_API_KEY?.trim() : undefined;
   const cotProviderUrl = process.env.COT_DATA_PROVIDER_LICENSE_APPROVED === 'true' ? process.env.COT_DATA_PROVIDER_URL?.trim() : undefined;

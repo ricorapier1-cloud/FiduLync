@@ -191,7 +191,7 @@ export type MacroSnapshot = {
 };
 
 export type MarketQuote = {
-  symbol: 'EURUSD' | 'GBPUSD' | 'USDJPY' | 'XAUUSD';
+  symbol: 'EURUSD' | 'GBPUSD' | 'USDJPY' | 'AUDUSD' | 'USDCAD' | 'USDCHF' | 'NZDUSD' | 'XAUUSD';
   price: number;
   changePercent: number | null;
   timestamp: string;

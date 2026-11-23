@@ -386,7 +386,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
                         </>
                       )}
                     </td>
-                    <td className={`mono ${realRate >= 0 ? 'macro-positive' : 'macro-negative'}`}>
+                    <td className={`mono ${realRate === null ? 'text-slate-500' : realRate >= 0 ? 'macro-positive' : 'macro-negative'}`}>
                       {realRate === null ? '—' : `${realRate > 0 ? '+' : ''}${formatRate(realRate)}`}
                     </td>
                     <td><span className="macro-stance">{currency.stance}</span></td>
