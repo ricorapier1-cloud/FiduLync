@@ -41,6 +41,8 @@ function sourceUrl(provider: string): string {
     'Bank of England': 'https://www.bankofengland.co.uk/boeapps/database/',
     'Bank of Canada': 'https://www.bankofcanada.ca/valet/',
     'World Bank': 'https://data.worldbank.org/',
+    'Sveriges Riksbank': 'https://api.riksbank.se/swea/v1/Observations/Latest/SECBREPOEFF',
+    'Norges Bank': 'https://data.norges-bank.no/api/data/IR/B.KPRA.SD.R',
     CFTC: 'https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm',
   };
   return urls[provider] ?? 'https://www.cftc.gov/';
