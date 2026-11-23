@@ -329,7 +329,7 @@ async function getBisG8MacroInputs() {
   ]);
   const currencyMap: Record<string, string> = {
     US: 'USD', XM: 'EUR', GB: 'GBP', JP: 'JPY',
-    CH: 'CHF', CA: 'CAD', AU: 'AUD', NZ: 'NZD',
+    CH: 'CHF', CA: 'CAD', AU: 'AUD', NZ: 'NZD', SE: 'SEK', NO: 'NOK',
   };
   const policies = [
     ...(dailyResult.status === 'fulfilled' ? dailyResult.value : []),
