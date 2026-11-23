@@ -162,7 +162,7 @@ async function getEiaOilSeries(seriesId: 'PET.RWTC.D' | 'PET.RBRTE.D', apiKey: s
   const observations = payload.response.data.flatMap((row): EiaOilObservation[] => {
     if (!isRecord(row) || typeof row.period !== 'string') return [];
     const value = typeof row.value === 'number' ? row.value : Number(row.value);
-    return /^\\d{4}-\\d{2}-\\d{2}$/.test(row.period) && Number.isFinite(value) && value > 0 ? [{ period: row.period, value }] : [];
+    return /^\d{4}-\d{2}-\d{2}$/.test(row.period) && Number.isFinite(value) && value > 0 ? [{ period: row.period, value }] : [];
   }).sort((a, b) => b.period.localeCompare(a.period));
   const latest = observations[0];
   if (!latest) throw new Error('EIA returned no usable daily observation for ' + seriesId + '.');
