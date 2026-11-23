@@ -8,6 +8,7 @@ import {
   getWorldBankG10Inflation,
 } from '@/lib/internationalMacro';
 import { getCachedData } from '@/lib/redisCache';
+import { persistMacroObservations } from '@/lib/macro/observationPersistence';
 
 export const EMPTY_SNAPSHOT: MacroSnapshot = {
   asOf: '',
@@ -675,6 +676,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
       if (isFiniteNumber(fredResult.value.policyRate)) {
         usd.policyRate = fredResult.value.policyRate;
         usd.policyRateSource = 'provider';
+        usd.policyRateProvider = 'FRED';
         usd.policyRateObservationDate = typeof fredResult.value.policyRateObservationDate === 'string' ? fredResult.value.policyRateObservationDate : undefined;
         hasLiveData = true;
       }
@@ -990,6 +992,7 @@ async function persistMacroSnapshot(snapshot: MacroSnapshot): Promise<void> {
       updated_at: new Date().toISOString(),
     }, { onConflict: 'snapshot_key' });
     if (error) throw error;
+    await persistMacroObservations(snapshot);
   } catch (error) {
     // Persistence failure must not turn a valid live provider response into a failed refresh.
     console.error('Macro snapshot persistence failed:', error);
