@@ -176,3 +176,82 @@ export async function getWorldBankG10Inflation(): Promise<WorldBankInflation[]> 
     return [];
   });
 }
+
+
+export type OfficialPolicyRate = { value: number; date: string };
+
+function parseProviderCsvRow(line: string, delimiter: string): string[] {
+  const cells: string[] = [];
+  let cell = '';
+  let quoted = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+    if (character === '"' && quoted && line[index + 1] === '"') {
+      cell += '"';
+      index += 1;
+    } else if (character === '"') {
+      quoted = !quoted;
+    } else if (character === delimiter && !quoted) {
+      cells.push(cell.trim());
+      cell = '';
+    } else {
+      cell += character;
+    }
+  }
+  cells.push(cell.trim());
+  return cells;
+}
+
+export async function getRiksbankPolicyRate(): Promise<OfficialPolicyRate> {
+  return getCachedData('macro:riksbank:policy-rate', async () => {
+    const response = await fetch('https://api.riksbank.se/swea/v1/Observations/Latest/SECBREPOEFF', {
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!response.ok) throw new Error(`Sveriges Riksbank returned ${response.status} for SECBREPOEFF.`);
+    const payload: unknown = await response.json();
+    const rows = Array.isArray(payload) ? payload : isRecord(payload) && Array.isArray(payload.observations) ? payload.observations : [];
+    const latest = rows.find((item) => isRecord(item)
+      && typeof item.date === 'string'
+      && (typeof item.value === 'number' || typeof item.value === 'string'));
+    if (!isRecord(latest) || typeof latest.date !== 'string') {
+      throw new Error('Sveriges Riksbank returned no usable policy-rate observation.');
+    }
+    const value = Number(latest.value);
+    if (!Number.isFinite(value) || !Number.isFinite(Date.parse(latest.date))) {
+      throw new Error('Sveriges Riksbank policy-rate observation failed validation.');
+    }
+    return { value, date: latest.date };
+  }, 3_600);
+}
+
+export async function getNorgesBankPolicyRate(): Promise<OfficialPolicyRate> {
+  return getCachedData('macro:norges-bank:policy-rate', async () => {
+    const url = new URL('https://data.norges-bank.no/api/data/IR/B.KPRA.SD.R');
+    url.searchParams.set('format', 'csv');
+    url.searchParams.set('lastNObservations', '1');
+    url.searchParams.set('locale', 'en');
+    const response = await fetch(url, {
+      cache: 'no-store',
+      headers: { Accept: 'text/csv' },
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!response.ok) throw new Error(`Norges Bank returned ${response.status} for its key policy rate.`);
+    const csv = (await response.text()).replace(/^\\uFEFF/, '').trim();
+    const lines = csv.split(/\\r?\\n/).filter(Boolean);
+    if (lines.length < 2) throw new Error('Norges Bank returned no policy-rate rows.');
+    const delimiter = lines[0].includes(';') ? ';' : ',';
+    const headers = parseProviderCsvRow(lines[0], delimiter).map((header) => header.toUpperCase());
+    const dateIndex = headers.indexOf('TIME_PERIOD');
+    const valueIndex = headers.indexOf('OBS_VALUE');
+    if (dateIndex < 0 || valueIndex < 0) throw new Error('Norges Bank CSV is missing TIME_PERIOD or OBS_VALUE.');
+    for (const line of lines.slice(1).reverse()) {
+      const cells = parseProviderCsvRow(line, delimiter);
+      const date = cells[dateIndex];
+      const value = Number(cells[valueIndex]);
+      if (date && Number.isFinite(Date.parse(date)) && Number.isFinite(value)) return { value, date };
+    }
+    throw new Error('Norges Bank returned no valid key policy-rate observation.');
+  }, 3_600);
+}
