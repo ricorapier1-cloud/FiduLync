@@ -126,3 +126,10 @@ test('G10 Nordic policy rates use official no-key central-bank sources', () => {
   assert.match(telemetry, /Sveriges Riksbank policy rate/);
   assert.match(telemetry, /Norges Bank policy rate/);
 });
+
+
+test('complete G10 status requires fresh provider observations, not annual historical fallbacks', () => {
+  const macroData = read('../lib/macroData.ts');
+  assert.match(macroData, /isFreshProviderObservation\(currency\.policyRateObservationDate, 180\)/);
+  assert.match(macroData, /isFreshProviderObservation\(currency\.inflationObservationDate, currency\.code === 'AUD' \? 180 : 120\)/);
+});
