@@ -706,7 +706,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     eiaApiKey ? getEiaEnergyMarkets(eiaApiKey) : Promise.resolve(null),
   ]);
   let hasLiveData = false;
-  if (eiaResult.status === 'fulfilled' && eiaResult.value) { snapshot.energyMarkets = eiaResult.value; hasLiveData = true; }
+  if (eiaResult.status === 'fulfilled' && eiaResult.value) { snapshot.energyMarkets = eiaResult.value; }
   else if (eiaResult.status === 'rejected') console.warn('EIA crude oil spot observations are unavailable:', eiaResult.reason);
   if (fredResult.status === 'fulfilled' && isRecord(fredResult.value)) {
     let usd = snapshot.currencies.find((currency) => currency.code === 'USD');
