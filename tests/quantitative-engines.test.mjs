@@ -172,3 +172,12 @@ test('EIA crude feed is reported independently and cannot promote macro snapshot
   assert.doesNotMatch(macroData, /snapshot\.energyMarkets = eiaResult\.value; hasLiveData = true/);
   assert.match(telemetry, /U\.S\. Energy Information Administration \(WTI \/ Brent\)/);
 });
+
+test('CFTC COT retrieval is cached between weekly publications and tolerates slower official responses', () => {
+  const macroData = read('../lib/macroData.ts');
+  const cftc = macroData.slice(macroData.indexOf('async function getCftcCot'), macroData.indexOf('async function getLiveProviderSnapshot'));
+  assert.match(cftc, /getCachedData\('macro:cftc-cot-v1'/);
+  assert.match(cftc, /AbortSignal\.timeout\(20_000\)/);
+  assert.match(cftc, /6 \* 60 \* 60/);
+  assert.match(cftc, /reportDate: latest\.date/);
+});
