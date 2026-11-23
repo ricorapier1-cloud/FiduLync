@@ -127,7 +127,7 @@ function isCatalyst(value: unknown): value is EconomicCatalyst {
     && (typeof value.actual === 'string' || value.actual === null);
 }
 
-function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies' | 'cot' | 'catalysts'> | null {
+function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies' | 'cot' | 'catalysts' | 'energyMarkets'> | null {
   if (!isRecord(value)
     || !Array.isArray(value.currencies)
     || !Array.isArray(value.cot)
@@ -138,6 +138,46 @@ function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies'
     currencies: value.currencies,
     cot: value.cot,
     catalysts: value.catalysts,
+    ...(isRecord(value.energyMarkets) && isRecord(value.energyMarkets.wti) && isRecord(value.energyMarkets.brent)
+      && isFiniteNumber(value.energyMarkets.wti.valueUsdPerBarrel) && isFiniteNumber(value.energyMarkets.brent.valueUsdPerBarrel)
+      && typeof value.energyMarkets.wti.observationDate === 'string' && typeof value.energyMarkets.brent.observationDate === 'string'
+      && value.energyMarkets.wti.source === 'EIA' && value.energyMarkets.brent.source === 'EIA'
+      && isFiniteNumber(value.energyMarkets.brentWtiSpreadUsd)
+      ? { energyMarkets: value.energyMarkets as unknown as MacroSnapshot['energyMarkets'] } : {}),
+  };
+}
+
+type EiaOilObservation = { period: string; value: number };
+
+async function getEiaOilSeries(seriesId: 'PET.RWTC.D' | 'PET.RBRTE.D', apiKey: string): Promise<EiaOilObservation> {
+  const url = new URL('https://api.eia.gov/v2/seriesid/' + seriesId);
+  url.searchParams.set('api_key', apiKey);
+  url.searchParams.set('length', '30');
+  url.searchParams.set('sort[0][column]', 'period');
+  url.searchParams.set('sort[0][direction]', 'desc');
+  const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(10_000) });
+  if (!response.ok) throw new Error('EIA returned ' + response.status + ' for ' + seriesId + '.');
+  const payload: unknown = await response.json();
+  if (!isRecord(payload) || !isRecord(payload.response) || !Array.isArray(payload.response.data)) throw new Error('EIA returned an invalid ' + seriesId + ' response.');
+  const observations = payload.response.data.flatMap((row): EiaOilObservation[] => {
+    if (!isRecord(row) || typeof row.period !== 'string') return [];
+    const value = typeof row.value === 'number' ? row.value : Number(row.value);
+    return /^\\d{4}-\\d{2}-\\d{2}$/.test(row.period) && Number.isFinite(value) && value > 0 ? [{ period: row.period, value }] : [];
+  }).sort((a, b) => b.period.localeCompare(a.period));
+  const latest = observations[0];
+  if (!latest) throw new Error('EIA returned no usable daily observation for ' + seriesId + '.');
+  const ageDays = (Date.now() - Date.parse(latest.period)) / 86_400_000;
+  if (!Number.isFinite(ageDays) || ageDays < -1 || ageDays > 10) throw new Error('EIA latest observation is stale or invalid for ' + seriesId + ': ' + latest.period);
+  return latest;
+}
+
+async function getEiaEnergyMarkets(apiKey: string): Promise<NonNullable<MacroSnapshot['energyMarkets']>> {
+  const results = await Promise.all([getEiaOilSeries('PET.RWTC.D', apiKey), getEiaOilSeries('PET.RBRTE.D', apiKey)]);
+  const wti = results[0]; const brent = results[1]; const retrievedAtUtc = new Date().toISOString();
+  return {
+    wti: { valueUsdPerBarrel: wti.value, observationDate: wti.period, retrievedAtUtc, source: 'EIA', freshness: 'LATEST PUBLISHED' },
+    brent: { valueUsdPerBarrel: brent.value, observationDate: brent.period, retrievedAtUtc, source: 'EIA', freshness: 'LATEST PUBLISHED' },
+    brentWtiSpreadUsd: Number((brent.value - wti.value).toFixed(2)),
   };
 }
 
@@ -636,6 +676,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
   const fmpKey = process.env.FMP_COMMERCIAL_USE_APPROVED === 'true' ? process.env.FMP_API_KEY?.trim() : undefined;
   const cotProviderUrl = process.env.COT_DATA_PROVIDER_LICENSE_APPROVED === 'true' ? process.env.COT_DATA_PROVIDER_URL?.trim() : undefined;
   const cotProviderToken = process.env.COT_DATA_PROVIDER_TOKEN?.trim();
+  const eiaApiKey = process.env.EIA_API_KEY?.trim();
 
   const snapshot: MacroSnapshot = {
     ...cachedSnapshot,
@@ -645,7 +686,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     asOf: new Date().toISOString(),
     source: cachedSnapshot.source === 'fallback' ? 'fallback' : 'partial',
   };
-  const [fredResult, finnhubResult, alphaResult, fmpResult, cotResult, frankfurterResult, calendarResult, ecbResult, bocResult, boeResult, worldBankResult, blsResult, beaResult, bisResult, riksbankResult, norgesBankResult] = await Promise.allSettled([
+  const [fredResult, finnhubResult, alphaResult, fmpResult, cotResult, frankfurterResult, calendarResult, ecbResult, bocResult, boeResult, worldBankResult, blsResult, beaResult, bisResult, riksbankResult, norgesBankResult, eiaResult] = await Promise.allSettled([
     fredApiKey ? getFredUsdUpdates(fredApiKey) : Promise.resolve(null),
     finnhubApiKey ? getFinnhubCatalysts(finnhubApiKey) : Promise.resolve(null),
     alphaVantageKey ? getAlphaVantageUsdUpdates(alphaVantageKey) : Promise.resolve(null),
@@ -662,8 +703,11 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     getBisG8MacroInputs(),
     getRiksbankPolicyRate(),
     getNorgesBankPolicyRate(),
+    eiaApiKey ? getEiaEnergyMarkets(eiaApiKey) : Promise.resolve(null),
   ]);
   let hasLiveData = false;
+  if (eiaResult.status === 'fulfilled' && eiaResult.value) { snapshot.energyMarkets = eiaResult.value; hasLiveData = true; }
+  else if (eiaResult.status === 'rejected') console.warn('EIA crude oil spot observations are unavailable:', eiaResult.reason);
   if (fredResult.status === 'fulfilled' && isRecord(fredResult.value)) {
     let usd = snapshot.currencies.find((currency) => currency.code === 'USD');
     const policyRate = isFiniteNumber(fredResult.value.policyRate)
@@ -1008,6 +1052,7 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
           : 'fallback',
       cotSource: data.payload.cotSource === 'provider' ? 'provider' : 'unavailable',
       calendarSource: data.payload.calendarSource === 'provider' ? 'provider' : 'reference',
+      ...(parsed.energyMarkets ? { energyMarkets: parsed.energyMarkets } : {}),
       asOf: data.refreshed_at,
       ...(ecbRates && Object.keys(ecbRates).length > 0 ? { ecbRates } : {}),
     };
