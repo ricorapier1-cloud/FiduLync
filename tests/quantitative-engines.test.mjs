@@ -150,3 +150,17 @@ test('cron provenance distinguishes live macro data from a reference-only econom
   assert.match(cron, /status === 'partial'/);
   assert.doesNotMatch(cron, /snapshot\.source === 'partial'\s*\?\s*'PARTIAL_LIVE'/);
 });
+
+test('EIA adapter validates daily WTI and Brent observations and preserves published dates', () => {
+  const macroData = read('../lib/macroData.ts');
+  const macroTypes = read('../types/macro.ts');
+  const dashboard = read('../app/components/MacroDashboard.tsx');
+  assert.match(macroData, /process\.env\.EIA_API_KEY/);
+  assert.match(macroData, /PET\.RWTC\.D/);
+  assert.match(macroData, /PET\.RBRTE\.D/);
+  assert.match(macroData, /EIA latest observation is stale or invalid/);
+  assert.match(macroData, /observationDate: wti\.period/);
+  assert.match(macroTypes, /energyMarkets\?: EnergyMarkets/);
+  assert.match(dashboard, /EIA Brent–WTI spot spread/);
+  assert.match(dashboard, /not intraday futures or live ticks/);
+});
