@@ -164,3 +164,11 @@ test('EIA adapter validates daily WTI and Brent observations and preserves publi
   assert.match(dashboard, /EIA Brent–WTI spot spread/);
   assert.match(dashboard, /not intraday futures or live ticks/);
 });
+
+test('EIA crude feed is reported independently and cannot promote macro snapshot provenance', () => {
+  const macroData = read('../lib/macroData.ts');
+  const telemetry = read('../lib/macro/providerTelemetry.ts');
+  assert.match(macroData, /snapshot\.energyMarkets = eiaResult\.value;\s*\}/);
+  assert.doesNotMatch(macroData, /snapshot\.energyMarkets = eiaResult\.value; hasLiveData = true/);
+  assert.match(telemetry, /U\.S\. Energy Information Administration \(WTI \/ Brent\)/);
+});
