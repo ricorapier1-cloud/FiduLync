@@ -140,3 +140,13 @@ test('BIS monthly CPI adapter maps Sweden and Norway when official observations 
   assert.match(macroData, /SE: 'SEK', NO: 'NOK'/);
   assert.match(macroData, /WS_LONG_CPI/);
 });
+
+
+test('cron provenance distinguishes live macro data from a reference-only economic calendar', () => {
+  const cron = read('../app/api/cron/sync-macro/route.ts');
+  assert.match(cron, /LIVE_MACRO_REFERENCE_CALENDAR/);
+  assert.match(cron, /hasLiveMacroData/);
+  assert.match(cron, /hasLiveCalendar/);
+  assert.match(cron, /status === 'partial'/);
+  assert.doesNotMatch(cron, /snapshot\.source === 'partial'\s*\?\s*'PARTIAL_LIVE'/);
+});
