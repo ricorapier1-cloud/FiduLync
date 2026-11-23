@@ -53,6 +53,9 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
     isFresh(nok?.policyRateObservationDate, 180), true);
   const worldBank = feedStatus(worldBankCurrencies.length > 0,
     worldBankCurrencies.some((item) => isFresh(item.inflationObservationDate, 365)), true);
+  const eiaConfigured = Boolean(process.env.EIA_API_KEY?.trim());
+  const eia = feedStatus(Boolean(snapshot.energyMarkets),
+    Boolean(snapshot.energyMarkets && isFresh(snapshot.energyMarkets.wti.observationDate, 10) && isFresh(snapshot.energyMarkets.brent.observationDate, 10)), eiaConfigured);
 
   return [
     { name: 'FRED / US macro (storage permission gated)', endpoint: 'Disabled until data storage permission is confirmed', ...fred, latencyMs: null, lastSuccessfulSyncUtc: fred.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
@@ -62,6 +65,7 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
     { name: 'CFTC Commitments of Traders', endpoint: 'https://publicreporting.cftc.gov/resource/6dca-aqww.json', ...cftc, latencyMs: null, lastSuccessfulSyncUtc: cftc.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'BIS Statistics / G8 policy rates & CPI', endpoint: 'https://stats.bis.org/api/v2/data/dataflow/BIS', ...bis, latencyMs: null, lastSuccessfulSyncUtc: bis.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'World Bank CPI', endpoint: 'https://api.worldbank.org/v2/country', ...worldBank, latencyMs: null, lastSuccessfulSyncUtc: worldBank.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
+    { name: 'U.S. Energy Information Administration (WTI / Brent)', endpoint: 'https://api.eia.gov/v2/seriesid/', ...eia, latencyMs: null, lastSuccessfulSyncUtc: snapshot.energyMarkets?.wti.retrievedAtUtc ?? null, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'Sveriges Riksbank policy rate', endpoint: 'https://api.riksbank.se/swea/v1/Observations/Latest/SECBREPOEFF', ...riksbank, latencyMs: null, lastSuccessfulSyncUtc: riksbank.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'Norges Bank policy rate', endpoint: 'https://data.norges-bank.no/api/data/IR/B.KPRA.SD.R', ...norgesBank, latencyMs: null, lastSuccessfulSyncUtc: norgesBank.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'US Bureau of Labor Statistics', endpoint: 'https://api.bls.gov/publicAPI/v2/timeseries/data/', ...bls, latencyMs: null, lastSuccessfulSyncUtc: bls.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
