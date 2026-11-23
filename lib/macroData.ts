@@ -589,6 +589,9 @@ async function getCotProvider(urlValue: string, token?: string): Promise<CotPosi
 }
 
 async function getCftcCot(): Promise<CotPosition[]> {
+  // COT is a weekly publication. Cache successful provider responses for six hours
+  // to reduce repeated upstream load and smooth over intermittent CFTC latency.
+  return getCachedData('macro:cftc-cot-v1', async () => {
   const providerUrl = new URL('https://publicreporting.cftc.gov/resource/6dca-aqww.json');
   const cutoff = new Date(Date.now() - 3 * 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const markets = [
@@ -615,7 +618,7 @@ async function getCftcCot(): Promise<CotPosition[]> {
 
   const response = await fetch(providerUrl, {
     cache: 'no-store',
-    signal: AbortSignal.timeout(8_000),
+    signal: AbortSignal.timeout(20_000),
   });
   if (!response.ok) throw new Error(`CFTC returned ${response.status}.`);
   const payload: unknown = await response.json();
@@ -667,6 +670,7 @@ async function getCftcCot(): Promise<CotPosition[]> {
   });
   if (!positions.length) throw new Error('CFTC returned no supported currency or gold positions.');
   return positions;
+  }, 6 * 60 * 60);
 }
 
 async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallbackSnapshot()): Promise<MacroSnapshot | null> {
