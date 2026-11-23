@@ -102,3 +102,27 @@ test('provider health is attributed to the actual source, not any provider flag'
   assert.match(telemetry, /policyRateProvider === 'Bank of Canada'/);
   assert.match(telemetry, /BIS Statistics \/ G8 policy rates & CPI/);
 });
+
+
+test('normalized macro observations retain source, period, provenance and honest unknown release dates', () => {
+  const persistence = read('../lib/macro/observationPersistence.ts');
+  const macroData = read('../lib/macroData.ts');
+  assert.match(persistence, /from\('macro_observations'\)/);
+  assert.match(persistence, /onConflict: 'source_hash'/);
+  assert.match(persistence, /source_hash/);
+  assert.match(persistence, /released_at: null/);
+  assert.match(persistence, /observation_period/);
+  assert.match(macroData, /persistMacroObservations\(snapshot\)/);
+});
+
+test('G10 Nordic policy rates use official no-key central-bank sources', () => {
+  const international = read('../lib/internationalMacro.ts');
+  const macroData = read('../lib/macroData.ts');
+  const telemetry = read('../lib/macro/providerTelemetry.ts');
+  assert.match(international, /api\.riksbank\.se\/swea\/v1\/Observations\/Latest\/SECBREPOEFF/);
+  assert.match(international, /data\.norges-bank\.no\/api\/data\/IR\/B\.KPRA\.SD\.R/);
+  assert.match(macroData, /policyRateProvider = 'Sveriges Riksbank'/);
+  assert.match(macroData, /policyRateProvider = 'Norges Bank'/);
+  assert.match(telemetry, /Sveriges Riksbank policy rate/);
+  assert.match(telemetry, /Norges Bank policy rate/);
+});
