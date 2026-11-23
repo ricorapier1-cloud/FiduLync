@@ -133,3 +133,10 @@ test('complete G10 status requires fresh provider observations, not annual histo
   assert.match(macroData, /isFreshProviderObservation\(currency\.policyRateObservationDate, 180\)/);
   assert.match(macroData, /isFreshProviderObservation\(currency\.inflationObservationDate, currency\.code === 'AUD' \? 180 : 120\)/);
 });
+
+
+test('BIS monthly CPI adapter maps Sweden and Norway when official observations exist', () => {
+  const macroData = read('../lib/macroData.ts');
+  assert.match(macroData, /SE: 'SEK', NO: 'NOK'/);
+  assert.match(macroData, /WS_LONG_CPI/);
+});
