@@ -207,3 +207,34 @@ test('FRED and Finnhub API keys are directly utilized without artificial gate bl
   assert.match(macroData, /process\.env\.FRED_API_KEY\?\.trim\(\)/);
   assert.match(macroData, /process\.env\.FINNHUB_API_KEY\?\.trim\(\)/);
 });
+
+
+test('XAUUSD macro context engine requires verified spot, official macro series, and weekly CFTC evidence', () => {
+  const engine = read('../lib/macro/goldAndRegimeEngine.ts');
+  const route = read('../app/api/v1/xauusd-context/route.ts');
+  assert.match(engine, /DFII10/);
+  assert.match(engine, /T10YIE/);
+  assert.match(engine, /DGS2/);
+  assert.match(engine, /DTB3/);
+  assert.match(engine, /BAMLH0A0HYM2/);
+  assert.match(engine, /VIXCLS/);
+  assert.match(engine, /cftc_contract_market_code/);
+  assert.match(engine, /088691/);
+  assert.match(engine, /rollingZScore/);
+  assert.match(engine, /FRED_WINDOW = 65/);
+  assert.match(engine, /QUOTE_MAX_AGE_MS = 60 \* 60 \* 1000/);
+  assert.match(engine, /INSUFFICIENT_EVIDENCE/);
+  assert.match(engine, /latencyMs/);
+  assert.match(engine, /goldBiasScore: number \| null/);
+  assert.match(route, /MACRO_API_TOKEN/);
+  assert.match(route, /CRON_SECRET/);
+  assert.match(route, /status: 401/);
+  assert.match(route, /timingSafeEqual/);
+});
+
+test('XAUUSD fallback spot never fabricates bid, ask, or spread from a mid-only feed', () => {
+  const engine = read('../lib/macro/goldAndRegimeEngine.ts');
+  assert.match(engine, /source: 'XAUS'/);
+  assert.match(engine, /bid: null, ask: null, mid/);
+  assert.match(engine, /spreadUsd: null/);
+});
