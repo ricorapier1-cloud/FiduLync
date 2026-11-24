@@ -1,6 +1,7 @@
 export type BrandGlyphName =
   | 'activity'
   | 'arrow-down'
+  | 'arrow-left'
   | 'arrow-up-right'
   | 'calendar'
   | 'calendar-clock'
@@ -38,6 +39,9 @@ export default function BrandGlyph({
   switch (name) {
     case 'activity':
       shape = <path d="M3 12h4l2.2-6 4.1 12 2.2-6H21" />;
+      break;
+    case 'arrow-left':
+      shape = <><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></>;
       break;
     case 'arrow-down':
       shape = <><path d="M12 3v12" /><path d="m7 11 5 5 5-5" /><path d="M4 20h16" /></>;

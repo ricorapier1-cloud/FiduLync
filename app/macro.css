@@ -244,3 +244,107 @@
 @media (prefers-reduced-motion: reduce) {
   .macro-spin { animation: none; }
 }
+
+/* Policy Divergence Leaderboard & Quote Changes */
+.macro-change {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.macro-divergence-card {
+  margin-bottom: 20px;
+  padding: 20px 24px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(14, 20, 28, 0.75);
+}
+.macro-divergence-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.macro-divergence-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--foreground);
+  margin: 4px 0 0 0;
+}
+.macro-divergence-desc {
+  font-size: 13px;
+  color: #8c9ba5;
+  margin: 0 0 16px 0;
+  line-height: 1.5;
+}
+.macro-spread-pill {
+  padding: 6px 14px;
+  border-radius: 8px;
+  background: rgba(81, 228, 194, 0.08);
+  border: 1px solid rgba(81, 228, 194, 0.25);
+  color: var(--teal);
+  font-size: 11px;
+}
+.macro-spread-pill strong {
+  color: #fff;
+  font-weight: 700;
+}
+.macro-divergence-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+.macro-divergence-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.macro-item-hawkish {
+  border-left: 3px solid var(--teal, #51e4c2);
+}
+.macro-item-dovish {
+  border-left: 3px solid #f27b8c;
+}
+.macro-div-rank {
+  font-size: 11px;
+  color: #677580;
+  font-weight: 600;
+}
+.macro-div-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.macro-div-ccy {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--foreground);
+}
+.macro-div-bank {
+  font-size: 10px;
+  color: #7b8a95;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.macro-div-metrics {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.macro-div-real {
+  font-size: 13px;
+  font-weight: 700;
+}
+.macro-div-stance {
+  font-size: 10px;
+  color: #8c9ba5;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}

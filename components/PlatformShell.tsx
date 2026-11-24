@@ -100,6 +100,28 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
         </div>
       )}
 
+      {!isHome && (
+        <div className="inner-back-bar" role="navigation" aria-label="Page navigation">
+          <div className="inner-back-bar-content">
+            <Link href="/" className="back-button" aria-label="Return to Macro Terminal">
+              <BrandGlyph name="arrow-left" size={15} strokeWidth={2.2} />
+              <span>Back to Terminal</span>
+            </Link>
+            <div className="breadcrumb-path">
+              <Link href="/" className="breadcrumb-root">Terminal</Link>
+              <span className="breadcrumb-separator">/</span>
+              <span className="breadcrumb-current">
+                {pathname === '/notebook' ? 'Research Notebook' :
+                 pathname === '/workbench' ? 'Validation Workbench' :
+                 pathname === '/faq' ? 'FAQ & Methodology' :
+                 pathname === '/privacy' ? 'Privacy Policy' :
+                 pathname === '/terms' ? 'Terms & Disclosures' : 'Workspace'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       <main className="page-frame">{children}</main>
 
       <PlatformFooter />

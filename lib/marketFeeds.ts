@@ -58,14 +58,71 @@ async function getFrankfurterQuotes(): Promise<MarketQuote[]> {
   if (!isRecord(payload) || !isRecord(payload.rates)) throw new Error('Frankfurter rates payload is invalid.');
   const rates = payload.rates;
   const timestamp = typeof payload.date === 'string' ? `${payload.date}T16:00:00.000Z` : new Date().toISOString();
+
+  let prevRates: Record<string, unknown> | null = null;
+  if (typeof payload.date === 'string') {
+    try {
+      const prevDate = new Date(payload.date);
+      const day = prevDate.getUTCDay();
+      const stepDays = day === 1 ? 3 : day === 0 ? 2 : 1;
+      prevDate.setUTCDate(prevDate.getUTCDate() - stepDays);
+      const prevDateStr = prevDate.toISOString().slice(0, 10);
+      const prevResp = await fetch(`https://api.frankfurter.app/${prevDateStr}?from=USD&to=EUR,GBP,JPY,AUD,CAD,CHF,NZD`, {
+        cache: 'no-store',
+        signal: AbortSignal.timeout(4_000),
+      });
+      if (prevResp.ok) {
+        const prevPayload: unknown = await prevResp.json();
+        if (isRecord(prevPayload) && isRecord(prevPayload.rates)) {
+          prevRates = prevPayload.rates;
+        }
+      }
+    } catch {
+      // Non-critical; fallback to null changePercent if prior date fails
+    }
+  }
+
+  const calcChange = (priceNow: number, pricePrev: number | undefined): number | null => {
+    if (pricePrev === undefined || pricePrev <= 0) return null;
+    return Number(((priceNow - pricePrev) / pricePrev * 100).toFixed(2));
+  };
+
   const quotes: MarketQuote[] = [];
-  if (typeof rates.EUR === 'number' && rates.EUR > 0) quotes.push({ symbol: 'EURUSD', price: 1 / rates.EUR, changePercent: null, timestamp, source: 'frankfurter' });
-  if (typeof rates.GBP === 'number' && rates.GBP > 0) quotes.push({ symbol: 'GBPUSD', price: 1 / rates.GBP, changePercent: null, timestamp, source: 'frankfurter' });
-  if (typeof rates.JPY === 'number' && rates.JPY > 0) quotes.push({ symbol: 'USDJPY', price: rates.JPY, changePercent: null, timestamp, source: 'frankfurter' });
-  if (typeof rates.AUD === 'number' && rates.AUD > 0) quotes.push({ symbol: 'AUDUSD', price: 1 / rates.AUD, changePercent: null, timestamp, source: 'frankfurter' });
-  if (typeof rates.CAD === 'number' && rates.CAD > 0) quotes.push({ symbol: 'USDCAD', price: rates.CAD, changePercent: null, timestamp, source: 'frankfurter' });
-  if (typeof rates.CHF === 'number' && rates.CHF > 0) quotes.push({ symbol: 'USDCHF', price: rates.CHF, changePercent: null, timestamp, source: 'frankfurter' });
-  if (typeof rates.NZD === 'number' && rates.NZD > 0) quotes.push({ symbol: 'NZDUSD', price: 1 / rates.NZD, changePercent: null, timestamp, source: 'frankfurter' });
+  if (typeof rates.EUR === 'number' && rates.EUR > 0) {
+    const p = 1 / rates.EUR;
+    const prevP = typeof prevRates?.EUR === 'number' && prevRates.EUR > 0 ? 1 / prevRates.EUR : undefined;
+    quotes.push({ symbol: 'EURUSD', price: p, changePercent: calcChange(p, prevP), timestamp, source: 'frankfurter' });
+  }
+  if (typeof rates.GBP === 'number' && rates.GBP > 0) {
+    const p = 1 / rates.GBP;
+    const prevP = typeof prevRates?.GBP === 'number' && prevRates.GBP > 0 ? 1 / prevRates.GBP : undefined;
+    quotes.push({ symbol: 'GBPUSD', price: p, changePercent: calcChange(p, prevP), timestamp, source: 'frankfurter' });
+  }
+  if (typeof rates.JPY === 'number' && rates.JPY > 0) {
+    const p = rates.JPY;
+    const prevP = typeof prevRates?.JPY === 'number' && prevRates.JPY > 0 ? prevRates.JPY : undefined;
+    quotes.push({ symbol: 'USDJPY', price: p, changePercent: calcChange(p, prevP), timestamp, source: 'frankfurter' });
+  }
+  if (typeof rates.AUD === 'number' && rates.AUD > 0) {
+    const p = 1 / rates.AUD;
+    const prevP = typeof prevRates?.AUD === 'number' && prevRates.AUD > 0 ? 1 / prevRates.AUD : undefined;
+    quotes.push({ symbol: 'AUDUSD', price: p, changePercent: calcChange(p, prevP), timestamp, source: 'frankfurter' });
+  }
+  if (typeof rates.CAD === 'number' && rates.CAD > 0) {
+    const p = rates.CAD;
+    const prevP = typeof prevRates?.CAD === 'number' && prevRates.CAD > 0 ? prevRates.CAD : undefined;
+    quotes.push({ symbol: 'USDCAD', price: p, changePercent: calcChange(p, prevP), timestamp, source: 'frankfurter' });
+  }
+  if (typeof rates.CHF === 'number' && rates.CHF > 0) {
+    const p = rates.CHF;
+    const prevP = typeof prevRates?.CHF === 'number' && prevRates.CHF > 0 ? prevRates.CHF : undefined;
+    quotes.push({ symbol: 'USDCHF', price: p, changePercent: calcChange(p, prevP), timestamp, source: 'frankfurter' });
+  }
+  if (typeof rates.NZD === 'number' && rates.NZD > 0) {
+    const p = 1 / rates.NZD;
+    const prevP = typeof prevRates?.NZD === 'number' && prevRates.NZD > 0 ? 1 / prevRates.NZD : undefined;
+    quotes.push({ symbol: 'NZDUSD', price: p, changePercent: calcChange(p, prevP), timestamp, source: 'frankfurter' });
+  }
   if (!quotes.length) throw new Error('Frankfurter returned no usable currency quotes.');
   return quotes;
 }

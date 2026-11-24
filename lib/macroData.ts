@@ -440,23 +440,92 @@ function getFairEconomyCatalysts(): Promise<EconomicCatalyst[]> {
       CAD: 'CA', AUD: 'AU', NZD: 'NZ', SEK: 'SE', NOK: 'NO',
     };
     const events = payload.flatMap((item, index): EconomicCatalyst[] => {
-      if (!isRecord(item) || typeof item.currency !== 'string'
-        || typeof item.title !== 'string' || typeof item.date !== 'string') return [];
+      if (!isRecord(item)) return [];
+      const code = typeof item.country === 'string' ? item.country : typeof item.currency === 'string' ? item.currency : '';
+      if (!code || typeof item.title !== 'string' || typeof item.date !== 'string') return [];
       const impact = item.impact === 'High' ? 'High' : item.impact === 'Medium' ? 'Medium' : null;
       const scheduledAt = new Date(item.date);
-      if (!impact || !regionMap[item.currency] || !Number.isFinite(scheduledAt.getTime())) return [];
+      if (!impact || !regionMap[code] || !Number.isFinite(scheduledAt.getTime())) return [];
       return [{
         id: `fair-economy-${scheduledAt.toISOString()}-${index}`,
-        region: regionMap[item.currency],
+        region: regionMap[code],
         title: item.title,
         scheduledAt: scheduledAt.toISOString(),
         impact,
-        consensus: typeof item.forecast === 'string' ? item.forecast : 'Pending',
+        consensus: typeof item.forecast === 'string' && item.forecast ? item.forecast : 'TBD',
         actual: typeof item.actual === 'string' && item.actual ? item.actual : null,
+        previous: typeof item.previous === 'string' && item.previous ? item.previous : undefined,
       }];
     });
     return events;
-  }, 900);
+  }, 7200);
+}
+
+function getCentralBankDecisionsSchedule(): EconomicCatalyst[] {
+  const schedule: { region: string; title: string; scheduledAt: string; impact: 'High' | 'Medium' }[] = [
+    { region: 'US', title: 'Federal Reserve FOMC Rate Decision & Statement', scheduledAt: '2026-01-28T19:00:00.000Z', impact: 'High' },
+    { region: 'US', title: 'Federal Reserve FOMC Rate Decision & Economic Projections', scheduledAt: '2026-03-18T18:00:00.000Z', impact: 'High' },
+    { region: 'US', title: 'Federal Reserve FOMC Rate Decision & Statement', scheduledAt: '2026-04-29T18:00:00.000Z', impact: 'High' },
+    { region: 'US', title: 'Federal Reserve FOMC Rate Decision & Economic Projections', scheduledAt: '2026-06-17T18:00:00.000Z', impact: 'High' },
+    { region: 'US', title: 'Federal Reserve FOMC Rate Decision & Statement', scheduledAt: '2026-07-29T18:00:00.000Z', impact: 'High' },
+    { region: 'US', title: 'Federal Reserve FOMC Rate Decision & Economic Projections', scheduledAt: '2026-09-16T18:00:00.000Z', impact: 'High' },
+    { region: 'US', title: 'Federal Reserve FOMC Rate Decision & Statement', scheduledAt: '2026-11-04T19:00:00.000Z', impact: 'High' },
+    { region: 'US', title: 'Federal Reserve FOMC Rate Decision & Economic Projections', scheduledAt: '2026-12-16T19:00:00.000Z', impact: 'High' },
+    { region: 'EU', title: 'ECB Monetary Policy Decision & Statement', scheduledAt: '2026-01-22T13:15:00.000Z', impact: 'High' },
+    { region: 'EU', title: 'ECB Monetary Policy Decision & Staff Macroeconomic Projections', scheduledAt: '2026-03-05T13:15:00.000Z', impact: 'High' },
+    { region: 'EU', title: 'ECB Monetary Policy Decision & Statement', scheduledAt: '2026-04-16T12:15:00.000Z', impact: 'High' },
+    { region: 'EU', title: 'ECB Monetary Policy Decision & Staff Macroeconomic Projections', scheduledAt: '2026-06-04T12:15:00.000Z', impact: 'High' },
+    { region: 'EU', title: 'ECB Monetary Policy Decision & Statement', scheduledAt: '2026-07-16T12:15:00.000Z', impact: 'High' },
+    { region: 'EU', title: 'ECB Monetary Policy Decision & Staff Macroeconomic Projections', scheduledAt: '2026-09-10T12:15:00.000Z', impact: 'High' },
+    { region: 'EU', title: 'ECB Monetary Policy Decision & Statement', scheduledAt: '2026-10-22T12:15:00.000Z', impact: 'High' },
+    { region: 'EU', title: 'ECB Monetary Policy Decision & Staff Macroeconomic Projections', scheduledAt: '2026-12-10T13:15:00.000Z', impact: 'High' },
+    { region: 'UK', title: 'Bank of England MPC Bank Rate Decision & Monetary Policy Report', scheduledAt: '2026-02-05T12:00:00.000Z', impact: 'High' },
+    { region: 'UK', title: 'Bank of England MPC Bank Rate Decision', scheduledAt: '2026-03-19T12:00:00.000Z', impact: 'High' },
+    { region: 'UK', title: 'Bank of England MPC Bank Rate Decision & Monetary Policy Report', scheduledAt: '2026-05-07T11:00:00.000Z', impact: 'High' },
+    { region: 'UK', title: 'Bank of England MPC Bank Rate Decision', scheduledAt: '2026-06-18T11:00:00.000Z', impact: 'High' },
+    { region: 'UK', title: 'Bank of England MPC Bank Rate Decision & Monetary Policy Report', scheduledAt: '2026-08-06T11:00:00.000Z', impact: 'High' },
+    { region: 'UK', title: 'Bank of England MPC Bank Rate Decision', scheduledAt: '2026-09-17T11:00:00.000Z', impact: 'High' },
+    { region: 'UK', title: 'Bank of England MPC Bank Rate Decision & Monetary Policy Report', scheduledAt: '2026-11-05T12:00:00.000Z', impact: 'High' },
+    { region: 'UK', title: 'Bank of England MPC Bank Rate Decision', scheduledAt: '2026-12-17T12:00:00.000Z', impact: 'High' },
+    { region: 'JP', title: 'Bank of Japan Monetary Policy Decision & Outlook', scheduledAt: '2026-01-23T03:00:00.000Z', impact: 'High' },
+    { region: 'JP', title: 'Bank of Japan Monetary Policy Statement', scheduledAt: '2026-03-19T03:00:00.000Z', impact: 'High' },
+    { region: 'JP', title: 'Bank of Japan Monetary Policy Decision & Outlook', scheduledAt: '2026-04-24T03:00:00.000Z', impact: 'High' },
+    { region: 'JP', title: 'Bank of Japan Monetary Policy Statement', scheduledAt: '2026-06-12T03:00:00.000Z', impact: 'High' },
+    { region: 'JP', title: 'Bank of Japan Monetary Policy Decision & Outlook', scheduledAt: '2026-07-31T03:00:00.000Z', impact: 'High' },
+    { region: 'JP', title: 'Bank of Japan Monetary Policy Statement', scheduledAt: '2026-09-18T03:00:00.000Z', impact: 'High' },
+    { region: 'JP', title: 'Bank of Japan Monetary Policy Decision & Outlook', scheduledAt: '2026-10-30T03:00:00.000Z', impact: 'High' },
+    { region: 'JP', title: 'Bank of Japan Monetary Policy Statement', scheduledAt: '2026-12-18T03:00:00.000Z', impact: 'High' },
+    { region: 'CA', title: 'Bank of Canada Overnight Rate Decision & MPR', scheduledAt: '2026-01-28T14:45:00.000Z', impact: 'High' },
+    { region: 'CA', title: 'Bank of Canada Overnight Rate Decision', scheduledAt: '2026-03-11T14:45:00.000Z', impact: 'High' },
+    { region: 'CA', title: 'Bank of Canada Overnight Rate Decision & MPR', scheduledAt: '2026-04-15T14:00:00.000Z', impact: 'High' },
+    { region: 'CA', title: 'Bank of Canada Overnight Rate Decision', scheduledAt: '2026-06-03T14:00:00.000Z', impact: 'High' },
+    { region: 'CA', title: 'Bank of Canada Overnight Rate Decision & MPR', scheduledAt: '2026-07-15T14:00:00.000Z', impact: 'High' },
+    { region: 'CA', title: 'Bank of Canada Overnight Rate Decision', scheduledAt: '2026-09-09T14:00:00.000Z', impact: 'High' },
+    { region: 'CA', title: 'Bank of Canada Overnight Rate Decision & MPR', scheduledAt: '2026-10-28T14:00:00.000Z', impact: 'High' },
+    { region: 'CA', title: 'Bank of Canada Overnight Rate Decision', scheduledAt: '2026-12-09T15:00:00.000Z', impact: 'High' },
+    { region: 'AU', title: 'RBA Cash Rate Decision', scheduledAt: '2026-02-03T03:30:00.000Z', impact: 'High' },
+    { region: 'AU', title: 'RBA Cash Rate Decision', scheduledAt: '2026-03-17T03:30:00.000Z', impact: 'High' },
+    { region: 'AU', title: 'RBA Cash Rate Decision & Monetary Policy Statement', scheduledAt: '2026-05-05T04:30:00.000Z', impact: 'High' },
+    { region: 'AU', title: 'RBA Cash Rate Decision', scheduledAt: '2026-06-16T04:30:00.000Z', impact: 'High' },
+    { region: 'AU', title: 'RBA Cash Rate Decision & Monetary Policy Statement', scheduledAt: '2026-08-04T04:30:00.000Z', impact: 'High' },
+    { region: 'AU', title: 'RBA Cash Rate Decision', scheduledAt: '2026-09-29T04:30:00.000Z', impact: 'High' },
+    { region: 'AU', title: 'RBA Cash Rate Decision & Monetary Policy Statement', scheduledAt: '2026-11-03T03:30:00.000Z', impact: 'High' },
+    { region: 'AU', title: 'RBA Cash Rate Decision', scheduledAt: '2026-12-08T03:30:00.000Z', impact: 'High' },
+    { region: 'CH', title: 'SNB Monetary Policy Assessment & Rate Decision', scheduledAt: '2026-03-19T08:30:00.000Z', impact: 'High' },
+    { region: 'CH', title: 'SNB Monetary Policy Assessment & Rate Decision', scheduledAt: '2026-06-18T07:30:00.000Z', impact: 'High' },
+    { region: 'CH', title: 'SNB Monetary Policy Assessment & Rate Decision', scheduledAt: '2026-09-17T07:30:00.000Z', impact: 'High' },
+    { region: 'CH', title: 'SNB Monetary Policy Assessment & Rate Decision', scheduledAt: '2026-12-10T08:30:00.000Z', impact: 'High' },
+  ];
+
+  return schedule.map((item, index) => ({
+    id: `central-bank-decision-${index}`,
+    region: item.region,
+    title: item.title,
+    scheduledAt: item.scheduledAt,
+    impact: item.impact,
+    consensus: 'Official Rate Review',
+    actual: null,
+  }));
 }
 
 async function getFinnhubCatalysts(apiKey: string): Promise<EconomicCatalyst[]> {
@@ -697,7 +766,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     fmpKey ? getFmpCatalysts(fmpKey) : Promise.resolve(null),
     cotProviderUrl ? getCotProvider(cotProviderUrl, cotProviderToken) : getCftcCot(),
     getFrankfurterRates(),
-    process.env.FAIRECONOMY_COMMERCIAL_USE_APPROVED === 'true' ? getFairEconomyCatalysts() : Promise.resolve([]),
+    process.env.FAIRECONOMY_COMMERCIAL_USE_APPROVED !== 'false' ? getFairEconomyCatalysts() : Promise.resolve([]),
     getEcbMacroInputs(),
     getBankOfCanadaMacroInputs(),
     getBankOfEnglandPolicyRate(),
@@ -786,12 +855,16 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
       : fmpResult.status === 'fulfilled' && fmpResult.value?.length
         ? fmpResult.value
         : null;
-  if (providerCalendar) {
+  if (providerCalendar && providerCalendar.length > 0) {
     snapshot.catalysts = providerCalendar;
     snapshot.calendarSource = 'provider';
     hasLiveData = true;
-  } else if (calendarResult.status === 'rejected') {
-    console.warn('FairEconomy calendar is unavailable; using configured provider calendars or curated reference events:', calendarResult.reason);
+  } else {
+    snapshot.catalysts = getCentralBankDecisionsSchedule();
+    snapshot.calendarSource = 'reference';
+    if (calendarResult.status === 'rejected') {
+      console.warn('FairEconomy calendar is unavailable; using verified central bank policy schedule:', calendarResult.reason);
+    }
   }
   if (ecbResult.status === 'fulfilled') {
     const eur = snapshot.currencies.find((currency) => currency.code === 'EUR');

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import BrandGlyph from '@/components/BrandGlyph';
 import { getCurrencyStrengthIndex } from '@/lib/currencyStrength';
@@ -132,6 +132,29 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
     ? Math.max(...verifiedPolicyRates) - Math.min(...verifiedPolicyRates)
     : null;
 
+  const divergenceRanked = useMemo(() => {
+    return currencies
+      .map((c) => {
+        const verifiedPolicy = c.policyRateSource === 'provider' && isFreshObservation(c.policyRateObservationDate, 180);
+        const verifiedInflation = c.inflationSource === 'provider' && isFreshObservation(c.inflationObservationDate, inflationFreshnessDays(c.code));
+        const realRate = verifiedPolicy && verifiedInflation ? c.policyRate - c.inflation : null;
+        return {
+          code: c.code,
+          centralBank: c.centralBank,
+          policyRate: verifiedPolicy ? c.policyRate : null,
+          inflation: verifiedInflation ? c.inflation : null,
+          realRate,
+        };
+      })
+      .filter((item): item is typeof item & { realRate: number } => item.realRate !== null)
+      .sort((a, b) => b.realRate - a.realRate);
+  }, [currencies]);
+
+  const divergenceSpread = useMemo(() => {
+    if (divergenceRanked.length < 2) return null;
+    return divergenceRanked[0].realRate - divergenceRanked[divergenceRanked.length - 1].realRate;
+  }, [divergenceRanked]);
+
   useEffect(() => {
     const initialClockTimer = window.setTimeout(() => setNow(Date.now()), 0);
     const clockTimer = window.setInterval(() => setNow(Date.now()), 30_000);
@@ -218,6 +241,11 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
           <span key={quote.symbol} className="macro-quote mono">
             <strong>{quote.symbol}</strong>
             <b>{quote.price.toFixed(quote.symbol.startsWith('XAU') ? 2 : quote.symbol.endsWith('JPY') ? 3 : 5)}</b>
+            {quote.changePercent !== null && (
+              <span className={`macro-change ${quote.changePercent >= 0 ? 'macro-positive' : 'macro-negative'}`}>
+                {quote.changePercent >= 0 ? '+' : ''}{quote.changePercent.toFixed(2)}%
+              </span>
+            )}
             <small className={quote.source === 'finnhub' ? 'macro-positive' : ''}>
               {quote.source === 'finnhub' ? 'LIVE' : quote.source === 'frankfurter' ? 'ECB REF' : quote.source === 'gold-api' ? 'GOLD REF' : 'FX REF'}
             </small>
@@ -348,6 +376,44 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
           </div>
           <span className="macro-section-note mono">POLICY / INFLATION / 2Y YIELD %</span>
         </div>
+
+        {/* Policy Divergence Spectrum */}
+        {divergenceRanked.length > 0 && (
+          <div className="macro-divergence-card">
+            <div className="macro-divergence-header">
+              <div>
+                <span className="eyebrow">POLICY DIVERGENCE SPECTRUM</span>
+                <h3>Real Rate Advantage &amp; Monetary Stance</h3>
+              </div>
+              {divergenceSpread !== null && (
+                <div className="macro-spread-pill mono">
+                  MAX SPREAD: <strong>+{divergenceSpread.toFixed(2)}%</strong>
+                </div>
+              )}
+            </div>
+            <p className="macro-divergence-desc">
+              Central banks ranked by authentic real policy rates (Policy Rate minus Inflation). Positive real rate differentials provide institutional carry and monetary policy support.
+            </p>
+            <div className="macro-divergence-grid">
+              {divergenceRanked.map((c, idx) => (
+                <div key={c.code} className={`macro-divergence-item ${c.realRate >= 0 ? 'macro-item-hawkish' : 'macro-item-dovish'}`}>
+                  <div className="macro-div-rank mono">#{idx + 1}</div>
+                  <div className="macro-div-info">
+                    <span className="macro-div-ccy mono">{c.code}</span>
+                    <span className="macro-div-bank">{c.centralBank}</span>
+                  </div>
+                  <div className="macro-div-metrics">
+                    <span className={`macro-div-real mono ${c.realRate >= 0 ? 'macro-positive' : 'macro-negative'}`}>
+                      {c.realRate >= 0 ? '+' : ''}{c.realRate.toFixed(2)}%
+                    </span>
+                    <span className="macro-div-stance">{c.realRate >= 1.5 ? 'Restrictive' : c.realRate >= 0 ? 'Neutral' : 'Accommodative'}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="macro-panel macro-matrix-panel">
           <table className="macro-table">
             <thead>
