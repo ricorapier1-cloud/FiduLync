@@ -107,15 +107,6 @@ type CftcPosition = {
   reportDate: string;
 };
 
-type FredBundle = {
-  DFII10: Observation[];
-  T10YIE: Observation[];
-  DGS2: Observation[];
-  DTB3: Observation[];
-  BAMLH0A0HYM2: Observation[];
-  VIXCLS: Observation[];
-};
-
 const FRED_SERIES = [
   'DFII10',
   'T10YIE',
@@ -181,14 +172,27 @@ function parseObservationRows(payload: unknown): Observation[] {
   }).sort((left, right) => left.date.localeCompare(right.date));
 }
 
+type TimedFetchError = Error & { latencyMs: number };
+
+function failedLatency(error: unknown): number | null {
+  return isRecord(error) ? finiteNumber(error.latencyMs) : null;
+}
+
 async function timedFetch<T>(operation: () => Promise<T>): Promise<TimedResult<T>> {
   const started = performance.now();
-  const value = await operation();
-  return {
-    value,
-    latencyMs: Math.max(0, Math.round(performance.now() - started)),
-    retrievedAtUtc: new Date().toISOString(),
-  };
+  try {
+    const value = await operation();
+    return {
+      value,
+      latencyMs: Math.max(0, Math.round(performance.now() - started)),
+      retrievedAtUtc: new Date().toISOString(),
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Upstream request failed.';
+    const failure = new Error(message) as TimedFetchError;
+    failure.latencyMs = Math.max(0, Math.round(performance.now() - started));
+    throw failure;
+  }
 }
 
 async function fetchFredSeries(seriesId: typeof FRED_SERIES[number], apiKey: string): Promise<TimedResult<Observation[]>> {
@@ -312,6 +316,7 @@ async function fetchXausQuote(): Promise<TimedResult<QuoteCandidate>> {
 
 async function fetchGoldQuote(): Promise<GoldQuote> {
   let primary: TimedResult<QuoteCandidate> | null = null;
+  let primaryFailureLatencyMs = 0;
   try {
     primary = await fetchSwissquoteQuote();
     const stale = (ageMs(primary.value.timestampUtc) ?? Number.POSITIVE_INFINITY) > QUOTE_MAX_AGE_MS;
@@ -331,7 +336,8 @@ async function fetchGoldQuote(): Promise<GoldQuote> {
         state: 'HEALTHY',
       };
     }
-  } catch {
+  } catch (error) {
+    primaryFailureLatencyMs = failedLatency(error) ?? 0;
     primary = null;
   }
 
@@ -346,11 +352,12 @@ async function fetchGoldQuote(): Promise<GoldQuote> {
       spreadUsd: null,
       quoteTimestampUtc: fallback.value.timestampUtc,
       retrievedAtUtc: fallback.retrievedAtUtc,
-      latencyMs: fallback.latencyMs + (primary?.latencyMs ?? 0),
+      latencyMs: fallback.latencyMs + (primary?.latencyMs ?? primaryFailureLatencyMs),
       isStale: stale,
       state: stale ? 'STALE' : 'HEALTHY',
     };
-  } catch {
+  } catch (error) {
+    const fallbackFailureLatencyMs = failedLatency(error) ?? 0;
     return {
       source: 'UNAVAILABLE',
       bid: null,
@@ -359,7 +366,7 @@ async function fetchGoldQuote(): Promise<GoldQuote> {
       spreadUsd: null,
       quoteTimestampUtc: null,
       retrievedAtUtc: new Date().toISOString(),
-      latencyMs: primary?.latencyMs ?? null,
+      latencyMs: (primary?.latencyMs ?? primaryFailureLatencyMs) + fallbackFailureLatencyMs,
       isStale: true,
       state: 'UNAVAILABLE',
     };
@@ -461,16 +468,20 @@ export async function buildGoldMacroContext(): Promise<GoldMacroContext> {
   const fredApiKey = process.env.FRED_API_KEY?.trim() ?? '';
 
   const quotePromise = fetchGoldQuote();
-  const cotPromise = fetchCftcGoldPosition().catch(() => null);
+  let cftcFailureLatencyMs = 0;
+  const cotPromise = fetchCftcGoldPosition().catch((error: unknown) => {
+    cftcFailureLatencyMs = failedLatency(error) ?? 0;
+    return null;
+  });
   const fredPromises = fredApiKey
     ? FRED_SERIES.map(async (seriesId) => {
       try {
-        return [seriesId, await fetchFredSeries(seriesId, fredApiKey)] as const;
-      } catch {
-        return [seriesId, null] as const;
+        return [seriesId, await fetchFredSeries(seriesId, fredApiKey), null] as const;
+      } catch (error) {
+        return [seriesId, null, failedLatency(error)] as const;
       }
     })
-    : FRED_SERIES.map(async (seriesId) => [seriesId, null] as const);
+    : FRED_SERIES.map(async (seriesId) => [seriesId, null, null] as const);
 
   const [quoteResult, cotResult, fredResults] = await Promise.all([
     quotePromise.catch(() => unavailableQuote()),
@@ -478,7 +489,7 @@ export async function buildGoldMacroContext(): Promise<GoldMacroContext> {
     Promise.all(fredPromises),
   ]);
 
-  const fredBySeries = new Map<string, TimedResult<Observation[]> | null>(fredResults);
+  const fredBySeries = new Map<string, TimedResult<Observation[]> | null>(fredResults.map(([seriesId, result]) => [seriesId, result]));
   const drivers = {
     DFII10: makeDriver('DFII10', fredBySeries.get('DFII10') ?? null),
     T10YIE: makeDriver('T10YIE', fredBySeries.get('T10YIE') ?? null),
@@ -510,11 +521,11 @@ export async function buildGoldMacroContext(): Promise<GoldMacroContext> {
 
   const cotReportDate = cot.reportDate;
   const quoteTimestampUtc = quoteResult.quoteTimestampUtc;
-  const fredLatencyValues = fredResults.flatMap(([, result]) => result ? [result.latencyMs] : []);
+  const fredLatencyValues = fredResults.flatMap(([, result, failureLatency]) => result ? [result.latencyMs] : failureLatency === null ? [] : [failureLatency]);
   const fredLatencyMs = fredLatencyValues.length
     ? Math.max(...fredLatencyValues)
     : null;
-  const cftcLatencyMs = cotResult?.latencyMs ?? null;
+  const cftcLatencyMs = cotResult?.latencyMs ?? (cftcFailureLatencyMs > 0 ? cftcFailureLatencyMs : null);
   const quoteLatencyMs = quoteResult.latencyMs;
   const totalLatencyMs = Math.max(0, Math.round(performance.now() - totalStarted));
 
@@ -552,7 +563,7 @@ export async function buildGoldMacroContext(): Promise<GoldMacroContext> {
     && breakevenChange !== null
     && forwardSpread !== null
     && cotNet !== null) {
-    const cotDirection = clamp(-cotNet / Math.max(Math.abs(cot.nonCommercialLong ?? 0) + Math.abs(cot.nonCommercialShort ?? 0), 1), -1, 1);
+    const cotDirection = clamp(cotNet / Math.max(Math.abs(cot.nonCommercialLong ?? 0) + Math.abs(cot.nonCommercialShort ?? 0), 1), -1, 1);
     const components = [
       { name: '10Y real-yield pressure', score: -35 * clamp(realYieldZ / 3, -1, 1), evidence: 'DFII10 65-observation z-score ' + realYieldZ.toFixed(2) },
       { name: 'high-yield credit stress', score: 20 * clamp(creditOasZ / 3, -1, 1), evidence: 'ICE BofA US HY OAS 65-observation z-score ' + creditOasZ.toFixed(2) },
