@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { getCachedData } from '@/lib/redisCache';
+
 type Observation = {
   date: string;
   value: number;
@@ -83,6 +85,14 @@ export type GoldMacroContext = {
     fredSeriesCadence: 'PUBLISHED_DAILY';
     cftcCadence: 'WEEKLY';
     interpretation: string;
+    scoreWeights: {
+      DFII10RealYieldZ: 35;
+      HighYieldOasZ: 20;
+      T10YIE20ObservationChange: 15;
+      DGS2MinusDTB3: 10;
+      VIXCLS: 10;
+      CFTCNetPosition: 10;
+    };
   };
 };
 
@@ -318,7 +328,7 @@ async function fetchGoldQuote(): Promise<GoldQuote> {
   let primary: TimedResult<QuoteCandidate> | null = null;
   let primaryFailureLatencyMs = 0;
   try {
-    primary = await fetchSwissquoteQuote();
+    primary = await getCachedData('xau:spot:swissquote:v1', fetchSwissquoteQuote, 10);
     const stale = (ageMs(primary.value.timestampUtc) ?? Number.POSITIVE_INFINITY) > QUOTE_MAX_AGE_MS;
     if (!stale) {
       return {
@@ -342,7 +352,7 @@ async function fetchGoldQuote(): Promise<GoldQuote> {
   }
 
   try {
-    const fallback = await fetchXausQuote();
+    const fallback = await getCachedData('xau:spot:xaus:v1', fetchXausQuote, 30);
     const stale = (ageMs(fallback.value.timestampUtc) ?? Number.POSITIVE_INFINITY) > QUOTE_MAX_AGE_MS;
     return {
       source: 'XAUS',
@@ -469,14 +479,14 @@ export async function buildGoldMacroContext(): Promise<GoldMacroContext> {
 
   const quotePromise = fetchGoldQuote();
   let cftcFailureLatencyMs = 0;
-  const cotPromise = fetchCftcGoldPosition().catch((error: unknown) => {
+  const cotPromise = getCachedData('xau:cot:cftc-088691:v1', fetchCftcGoldPosition, 6 * 60 * 60).catch((error: unknown) => {
     cftcFailureLatencyMs = failedLatency(error) ?? 0;
     return null;
   });
   const fredPromises = fredApiKey
     ? FRED_SERIES.map(async (seriesId) => {
       try {
-        return [seriesId, await fetchFredSeries(seriesId, fredApiKey), null] as const;
+        return [seriesId, await getCachedData('xau:fred:' + seriesId + ':v1', () => fetchFredSeries(seriesId, fredApiKey), 15 * 60), null] as const;
       } catch (error) {
         return [seriesId, null, failedLatency(error)] as const;
       }
@@ -633,7 +643,15 @@ export async function buildGoldMacroContext(): Promise<GoldMacroContext> {
       quoteStaleAfterMinutes: 60,
       fredSeriesCadence: 'PUBLISHED_DAILY',
       cftcCadence: 'WEEKLY',
-      interpretation: 'Deterministic research heuristic, not a calibrated probability or trading instruction. Score is withheld unless the spot quote, all six FRED series, both 65-observation z-scores, and the current CFTC report pass freshness validation.',
+      interpretation: 'Deterministic research heuristic, not a calibrated probability or trading instruction. Score is withheld unless the spot quote, all six FRED series, both 65-observation z-scores, and the current CFTC report pass freshness validation. DGS2 minus DTB3 is a 2-year versus 3-month yield-curve spread, not a directly observed forward rate.',
+      scoreWeights: {
+        DFII10RealYieldZ: 35,
+        HighYieldOasZ: 20,
+        T10YIE20ObservationChange: 15,
+        DGS2MinusDTB3: 10,
+        VIXCLS: 10,
+        CFTCNetPosition: 10,
+      },
     },
   };
 }
