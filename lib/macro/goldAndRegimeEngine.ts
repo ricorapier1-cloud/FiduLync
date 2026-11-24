@@ -473,7 +473,6 @@ function classifyRegime(
 }
 
 export async function buildGoldMacroContext(): Promise<GoldMacroContext> {
-  const generatedAtUtc = new Date().toISOString();
   const totalStarted = performance.now();
   const fredApiKey = process.env.FRED_API_KEY?.trim() ?? '';
 
@@ -618,7 +617,7 @@ export async function buildGoldMacroContext(): Promise<GoldMacroContext> {
   }
 
   return {
-    generatedAtUtc,
+    generatedAtUtc: new Date().toISOString(),
     quoteTimestampUtc,
     cftcReportDate: cotReportDate,
     overallState,
