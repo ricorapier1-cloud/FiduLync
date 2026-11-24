@@ -489,7 +489,8 @@ export async function buildGoldMacroContext(): Promise<GoldMacroContext> {
     Promise.all(fredPromises),
   ]);
 
-  const fredBySeries = new Map<string, TimedResult<Observation[]> | null>(fredResults.map(([seriesId, result]) => [seriesId, result]));
+  const fredBySeries = new Map<string, TimedResult<Observation[]> | null>();
+  for (const [seriesId, result] of fredResults) fredBySeries.set(seriesId, result);
   const drivers = {
     DFII10: makeDriver('DFII10', fredBySeries.get('DFII10') ?? null),
     T10YIE: makeDriver('T10YIE', fredBySeries.get('T10YIE') ?? null),
