@@ -325,3 +325,25 @@ test('pair ranking only publishes provider-evidenced candidates and never labels
   assert.match(board, /NO QUALIFIED MACRO OPPORTUNITIES/);
   assert.match(board, /No historical win probability is claimed/);
 });
+
+test('official Treasury daily nominal and TIPS yields work without a paid API key', () => {
+  const adapter = read('../lib/treasuryData.ts');
+  const macroData = read('../lib/macroData.ts');
+  const dashboard = read('../app/components/MacroDashboard.tsx');
+  assert.match(adapter, /home\\.treasury\\.gov/);
+  assert.match(adapter, /daily_treasury_yield_curve/);
+  assert.match(adapter, /daily_treasury_real_yield_curve/);
+  assert.match(adapter, /BC_2YEAR/);
+  assert.match(adapter, /BC_10YEAR/);
+  assert.match(macroData, /getTreasuryYieldData/);
+  assert.match(dashboard, /US 10Y benchmark/);
+  assert.match(dashboard, /10Y TIPS real yield/);
+  assert.match(dashboard, /Daily published closing-market estimates/);
+});
+
+test('provider telemetry does not treat FRED key presence as data-use approval', () => {
+  const telemetry = read('../lib/macro/providerTelemetry.ts');
+  assert.match(telemetry, /const fredStorageAllowed = process\\.env\\.FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true'/);
+  assert.doesNotMatch(telemetry, /FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true' \\|\\| fredKeyPresent/);
+});
+
