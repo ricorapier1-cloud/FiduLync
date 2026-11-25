@@ -416,4 +416,5 @@ test('provider resilience handles Riksbank single-observation payloads, caches E
   assert.ok(macroData.includes("getCachedData('macro:eia-energy-markets-v1'"));
   assert.ok(macroData.includes('AbortSignal.timeout(15_000)'));
   assert.ok(aiBrief.includes("GEMINI_MACRO_BRIEF_ENABLED !== 'true'"));
+  assert.ok(aiBrief.includes("'macro:ai-brief:v3'"));
 });

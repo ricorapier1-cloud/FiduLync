@@ -203,7 +203,7 @@ function parseProviderCsvRow(line: string, delimiter: string): string[] {
 }
 
 export async function getRiksbankPolicyRate(): Promise<OfficialPolicyRate> {
-  return getCachedData('macro:riksbank:policy-rate', async () => {
+  return getCachedData('macro:riksbank:policy-rate-v2', async () => {
     const response = await fetch('https://api.riksbank.se/swea/v1/Observations/Latest/SECBREPOEFF', {
       cache: 'no-store',
       headers: { Accept: 'application/json' },

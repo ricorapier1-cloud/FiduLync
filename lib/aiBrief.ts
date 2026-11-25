@@ -102,7 +102,7 @@ async function generateGeminiBrief(
 }
 
 export async function getMacroBrief(): Promise<MacroBrief> {
-  return getCachedData('macro:ai-brief:v2', async () => {
+  return getCachedData('macro:ai-brief:v3', async () => {
     const snapshot = await getMacroSnapshot();
     try {
       return await generateGeminiBrief(snapshot);
