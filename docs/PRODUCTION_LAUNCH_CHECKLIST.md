@@ -39,7 +39,7 @@ The service API also accepts MACROLYNC_API_SECRET or the legacy ALGO_PRIVATE_API
 - Swissquote supplies the terminal's four-symbol bid/ask feed without a user API key. It is a quote source, not a complete FX candle history feed.
 - U.S. Treasury daily nominal/TIPS yields, Cboe daily VIX closes, CFTC weekly COT, BLS, BIS, ECB, BoE, BoC, Riksbank, Norges Bank and World Bank public data provide the no-paid-key research baseline.
 - EIA requires the configured EIA API key for daily energy observations.
-- FRED remains permission-gated. When disabled, the active macro snapshot strips cached FRED-derived values and the gold model uses validated Treasury history plus Cboe VIX, CFTC positioning and the available Swissquote quote. The optional high-yield credit-spread component remains unavailable.
+- FRED remains permission-gated. When disabled, the active macro snapshot strips cached FRED-derived values and the gold model uses validated Treasury history plus Cboe VIX, CFTC positioning and the available Swissquote quote. Treasury's 3-month constant-maturity yield is labelled as a proxy for the DTB3 input (not an exact series match); the optional ICE BofA high-yield credit-spread component remains unavailable.
 - The no-key FairEconomy weekly calendar is the default personal-research fallback for High-impact USD/EUR/GBP/JPY/AUD/CHF/CAD events. It is tagged `FAIRECONOMY_PUBLIC`, stored in UTC and displayed in Lagos WAT. If the public feed fails validation or is unreachable, the calendar remains UNAVAILABLE and the event gate fails closed.
 - Do not set a provider approval flag merely because an API key exists. Confirm applicable personal-plan, caching, display and storage rights first.
 
