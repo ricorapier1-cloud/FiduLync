@@ -6,6 +6,7 @@ import BrandGlyph from '@/components/BrandGlyph';
 import { getCurrencyStrengthIndex } from '@/lib/currencyStrength';
 import { generatePairDossier } from '@/lib/macro/dossierEngine';
 import type { MacroSnapshot, MarketQuote, PairDossier } from '@/types/macro';
+import DeskTerminal from '@/app/components/DeskTerminal';
 
 type MacroDashboardProps = {
   initialSnapshot: MacroSnapshot;
@@ -220,6 +221,8 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
 
   return (
     <div className="macro-page pb-36 sm:pb-12 md:pb-8">
+      <DeskTerminal initialSnapshot={initialSnapshot} />
+
       {/* Top Statusline */}
       <div className="macro-statusline mono">
         <span><span className={`macro-pulse${liveQuoteAvailable ? ' macro-pulse-live' : ''}`} /> MACROLYNC / INSTITUTIONAL RESEARCH TERMINAL</span>
