@@ -19,7 +19,7 @@ type Journal = { dateWAT: string; trades: number; wins: number; losses: number; 
 type SymbolCode = 'EURUSD' | 'GBPUSD' | 'XAUUSD' | 'USDJPY';
 type Direction = 'BUY' | 'SELL';
 const symbols: SymbolCode[] = ['EURUSD', 'GBPUSD', 'XAUUSD', 'USDJPY'];
-const currencies = ['EUR', 'GBP', 'JPY', 'AUD', 'CHF', 'CAD'] as const;
+const currencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CHF', 'CAD'] as const;
 const JOURNAL_KEY = 'fidulync-desk-journal-v1';
 const FX_KEY = 'fidulync-desk-fx-v1';
 const blankJournal = (dateWAT: string): Journal => ({ dateWAT, trades: 0, wins: 0, losses: 0, netPnl: 0, entries: [] });
@@ -81,7 +81,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const inSession = activeSession !== 'OFF-SESSION';
   const healthyProviderCount = snapshot.providerStatus?.filter((provider) => provider.status === 'HEALTHY').length ?? 0;
   const totalProviderCount = snapshot.providerStatus?.length ?? 0;
-  const locked = journal.trades >= 2 || journal.losses >= 2;
+  const locked = journal.trades >= 2 || journal.losses >= 2;\n  const vixValue = goldContext?.drivers.VIXCLS.value ?? null;\n  const tailRiskStatus = vixValue === null ? 'UNAVAILABLE' : vixValue >= 28 ? 'BLACK_SWAN_LOCKOUT' : vixValue >= 22 ? 'ELEVATED_VOLATILITY' : 'NORMAL';\n  const riskCap = tailRiskStatus === 'BLACK_SWAN_LOCKOUT' ? 0 : tailRiskStatus === 'ELEVATED_VOLATILITY' ? 0.5 : 1;\n  const selectedLegs = selected === 'XAUUSD' ? ['USD'] : [selected.slice(0, 3), selected.slice(3, 6)];\n  const conflictingTrades = journal.entries.filter((entry) => {\n    const legs = entry.symbol === 'XAUUSD' ? ['USD'] : [entry.symbol.slice(0, 3), entry.symbol.slice(3, 6)];\n    return legs.some((leg) => selectedLegs.includes(leg));\n  });\n  const correlationPass = conflictingTrades.length === 0;
   const dossier = useMemo(() => generatePairDossier(snapshot, selected), [snapshot, selected]);
   const fxMacroPass = (dossier.confidence === 'HIGH' || dossier.confidence === 'MODERATE')
     && ((dossier.biasScore > 0 && direction === 'BUY') || (dossier.biasScore < 0 && direction === 'SELL'));
@@ -105,7 +105,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
     { name: 'Tier-1 event risk', pass: eventPass, detail: !verifiedCalendar ? 'Calendar unverified; fail-closed' : nearEvent ? 'Event within ±30 minutes' : 'Verified calendar: clear' },
     { name: 'H4/H1 structure and liquidity', pass: technicalConfirmed, detail: 'Requires manual MT5 chart confirmation' },
     { name: 'Reward/risk and spread', pass: spreadPass, detail: `${rr.toFixed(2)}R · ${quoteIsFresh ? 'fresh quote' : 'quote stale/unavailable'} · spread ${spreadPct === null ? 'unavailable' : spreadPct.toFixed(1) + '% of SL'}` },
-    { name: 'Daily risk circuit breaker', pass: riskPass, detail: `${risk.toFixed(2)}% · ${lots.toFixed(2)} lots · ${journal.trades}/2 trades · ${journal.losses}/2 losses` },
+    { name: 'Daily risk & correlation circuit breaker', pass: riskPass, detail: `${correlationPass ? 'Currency legs clear' : 'BLOCKED: shared leg with ' + conflictingTrades.map((entry) => entry.symbol).join(', ')} · ${risk.toFixed(2)}% / ${riskCap.toFixed(2)}% cap · ${journal.trades}/2 trades · ${journal.losses}/2 losses · ${tailRiskStatus}` },
   ];
   const gatePassed = gates.every((gate) => gate.pass) && !locked;
 
