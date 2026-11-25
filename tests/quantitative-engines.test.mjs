@@ -51,8 +51,8 @@ test('currency strength uses only provider-sourced policy and inflation data', (
 
 test('dashboard marks cross-asset values unavailable until verified feeds exist', () => {
   assert.match(dashboard, /No verified adapter/);
-  assert.match(dashboard, /US 10Y benchmark/);
-  assert.match(dashboard, /10Y TIPS real yield/);
+  assert.ok(dashboard.includes('US 10Y benchmark'));
+  assert.ok(dashboard.includes('10Y TIPS real yield'));
   assert.match(dashboard, /snapshot\.providerStatus\?\.length/);
   assert.doesNotMatch(dashboard, /FRED \(St\. Louis Fed\)[\s\S]{0,200}HEALTHY/);
   assert.doesNotMatch(dashboard, /4\.35%|2\.05%|14\.80|\$76\.40|\$2,740/);
@@ -332,21 +332,21 @@ test('official Treasury daily nominal and TIPS yields work without a paid API ke
   const adapter = read('../lib/treasuryData.ts');
   const macroData = read('../lib/macroData.ts');
   const dashboard = read('../app/components/MacroDashboard.tsx');
-  assert.match(adapter, /home\\.treasury\\.gov/);
-  assert.match(adapter, /daily_treasury_yield_curve/);
-  assert.match(adapter, /daily_treasury_real_yield_curve/);
-  assert.match(adapter, /BC_2YEAR/);
-  assert.match(adapter, /BC_10YEAR/);
-  assert.match(macroData, /getTreasuryYieldData/);
+  assert.ok(adapter.includes('home.treasury.gov'));
+  assert.ok(adapter.includes('daily_treasury_yield_curve'));
+  assert.ok(adapter.includes('daily_treasury_real_yield_curve'));
+  assert.ok(adapter.includes('BC_2YEAR'));
+  assert.ok(adapter.includes('BC_10YEAR'));
+  assert.ok(macroData.includes('getTreasuryYieldData'));
   assert.match(dashboard, /US 10Y benchmark/);
   assert.match(dashboard, /10Y TIPS real yield/);
-  assert.match(dashboard, /Daily published closing-market estimates/);
+  assert.ok(dashboard.includes('Daily published closing-market estimates'));
 });
 
 test('provider telemetry does not treat FRED key presence as data-use approval', () => {
   const telemetry = read('../lib/macro/providerTelemetry.ts');
-  assert.match(telemetry, /const fredStorageAllowed = process\\.env\\.FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true'/);
-  assert.doesNotMatch(telemetry, /FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true' \\|\\| fredKeyPresent/);
+  assert.ok(telemetry.includes("const fredStorageAllowed = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true'"));
+  assert.ok(!telemetry.includes("FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true' || fredKeyPresent"));
 });
 
 
