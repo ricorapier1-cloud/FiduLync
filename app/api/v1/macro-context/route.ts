@@ -155,6 +155,8 @@ export async function GET(request: Request) {
       generated_at_utc: new Date().toISOString(),
       timezone: 'Africa/Lagos',
       allowedToTrade,
+      biasScore: selectedBias?.biasScore ?? null,
+      directionalVerdict: selectedBias?.directionalVerdict ?? 'INSUFFICIENT_EVIDENCE',
       newsLockoutActive,
       activeSession,
       macroRiskRegime: selectedBias?.macroRiskRegime ?? 'INSUFFICIENT_EVIDENCE',
