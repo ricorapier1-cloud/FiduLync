@@ -39,6 +39,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const goldContext = initialGoldContext;
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [satelliteSymbol, setSatelliteSymbol] = useState<string | null>(null);
+  const [spreadHistory, setSpreadHistory] = useState<Record<string, number[]>>({});
   const [quoteStatus, setQuoteStatus] = useState('CONNECTING');
   const [latency, setLatency] = useState<number | null>(null);
   const [quoteSync, setQuoteSync] = useState<string | null>(null);
@@ -82,6 +83,9 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const gross = riskAmount * rr;
   const spreadUnits = quote?.spread === null || quote?.spread === undefined ? null : selected === 'XAUUSD' ? quote.spread : quote.spread / (selected.slice(3) === 'JPY' ? 0.01 : 0.0001);
   const spreadPct = spreadUnits !== null && stop > 0 ? spreadUnits / stop * 100 : null;
+  const baselineSamples = spreadHistory[selected] ?? [];
+  const spreadBaseline = baselineSamples.length >= 5 ? baselineSamples.reduce((sum, value) => sum + value, 0) / baselineSamples.length : null;
+  const spreadBlowoutBlock = quote?.spread !== null && quote?.spread !== undefined && spreadBaseline !== null && quote.spread > spreadBaseline * 2;
   const currentDateWAT = watDate(new Date(now));
   const sessionClock = new Date(now);
   const hourWAT = zonedDecimalHour(sessionClock, 'Africa/Lagos');
@@ -115,13 +119,13 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
     && risk > 0 && risk <= sovereignRiskCap && lots >= 0.01
     && journal.trades < 2 && journal.losses < 2 && !locked && !correlationBlocked;
   const quoteIsFresh = quote?.freshness === 'LIVE' && quote.ageMs !== null && quote.ageMs <= 60_000;
-  const spreadPass = quoteIsFresh && rr >= 2 && spreadPct !== null && spreadPct < 15;
+  const spreadPass = quoteIsFresh && rr >= 2 && spreadPct !== null && spreadPct < 15 && !spreadBlowoutBlock;
   const gates = [
     { name: 'Macro alignment', pass: macroPass, detail: selected === 'XAUUSD' ? (goldScore === null ? 'Gold engine evidence unavailable' : `${goldScore} gold score · ${goldContext?.directionalVerdict} · ${direction}`) : dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? 'No verified pair bias available' : `${dossier.biasScore} score · ${dossier.confidence} · ${direction}` },
     { name: 'Lagos session', pass: inSession, detail: 'London 08:00–12:00 WAT / New York 08:00–12:00 ET (DST-aware)' },
     { name: 'Tier-1 event risk', pass: eventPass, detail: !verifiedCalendar ? 'Calendar unverified; fail-closed' : nearRateDecision ? 'Central-bank decision within ±60 minutes' : nearEvent ? 'Event within ±30 minutes' : 'Verified calendar: clear' },
     { name: 'H4/H1 structure and liquidity', pass: technicalConfirmed, detail: 'Requires manual MT5 chart confirmation' },
-    { name: 'Reward/risk and spread', pass: spreadPass, detail: `${rr.toFixed(2)}R · ${quoteIsFresh ? 'fresh quote' : 'quote stale/unavailable'} · spread ${spreadPct === null ? 'unavailable' : spreadPct.toFixed(1) + '% of SL'}` },
+    { name: 'Reward/risk and spread', pass: spreadPass, detail: `${rr.toFixed(2)}R · ${quoteIsFresh ? 'fresh quote' : 'quote stale/unavailable'} · spread ${spreadPct === null ? 'unavailable' : spreadPct.toFixed(1) + '% of SL'}${spreadBlowoutBlock ? ' · SPREAD_BLOWOUT_BLOCK' : ''}` },
     { name: 'Daily risk circuit breaker', pass: riskPass, detail: `${risk.toFixed(2)}% · ${lots.toFixed(2)} lots · ${journal.trades}/2 trades · ${journal.losses}/2 losses${correlationBlocked ? ' · SHARED LEG: ' + conflictingLegs.join('/') : ''}` },
   ];
   const gatePassed = gates.every((gate) => gate.pass) && !locked;
@@ -133,6 +137,15 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
     if (!response.ok) throw new Error(`Live quote proxy HTTP ${response.status}`);
     const payload = await response.json() as QuoteResponse;
     setQuotes(payload.quotes);
+    setSpreadHistory((previous) => {
+      const next = { ...previous };
+      for (const item of payload.quotes) {
+        if (item.freshness === 'LIVE' && item.spread !== null && item.spread > 0) {
+          next[item.symbol] = [...(previous[item.symbol] ?? []), item.spread].slice(-20);
+        }
+      }
+      return next;
+    });
     setQuoteStatus(payload.status);
     setLatency(payload.latencyMs);
     setQuoteSync(payload.generatedAtUtc);
