@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { getCachedData } from '@/lib/redisCache';
+import { getCboeVixHistory } from '@/lib/cboeVix';
 
 type Observation = {
   date: string;
@@ -477,6 +478,8 @@ export async function buildGoldMacroContext(): Promise<GoldMacroContext> {
   const fredApiKey = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true' ? process.env.FRED_API_KEY?.trim() ?? '' : '';
 
   const quotePromise = fetchGoldQuote();
+  const cboeVixStarted = performance.now();
+  const cboeVixPromise = getCachedData('macro:cboe-vix-history-v1', getCboeVixHistory, 60 * 60).catch(() => null);
   let cftcFailureLatencyMs = 0;
   const cotPromise = getCachedData('xau:cot:cftc-088691:v1', fetchCftcGoldPosition, 6 * 60 * 60).catch((error: unknown) => {
     cftcFailureLatencyMs = failedLatency(error) ?? 0;
@@ -492,14 +495,22 @@ export async function buildGoldMacroContext(): Promise<GoldMacroContext> {
     })
     : FRED_SERIES.map(async (seriesId) => [seriesId, null, null] as const);
 
-  const [quoteResult, cotResult, fredResults] = await Promise.all([
+  const [quoteResult, cotResult, fredResults, cboeVixResult] = await Promise.all([
     quotePromise.catch(() => unavailableQuote()),
     cotPromise,
     Promise.all(fredPromises),
+    cboeVixPromise,
   ]);
 
   const fredBySeries = new Map<string, TimedResult<Observation[]> | null>();
   for (const [seriesId, result] of fredResults) fredBySeries.set(seriesId, result);
+  if (cboeVixResult && !fredBySeries.get('VIXCLS')) {
+    fredBySeries.set('VIXCLS', {
+      value: cboeVixResult.history.map((item) => ({ date: item.date, value: item.value })),
+      latencyMs: Math.max(0, Math.round(performance.now() - cboeVixStarted)),
+      retrievedAtUtc: cboeVixResult.retrievedAtUtc,
+    });
+  }
   const drivers = {
     DFII10: makeDriver('DFII10', fredBySeries.get('DFII10') ?? null),
     T10YIE: makeDriver('T10YIE', fredBySeries.get('T10YIE') ?? null),
