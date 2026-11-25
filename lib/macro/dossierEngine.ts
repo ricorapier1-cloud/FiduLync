@@ -103,7 +103,9 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
   }
 
   // Apply penalty factor for missing components
-  const penaltyMultiplier = Math.max(0.2, 1.0 - (missingComponents * 0.18));
+  // COT is supporting weekly evidence, not a required macro input; absence should
+  // lower evidence confidence without suppressing a valid policy/inflation thesis.
+  const penaltyMultiplier = Math.max(0.75, 1.0 - (missingComponents * 0.08));
   const biasScore = Math.max(-100, Math.min(100, Math.round(rawScore * penaltyMultiplier)));
 
   let fundamentalBias: FundamentalBias = 'NEUTRAL';
