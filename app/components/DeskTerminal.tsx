@@ -16,9 +16,9 @@ type QuoteResponse = { generatedAtUtc: string; latencyMs: number; status: string
 type FxRow = { date: string; rates: Record<string, number> };
 type JournalEntry = { id: string; timeUtc: string; symbol: string; result: 'WIN' | 'LOSS' | 'FLAT'; pnl: number };
 type Journal = { dateWAT: string; trades: number; wins: number; losses: number; netPnl: number; entries: JournalEntry[] };
-type SymbolCode = 'EURUSD' | 'GBPUSD' | 'XAUUSD' | 'USDJPY';
+type SymbolCode = string;
 type Direction = 'BUY' | 'SELL';
-const symbols: SymbolCode[] = ['EURUSD', 'GBPUSD', 'XAUUSD', 'USDJPY'];
+const symbols: SymbolCode[] = ['EURUSD', 'XAUUSD', 'USDJPY'];
 const currencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CHF', 'CAD'] as const;
 const JOURNAL_KEY = 'fidulync-desk-journal-v1';
 const FX_KEY = 'fidulync-desk-fx-v1';
@@ -38,6 +38,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const snapshot = initialSnapshot;
   const goldContext = initialGoldContext;
   const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [satelliteSymbol, setSatelliteSymbol] = useState<string | null>(null);
   const [quoteStatus, setQuoteStatus] = useState('CONNECTING');
   const [latency, setLatency] = useState<number | null>(null);
   const [quoteSync, setQuoteSync] = useState<string | null>(null);
@@ -71,7 +72,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const lots = pipValue && stop > 0 ? Math.floor((riskAmount / (stop * pipValue)) * 100) / 100 : 0;
   const rr = stop > 0 && target > 0 ? target / stop : 0;
   const gross = riskAmount * rr;
-  const spreadUnits = quote?.spread === null || quote?.spread === undefined ? null : selected === 'XAUUSD' ? quote.spread : quote.spread / (selected === 'USDJPY' ? 0.01 : 0.0001);
+  const spreadUnits = quote?.spread === null || quote?.spread === undefined ? null : selected === 'XAUUSD' ? quote.spread : quote.spread / (selected.slice(3) === 'JPY' ? 0.01 : 0.0001);
   const spreadPct = spreadUnits !== null && stop > 0 ? spreadUnits / stop * 100 : null;
   const currentDateWAT = watDate(new Date(now));
   const sessionClock = new Date(now);
