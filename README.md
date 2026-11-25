@@ -79,7 +79,7 @@ Configure secrets only in the Vercel project environment settings, never in this
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` | Server-only database persistence |
 | `CRON_SECRET` | Authenticates scheduled macro refresh |
-| `BLS_API_KEY` | Optional BLS API v2 registration key |
+| `BLS_API_KEY` | Optional BLS API v2 registration key; public v1 fallback works without a key |
 | `BEA_API_KEY` | Optional BEA API key |
 | `FRED_API_KEY` | Optional FRED API key |
 | `FRED_DATA_STORAGE_PERMISSION_APPROVED` | Explicit approval gate for FRED storage/use in this application |
@@ -90,7 +90,7 @@ Configure secrets only in the Vercel project environment settings, never in this
 | `FAIRECONOMY_COMMERCIAL_USE_APPROVED` | Explicit calendar-feed use gate |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Shared caching and telemetry |
 
-Never set an approval flag merely because an API key exists. Confirm the provider's applicable terms, plan and data-use rights first. Twelve Data is not required for the macro-only product scope. No paid data subscription is required for the official public central-bank feeds listed above.
+Never set an approval flag merely because an API key exists. Confirm the provider's applicable terms, plan and data-use rights first. Twelve Data is not required for the macro-only product scope. No paid data subscription is required for the official public central-bank feeds listed above. U.S. Treasury daily nominal/TIPS yields and Cboe daily VIX closes are also ingested from public official sources without API keys; both are daily closing observations, not intraday feeds. BLS public v1 is cached conservatively when no registration key is supplied. The economic calendar remains explicitly unavailable until an approved calendar provider is enabled.
 
 ## Verification
 
