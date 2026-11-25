@@ -93,6 +93,12 @@ test('public MT5 bridge is read-only macro context with no licensing, heartbeat 
   assert.match(bridge, /api\/v1\/macro-context/);
   assert.match(bridge, /x-macro-key/);
   assert.match(bridge, /safe_to_trade = false/);
+  assert.match(bridge, /allowedToTrade/);
+  assert.match(bridge, /newsLockoutActive/);
+  assert.match(bridge, /activeSession/);
+  assert.match(bridge, /macroRiskRegime/);
+  assert.match(bridge, /directionalVerdict/);
+  assert.match(bridge, /macro_allowed_to_trade = context\.allowed_to_trade/);
   assert.doesNotMatch(bridge, /license_key|LogClosedTrade|MacroLyncSendHeartbeat|SimulateTesterSignal|api\/v1\/macro-signal/i);
   for (const legacyFile of [
     '../public/downloads/AlgoLync_EA_README.txt',
