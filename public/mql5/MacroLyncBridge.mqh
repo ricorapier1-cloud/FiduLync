@@ -249,6 +249,10 @@ bool ML_FetchMacroContext(const string symbol, const string endpoint, const stri
    context.event_risk_status = event_status;
    context.news_lockout = context.news_lockout_active || news == "true" || !context.calendar_verified || decision == "INSUFFICIENT_EVIDENCE";
    context.allowed_to_trade = allowed == "true" && !context.news_lockout;
+   context.sovereign_shield_status = shield_status == "" ? "UNVERIFIED" : shield_status;
+   context.sovereign_max_risk_pct = StringToDouble(shield_max_risk);
+   context.sovereign_shield_blocked = shield_status == "BLACK_SWAN_LOCKOUT" || shield_max_risk == "" || context.sovereign_max_risk_pct <= 0.0;
+   if(context.sovereign_shield_blocked) context.allowed_to_trade = false;
    context.next_catalyst_title = ML_JsonString(response, "title");
    context.next_catalyst_utc = ML_JsonString(response, "scheduled_at_utc");
    context.source_mode = source_mode;
