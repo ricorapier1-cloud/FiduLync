@@ -78,8 +78,9 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext }: { 
   const fxMacroPass = (dossier.confidence === 'HIGH' || dossier.confidence === 'MODERATE')
     && ((dossier.biasScore > 0 && direction === 'BUY') || (dossier.biasScore < 0 && direction === 'SELL'));
   const goldScore = initialGoldContext?.goldBiasScore ?? null;
-  const goldMacroPass = initialGoldContext?.overallState === 'AVAILABLE' && goldScore !== null
-    && ((goldScore > 0 && direction === 'BUY') || (goldScore < 0 && direction === 'SELL'));
+  const goldMacroPass = initialGoldContext?.overallState === 'AVAILABLE'
+    && ((initialGoldContext.directionalVerdict === 'BULLISH' && direction === 'BUY')
+      || (initialGoldContext.directionalVerdict === 'BEARISH' && direction === 'SELL'));
   const macroPass = selected === 'XAUUSD' ? goldMacroPass : fxMacroPass;
   const verifiedCalendar = initialSnapshot.calendarSource === 'provider';
   const nearEvent = verifiedCalendar && initialSnapshot.catalysts.some((event) => event.impact === 'High' && Math.abs(Date.parse(event.scheduledAt) - now) <= 30 * 60_000);
