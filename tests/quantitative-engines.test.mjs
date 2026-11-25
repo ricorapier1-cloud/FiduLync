@@ -236,7 +236,7 @@ test('public FairEconomy calendar is no-key, Tier-1-only, and records source pro
   assert.match(macroData, /item\.impact === 'High'/);
   assert.match(macroData, /snapshot\.calendarProvider = calendarResult/);
   assert.match(types, /calendarProvider\?: 'FAIRECONOMY_PUBLIC'/);
-  assert.match(desk, /initialSnapshot\.calendarSource === 'provider'/);
+  assert.match(desk, /snapshot\.calendarSource === 'provider' && Boolean\(snapshot\.calendarProvider\)/);
 });
 
 test('live quote API rounds each instrument to its display precision before JSON serialization', () => {
