@@ -732,9 +732,9 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
   ]);
   let hasMacroData = false;
   let hasAnyProviderData = false;
-  if (eiaResult.status === 'fulfilled' && eiaResult.value) { snapshot.energyMarkets = eiaResult.value; }
+  if (eiaResult.status === 'fulfilled' && eiaResult.value) { snapshot.energyMarkets = eiaResult.value; hasAnyProviderData = true; }
   else if (eiaResult.status === 'rejected') console.warn('EIA crude oil spot observations are unavailable:', eiaResult.reason);
-  if (treasuryResult.status === 'fulfilled') snapshot.usTreasury = treasuryResult.value;
+  if (treasuryResult.status === 'fulfilled') { snapshot.usTreasury = treasuryResult.value; hasAnyProviderData = true; }
   else if (treasuryResult.status === 'rejected') console.warn('Official U.S. Treasury yield observations are unavailable:', treasuryResult.reason);
   if (fredResult.status === 'fulfilled' && isRecord(fredResult.value)) {
     let usd = snapshot.currencies.find((currency) => currency.code === 'USD');
