@@ -183,9 +183,9 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   }, []);
   useEffect(() => {
     if (!ready) return;
-    void refreshSatellite();
+    const initial = window.setTimeout(() => void refreshSatellite(), 0);
     const timer = window.setInterval(() => void refreshSatellite(), 300_000);
-    return () => window.clearInterval(timer);
+    return () => { window.clearTimeout(initial); window.clearInterval(timer); };
   }, [ready, refreshSatellite]);
   useEffect(() => {
     const tick = () => setNow(Date.now());
