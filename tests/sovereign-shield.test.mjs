@@ -31,7 +31,8 @@ test('Sovereign Shield locks around tier-1 and central bank rate decisions', () 
 
 test('Sovereign Shield exposes missing account ledger instead of inventing it', () => {
   const result = evaluateSovereignShield({ ...complete, rollingSevenDayDrawdownPct: null, tradesToday: null, lossesToday: null });
-  assert.equal(result.allowedToTrade, true);
+  assert.equal(result.allowedToTrade, false);
+  assert.ok(result.blockReasons.includes('AUTHORITATIVE_ACCOUNT_RISK_LEDGER_UNAVAILABLE'));
   assert.equal(result.dataGaps.length, 2);
 });
 
