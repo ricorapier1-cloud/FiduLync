@@ -21,7 +21,7 @@ export async function GET(req: Request) {
       ? 'REFERENCE_FALLBACK'
       : hasLiveCalendar
         ? 'LIVE_PROVIDER'
-        : 'LIVE_MACRO_REFERENCE_CALENDAR';
+        : 'LIVE_MACRO_CALENDAR_UNAVAILABLE';
     const status = !hasLiveMacroData
       ? 'degraded'
       : snapshot.source === 'partial' || !hasLiveCalendar
@@ -44,8 +44,8 @@ export async function GET(req: Request) {
     return NextResponse.json({
       status,
       message: status === 'partial'
-        ? 'Live macro observations refreshed. One or more independent data domains remain reference-only or incomplete.'
-        : 'Live macro and economic-calendar feeds refreshed.',
+        ? 'Live macro observations refreshed. The economic calendar remains unavailable or incomplete.'
+        : 'Live macro observations refreshed with a verified provider calendar.',
       source: snapshot.source,
       calendarSource: snapshot.calendarSource,
       cotSource: snapshot.cotSource,
