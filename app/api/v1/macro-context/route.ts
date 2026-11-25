@@ -36,7 +36,10 @@ async function authenticate(request: Request): Promise<string | null> {
     return data?.id ? `installation:${data.id}` : null;
   }
 
-  const secret = process.env.MACROLYNC_API_SECRET?.trim()
+  // Accept the configured bridge token as a service credential. Keep all
+  // service secrets on the server and compare in constant time.
+  const secret = process.env.MACRO_API_TOKEN?.trim()
+    || process.env.MACROLYNC_API_SECRET?.trim()
     || process.env.ALGO_PRIVATE_API_KEY?.trim();
   if (!secret || secret.length < 32 || !safeEqual(candidate, secret)) return null;
   return `service:${createHash('sha256').update(secret).digest('hex').slice(0, 16)}`;
@@ -75,7 +78,9 @@ export async function GET(request: Request) {
   }
 
   if (!identity) {
-    const secret = process.env.MACRO_API_TOKEN?.trim() || process.env.MACROLYNC_API_SECRET?.trim() || process.env.ALGO_PRIVATE_API_KEY?.trim();
+    const secret = process.env.MACRO_API_TOKEN?.trim()
+      || process.env.MACROLYNC_API_SECRET?.trim()
+      || process.env.ALGO_PRIVATE_API_KEY?.trim();
     const status = !secret || secret.length < 32 ? 503 : 401;
     return NextResponse.json(
       { error: status === 503 ? 'Macro context API is not configured for authenticated access.' : 'Unauthorized.' },
