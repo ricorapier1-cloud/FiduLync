@@ -592,7 +592,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
               <span className="eyebrow">05 / EVENT RISK</span>
               <h2 id="catalyst-title">Tier-1 Economic Catalysts</h2>
             </div>
-            <span className="macro-section-note mono"><BrandGlyph name="calendar-clock" size={13} /> UTC SCHEDULE</span>
+            <span className="macro-section-note mono"><BrandGlyph name="calendar-clock" size={13} /> {snapshot.calendarProvider ?? 'CALENDAR SOURCE UNAVAILABLE'} · UTC / WAT</span>
           </div>
 
           <div className="macro-panel macro-catalyst-panel">
@@ -602,6 +602,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
                 <div className="macro-event-time">
                   <span className="mono">{new Date(catalyst.scheduledAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', timeZone: 'UTC' }).toUpperCase()}</span>
                   <strong className="mono">{new Date(catalyst.scheduledAt).toISOString().slice(11, 16)}Z</strong>
+                  <small className="mono text-slate-500">WAT {new Date(catalyst.scheduledAt).toLocaleTimeString('en-GB', { timeZone: 'Africa/Lagos', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })}</small>
                 </div>
                 <div className="macro-event-info">
                   <div>
