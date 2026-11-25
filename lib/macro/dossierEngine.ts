@@ -149,25 +149,28 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
     supporting.push(`Speculative short positioning on ${base} is exhausted (${baseCot.percentile}%ile); short-covering potential.`);
   }
 
-  // Cross-asset confirmation
-  const crossAssetConfirmation = 'UNAVAILABLE — verified cross-asset observations are not yet connected to this dossier.';
+  // Cross-asset confirmation reports only independently sourced observations.
+  const crossAssetEvidence: string[] = [];
+  if (crossAsset.usTenYearRealYield !== null) crossAssetEvidence.push('US 10Y real yield ' + crossAsset.usTenYearRealYield.toFixed(2) + '%');
+  if (crossAsset.usTwoYearYield !== null && crossAsset.usTenYearYield !== null) crossAssetEvidence.push('US 2s10s curve ' + ((crossAsset.usTenYearYield - crossAsset.usTwoYearYield) * 100).toFixed(0) + ' bps');
+  if (crossAsset.vix !== null) crossAssetEvidence.push('CBOE VIX ' + crossAsset.vix.toFixed(2) + ' (' + crossAsset.vixRegime + ')');
+  if (crossAsset.crudeWti !== null) crossAssetEvidence.push('WTI ' + crossAsset.crudeWti.toFixed(2) + ' USD/bbl');
+  const crossAssetConfirmation = crossAssetEvidence.length ? crossAssetEvidence.join(' · ') : 'UNAVAILABLE — no fresh cross-asset observations passed validation.'
 
   // Upcoming catalysts
   const now = Date.now();
   const relevantRegions = new Set([base, quote, 'US', 'EU', 'UK', 'JP', 'CH', 'CA', 'AU', 'NZ']);
-  const upcoming = snapshot.catalysts
-    .filter((c) => relevantRegions.has(c.region) && Date.parse(c.scheduledAt) >= now)
-    .sort((a, b) => Date.parse(a.scheduledAt) - Date.parse(b.scheduledAt));
-
+  const relevantEvents = snapshot.catalysts.filter((event) => relevantRegions.has(event.region));
+  const activeHighImpactLockout = relevantEvents.some((event) => event.impact === 'High'
+    && Math.abs(Date.parse(event.scheduledAt) - now) <= 30 * 60 * 1000);
+  const upcoming = relevantEvents.filter((event) => Date.parse(event.scheduledAt) >= now)
+    .sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt));
   const nextCatalyst = upcoming[0] ? {
-    title: upcoming[0].title,
-    scheduledAt: upcoming[0].scheduledAt,
-    region: upcoming[0].region,
-    impact: upcoming[0].impact,
-    lockoutActive: Math.abs(Date.parse(upcoming[0].scheduledAt) - now) <= 30 * 60 * 1000,
+    title: upcoming[0].title, scheduledAt: upcoming[0].scheduledAt, region: upcoming[0].region,
+    impact: upcoming[0].impact, lockoutActive: activeHighImpactLockout,
   } : null;
-
-  const eventRiskLockout = nextCatalyst?.lockoutActive ?? false;
+  // Includes both the 30-minute pre-release and post-release windows.
+  const eventRiskLockout = activeHighImpactLockout;
 
   // Invalidation triggers
   const riskRegimeInvalidation = crossAsset.globalRiskAppetite === 'UNAVAILABLE'

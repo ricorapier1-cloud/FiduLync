@@ -22,7 +22,7 @@ function numberValue(value: unknown): number | null {
   return null;
 }
 function isoTime(value: unknown): string | null {
-  if (typeof value === 'number' || (typeof value === 'string' && /^\\d{10,13}$/.test(value))) {
+  if (typeof value === 'number' || (typeof value === 'string' && /^\d{10,13}$/.test(value))) {
     const numeric = Number(value);
     const date = new Date(numeric < 1_000_000_000_000 ? numeric * 1000 : numeric);
     return Number.isFinite(date.getTime()) ? date.toISOString() : null;

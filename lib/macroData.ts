@@ -24,6 +24,27 @@ export const EMPTY_SNAPSHOT: MacroSnapshot = {
   catalysts: [],
 };
 
+export function sanitizeMacroSnapshotPermissions(snapshot: MacroSnapshot): MacroSnapshot {
+  if (process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true') return snapshot;
+  let removed = false;
+  const currencies = snapshot.currencies.map((currency) => {
+    const next = { ...currency };
+    if (next.policyRateProvider === 'FRED') {
+      next.policyRate = 0; next.policyRateSource = 'reference';
+      delete next.policyRateProvider; delete next.policyRateObservationDate; removed = true;
+    }
+    if (next.inflationProvider === 'FRED') {
+      next.inflation = 0; next.inflationLabel = 'CPI'; next.inflationSource = 'reference';
+      delete next.inflationProvider; delete next.inflationObservationDate; delete next.corePce; delete next.cpi; removed = true;
+    }
+    if (next.code === 'USD' && next.twoYearYieldSource === 'provider') {
+      next.twoYearYield = undefined; next.twoYearYieldSource = 'reference'; delete next.twoYearYieldObservationDate; removed = true;
+    }
+    return next;
+  });
+  return removed ? { ...snapshot, currencies, source: snapshot.source === 'provider' ? 'partial' : snapshot.source } : snapshot;
+}
+
 export function getFallbackSnapshot(): MacroSnapshot {
   return {
     asOf: new Date().toISOString(),
@@ -1114,7 +1135,7 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
         .filter((entry): entry is [string, number] => /^[A-Z]{3}$/.test(entry[0])
           && isFiniteNumber(entry[1]) && entry[1] > 0))
       : undefined;
-    return {
+    return sanitizeMacroSnapshotPermissions({
       ...parsed,
       source: data.payload.source === 'partial'
         ? 'partial'
@@ -1127,7 +1148,7 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
       ...(parsed.energyMarkets ? { energyMarkets: parsed.energyMarkets } : {}),
       asOf: data.refreshed_at,
       ...(ecbRates && Object.keys(ecbRates).length > 0 ? { ecbRates } : {}),
-    };
+    });
   } catch (error) {
     console.warn('Persisted macro snapshot is unavailable:', error);
     return null;

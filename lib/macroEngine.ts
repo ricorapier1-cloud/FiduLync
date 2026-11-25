@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { getFallbackSnapshot, loadMacroSnapshot } from '@/lib/macroData';
+import { getFallbackSnapshot, loadMacroSnapshot, sanitizeMacroSnapshotPermissions } from '@/lib/macroData';
 import { getCachedData } from '@/lib/redisCache';
 import type { MacroSnapshot } from '@/types/macro';
 import { getCrossAssetTelemetry, classifyMacroRegime } from '@/lib/macro/crossAssetEngine';
@@ -19,7 +19,7 @@ export type FundamentalSignal = {
 export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnapshot> {
   let snapshot: MacroSnapshot;
   try {
-    snapshot = await getCachedData('macro:snapshot:v3', loadMacroSnapshot, 900, forceRefresh);
+    snapshot = sanitizeMacroSnapshotPermissions(await getCachedData('macro:snapshot:v3', loadMacroSnapshot, 900, forceRefresh));
   } catch (error) {
     console.warn('Macro providers and cached snapshots are unavailable; serving reference macro levels.', error);
     snapshot = getFallbackSnapshot();

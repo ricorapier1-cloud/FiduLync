@@ -32,7 +32,7 @@ const pairs = [
 function inflationFreshnessDays(currencyCode: string) { return currencyCode === 'AUD' ? 180 : 120; }
 
 function isFreshQuarter(period: string | undefined) {
-  const match = period?.match(/^(\\d{4})Q([1-4])$/);
+  const match = period?.match(/^(\d{4})Q([1-4])$/);
   if (!match) return false;
   const quarterEnd = Date.UTC(Number(match[1]), Number(match[2]) * 3, 0);
   const age = Date.now() - quarterEnd;

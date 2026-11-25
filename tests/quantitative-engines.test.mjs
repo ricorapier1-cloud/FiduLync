@@ -300,6 +300,25 @@ test('licensed or permission-dependent providers fail closed unless their explic
   assert.match(goldEngine, /FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true'/);
 });
 
+test('Swissquote BBO timestamp parsing accepts parent-level item timestamps and numeric Unix timestamps', () => {
+  const quotes = read('../app/api/v1/live-quotes/route.ts');
+  assert.ok(quotes.includes('raw.ts ?? item.ts'));
+  assert.ok(quotes.includes('/^\\d{10,13}$/'));
+});
+
+test('GDP quarter parsing uses a real digit matcher', () => {
+  const dashboard = read('../app/components/MacroDashboard.tsx');
+  assert.ok(dashboard.includes('period?.match(/^(\\d{4})Q([1-4])$/)'));
+});
+
+test('cached FRED observations are excluded when storage permission is not approved', () => {
+  const macroData = read('../lib/macroData.ts');
+  const engine = read('../lib/macroEngine.ts');
+  assert.match(macroData, /sanitizeMacroSnapshotPermissions/);
+  assert.match(macroData, /policyRateProvider === 'FRED'/);
+  assert.match(engine, /sanitizeMacroSnapshotPermissions\\(await getCachedData/);
+});
+
 test('economic calendar never falls back to hardcoded central-bank dates or stale persisted fixtures', () => {
   const macroData = read('../lib/macroData.ts');
   assert.doesNotMatch(macroData, /getCentralBankDecisionsSchedule/);
