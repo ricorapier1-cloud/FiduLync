@@ -63,7 +63,7 @@ export async function GET() {
           symbol: dossier.symbol,
           direction: dossier.fundamentalBias.includes('BULLISH') ? 'BUY' : 'SELL',
           macroScore: dossier.biasScore,
-          confidence: dossier.confidence,
+          confidence: dossier.confidence === 'HIGH' ? 'HIGH' : 'MODERATE',
           evidenceCoveragePct: Math.round((essential.filter(Boolean).length + optional.filter(Boolean).length) / 6 * 100),
           regime: dossier.macroRegime,
           supportingEvidence: dossier.supportingEvidence.filter((item) => !item.startsWith('No verified')).slice(0, 3),
