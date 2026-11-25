@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getCachedData } from '@/lib/redisCache';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -85,7 +86,12 @@ async function fetchQuote(instrument: typeof instruments[number]) {
 
 export async function GET() {
   const started = performance.now();
-  const quotes = await Promise.all(instruments.map(fetchQuote));
+  const cachedQuotes = await getCachedData('macro:swissquote-bbo-v1', () => Promise.all(instruments.map(fetchQuote)), 5);
+  const quotes = cachedQuotes.map((quote) => {
+    const ageMs = quote.quoteTimeUtc ? Math.max(0, Date.now() - Date.parse(quote.quoteTimeUtc)) : null;
+    const freshness = ageMs === null ? 'UNAVAILABLE' as const : ageMs > 60_000 ? 'STALE' as const : 'LIVE' as const;
+    return { ...quote, ageMs, freshness };
+  });
   const healthy = quotes.filter((quote) => quote.freshness === 'LIVE').length;
   return NextResponse.json({
     schemaVersion: '1.0.0',
