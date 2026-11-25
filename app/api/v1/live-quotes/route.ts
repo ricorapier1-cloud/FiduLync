@@ -49,7 +49,7 @@ async function fetchQuote(instrument: typeof instruments[number]) {
         if (!isRecord(raw)) continue;
         const bid = numberValue(raw.bid);
         const ask = numberValue(raw.ask);
-        const quoteTimeUtc = isoTime(raw.ts);
+        const quoteTimeUtc = isoTime(raw.ts ?? item.ts);
         if (bid !== null && ask !== null && bid > 0 && ask >= bid && quoteTimeUtc) {
           quote = { bid, ask, quoteTimeUtc };
           break;
