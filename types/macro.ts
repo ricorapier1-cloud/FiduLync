@@ -188,6 +188,15 @@ export type TreasuryYieldData = {
   freshness: 'LATEST PUBLISHED' | 'STALE';
 };
 
+export type CboeVixData = {
+  source: 'CBOE';
+  value: number;
+  observationDate: string;
+  retrievedAtUtc: string;
+  freshness: 'LATEST PUBLISHED' | 'STALE';
+  history: Array<{ date: string; value: number }>;
+};
+
 export type MacroSnapshot = {
   asOf: string;
   source: 'fallback' | 'provider' | 'partial';
@@ -203,6 +212,7 @@ export type MacroSnapshot = {
   providerStatus?: ProviderStatus[];
   energyMarkets?: EnergyMarkets;
   usTreasury?: TreasuryYieldData;
+  vix?: CboeVixData;
 };
 
 export type MarketQuote = {
