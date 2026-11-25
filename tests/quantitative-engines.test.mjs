@@ -511,6 +511,6 @@ test('trade journal offers JSON and CSV exports and desk sections use non-collid
   const desk = read('../app/components/DeskTerminal.tsx');
   assert.match(desk, /exportJournal\('json'\)/);
   assert.match(desk, /exportJournal\('csv'\)/);
-  assert.match(desk, /A \/ RELATIVE PERFORMANCE/);
+  assert.match(desk, /A \/ UNIFIED CURRENCY MATRIX/);
   assert.match(desk, /E \/ MT5 MACRO CONTEXT BRIDGE/);
 });
