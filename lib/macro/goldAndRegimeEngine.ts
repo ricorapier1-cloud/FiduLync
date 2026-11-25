@@ -573,6 +573,10 @@ export async function buildGoldMacroContext(snapshot?: MacroSnapshot): Promise<G
     drivers.twoYearMinusThreeMonthPct = Number((dgs2.value - dtb3.value).toFixed(4));
   }
 
+  if (!treasuryResult && snapshotTreasury) {
+    for (const seriesId of ['DFII10', 'T10YIE', 'DGS2', 'DTB3'] as const) drivers[seriesId].latencyMs = null;
+  }
+
   const cot = cotResult
     ? {
       market: cotResult.value.market,
