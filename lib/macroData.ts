@@ -761,7 +761,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     getRiksbankPolicyRate(),
     getNorgesBankPolicyRate(),
     eiaApiKey ? getEiaEnergyMarkets(eiaApiKey) : Promise.resolve(null),
-    getCachedData('macro:us-treasury-yields-v1', getTreasuryYieldData, 60 * 60),
+    getCachedData('macro:us-treasury-yields-history-v2', getTreasuryYieldData, 60 * 60),
     getCachedData('macro:cboe-vix-history-v1', getCboeVixHistory, 60 * 60),
   ]);
   let hasMacroData = false;

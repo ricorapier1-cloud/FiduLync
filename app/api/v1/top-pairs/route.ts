@@ -35,7 +35,13 @@ function readiness(calendarVerified: boolean, eventLockout: boolean): Candidate[
 
 export async function GET() {
   try {
-    const [snapshot, gold] = await Promise.all([getMacroSnapshot(), buildGoldMacroContext()]);
+    const [snapshot, gold] = await Promise.all([
+      getMacroSnapshot(),
+      buildGoldMacroContext().catch((error) => {
+        console.warn('Gold opportunity input unavailable; continuing with FX candidates:', error);
+        return null;
+      }),
+    ]);
     const fx = G8_PAIRS.filter((symbol) => symbol !== 'XAUUSD')
       .map((symbol) => generatePairDossier(snapshot, symbol))
       .filter((dossier) => (dossier.confidence === 'HIGH' || dossier.confidence === 'MODERATE')
@@ -79,7 +85,7 @@ export async function GET() {
       && event.region === 'US' && Math.abs(Date.parse(event.scheduledAt) - Date.now()) <= 30 * 60 * 1000);
     const nextGoldEvent = snapshot.catalysts.filter((event) => event.region === 'US' && Date.parse(event.scheduledAt) >= Date.now())
       .sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt))[0];
-    const goldCandidate: Omit<Candidate, 'rank'> | null = gold.overallState === 'AVAILABLE'
+    const goldCandidate: Omit<Candidate, 'rank'> | null = gold && gold.overallState === 'AVAILABLE'
       && gold.goldBiasScore !== null && Math.abs(gold.goldBiasScore) >= 20
       && (gold.directionalVerdict === 'BULLISH' || gold.directionalVerdict === 'BEARISH')
       ? {
