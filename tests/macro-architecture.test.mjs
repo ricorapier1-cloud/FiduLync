@@ -110,9 +110,9 @@ test('legacy storefront, licensing, payments and execution APIs are blocked at t
     '/api/v1/paystack-webhook',
     '/api/v1/license-bind',
     '/api/v1/trade-log',
-    '/api/v1/top-pairs',
     '/api/mt5/ingest',
   ]) assert.ok(proxy.includes(route), route);
+  assert.doesNotMatch(proxy, /'\/api\/v1\/top-pairs'/);
   assert.doesNotMatch(read('../app/components/MacroDashboard.tsx'), /TopPairBanner|top-pairs/);
 });
 
