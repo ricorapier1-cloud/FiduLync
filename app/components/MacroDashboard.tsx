@@ -221,8 +221,6 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
 
   return (
     <div className="macro-page pb-36 sm:pb-12 md:pb-8">
-      <DeskTerminal initialSnapshot={snapshot} />
-
       {/* Top Statusline */}
       <div className="macro-statusline mono">
         <span><span className={`macro-pulse${liveQuoteAvailable ? ' macro-pulse-live' : ''}`} /> MACROLYNC / INSTITUTIONAL RESEARCH TERMINAL</span>
@@ -249,8 +247,13 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
                 {quote.changePercent >= 0 ? '+' : ''}{quote.changePercent.toFixed(2)}%
               </span>
             )}
-            <small className={quote.source === 'finnhub' ? 'macro-positive' : ''}>
-              {quote.source === 'finnhub' ? 'LIVE' : quote.source === 'frankfurter' ? 'ECB REF' : quote.source === 'gold-api' ? 'GOLD REF' : 'FX REF'}
+            <small className={quote.source === 'finnhub' && liveFeed && now !== null
+              && now - Date.parse(quote.timestamp) >= 0 && now - Date.parse(quote.timestamp) <= 120_000
+              ? 'macro-positive' : ''}>
+              {quote.source === 'finnhub'
+                ? liveFeed && now !== null && now - Date.parse(quote.timestamp) >= 0 && now - Date.parse(quote.timestamp) <= 120_000
+                  ? 'LIVE · FINNHUB' : 'STALE / DELAYED'
+                : quote.source === 'frankfurter' ? 'ECB REF' : quote.source === 'gold-api' ? 'GOLD REF' : 'FX REF'}
             </small>
           </span>
         ))}
@@ -321,6 +324,19 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
           <small>{refreshing ? 'Polling provider telemetry…' : currencies.length >= 11 ? 'All 11 currency inputs present' : 'Provider coverage incomplete'}</small>
         </article>
       </section>
+
+      {/* Unified research workspace navigation */}
+      <nav aria-label="Research workspaces" className="sticky top-0 z-30 flex flex-wrap gap-2 border-y border-white/10 bg-[#080d14]/95 px-3 py-3 backdrop-blur">
+        <a className="macro-refresh" href="#desk-terminal">01 / DESK &amp; EXECUTION</a>
+        <a className="macro-refresh" href="#matrix">02 / GLOBAL MACRO</a>
+        <a className="macro-refresh" href="#bias">03 / PAIR RESEARCH</a>
+        <a className="macro-refresh" href="#regimes">04 / CROSS-ASSET</a>
+        <a className="macro-refresh" href="#positioning">05 / POSITIONING</a>
+        <a className="macro-refresh" href="#catalysts">06 / CATALYSTS</a>
+        <a className="macro-refresh" href="#health">07 / DATA HEALTH</a>
+      </nav>
+
+      <DeskTerminal initialSnapshot={snapshot} />
 
       {/* Top Macro Divergence Banner */}
 
