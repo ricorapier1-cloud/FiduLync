@@ -122,7 +122,7 @@ export async function GET(request: Request) {
     const activeSession = activeMarketSession();
     const highImpactWindow = snapshot.catalysts.some((event) => event.impact === 'High'
       && Math.abs(Date.parse(event.scheduledAt) - Date.now()) <= 30 * 60_000);
-    const newsLockoutActive = snapshot.calendarSource !== 'provider' || highImpactWindow || dossier.eventRiskLockout;
+    const newsLockoutActive = snapshot.calendarSource !== 'provider' || !snapshot.calendarProvider || highImpactWindow || dossier.eventRiskLockout;
     const symbolBiases: Record<string, MacroSymbolBias> = Object.fromEntries(G8_PAIRS.map((candidate) => {
       if (candidate === 'XAUUSD') {
         const available = goldContext.goldBiasScore !== null
