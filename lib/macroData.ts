@@ -707,7 +707,7 @@ async function getCftcCot(): Promise<CotPosition[]> {
 
 async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallbackSnapshot()): Promise<MacroSnapshot | null> {
   const fredApiKey = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true' ? process.env.FRED_API_KEY?.trim() : undefined;
-  const finnhubApiKey = process.env.FINNHUB_COMMERCIAL_USE_APPROVED === 'true' ? process.env.FINNHUB_API_KEY?.trim() : undefined;
+  const finnhubApiKey = process.env.FINNHUB_PERSONAL_PLAN_ACTIVE === 'true' ? process.env.FINNHUB_API_KEY?.trim() : undefined;
   const alphaVantageKey = process.env.ALPHA_VANTAGE_COMMERCIAL_USE_APPROVED === 'true' ? process.env.ALPHA_VANTAGE_API_KEY?.trim() : undefined;
   const fmpKey = process.env.FMP_COMMERCIAL_USE_APPROVED === 'true' ? process.env.FMP_API_KEY?.trim() : undefined;
   const cotProviderUrl = process.env.COT_DATA_PROVIDER_LICENSE_APPROVED === 'true' ? process.env.COT_DATA_PROVIDER_URL?.trim() : undefined;
