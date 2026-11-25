@@ -256,17 +256,19 @@ function blsPeriodDate(year: string, period: string): string | undefined {
   return `${year}-${period.slice(1)}`;
 }
 
-async function getBlsUsdUpdates(apiKey: string) {
+async function getBlsUsdUpdates(apiKey?: string) {
   const currentYear = new Date().getUTCFullYear();
-  const response = await fetch('https://api.bls.gov/publicAPI/v2/timeseries/data/', {
+  const version = apiKey ? 'v2' : 'v1';
+  const requestBody: Record<string, unknown> = {
+    seriesid: ['CUSR0000SA0', 'CUUR0000SA0', 'LNS14000000', 'CES0500000003'],
+    startyear: String(currentYear - 2),
+    endyear: String(currentYear),
+  };
+  if (apiKey) requestBody.registrationkey = apiKey;
+  const response = await fetch('https://api.bls.gov/publicAPI/' + version + '/timeseries/data/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      seriesid: ['CUSR0000SA0', 'CUUR0000SA0', 'LNS14000000', 'CES0500000003'],
-      startyear: String(currentYear - 2),
-      endyear: String(currentYear),
-      registrationkey: apiKey,
-    }),
+    body: JSON.stringify(requestBody),
     cache: 'no-store',
     signal: AbortSignal.timeout(8_000),
   });
@@ -722,7 +724,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     getBankOfCanadaMacroInputs(),
     getBankOfEnglandPolicyRate(),
     getWorldBankG10Inflation(),
-    process.env.BLS_API_KEY?.trim() ? getBlsUsdUpdates(process.env.BLS_API_KEY.trim()) : Promise.resolve(null),
+    getCachedData('macro:bls-usd-updates-v1', () => getBlsUsdUpdates(process.env.BLS_API_KEY?.trim()), 6 * 60 * 60),
     process.env.BEA_API_KEY?.trim() ? getBeaRealGdpYoY(process.env.BEA_API_KEY.trim()) : Promise.resolve(null),
     getBisG8MacroInputs(),
     getRiksbankPolicyRate(),
