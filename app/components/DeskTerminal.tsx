@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { MacroSnapshot } from '@/types/macro';
+import type { GoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
 import { generatePairDossier } from '@/lib/macro/dossierEngine';
 
 type Quote = {
@@ -32,7 +33,7 @@ function readStorage<T>(key: string): T | null {
 function display(value: number | null | undefined, digits: number) { return value === null || value === undefined || !Number.isFinite(value) ? '—' : value.toFixed(digits); }
 function clamp(value: number, min: number, max: number) { return Math.max(min, Math.min(max, value)); }
 
-export default function DeskTerminal({ initialSnapshot }: { initialSnapshot: MacroSnapshot }) {
+export default function DeskTerminal({ initialSnapshot, initialGoldContext }: { initialSnapshot: MacroSnapshot; initialGoldContext: GoldMacroContext | null }) {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [quoteStatus, setQuoteStatus] = useState('CONNECTING');
   const [latency, setLatency] = useState<number | null>(null);
@@ -74,8 +75,12 @@ export default function DeskTerminal({ initialSnapshot }: { initialSnapshot: Mac
   const inSession = (hourWAT >= 8 && hourWAT < 12) || (hourWAT >= 13 && hourWAT < 17);
   const locked = journal.trades >= 2 || journal.losses >= 2;
   const dossier = useMemo(() => generatePairDossier(initialSnapshot, selected), [initialSnapshot, selected]);
-  const macroPass = (dossier.confidence === 'HIGH' || dossier.confidence === 'MODERATE')
+  const fxMacroPass = (dossier.confidence === 'HIGH' || dossier.confidence === 'MODERATE')
     && ((dossier.biasScore > 0 && direction === 'BUY') || (dossier.biasScore < 0 && direction === 'SELL'));
+  const goldScore = initialGoldContext?.goldBiasScore ?? null;
+  const goldMacroPass = initialGoldContext?.overallState === 'AVAILABLE' && goldScore !== null
+    && ((goldScore > 0 && direction === 'BUY') || (goldScore < 0 && direction === 'SELL'));
+  const macroPass = selected === 'XAUUSD' ? goldMacroPass : fxMacroPass;
   const verifiedCalendar = initialSnapshot.calendarSource === 'provider';
   const nearEvent = verifiedCalendar && initialSnapshot.catalysts.some((event) => event.impact === 'High' && Math.abs(Date.parse(event.scheduledAt) - now) <= 30 * 60_000);
   const eventPass = verifiedCalendar && !nearEvent;
@@ -86,7 +91,7 @@ export default function DeskTerminal({ initialSnapshot }: { initialSnapshot: Mac
   const quoteIsFresh = quote?.freshness === 'LIVE' && quote.ageMs !== null && quote.ageMs <= 60_000;
   const spreadPass = quoteIsFresh && rr >= 2 && spreadPct !== null && spreadPct < 15;
   const gates = [
-    { name: 'Macro alignment', pass: macroPass, detail: dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? 'No verified pair bias available' : `${dossier.biasScore} score · ${direction}` },
+    { name: 'Macro alignment', pass: macroPass, detail: selected === 'XAUUSD' ? (goldScore === null ? 'Gold engine evidence unavailable' : `${goldScore} gold score · ${initialGoldContext?.directionalVerdict} · ${direction}`) : dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? 'No verified pair bias available' : `${dossier.biasScore} score · ${dossier.confidence} · ${direction}` },
     { name: 'Lagos session', pass: inSession, detail: 'London 08:00–12:00 / New York 13:00–17:00 WAT' },
     { name: 'Tier-1 event risk', pass: eventPass, detail: !verifiedCalendar ? 'Calendar unverified; fail-closed' : nearEvent ? 'Event within ±30 minutes' : 'Verified calendar: clear' },
     { name: 'H4/H1 structure and liquidity', pass: technicalConfirmed, detail: 'Requires manual MT5 chart confirmation' },
