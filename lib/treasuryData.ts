@@ -1,8 +1,6 @@
 import 'server-only';
 import type { TreasuryYieldData } from '@/types/macro';
 
-
-
 type YieldRow = { date: string; values: Record<string, number> };
 
 function parseXmlNumber(entry: string, field: string): number | null {
@@ -14,11 +12,11 @@ function parseXmlNumber(entry: string, field: string): number | null {
 }
 
 function parseTreasuryRows(xml: string, fields: string[]): YieldRow[] {
-  const entries = xml.match(/<entry\\b[^>]*>[\\s\\S]*?<\\/entry>/gi) ?? [];
+  const entries = xml.match(/<entry\b[^>]*>[\s\S]*?<\/entry>/gi) ?? [];
   return entries.flatMap((entry): YieldRow[] => {
-    const dateMatch = entry.match(/<(?:[A-Za-z0-9_]+:)?NEW_DATE\\b[^>]*>([^<]+)<\\/(?:[A-Za-z0-9_]+:)?NEW_DATE>/i);
+    const dateMatch = entry.match(/<(?:[A-Za-z0-9_]+:)?NEW_DATE\b[^>]*>([^<]+)<\/(?:[A-Za-z0-9_]+:)?NEW_DATE>/i);
     const date = dateMatch?.[1]?.slice(0, 10);
-    if (!date || !/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return [];
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return [];
     const values: Record<string, number> = {};
     for (const field of fields) {
       const value = parseXmlNumber(entry, field);
@@ -46,10 +44,7 @@ async function fetchTreasuryRows(dataset: 'daily_treasury_yield_curve' | 'daily_
   return rows;
 }
 
-/**
- * Daily official Treasury par nominal and TIPS real yields.
- * These are published daily observations, not intraday market quotes.
- */
+/** Daily official Treasury par nominal and TIPS real yields; not intraday quotes. */
 export async function getTreasuryYieldData(): Promise<TreasuryYieldData> {
   const retrievedAtUtc = new Date().toISOString();
   const [nominalRows, realRows] = await Promise.all([
