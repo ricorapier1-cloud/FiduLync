@@ -107,9 +107,12 @@ export async function GET(request: Request) {
   }
 
   try {
-    const snapshot = await getMacroSnapshot();
+    const [snapshot, quotes] = await Promise.all([getMacroSnapshot(), getMarketQuotes()]);
     const dossier = generatePairDossier(snapshot, symbol);
-    return NextResponse.json({
+    const payload: MacroContextPayload = {
+      schema_version: '1.0.0',
+      generated_at_utc: new Date().toISOString(),
+      timezone: 'Africa/Lagos',
       symbol: dossier.symbol,
       base: dossier.base,
       quote: dossier.quote,
@@ -159,7 +162,8 @@ export async function GET(request: Request) {
         cot_source: snapshot.cotSource ?? 'unavailable',
       },
       disclaimer: 'Read-only macroeconomic intelligence. No technical analysis or broker order execution.',
-    }, { status: 200, headers });
+    };
+    return NextResponse.json(payload, { status: 200, headers });
   } catch (error) {
     console.error('Macro context query failed:', error);
     return NextResponse.json({ error: 'Macro context service is temporarily unavailable.' }, { status: 503, headers });
