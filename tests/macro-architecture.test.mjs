@@ -28,6 +28,12 @@ test('security: owner login and control-console implementation is absent; /owner
     '../app/api/owner/licenses/route.ts',
     '../app/api/mt5/installations/route.ts',
   ]) assert.equal(existsSync(new URL(retiredPath, import.meta.url)), false, retiredPath);
+  for (const retiredPath of [
+    '../app/api/v1/market-data/ingest/route.ts',
+    '../app/api/mt5/ingest/route.ts',
+    '../scripts/mt5_market_publisher.py',
+    '../docs/OWNER_HYBRID_MARKET_DATA_RUNBOOK.md',
+  ]) assert.equal(existsSync(new URL(retiredPath, import.meta.url)), false, retiredPath);
 });
 
 test('security: commercial account/store surfaces redirect to the research terminal', () => {
