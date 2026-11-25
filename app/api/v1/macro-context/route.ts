@@ -125,7 +125,21 @@ export async function GET(request: Request) {
         && snapshot.cot.some((position) => position.market === (dossier.base === 'XAU' ? 'GOLD' : dossier.base))
         && snapshot.cot.some((position) => position.market === dossier.quote)
           ? dossier.cotPercentileDiff : null,
-      cross_asset_confirmation: dossier.crossAssetConfirmation,\n      live_quotes: quotes.map((quote) => ({\n        symbol: quote.symbol,\n        mid: quote.price,\n        observation_time_utc: quote.timestamp,\n        source: quote.source,\n        quote_type: quote.source === 'finnhub' || quote.source === 'mt5' ? 'PROVIDER_QUOTE' : 'REFERENCE_RATE',\n      })),\n      daily_governance: {\n        state: 'NOT_CONNECTED_TO_SERVER',\n        trades_taken: null,\n        losses: null,\n        locked: null,\n        authority: 'MT5_ACCOUNT_SIDE_ENFORCEMENT_REQUIRED',\n      },
+      cross_asset_confirmation: dossier.crossAssetConfirmation,
+      live_quotes: quotes.map((quote) => ({
+        symbol: quote.symbol,
+        mid: quote.price,
+        observation_time_utc: quote.timestamp,
+        source: quote.source,
+        quote_type: quote.source === 'finnhub' || quote.source === 'mt5' ? 'PROVIDER_QUOTE' : 'REFERENCE_RATE',
+      })),
+      daily_governance: {
+        state: 'NOT_CONNECTED_TO_SERVER',
+        trades_taken: null,
+        losses: null,
+        locked: null,
+        authority: 'MT5_ACCOUNT_SIDE_ENFORCEMENT_REQUIRED',
+      }),
       calendar_verified: snapshot.calendarSource === 'provider',
       event_risk_status: snapshot.calendarSource === 'provider' ? 'PROVIDER_CALENDAR' : 'UNVERIFIED_CALENDAR',
       news_lockout: dossier.eventRiskLockout || snapshot.calendarSource !== 'provider',
