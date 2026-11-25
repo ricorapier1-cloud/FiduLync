@@ -275,3 +275,15 @@ test('MT5 macro bridge rejects unsupported instruments and withholds stale provi
   assert.match(route, /age_ms: Number\.isFinite\(ageMs\)/);
   assert.match(types, /freshness: 'FRESH' \| 'STALE' \| 'REFERENCE'/);
 });
+test('XAUUSD dashboard, desk gate and MT5 context use the dedicated gold macro engine', () => {
+  const page = read('../app/page.tsx');
+  const dashboard = read('../app/components/MacroDashboard.tsx');
+  const desk = read('../app/components/DeskTerminal.tsx');
+  const route = read('../app/api/v1/macro-context/route.ts');
+  assert.match(page, /buildGoldMacroContext\(\)/);
+  assert.match(dashboard, /Gold Macro &amp; Liquidity Intelligence/);
+  assert.match(desk, /selected === 'XAUUSD' \? goldMacroPass : fxMacroPass/);
+  assert.match(route, /symbol === 'XAUUSD' \? buildGoldMacroContext\(\)/);
+  assert.match(route, /goldAvailable/);
+  assert.match(route, /goldContext\?\.invalidationTriggers/);
+});
