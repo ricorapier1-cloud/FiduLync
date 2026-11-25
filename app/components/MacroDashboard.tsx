@@ -221,7 +221,7 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes }: Macro
 
   return (
     <div className="macro-page pb-36 sm:pb-12 md:pb-8">
-      <DeskTerminal initialSnapshot={initialSnapshot} />
+      <DeskTerminal initialSnapshot={snapshot} />
 
       {/* Top Statusline */}
       <div className="macro-statusline mono">
