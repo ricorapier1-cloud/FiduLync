@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { MacroSnapshot } from '@/types/macro';
 import type { GoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
+import type { CurrencyStrength } from '@/lib/currencyStrength';
 import { generatePairDossier } from '@/lib/macro/dossierEngine';
 
 type Quote = {
@@ -33,7 +34,7 @@ function readStorage<T>(key: string): T | null {
 function display(value: number | null | undefined, digits: number) { return value === null || value === undefined || !Number.isFinite(value) ? '—' : value.toFixed(digits); }
 function clamp(value: number, min: number, max: number) { return Math.max(min, Math.min(max, value)); }
 
-export default function DeskTerminal({ initialSnapshot, initialGoldContext }: { initialSnapshot: MacroSnapshot; initialGoldContext: GoldMacroContext | null }) {
+export default function DeskTerminal({ initialSnapshot, initialGoldContext, macroStrength }: { initialSnapshot: MacroSnapshot; initialGoldContext: GoldMacroContext | null; macroStrength: CurrencyStrength[] }) {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [quoteStatus, setQuoteStatus] = useState('CONNECTING');
   const [latency, setLatency] = useState<number | null>(null);
@@ -192,6 +193,8 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext }: { 
       item.change === null ? [] : [{ currency: item.currency, score: clamp(5 - item.change * 2, 0, 10) }])];
     return rows.map((item) => ({ ...item, score: Number(item.score.toFixed(2)) })).sort((a, b) => b.score - a.score);
   }, [fxRows]);
+  const matrixCurrencies = Array.from(new Set([...strength.map((item) => item.currency), ...macroStrength.map((item) => item.currency)])).sort();
+
 
   const recordTrade = () => {
     const pnl = Number(pnlInput);
@@ -241,9 +244,16 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext }: { 
     <div className="desk-syncline"><span>Swissquote public BBO · {latency ?? '—'} ms</span><span>Retrieved {quoteSync ?? '—'}</span><span>Frankfurter {fxStatus} · {fxSync ?? '—'}</span></div>
     <div className="desk-workflow"><strong>DESK WORKFLOW</strong><span>1 Macro Bias</span><b>→</b><span>2 Position Sizing</span><b>→</b><span>3 6/6 Gate</span><b>→</b><span>4 MT5 Execution</span><b>→</b><span>5 Trade Journal</span></div>
     <div className="desk-grid">
-      <article className="desk-panel"><header><div><span className="desk-kicker">A / RELATIVE PERFORMANCE</span><h3>20-Day Currency Strength</h3></div><small>{strength.length ? 'DAILY REFERENCE RATES' : 'INSUFFICIENT HISTORY'}</small></header>
-        {strength.length ? strength.map((item) => <div className="desk-strength-row" key={item.currency}><b>{item.currency}</b><span><i style={{ width: `${item.score * 10}%` }} /></span><strong>{item.score.toFixed(2)}</strong></div>) : <p className="desk-empty">Awaiting dated FX reference observations. Reference rates are not executable prices.</p>}
-        <p className="desk-footnote">Scores compare the latest 20 available business-day observations with USD. They are reference-rate strength estimates, not intraday market momentum.</p>
+      <article className="desk-panel"><header><div><span className="desk-kicker">A / UNIFIED CURRENCY MATRIX</span><h3>Spot Momentum vs Fundamental Rate Strength</h3></div><small>20-DAY REFERENCE · LIVE MACRO</small></header>
+        <div className="overflow-x-auto"><table className="w-full min-w-[480px] text-xs"><thead><tr className="border-b border-white/10 text-left text-[10px] font-mono text-slate-500"><th className="py-2">CCY</th><th className="py-2">SPOT MOMENTUM / 10</th><th className="py-2">MACRO RATE / 100</th><th className="py-2">RELATION</th></tr></thead><tbody>
+          {matrixCurrencies.map((currency) => {
+            const spot = strength.find((item) => item.currency === currency);
+            const macro = macroStrength.find((item) => item.currency === currency);
+            const aligned = spot && macro ? (spot.score >= 5 && macro.score > 0) || (spot.score < 5 && macro.score < 0) : null;
+            return <tr className="border-b border-white/[0.06]" key={currency}><th className="py-2 text-left font-mono text-slate-200">{currency}</th><td className="py-2 font-mono">{spot ? spot.score.toFixed(2) : '—'}</td><td className={`py-2 font-mono ${macro ? macro.score >= 0 ? 'desk-good' : 'desk-warning' : 'text-slate-500'}`}>{macro ? (macro.score > 0 ? '+' : '') + macro.score : '—'}</td><td className="py-2 font-mono text-[10px]">{aligned === null ? 'INSUFFICIENT INPUTS' : aligned ? 'ALIGNED' : 'DIVERGENCE'}</td></tr>;
+          })}
+        </tbody></table></div>
+        <p className="desk-footnote">Spot momentum is calculated from the latest 20 available Frankfurter business-day reference observations, not executable intraday quotes. Fundamental strength uses fresh provider policy and inflation observations. Divergence flags a disagreement between price trend and rate fundamentals; neither is an entry signal.</p>
       </article>
       <article className="desk-panel"><header><div><span className="desk-kicker">B / LIVE RISK CALCULATOR</span><h3>Position Sizing</h3></div><small>USD ACCOUNT · STANDARD LOT ESTIMATE</small></header>
         <div className="desk-form-grid">
