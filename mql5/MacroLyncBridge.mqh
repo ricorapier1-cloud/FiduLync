@@ -149,9 +149,7 @@ bool ML_FetchMacroContext(const string symbol, const string endpoint, const stri
    context.disclaimer = "Read-only macroeconomic intelligence. No technical analysis or broker order execution.";
 
    string root = ML_BaseUrl(endpoint);
-   int legacy_path = StringFind(root, "/api/v1/macro-signal");
-   if(legacy_path >= 0) root = StringSubstr(root, 0, legacy_path) + "/api/v1/macro-context";
-   else if(StringFind(root, "/api/v1/macro-context") < 0) root += "/api/v1/macro-context";
+   if(StringFind(root, "/api/v1/macro-context") < 0) root += "/api/v1/macro-context";
    string normalized_symbol = symbol;
    StringToUpper(normalized_symbol);
    if(root == "" || token == "" || normalized_symbol == "") return false;
