@@ -202,10 +202,10 @@ test('market quote feeds include G8 currency pairs for Finnhub and Frankfurter',
   }
 });
 
-test('FRED and Finnhub API keys are directly utilized without artificial gate blockers', () => {
+test('FRED and Finnhub API keys are used only behind explicit provider approval', () => {
   const macroData = read('../lib/macroData.ts');
-  assert.match(macroData, /process\.env\.FRED_API_KEY\?\.trim\(\)/);
-  assert.match(macroData, /process\.env\.FINNHUB_API_KEY\?\.trim\(\)/);
+  assert.match(macroData, /FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true'/);
+  assert.match(macroData, /FINNHUB_COMMERCIAL_USE_APPROVED === 'true'/);
 });
 
 
