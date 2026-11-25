@@ -616,20 +616,20 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
-            { label: 'US 10Y benchmark', value: snapshot.usTreasury?.nominal10YPct ?? null, unit: '%', source: 'U.S. Treasury', observationDate: snapshot.usTreasury?.observationDate ?? null },
+            { label: 'US 10Y benchmark', value: snapshot.usTreasury?.nominal10YPct ?? null, unit: '%', source: 'U.S. Treasury', observationDate: snapshot.usTreasury?.observationDate ?? null, stale: snapshot.usTreasury?.freshness === 'STALE' },
             { label: 'US 2s10s curve', value: snapshot.usTreasury?.twoYearTenYearSpreadBps ?? null, unit: 'bps', source: 'U.S. Treasury', observationDate: snapshot.usTreasury?.observationDate ?? null },
             { label: '10Y TIPS real yield', value: snapshot.usTreasury?.real10YPct ?? null, unit: '%', source: 'U.S. Treasury', observationDate: snapshot.usTreasury?.observationDate ?? null },
-            { label: 'CBOE VIX', value: snapshot.vix?.freshness === 'LATEST PUBLISHED' ? snapshot.vix.value : null, unit: '', source: 'CBOE daily close', observationDate: snapshot.vix?.observationDate ?? null },
-            { label: 'WTI crude oil', value: snapshot.energyMarkets?.wti.valueUsdPerBarrel ?? null, unit: 'USD/bbl', source: 'EIA', observationDate: snapshot.energyMarkets?.wti.observationDate ?? null },
-            { label: 'Brent crude oil', value: snapshot.energyMarkets?.brent.valueUsdPerBarrel ?? null, unit: 'USD/bbl', source: 'EIA', observationDate: snapshot.energyMarkets?.brent.observationDate ?? null },
-          ].map(({ label, value, unit, source, observationDate }) => (
+            { label: 'CBOE VIX', value: snapshot.vix?.freshness === 'LATEST PUBLISHED' ? snapshot.vix.value : null, unit: '', source: 'CBOE daily close', observationDate: snapshot.vix?.observationDate ?? null, stale: snapshot.vix?.freshness === 'STALE' },
+            { label: 'WTI crude oil', value: snapshot.energyMarkets?.wti.valueUsdPerBarrel ?? null, unit: 'USD/bbl', source: 'EIA', observationDate: snapshot.energyMarkets?.wti.observationDate ?? null, stale: false },
+            { label: 'Brent crude oil', value: snapshot.energyMarkets?.brent.valueUsdPerBarrel ?? null, unit: 'USD/bbl', source: 'EIA', observationDate: snapshot.energyMarkets?.brent.observationDate ?? null, stale: false },
+          ].map(({ label, value, unit, source, observationDate, stale }) => (
             <div className="macro-panel p-3" key={label}>
               <span className="text-[10px] font-mono text-slate-400 block">{label.toUpperCase()}</span>
               <strong className="text-sm font-mono text-slate-100 block mt-1">
                 {value !== null ? value.toFixed(2) + (unit ? ' ' + unit : '') : 'UNAVAILABLE'}
               </strong>
               <small className="text-[10px] text-amber-400 font-mono">
-                {observationDate ? source + ' · OBS ' + observationDate + (snapshot.usTreasury?.freshness === 'STALE' && source === 'U.S. Treasury' ? ' · STALE' : '') : source}
+                {observationDate ? source + ' · OBS ' + observationDate + (stale ? ' · STALE' : '') : source}
               </small>
             </div>
           ))}
