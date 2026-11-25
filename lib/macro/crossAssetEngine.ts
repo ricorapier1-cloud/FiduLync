@@ -7,11 +7,12 @@ import type { CrossAssetTelemetry, MacroRegime, MacroSnapshot } from '@/types/ma
 export function getCrossAssetTelemetry(snapshot: MacroSnapshot): CrossAssetTelemetry {
   const usd = snapshot.currencies.find((currency) => currency.code === 'USD');
   const verifiedTwoYear = usd?.twoYearYieldSource === 'provider' ? usd.twoYearYield : null;
+  const treasury = snapshot.usTreasury?.freshness === 'LATEST PUBLISHED' ? snapshot.usTreasury : undefined;
   return {
-    usTwoYearYield: verifiedTwoYear ?? 0,
-    usTenYearYield: 0,
-    usTenYearRealYield: 0,
-    usBreakevenTenYear: 0,
+    usTwoYearYield: treasury?.nominal2YPct ?? verifiedTwoYear ?? 0,
+    usTenYearYield: treasury?.nominal10YPct ?? 0,
+    usTenYearRealYield: treasury?.real10YPct ?? 0,
+    usBreakevenTenYear: treasury?.breakevenTenYearPct ?? 0,
     broadTradeWeightedUsd: 0,
     vix: 0,
     vixRegime: 'LOW',
@@ -21,8 +22,8 @@ export function getCrossAssetTelemetry(snapshot: MacroSnapshot): CrossAssetTelem
     copperUsd: 0,
     highYieldSpreadBps: 0,
     globalRiskAppetite: 'NEUTRAL',
-    timestampUtc: snapshot.asOf || '',
-    freshness: 'UNAVAILABLE',
+    timestampUtc: treasury?.observationDate ?? snapshot.asOf ?? '',
+    freshness: treasury ? 'LATEST PUBLISHED' : 'UNAVAILABLE',
   };
 }
 
