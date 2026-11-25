@@ -35,8 +35,8 @@ function display(value: number | null | undefined, digits: number) { return valu
 function clamp(value: number, min: number, max: number) { return Math.max(min, Math.min(max, value)); }
 
 export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSnapshotChange, onGoldContextChange }: { initialSnapshot: MacroSnapshot; initialGoldContext: GoldMacroContext | null; onSnapshotChange: (snapshot: MacroSnapshot) => void; onGoldContextChange: (context: GoldMacroContext | null) => void }) {
-  const [snapshot, setSnapshot] = useState(initialSnapshot);
-  const [goldContext, setGoldContext] = useState(initialGoldContext);
+  const snapshot = initialSnapshot;
+  const goldContext = initialGoldContext;
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [quoteStatus, setQuoteStatus] = useState('CONNECTING');
   const [latency, setLatency] = useState<number | null>(null);
@@ -138,8 +138,6 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
     }
   }, [fxRows.length]);
 
-  useEffect(() => { setSnapshot(initialSnapshot); }, [initialSnapshot]);
-  useEffect(() => { setGoldContext(initialGoldContext); }, [initialGoldContext]);
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const cached = readStorage<Journal>(JOURNAL_KEY);
@@ -222,7 +220,6 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
       if (!Array.isArray(freshSnapshot.currencies) || !Array.isArray(freshSnapshot.catalysts)) {
         throw new Error('Macro snapshot response failed validation');
       }
-      setSnapshot(freshSnapshot);
       onSnapshotChange(freshSnapshot);
       const [goldResult, quoteResult] = await Promise.allSettled([
         fetch('/api/macro/gold-context', { cache: 'no-store' }),
@@ -232,10 +229,8 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
       if (quoteResult.status === 'rejected') setQuoteStatus('DEGRADED');
       if (goldResult.status === 'fulfilled') {
         const freshGold = await goldResult.value.json() as GoldMacroContext;
-        setGoldContext(freshGold);
         onGoldContextChange(freshGold);
       } else {
-        setGoldContext(null);
         onGoldContextChange(null);
       }
       setNow(Date.now());
