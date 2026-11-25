@@ -530,7 +530,7 @@ export async function buildGoldMacroContext(snapshot?: MacroSnapshot): Promise<G
     DTB3: treasuryHistory.map((item) => ({ date: item.date, value: item.nominal3MPct })),
   };
   if (treasuryResult) for (const [seriesId, observations] of Object.entries(treasurySeries)) {
-    if (!fredBySeries.get(seriesId) && observations.length >= FRED_WINDOW) {
+    if (!fredBySeries.get(seriesId) && observations.length > 0) {
       fredBySeries.set(seriesId, { value: observations, latencyMs: treasuryLatencyMs, retrievedAtUtc: treasuryResult.retrievedAtUtc });
     }
   }
