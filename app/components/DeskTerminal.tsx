@@ -261,29 +261,3 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext }: { 
     </article>
   </section>;
 }
- + pipValue.toFixed(2) + ' / PIP / LOT'}</small></div><div><span>REWARD / RISK</span><strong className={rr >= 2 ? 'desk-good' : 'desk-warning'}>{rr.toFixed(2)}R</strong></div><div><span>EXPECTED GROSS PROFIT</span><strong>${gross.toFixed(2)}</strong></div></div>
-        <p className="desk-footnote">{selected === 'USDJPY' ? `USDJPY pip value: 1,000 / live ${display(usdJpy, 3)} = ${pipValue?.toFixed(4) ?? 'unavailable'} USD per pip per lot.` : selected === 'XAUUSD' ? 'Gold assumption: 100 oz per standard lot; $100 P/L per $1.00 price move per lot.' : 'FX assumption: $10 USD pip value per standard lot for EUR/USD and GBP/USD.'} Excludes commissions, slippage, swaps and broker contract variations. Planning estimate only: verify the broker&apos;s MT5 symbol specification and account currency; the EA&apos;s broker-native sizing is authoritative.</p>
-        {risk > 1 && <p className="desk-warning-text">Risk exceeds the 1.0% governance ceiling.</p>}{lots > 0 && lots < 0.01 && <p className="desk-warning-text">Below 0.01 lot: skip, never round size up.</p>}{rr < 2 && <p className="desk-warning-text">R:R is below the required 1:2.0.</p>}
-      </article>
-    </div>
-    <div className="desk-grid">
-      <article className="desk-panel"><header><div><span className="desk-kicker">03 / GOVERNANCE</span><h3>Mandatory 6/6 Pre-Trade Gate</h3></div><small>{gates.filter((gate) => gate.pass).length}/6 PASSED</small></header>
-        <div className="desk-gate-list">{gates.map((gate, index) => <div className="desk-gate-row" key={gate.name}><span className={gate.pass ? 'desk-gate-pass' : 'desk-gate-fail'}>{gate.pass ? 'PASS' : 'BLOCK'}</span><div><b>{index + 1}. {gate.name}</b><small>{gate.detail}</small></div>{index === 3 && <label className="desk-check"><input type="checkbox" checked={technicalConfirmed} onChange={(e) => setTechnicalConfirmed(e.target.checked)} /> MT5 confirmed</label>}</div>)}</div>
-        <div className={locked ? 'desk-lockout' : gatePassed ? 'desk-clear' : 'desk-blocked'}>{locked ? 'DAILY CIRCUIT BREAKER ACTIVE · LOCKED UNTIL 00:00 WAT' : gatePassed ? '6/6 CHECKS PASSED · MT5 EXECUTION REMAINS MANUAL' : 'GATE CLOSED · ALL SIX CONDITIONS MUST PASS'}</div>
-        <p className="desk-footnote">Calendar must be verified before the event gate can pass. This checklist does not submit orders or control MT5. Local state is not a broker-enforced lockout.</p>
-      </article>
-      <article className="desk-panel"><header><div><span className="desk-kicker">04 / DAILY RISK CONTROL</span><h3>WAT Daily Circuit Breaker</h3></div><small>{currentDateWAT}</small></header>
-        <div className="desk-journal-stats"><div><span>TRADES</span><b>{journal.trades}/2</b></div><div><span>WINS</span><b>{journal.wins}</b></div><div><span>LOSSES</span><b>{journal.losses}/2</b></div><div><span>NET P&amp;L</span><b className={journal.netPnl >= 0 ? 'desk-good' : 'desk-warning'}>${journal.netPnl.toFixed(2)}</b></div></div>
-        <div className="desk-form-grid desk-journal-form"><label>Result<select value={resultInput} onChange={(e) => setResultInput(e.target.value as 'WIN' | 'LOSS' | 'FLAT')}><option>WIN</option><option>LOSS</option><option>FLAT</option></select></label><label>Realized P&amp;L USD<input inputMode="decimal" value={pnlInput} onChange={(e) => setPnlInput(e.target.value)} placeholder="Closed trade P&L" /></label><label>Instrument<select value={journalSymbol} onChange={(e) => setJournalSymbol(e.target.value as SymbolCode)}>{symbols.map((s) => <option key={s}>{s}</option>)}</select></label></div>
-        <button className="desk-record-button" type="button" disabled={!pnlInput.trim() || !Number.isFinite(Number(pnlInput)) || locked} onClick={recordTrade}>RECORD CLOSED TRADE</button>
-        <div className="desk-journal-list">{journal.entries.slice(0, 5).map((entry) => <div key={entry.id}><span>{entry.symbol} · {entry.result}</span><b className={entry.pnl >= 0 ? 'desk-good' : 'desk-warning'}>{entry.pnl >= 0 ? '+' : ''}${entry.pnl.toFixed(2)}</b><small>{entry.timeUtc}</small></div>)}</div>
-        <p className="desk-footnote">Journal persists in this browser only. Browser storage clearing or switching devices resets it. MT5 must independently enforce the same hard limits.</p>
-      </article>
-    </div>
-    <article className="desk-panel desk-bridge"><header><div><span className="desk-kicker">05 / MT5 MACRO CONTEXT BRIDGE</span><h3>Typed Context Preview</h3></div><small>READ-ONLY JSON</small></header>
-      <p>The authenticated read-only API provides macro context to the EA. The EA must independently use broker-native prices, contract specifications, daily lockout and account-level risk before execution. No Python publisher or VPS is required for the macro bridge.</p>
-      <pre>{JSON.stringify({ schemaVersion: '1.0.0', generatedAtUtc: new Date(now).toISOString(), timezone: 'Africa/Lagos', quotes: quotes.map((q) => ({ symbol: q.symbol, bid: q.bid, ask: q.ask, mid: q.mid, spread: q.spread, quoteTimeUtc: q.quoteTimeUtc, freshness: q.freshness, source: q.source })), pairBias: { symbol: selected, score: dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier.biasScore, confidence: dossier.confidence }, newsLockout: { calendarVerified: verifiedCalendar, active: !eventPass }, dailyGovernance: { dateWAT: journal.dateWAT, trades: journal.trades, losses: journal.losses, locked, authority: 'LOCAL_BROWSER_ONLY' } }, null, 2)}</pre>
-      <p className="desk-footnote">This is a browser-side preview. The authenticated /api/v1/macro-context endpoint remains the server-side EA bridge.</p>
-    </article>
-  </section>;
-}
