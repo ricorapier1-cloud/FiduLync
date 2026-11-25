@@ -21,7 +21,7 @@ const currencies = ['EUR', 'GBP', 'JPY', 'AUD', 'CHF', 'CAD'] as const;
 const JOURNAL_KEY = 'fidulync-desk-journal-v1';
 const FX_KEY = 'fidulync-desk-fx-v1';
 const blankJournal = (dateWAT: string): Journal => ({ dateWAT, trades: 0, wins: 0, losses: 0, netPnl: 0, entries: [] });
-const watDate = (date = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+const watDate = (date = new Date()) => { const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date); const part = (type: string) => parts.find((item) => item.type === type)?.value ?? '00'; return part('year') + '-' + part('month') + '-' + part('day'); };
 function watDecimalHour(date: Date) {
   const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Lagos', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date);
   return Number(parts.find((p) => p.type === 'hour')?.value ?? 0) + Number(parts.find((p) => p.type === 'minute')?.value ?? 0) / 60;
@@ -48,7 +48,7 @@ export default function DeskTerminal({ initialSnapshot }: { initialSnapshot: Mac
   const [tp, setTp] = useState('40');
   const [direction, setDirection] = useState<Direction>('BUY');
   const [technicalConfirmed, setTechnicalConfirmed] = useState(false);
-  const [journal, setJournal] = useState<Journal>(() => blankJournal(watDate()));
+  const [journal, setJournal] = useState<Journal>(() => blankJournal(''));
   const [pnlInput, setPnlInput] = useState('');
   const [resultInput, setResultInput] = useState<'WIN' | 'LOSS' | 'FLAT'>('WIN');
   const [journalSymbol, setJournalSymbol] = useState<SymbolCode>('EURUSD');
@@ -122,7 +122,7 @@ export default function DeskTerminal({ initialSnapshot }: { initialSnapshot: Mac
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const cached = readStorage<Journal>(JOURNAL_KEY);
-      if (cached?.dateWAT === watDate()) setJournal(cached);
+      if (cached?.dateWAT === watDate()) setJournal(cached);\n      else setJournal(blankJournal(watDate()));
       const cachedFx = readStorage<{ rows: FxRow[]; retrievedAtUtc: string }>(FX_KEY);
       if (cachedFx?.rows?.length) { setFxRows(cachedFx.rows); setFxSync(cachedFx.retrievedAtUtc); setFxStatus('CACHED'); }
       setReady(true);
