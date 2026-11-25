@@ -273,10 +273,10 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
         <a className="macro-refresh" href="#opportunities">02 / OPPORTUNITIES</a>
         <a className="macro-refresh" href="#matrix">03 / GLOBAL MACRO</a>
         <a className="macro-refresh" href="#bias">04 / PAIR RESEARCH</a>
-        <a className="macro-refresh" href="#regimes">05 / CROSS-ASSET</a>
-        <a className="macro-refresh" href="#gold-research">06 / GOLD RESEARCH</a>
-        <a className="macro-refresh" href="#positioning">07 / POSITIONING</a>
-        <a className="macro-refresh" href="#catalysts">08 / CATALYSTS</a>
+        <a className="macro-refresh" href="#catalysts">05 / CATALYSTS</a>
+        <a className="macro-refresh" href="#regimes">06 / CROSS-ASSET</a>
+        <a className="macro-refresh" href="#gold-research">07 / GOLD RESEARCH</a>
+        <a className="macro-refresh" href="#positioning">08 / POSITIONING</a>
         <a className="macro-refresh" href="#health">09 / DATA HEALTH</a>
       </nav>
 
@@ -338,7 +338,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
       <section id="matrix" className="macro-section" aria-labelledby="matrix-title">
         <div className="macro-section-heading">
           <div>
-            <span className="eyebrow">01 / MONETARY POLICY</span>
+            <span className="eyebrow">03 / MONETARY POLICY</span>
             <h2 id="matrix-title">Global Central Bank Policy Matrix</h2>
           </div>
           <span className="macro-section-note mono">POLICY / INFLATION / 2Y YIELD %</span>
@@ -440,7 +440,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
       </p>
       <section className="macro-section" aria-labelledby="us-drivers-title">
         <div className="macro-section-heading">
-          <div><span className="eyebrow">01A / UNITED STATES MACRO DRIVERS</span><h2 id="us-drivers-title">Growth, Labour &amp; Wage Impulse</h2></div>
+          <div><span className="eyebrow">03A / UNITED STATES MACRO DRIVERS</span><h2 id="us-drivers-title">Growth, Labour &amp; Wage Impulse</h2></div>
           <span className="macro-section-note mono">BEA / BLS / BIS OBSERVATIONS</span>
         </div>
         {(() => {
@@ -464,7 +464,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
         <section id="bias" className="macro-section" aria-labelledby="bias-title">
           <div className="macro-section-heading">
             <div>
-              <span className="eyebrow">02 / PAIR DOSSIER</span>
+              <span className="eyebrow">04 / PAIR DOSSIER</span>
               <h2 id="bias-title">Fundamental Pair Dossier</h2>
             </div>
             <span className="macro-section-note mono">COMPREHENSIVE RESEARCH</span>
@@ -568,7 +568,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
         <section id="catalysts" className="macro-section" aria-labelledby="catalyst-title">
           <div className="macro-section-heading">
             <div>
-              <span className="eyebrow">03 / EVENT RISK</span>
+              <span className="eyebrow">05 / EVENT RISK</span>
               <h2 id="catalyst-title">Tier-1 Economic Catalysts</h2>
             </div>
             <span className="macro-section-note mono"><BrandGlyph name="calendar-clock" size={13} /> UTC SCHEDULE</span>
@@ -608,7 +608,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
       <section id="regimes" className="macro-section" aria-labelledby="regime-title">
         <div className="macro-section-heading">
           <div>
-            <span className="eyebrow">04 / CROSS-ASSET TELEMETRY</span>
+            <span className="eyebrow">06 / CROSS-ASSET TELEMETRY</span>
             <h2 id="regime-title">Cross-Asset &amp; Macro Regime Matrix</h2>
           </div>
           <span className="macro-section-note mono">BONDS / COMMODITIES / VOLATILITY</span>
@@ -650,7 +650,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
       <section id="gold-research" className="macro-section" aria-labelledby="gold-research-title">
         <div className="macro-section-heading">
           <div>
-            <span className="eyebrow">04A / XAUUSD DEDICATED RESEARCH</span>
+            <span className="eyebrow">07 / XAUUSD DEDICATED RESEARCH</span>
             <h2 id="gold-research-title">Gold Macro &amp; Liquidity Intelligence</h2>
           </div>
           <span className="macro-section-note mono">{initialGoldContext?.overallState ?? 'UNAVAILABLE'}</span>
@@ -710,7 +710,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
       <section id="positioning" className="macro-section" aria-labelledby="cot-title">
         <div className="macro-section-heading">
           <div>
-            <span className="eyebrow">05 / POSITIONING &amp; CROWDING</span>
+            <span className="eyebrow">08 / POSITIONING &amp; CROWDING</span>
             <h2 id="cot-title">CFTC Commitments of Traders (COT)</h2>
           </div>
           <a className="macro-inline-link" href="https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm" target="_blank" rel="noreferrer">
@@ -771,7 +771,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
       {/* Provider Health & Telemetry Diagnostics */}
       <section id="health" className="macro-section" aria-labelledby="health-title">
         <div className="macro-section-heading">
-          <div><span className="eyebrow">06 / TELEMETRY</span><h2 id="health-title">Data Ingestion Health &amp; Freshness</h2></div>
+          <div><span className="eyebrow">09 / TELEMETRY</span><h2 id="health-title">Data Ingestion Health &amp; Freshness</h2></div>
           <span className="macro-section-note mono">OBSERVED STATUS ONLY</span>
         </div>
         <div className="macro-panel p-4">
