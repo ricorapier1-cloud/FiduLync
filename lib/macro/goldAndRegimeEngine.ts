@@ -2,6 +2,7 @@ import 'server-only';
 
 import { getCachedData } from '@/lib/redisCache';
 import { getCboeVixHistory } from '@/lib/cboeVix';
+import { getTreasuryYieldData } from '@/lib/treasuryData';
 
 type Observation = {
   date: string;
@@ -45,6 +46,7 @@ export type GoldMacroContext = {
     | 'RISK_OFF_DELEVERAGING'
     | 'INSUFFICIENT_EVIDENCE';
   goldBiasScore: number | null;
+  evidenceCoveragePct: number;
   directionalVerdict:
     | 'BULLISH'
     | 'BEARISH'
@@ -83,7 +85,7 @@ export type GoldMacroContext = {
     rollingWindowObservations: 65;
     rollingZScoreFormula: string;
     quoteStaleAfterMinutes: 60;
-    fredSeriesCadence: 'PUBLISHED_DAILY';
+    dailyMacroSeriesCadence: 'PUBLISHED_DAILY';
     cftcCadence: 'WEEKLY';
     interpretation: string;
     scoreWeights: {
@@ -283,7 +285,7 @@ function extractSwissquoteQuote(payload: unknown): QuoteCandidate | null {
       if (!isRecord(raw)) continue;
       const bid = finiteNumber(raw.bid);
       const ask = finiteNumber(raw.ask);
-      const timestampUtc = parseTimestamp(raw.ts);
+      const timestampUtc = parseTimestamp(raw.ts ?? item.ts);
       if (bid === null || ask === null || bid <= 0 || ask <= 0 || ask < bid || !timestampUtc) continue;
       return {
         bid,
@@ -478,6 +480,8 @@ export async function buildGoldMacroContext(): Promise<GoldMacroContext> {
   const fredApiKey = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true' ? process.env.FRED_API_KEY?.trim() ?? '' : '';
 
   const quotePromise = fetchGoldQuote();
+  const treasuryStarted = performance.now();
+  const treasuryPromise = getCachedData('macro:us-treasury-yields-history-v2', getTreasuryYieldData, 60 * 60).catch(() => null);
   const cboeVixStarted = performance.now();
   const cboeVixPromise = getCachedData('macro:cboe-vix-history-v1', getCboeVixHistory, 60 * 60).catch(() => null);
   let cftcFailureLatencyMs = 0;
@@ -495,12 +499,10 @@ export async function buildGoldMacroContext(): Promise<GoldMacroContext> {
     })
     : FRED_SERIES.map(async (seriesId) => [seriesId, null, null] as const);
 
-  const [quoteResult, cotResult, fredResults, cboeVixResult] = await Promise.all([
-    quotePromise.catch(() => unavailableQuote()),
-    cotPromise,
-    Promise.all(fredPromises),
-    cboeVixPromise,
+  const [quoteResult, cotResult, fredResults, cboeVixResult, treasuryResult] = await Promise.all([
+    quotePromise.catch(() => unavailableQuote()), cotPromise, Promise.all(fredPromises), cboeVixPromise, treasuryPromise,
   ]);
+  const treasuryLatencyMs = Math.max(0, Math.round(performance.now() - treasuryStarted));
 
   const fredBySeries = new Map<string, TimedResult<Observation[]> | null>();
   for (const [seriesId, result] of fredResults) fredBySeries.set(seriesId, result);
@@ -510,6 +512,18 @@ export async function buildGoldMacroContext(): Promise<GoldMacroContext> {
       latencyMs: Math.max(0, Math.round(performance.now() - cboeVixStarted)),
       retrievedAtUtc: cboeVixResult.retrievedAtUtc,
     });
+  }
+  const treasuryHistory = treasuryResult?.history ?? [];
+  const treasurySeries: Record<string, Observation[]> = {
+    DFII10: treasuryHistory.map((item) => ({ date: item.date, value: item.real10YPct })),
+    T10YIE: treasuryHistory.map((item) => ({ date: item.date, value: item.breakevenTenYearPct })),
+    DGS2: treasuryHistory.map((item) => ({ date: item.date, value: item.nominal2YPct })),
+    DTB3: treasuryHistory.map((item) => ({ date: item.date, value: item.nominal3MPct })),
+  };
+  if (treasuryResult) for (const [seriesId, observations] of Object.entries(treasurySeries)) {
+    if (!fredBySeries.get(seriesId) && observations.length >= FRED_WINDOW) {
+      fredBySeries.set(seriesId, { value: observations, latencyMs: treasuryLatencyMs, retrievedAtUtc: treasuryResult.retrievedAtUtc });
+    }
   }
   const drivers = {
     DFII10: makeDriver('DFII10', fredBySeries.get('DFII10') ?? null),
@@ -550,18 +564,11 @@ export async function buildGoldMacroContext(): Promise<GoldMacroContext> {
   const quoteLatencyMs = quoteResult.latencyMs;
   const totalLatencyMs = Math.max(0, Math.round(performance.now() - totalStarted));
 
-  const requiredFeedsHealthy = Boolean(
-    quoteResult.mid !== null
-    && quoteResult.state === 'HEALTHY'
+  const requiredDailySeries = ['DFII10', 'T10YIE', 'DGS2', 'DTB3', 'VIXCLS'] as const;
+  const requiredFeedsHealthy = Boolean(quoteResult.mid !== null && quoteResult.state === 'HEALTHY'
     && cot.state === 'HEALTHY'
-    && FRED_SERIES.every((seriesId) => {
-      const driver = drivers[seriesId];
-      return driver.state === 'HEALTHY' && driver.value !== null;
-    })
-    && drivers.DFII10.zScore65 !== null
-    && drivers.BAMLH0A0HYM2.zScore65 !== null
-    && drivers.twoYearMinusThreeMonthPct !== null
-  );
+    && requiredDailySeries.every((seriesId) => drivers[seriesId].state === 'HEALTHY' && drivers[seriesId].value !== null)
+    && drivers.DFII10.zScore65 !== null && drivers.twoYearMinusThreeMonthPct !== null);
 
   const realYieldZ = drivers.DFII10.zScore65;
   const creditOasZ = drivers.BAMLH0A0HYM2.zScore65;
@@ -571,6 +578,7 @@ export async function buildGoldMacroContext(): Promise<GoldMacroContext> {
   const cotNet = cot.nonCommercialNet;
 
   let goldBiasScore: number | null = null;
+  let evidenceCoveragePct = 0;
   let directionalVerdict: GoldMacroContext['directionalVerdict'] = 'INSUFFICIENT_EVIDENCE';
   let liquidityRegime: GoldMacroContext['liquidityRegime'] = 'INSUFFICIENT_EVIDENCE';
   const supportingEvidence: string[] = [];
@@ -579,20 +587,24 @@ export async function buildGoldMacroContext(): Promise<GoldMacroContext> {
 
   if (requiredFeedsHealthy
     && realYieldZ !== null
-    && creditOasZ !== null
     && vix !== null
     && breakevenChange !== null
     && forwardSpread !== null
     && cotNet !== null) {
     const cotDirection = clamp(cotNet / Math.max(Math.abs(cot.nonCommercialLong ?? 0) + Math.abs(cot.nonCommercialShort ?? 0), 1), -1, 1);
-    const components = [
-      { name: '10Y real-yield pressure', score: -35 * clamp(realYieldZ / 3, -1, 1), evidence: 'DFII10 65-observation z-score ' + realYieldZ.toFixed(2) },
-      { name: 'high-yield credit stress', score: 20 * clamp(creditOasZ / 3, -1, 1), evidence: 'ICE BofA US HY OAS 65-observation z-score ' + creditOasZ.toFixed(2) },
-      { name: 'breakeven inflation momentum', score: 15 * clamp(breakevenChange / 0.5, -1, 1), evidence: 'T10YIE 20-observation change ' + breakevenChange.toFixed(3) + ' percentage points' },
-      { name: '2Y minus 3M curve', score: 10 * clamp(forwardSpread / 1.5, -1, 1), evidence: 'DGS2 minus DTB3 ' + forwardSpread.toFixed(3) + ' percentage points' },
-      { name: 'volatility stress', score: 10 * clamp((vix - 20) / 20, -1, 1), evidence: 'VIXCLS latest published value ' + vix.toFixed(2) },
-      { name: 'CFTC non-commercial positioning', score: 10 * cotDirection, evidence: 'CFTC COMEX Gold non-commercial net ' + cotNet.toLocaleString('en-US') + ' contracts' },
+    const components: Array<{ name: string; score: number; weight: number; evidence: string }> = [
+      { name: '10Y real-yield pressure', weight: 35, score: -35 * clamp(realYieldZ / 3, -1, 1), evidence: 'US Treasury 10Y TIPS 65-observation z-score ' + realYieldZ.toFixed(2) },
+      { name: 'breakeven inflation momentum', weight: 15, score: 15 * clamp(breakevenChange / 0.5, -1, 1), evidence: 'US Treasury 10Y breakeven 20-observation change ' + breakevenChange.toFixed(3) + ' percentage points' },
+      { name: '2Y minus 3M curve', weight: 10, score: 10 * clamp(forwardSpread / 1.5, -1, 1), evidence: 'US Treasury 2Y minus 3M curve ' + forwardSpread.toFixed(3) + ' percentage points' },
+      { name: 'volatility stress', weight: 10, score: 10 * clamp((vix - 20) / 20, -1, 1), evidence: 'CBOE VIX latest published value ' + vix.toFixed(2) },
+      { name: 'CFTC non-commercial positioning', weight: 10, score: 10 * cotDirection, evidence: 'CFTC COMEX Gold non-commercial net ' + cotNet.toLocaleString('en-US') + ' contracts' },
     ];
+    if (creditOasZ !== null && drivers.BAMLH0A0HYM2.state === 'HEALTHY') components.push({
+      name: 'high-yield credit stress', weight: 20,
+      score: 20 * clamp(creditOasZ / 3, -1, 1),
+      evidence: 'ICE BofA US HY OAS 65-observation z-score ' + creditOasZ.toFixed(2),
+    });
+    evidenceCoveragePct = components.reduce((sum, item) => sum + item.weight, 0);
     goldBiasScore = Math.round(clamp(components.reduce((sum, item) => sum + item.score, 0), -100, 100));
     directionalVerdict = goldBiasScore >= 20
       ? 'BULLISH'
@@ -609,6 +621,7 @@ export async function buildGoldMacroContext(): Promise<GoldMacroContext> {
     if (realYieldZ < -1) invalidationTriggers.push('Reassess bearish gold exposure if DFII10 real-yield z-score remains below -1.0.');
     if (creditOasZ > 1.5) invalidationTriggers.push('Reassess the risk-off interpretation if high-yield OAS normalizes below its rolling mean.');
     if (cotNet !== 0) invalidationTriggers.push('Reassess positioning confirmation after the next published CFTC COMEX Gold report.');
+    if (creditOasZ === null) invalidationTriggers.push('High-yield credit-spread confirmation is unavailable; the score uses 80% of defined component weights.');
     if (invalidationTriggers.length === 0) invalidationTriggers.push('Reassess the score when any required official observation is revised or a new release is published.');
   }
 
@@ -619,14 +632,6 @@ export async function buildGoldMacroContext(): Promise<GoldMacroContext> {
     ? 'AVAILABLE'
     : anyEvidence ? 'INSUFFICIENT_EVIDENCE' : 'UNAVAILABLE';
 
-  const fredKeyMissing = !fredApiKey;
-  if (fredKeyMissing) {
-    for (const seriesId of FRED_SERIES) {
-      drivers[seriesId] = makeUnavailableDriver(seriesId);
-    }
-    drivers.twoYearMinusThreeMonthPct = null;
-  }
-
   return {
     generatedAtUtc: new Date().toISOString(),
     quoteTimestampUtc,
@@ -634,6 +639,7 @@ export async function buildGoldMacroContext(): Promise<GoldMacroContext> {
     overallState,
     liquidityRegime,
     goldBiasScore,
+    evidenceCoveragePct,
     directionalVerdict,
     supportingEvidence,
     contradictingEvidence,
@@ -644,6 +650,7 @@ export async function buildGoldMacroContext(): Promise<GoldMacroContext> {
     telemetry: {
       totalLatencyMs,
       fredLatencyMs,
+      treasuryLatencyMs: treasuryResult ? treasuryLatencyMs : null,
       cftcLatencyMs,
       quoteLatencyMs,
     },
@@ -651,9 +658,9 @@ export async function buildGoldMacroContext(): Promise<GoldMacroContext> {
       rollingWindowObservations: FRED_WINDOW,
       rollingZScoreFormula: 'Z = (latest observation - arithmetic mean of latest 65 valid observations) / population standard deviation of those 65 observations.',
       quoteStaleAfterMinutes: 60,
-      fredSeriesCadence: 'PUBLISHED_DAILY',
+      dailyMacroSeriesCadence: 'PUBLISHED_DAILY',
       cftcCadence: 'WEEKLY',
-      interpretation: 'Deterministic research heuristic, not a calibrated probability or trading instruction. Score is withheld unless the spot quote, all six FRED series, both 65-observation z-scores, and the current CFTC report pass freshness validation. DGS2 minus DTB3 is a 2-year versus 3-month yield-curve spread, not a directly observed forward rate.',
+      interpretation: 'Deterministic research heuristic, not a calibrated probability or trading instruction. The core score requires a fresh spot quote, Treasury-derived real yield, breakeven, 2Y/3M curve, CBOE VIX and current CFTC report. High-yield OAS is an optional 20% input when approved FRED access is enabled. DGS2 minus DTB3 is a 2-year versus 3-month yield-curve spread, not a directly observed forward rate.',
       scoreWeights: {
         DFII10RealYieldZ: 35,
         HighYieldOasZ: 20,

@@ -52,33 +52,33 @@ export async function getTreasuryYieldData(): Promise<TreasuryYieldData> {
     fetchTreasuryRows('daily_treasury_real_yield_curve', ['BC_10YEAR']),
   ]);
   const realByDate = new Map(realRows.map((row) => [row.date, row.values.BC_10YEAR]));
-  const matched = nominalRows.find((row) =>
-    row.values.BC_2YEAR !== undefined
-    && row.values.BC_3MONTH !== undefined
-    && row.values.BC_10YEAR !== undefined
-    && realByDate.has(row.date)
-  );
+  const history = nominalRows.flatMap((row) => {
+    const nominal2Y = row.values.BC_2YEAR;
+    const nominal3M = row.values.BC_3MONTH;
+    const nominal10Y = row.values.BC_10YEAR;
+    const real10Y = realByDate.get(row.date);
+    if (nominal2Y === undefined || nominal3M === undefined || nominal10Y === undefined
+      || real10Y === undefined || ![nominal2Y, nominal3M, nominal10Y, real10Y].every(Number.isFinite)) return [];
+    return [{ date: row.date, nominal2YPct: nominal2Y, nominal3MPct: nominal3M,
+      nominal10YPct: nominal10Y, real10YPct: real10Y,
+      breakevenTenYearPct: Number((nominal10Y - real10Y).toFixed(3)) }];
+  }).sort((left, right) => right.date.localeCompare(left.date));
+  const matched = history[0];
   if (!matched) throw new Error('No same-day nominal and real Treasury yield observations are available.');
-  const nominal2Y = matched.values.BC_2YEAR;
-  const nominal3M = matched.values.BC_3MONTH;
-  const nominal10Y = matched.values.BC_10YEAR;
-  const real10Y = realByDate.get(matched.date);
-  if (real10Y === undefined || ![nominal2Y, nominal3M, nominal10Y, real10Y].every(Number.isFinite)) {
-    throw new Error('Treasury yield observations failed numeric validation.');
-  }
   const ageMs = Date.now() - Date.parse(matched.date + 'T23:59:59Z');
   if (ageMs < -5 * 60_000) throw new Error('Treasury observation date is in the future.');
   return {
     source: 'US TREASURY',
     observationDate: matched.date,
     retrievedAtUtc,
-    nominal2YPct: nominal2Y,
-    nominal3MPct: nominal3M,
-    nominal10YPct: nominal10Y,
-    real10YPct: real10Y,
-    twoYearTenYearSpreadBps: Math.round((nominal10Y - nominal2Y) * 100),
-    twoYearThreeMonthSpreadBps: Math.round((nominal2Y - nominal3M) * 100),
-    breakevenTenYearPct: Number((nominal10Y - real10Y).toFixed(3)),
+    nominal2YPct: matched.nominal2YPct,
+    nominal3MPct: matched.nominal3MPct,
+    nominal10YPct: matched.nominal10YPct,
+    real10YPct: matched.real10YPct,
+    twoYearTenYearSpreadBps: Math.round((matched.nominal10YPct - matched.nominal2YPct) * 100),
+    twoYearThreeMonthSpreadBps: Math.round((matched.nominal2YPct - matched.nominal3MPct) * 100),
+    breakevenTenYearPct: matched.breakevenTenYearPct,
     freshness: ageMs <= 7 * 24 * 60 * 60 * 1000 ? 'LATEST PUBLISHED' : 'STALE',
+    history: history.slice(0, 260),
   };
 }

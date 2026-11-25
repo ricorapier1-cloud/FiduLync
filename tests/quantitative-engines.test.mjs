@@ -319,6 +319,16 @@ test('cached FRED observations are excluded when storage permission is not appro
   assert.match(engine, /sanitizeMacroSnapshotPermissions\\(await getCachedData/);
 });
 
+test('gold quote parser uses parent-level Swissquote timestamps and Treasury daily history when FRED storage is disabled', () => {
+  const gold = read('../lib/macro/goldAndRegimeEngine.ts');
+  const treasury = read('../lib/treasuryData.ts');
+  assert.ok(gold.includes('raw.ts ?? item.ts'));
+  assert.ok(gold.includes('macro:us-treasury-yields-history-v2'));
+  assert.ok(gold.includes("requiredDailySeries = ['DFII10', 'T10YIE', 'DGS2', 'DTB3', 'VIXCLS']"));
+  assert.ok(gold.includes('evidenceCoveragePct'));
+  assert.ok(treasury.includes('history: history.slice(0, 260)'));
+});
+
 test('economic calendar never falls back to hardcoded central-bank dates or stale persisted fixtures', () => {
   const macroData = read('../lib/macroData.ts');
   assert.doesNotMatch(macroData, /getCentralBankDecisionsSchedule/);
