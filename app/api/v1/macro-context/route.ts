@@ -22,23 +22,8 @@ async function authenticate(request: Request): Promise<string | null> {
   const candidate = (request.headers.get('x-macro-key')?.trim() || bearer).trim();
   if (!candidate) return null;
 
-  // Installation credentials are random, one-time-issued flmt5_ tokens.
-  // Only their SHA-256 hashes are stored in Supabase.
-  if (candidate.startsWith('flmt5_')) {
-    if (candidate.length < 40) return null;
-    const tokenHash = createHash('sha256').update(candidate).digest('hex');
-    const { data, error } = await getSupabaseAdmin()
-      .from('mt5_installations')
-      .select('id')
-      .eq('token_hash', tokenHash)
-      .eq('status', 'active')
-      .maybeSingle();
-    if (error) throw error;
-    return data?.id ? `installation:${data.id}` : null;
-  }
-
-  // Accept the configured bridge token as a service credential. Keep all
-  // service secrets on the server and compare in constant time.
+  // The private macro bridge uses a dedicated read-only service credential.
+  // Legacy per-installation/license tokens are intentionally no longer accepted.
   const secret = process.env.MACRO_API_TOKEN?.trim()
     || process.env.MACROLYNC_API_SECRET?.trim()
     || process.env.ALGO_PRIVATE_API_KEY?.trim();

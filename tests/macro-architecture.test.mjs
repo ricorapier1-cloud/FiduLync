@@ -60,10 +60,11 @@ test('architecture: /analytics redirects to /workbench', () => {
   assert.match(analyticsPage, /redirect\('\/workbench'\)/);
 });
 
-test('security: macro context API fails closed and validates installation tokens', () => {
-  assert.match(macroContextRoute, /candidate\.startsWith\('flmt5_'\)/);
-  assert.match(macroContextRoute, /createHash\('sha256'\)/);
-  assert.match(macroContextRoute, /from\('mt5_installations'\)/);
+test('security: macro context API accepts only the private read-only service credential and fails closed', () => {
+  assert.match(macroContextRoute, /MACRO_API_TOKEN/);
+  assert.match(macroContextRoute, /x-macro-key/);
+  assert.match(macroContextRoute, /safeEqual\(candidate, secret\)/);
+  assert.doesNotMatch(macroContextRoute, /flmt5_|mt5_installations/);
   assert.match(macroContextRoute, /status: 503/);
   assert.match(macroContextRoute, /timingSafeEqual/);
   assert.doesNotMatch(macroContextRoute, /isLocalhost|if \(!macroSecret\) return true/);
@@ -84,6 +85,24 @@ test('research notebook starts empty and defaults to insufficient evidence', () 
   assert.match(notebookPage, /useState<ResearchHypothesis\[]>\(\[\]\)/);
   assert.doesNotMatch(notebookPage, /INITIAL_DEMO_HYPOTHESIS|hyp-sample-01/);
   assert.match(notebookPage, /INSUFFICIENT_EVIDENCE/);
+});
+
+test('public MT5 bridge is read-only macro context with no licensing, heartbeat or synthetic tester path', () => {
+  const bridge = read('../public/mql5/MacroLyncBridge.mqh');
+  assert.match(bridge, /api\/v1\/macro-context/);
+  assert.match(bridge, /x-macro-key/);
+  assert.match(bridge, /safe_to_trade = false/);
+  assert.doesNotMatch(bridge, /license_key|LogClosedTrade|MacroLyncSendHeartbeat|SimulateTesterSignal|api\/v1\/macro-signal/i);
+  for (const legacyFile of [
+    '../public/downloads/AlgoLync_EA_README.txt',
+    '../public/downloads/Eridam_Nexus_Adaptive_Demo.mq5',
+    '../public/downloads/MacroLyncLicense.mqh',
+    '../public/downloads/MacroLync_G10_Breakout_Test.mq5',
+    '../public/downloads/MacroLync_Session_Momentum_Test.mq5',
+    '../public/downloads/Velocity_Vault_Momentum_Demo.mq5',
+  ]) assert.equal(existsSync(new URL(legacyFile, import.meta.url)), false, legacyFile);
+  for (const legacyEngine of ['../lib/signalEngine.ts', '../lib/technicalEngine.ts', '../lib/macro/centralBankEngine.ts'])
+    assert.equal(existsSync(new URL(legacyEngine, import.meta.url)), false, legacyEngine);
 });
 
 test('research pages exist', () => {

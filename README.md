@@ -68,7 +68,7 @@ The scheduled `/api/cron/sync-macro` route requires the server-side `CRON_SECRET
 
 `GET /api/v1/macro-context` is a read-only, authenticated endpoint for connected EAs. It returns macro research context, evidence status, confidence and event-risk metadata. It does not place trades, provide broker credentials or replace EA-side technical and risk validation.
 
-Use the exact private installation token mechanism already provisioned by the application. Do not send broker master/investor passwords or provider API keys to FiduLync or embed them in an EA.
+Use the dedicated MACRO_API_TOKEN service secret (or the legacy ALGO_PRIVATE_API_KEY alias) through the x-macro-key header or Bearer authorization. The public MT5 include uses this read-only context contract; it does not issue licenses, log closed trades, send heartbeats or place orders. Never reuse CRON_SECRET as the EA token. Do not send broker master/investor passwords or provider API keys to FiduLync or embed them in an EA.
 
 ## Environment variables
 
@@ -79,6 +79,8 @@ Configure secrets only in the Vercel project environment settings, never in this
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` | Server-only database persistence |
 | `CRON_SECRET` | Authenticates scheduled macro refresh |
+| `MACRO_API_TOKEN` | Dedicated read-only EA macro-context service token (32+ characters) |
+| `EIA_API_KEY` | Optional EIA energy data key for WTI/Brent daily observations |
 | `BLS_API_KEY` | Optional BLS API v2 registration key; public v1 fallback works without a key |
 | `BEA_API_KEY` | Optional BEA API key |
 | `FRED_API_KEY` | Optional FRED API key |

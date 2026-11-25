@@ -1,72 +1,72 @@
-# FiduLync production launch checklist
+# FiduLync Personal Quant Edition — production and operations checklist
 
-This runbook is for the project owner. Never commit secret values to GitHub, paste them into source files, or expose them in browser code.
+This runbook describes the private MacroLync research terminal. It is not a storefront or commercial launch checklist.
 
-## Current release posture
+## Product boundary
 
-- Development branch: `fix/institutional-api-contracts`
-- Production branch: `main` (not changed by this work)
-- Public project domain: `https://fidulync.vercel.app`
-- Paystack payments fail closed until the production secret is configured.
-- License email delivery and email-verified MT5 account transfers require `RESEND_API_KEY` and a verified `LICENSE_FROM_EMAIL`.
-- MT5 heartbeat and trade ingestion fail closed until the private EA API key is configured.
-- No compiled `.ex5` trading robot is represented as available until it has been built and tested in MetaEditor.
+- MacroLync researches macroeconomic releases, policy rates, inflation, growth, labour, yields, CFTC positioning, approved economic events and cross-asset regimes.
+- Connected MT5 EAs own technical analysis, entry/exit logic, broker orders, position sizing, stops, targets and account-level risk enforcement.
+- The web application does not execute orders, issue licenses, provision customer accounts, collect payments, send EA heartbeats or ingest closed-trade telemetry.
+- No owner console, login portal, customer store, subscription or billing flow is part of the product.
+- No data may be labelled live unless provider observation and freshness checks pass. Official macro releases are published at their own cadence; they are not intraday streams.
 
-## Required Vercel Production environment variables
+## Vercel Production environment
 
-In Vercel → Project → Settings → Environment Variables, configure the following for **Production**. Configure Preview as well when you want to test the same flows on preview deployments.
+Configure these in Vercel → Project → Settings → Environment Variables. Never commit secret values or place server-side keys in NEXT_PUBLIC_ variables.
 
 | Variable | Purpose |
-|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (public URL only) |
-| `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` | Server-side Supabase secret/service-role key; never prefix with `NEXT_PUBLIC_` |
-| `PAYSTACK_SECRET_KEY` | Paystack secret key for initialize, verify and webhook signature validation |
-| `RESEND_API_KEY` | Server-only transactional email API key for license delivery and transfer verification |
-| `LICENSE_FROM_EMAIL` | Verified sender identity/domain configured with the email provider (for example, `AlgoLync <licenses@your-verified-domain>`) |
-| `PAYSTACK_PUBLIC_KEY` and/or `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | Paystack public key if the checkout UI requires it |
-| `ALGOLYNC_PRIVATE_KEY` (or legacy `ALGO_PRIVATE_API_KEY`) | Long random secret shared only with trusted EA clients for private heartbeat/trade ingestion |
-| `CRON_SECRET` | Long random secret used to authorize the scheduled macro refresh |
-| `NEXT_PUBLIC_APP_URL` | Set to `https://fidulync.vercel.app` |
+| --- | --- |
+| SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL | Supabase project URL |
+| SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY | Server-only database persistence and rate limiting |
+| CRON_SECRET | Authenticates /api/cron/sync-macro |
+| NEXT_PUBLIC_APP_URL | Canonical app origin, https://fidulync.vercel.app |
+| MACRO_API_TOKEN | Dedicated read-only EA context credential; unique random value of at least 32 characters |
+| EIA_API_KEY | EIA daily WTI/Brent observations |
+| BEA_API_KEY | Optional BEA macro series |
+| BLS_API_KEY | Optional BLS API v2 registration key; public v1 fallback is supported |
+| FRED_API_KEY | Optional FRED series access; not used for active storage until permission is approved |
+| FRED_DATA_STORAGE_PERMISSION_APPROVED | Set true only after confirming the exact FRED series storage/use rights |
+| FINNHUB_API_KEY | Optional economic calendar provider key |
+| FINNHUB_PERSONAL_PLAN_ACTIVE | Set true only while the personal-plan entitlement is active and terms allow this use |
+| FAIRECONOMY_COMMERCIAL_USE_APPROVED | Enable only after applicable calendar-feed terms are reviewed |
+| FMP_API_KEY / FMP_COMMERCIAL_USE_APPROVED | Optional calendar fallback, only with applicable data-use permission |
+| UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN | Shared caching when configured |
 
-The server Supabase helper accepts either `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY`, and either `SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_URL`. Do not use a publishable/anon key for server-side writes.
+The service API also accepts MACROLYNC_API_SECRET or the legacy ALGO_PRIVATE_API_KEY as a compatibility secret. Prefer a dedicated MACRO_API_TOKEN; do not reuse CRON_SECRET.
 
-Other configured market-data providers may require `FX_API_KEY`, `FRED_API_KEY`, `FINNHUB_API_KEY`, or `GEMINI_API_KEY` depending on which provider-backed features are enabled. Keep these server-only.
+## Data availability and provider permissions
 
-## Paystack setup
+- Swissquote supplies the terminal's four-symbol bid/ask feed without a user API key. It is a quote source, not a complete FX candle history feed.
+- U.S. Treasury daily nominal/TIPS yields, Cboe daily VIX closes, CFTC weekly COT, BLS, BIS, ECB, BoE, BoC, Riksbank, Norges Bank and World Bank public data provide the no-paid-key research baseline.
+- EIA requires the configured EIA API key for daily energy observations.
+- FRED remains permission-gated. When disabled, the active macro snapshot strips cached FRED-derived values and the gold model uses validated Treasury history plus Cboe VIX, CFTC positioning and the available Swissquote quote. The optional high-yield credit-spread component remains unavailable.
+- Economic calendar data remains UNAVAILABLE until an approved provider is configured. No static meeting dates are substituted. Pair candidates remain visible for research but are marked BLOCKED · CALENDAR UNVERIFIED.
+- Do not set a provider approval flag merely because an API key exists. Confirm applicable personal-plan, caching, display and storage rights first.
 
-1. Confirm the Paystack account is activated for the currencies and business model being sold.
-2. Add the live secret key to Vercel Production as `PAYSTACK_SECRET_KEY`. Use the test key only in a non-production environment.
-3. Set `NEXT_PUBLIC_APP_URL=https://fidulync.vercel.app`.
-4. In Paystack Dashboard → Settings → API Keys & Webhooks, set the webhook URL to:
-   `https://fidulync.vercel.app/api/v1/paystack-webhook`
-5. Configure `RESEND_API_KEY` and `LICENSE_FROM_EMAIL` in Vercel Production so license delivery and account-transfer codes can be emailed. Verify the sender domain with the email provider first.
-6. Deploy after changing environment variables.
-7. Test a successful payment, failed payment, duplicate webhook delivery, and a callback retry with a Paystack test account in Preview before enabling live sales.
+## MT5 bridge setup (when a laptop is available)
 
-The checkout currently prices subscriptions in minor currency units: NGN 65,000 monthly, USD 49 monthly, NGN 250,000 lifetime, USD 199 lifetime. Confirm these prices and tax/refund terms before enabling live sales.
-
-## MT5 / EA bridge setup (when a laptop is available)
-
-1. Set the same strong `ALGOLYNC_PRIVATE_KEY` in Vercel and the EA's private request configuration (the legacy `ALGO_PRIVATE_API_KEY` alias is also accepted). Do not hardcode it into a public downloadable source file.
-2. Add `https://fidulync.vercel.app` to MT5 Tools → Options → Expert Advisors → Allow WebRequest for listed URL.
-3. Compile the EA in MetaEditor and resolve all compiler errors and warnings.
-4. Verify license validation against a real purchased test license and the correct MT5 account.
-5. Verify heartbeat, closed-trade ingestion, customer-specific account history, and offline status.
-6. Run on a demo account before any live trading. No automated profitability or safety guarantee is implied.
+1. Include public/mql5/MacroLyncBridge.mqh in the EA.
+2. Set InpMacroEndpoint to https://fidulync.vercel.app/api/v1/macro-context.
+3. Set InpMacroApiToken to the dedicated MACRO_API_TOKEN value. Never use CRON_SECRET.
+4. In MT5, open Tools → Options → Expert Advisors and allow WebRequest to https://fidulync.vercel.app.
+5. Call MacroLyncGetMacroContext(symbol, context) and treat INSUFFICIENT_EVIDENCE, unverified calendar and news_lockout=true as abstain conditions.
+6. Keep technical analysis, entries/exits, broker orders, stops, sizing and risk controls inside the EA. The compatibility MacroLyncGetSignal wrapper always sets safe_to_trade=false; it never authorizes a trade.
+7. Compile in MetaEditor, resolve every compiler warning/error and validate the authenticated HTTP 200 response on a demo account before connecting a live EA.
 
 ## Release gates
 
-Do not promote the development branch to `main` or switch on live selling until:
-- The latest production build is READY.
-- Required production secrets are configured and confirmed without exposing their values.
-- Paystack test-mode payment and webhook flows pass.
-- License issuance is idempotent and account-bound.
-- Supabase customer data isolation is tested with two different MT5 accounts.
-- Macro data freshness and cron authentication are tested.
-- Public routes, login, store, dashboard, and support journeys have been smoke-tested.
+- npm ci succeeds with zero reported vulnerabilities.
+- npm run build passes lint, TypeScript, tests and Next.js production compilation.
+- /api/v1/live-quotes returns valid, timestamped bid/ask/spread observations for EURUSD, GBPUSD, XAUUSD and USDJPY.
+- /api/v1/top-pairs ranks only fresh, provider-backed macro candidates and does not claim calibrated win probabilities.
+- /api/v1/macro-context?symbol=EURUSD returns HTTP 200 only with the configured read-only service credential.
+- Calendar-unavailable and insufficient-evidence states remain fail-closed.
+- The exact production deployment SHA matches the validated main commit. A successful build alone does not prove external providers are reachable.
 
-## Security notes
+## Security and data integrity
 
-- Never put private keys, Supabase secret keys, service-role keys, Paystack secret keys, or cron secrets in client-side variables or Git.
-- Rotate any credential that has been pasted into public source, logs, or chat.
-- Keep the WhatsApp support component and its existing behavior unchanged.
+- Keep Supabase secret/service-role keys, provider API keys, MACRO_API_TOKEN and CRON_SECRET server-side.
+- Never pass broker credentials to the app.
+- Never label reference rates, delayed quotes, daily closes, weekly positioning or monthly/quarterly releases as tick-level live data.
+- Missing, stale, revised, contradictory or malformed observations must be excluded from live research decisions.
+- Historical validation remains unvalidated until reproducible point-in-time data vintages and out-of-sample calculations exist.

@@ -1,6 +1,6 @@
 # Data licensing, attribution and original-work policy
 
-This document is an engineering control, not legal advice. Before commercial launch, retain copies of each provider's applicable contract, exchange addenda, pricing tier and written approvals in the company's compliance records. A working API key is not evidence of a redistribution or display licence.
+This document is an engineering control, not legal advice. FiduLync is currently a private personal research terminal. A working API key is not evidence that a provider permits caching, storage, derived-data use or display; review the applicable terms before enabling any gated adapter.
 
 ## Default-deny provider policy
 
@@ -8,8 +8,7 @@ All third-party data integrations must be server-side, credential-protected, HTT
 
 The following flags default to `false`. They must not be enabled merely because a key is present:
 
-- `FRED_COMMERCIAL_USE_APPROVED`
-- `TWELVE_DATA_COMMERCIAL_USE_APPROVED`
+- `FRED_DATA_STORAGE_PERMISSION_APPROVED`
 - `FINNHUB_PERSONAL_PLAN_ACTIVE`
 - `ALPHA_VANTAGE_COMMERCIAL_USE_APPROVED`
 - `FMP_COMMERCIAL_USE_APPROVED`
@@ -27,14 +26,6 @@ The owner must document the relevant written permission and the exact scope befo
 FRED series can be owned by third parties. Its API terms require compliance with each series owner's restrictions and include specific prohibitions concerning caching/archiving and use in AI development. Therefore the current FRED adapter is disabled unless the exact proposed commercial use and data handling have been reviewed and expressly approved. Do not assume all series are public domain.
 
 Terms: https://fred.stlouisfed.org/docs/api/terms_of_use.html
-
-### Twelve Data
-
-Individual plans are for personal/internal use and do not permit commercial third-party display or redistribution. Business plans and exchange-specific rights may be required for external display. Derived data must not permit reconstruction of underlying market data; public display may require attribution. The current candle fallback is disabled unless the correct business plan, relevant FX/exchange permissions and display/derived-data rights are documented.
-
-Terms: https://twelvedata.com/terms
-Commercial vs personal use: https://support.twelvedata.com/en/articles/5332349-commercial-and-personal-usage
-Attribution: https://support.twelvedata.com/en/articles/12647398-attribution-guidelines-for-using-twelve-data
 
 ### BEA
 
