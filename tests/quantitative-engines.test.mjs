@@ -512,5 +512,7 @@ test('trade journal offers JSON and CSV exports and desk sections use non-collid
   assert.match(desk, /exportJournal\('json'\)/);
   assert.match(desk, /exportJournal\('csv'\)/);
   assert.match(desk, /A \/ UNIFIED CURRENCY MATRIX/);
-  assert.match(desk, /E \/ MT5 MACRO CONTEXT BRIDGE/);
+  const diagnostics = read('../app/components/EABridgeDiagnostics.tsx');
+  assert.match(diagnostics, /ZONE 4/);
+  assert.match(diagnostics, /MacroLyncBridge\.mqh/);
 });
