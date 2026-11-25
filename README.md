@@ -84,7 +84,7 @@ Configure secrets only in the Vercel project environment settings, never in this
 | `FRED_API_KEY` | Optional FRED API key |
 | `FRED_DATA_STORAGE_PERMISSION_APPROVED` | Explicit approval gate for FRED storage/use in this application |
 | `FINNHUB_API_KEY` | Optional calendar provider key |
-| `FINNHUB_COMMERCIAL_USE_APPROVED` | Explicit provider-use approval gate |
+| `FINNHUB_PERSONAL_PLAN_ACTIVE` | Set true only while the private personal-plan entitlement is active and its terms permit this personal use |
 | `FMP_API_KEY` | Optional calendar provider key |
 | `FMP_COMMERCIAL_USE_APPROVED` | Explicit provider-use approval gate |
 | `FAIRECONOMY_COMMERCIAL_USE_APPROVED` | Explicit calendar-feed use gate |
