@@ -1061,6 +1061,7 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
           ? 'provider'
           : 'fallback',
       cotSource: data.payload.cotSource === 'provider' ? 'provider' : 'unavailable',
+      catalysts: data.payload.calendarSource === 'provider' ? parsed.catalysts : [],
       calendarSource: data.payload.calendarSource === 'provider' ? 'provider' : 'unavailable',
       ...(parsed.energyMarkets ? { energyMarkets: parsed.energyMarkets } : {}),
       asOf: data.refreshed_at,
