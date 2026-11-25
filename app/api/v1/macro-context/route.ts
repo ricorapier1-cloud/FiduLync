@@ -140,7 +140,7 @@ export async function GET(request: Request) {
         losses: null,
         locked: null,
         authority: 'MT5_ACCOUNT_SIDE_ENFORCEMENT_REQUIRED',
-      }),
+      },
       calendar_verified: snapshot.calendarSource === 'provider',
       event_risk_status: snapshot.calendarSource === 'provider' ? 'PROVIDER_CALENDAR' : 'UNVERIFIED_CALENDAR',
       news_lockout: dossier.eventRiskLockout || snapshot.calendarSource !== 'provider',
