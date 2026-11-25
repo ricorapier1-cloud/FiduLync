@@ -6,7 +6,8 @@ import type { CrossAssetTelemetry, MacroRegime, MacroSnapshot } from '@/types/ma
  */
 export function getCrossAssetTelemetry(snapshot: MacroSnapshot): CrossAssetTelemetry {
   const usd = snapshot.currencies.find((currency) => currency.code === 'USD');
-  const verifiedTwoYear = usd?.twoYearYieldSource === 'provider' ? usd.twoYearYield : null;
+  const verifiedTwoYear = usd?.twoYearYieldSource === 'provider'
+    && isFreshObservation(usd.twoYearYieldObservationDate, 14) ? usd.twoYearYield : null;
   const treasury = snapshot.usTreasury?.freshness === 'LATEST PUBLISHED' ? snapshot.usTreasury : undefined;
   const vixObservation = snapshot.vix?.freshness === 'LATEST PUBLISHED' ? snapshot.vix : undefined;
   const wti = snapshot.energyMarkets?.wti.freshness === 'LATEST PUBLISHED' ? snapshot.energyMarkets.wti.valueUsdPerBarrel : null;
