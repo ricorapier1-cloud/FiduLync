@@ -1152,8 +1152,10 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
           : 'fallback',
       cotSource: data.payload.cotSource === 'provider' ? 'provider' : 'unavailable',
       catalysts: data.payload.calendarSource === 'provider' ? persistedCatalysts : [],
-      calendarSource: data.payload.calendarSource === 'provider' && persistedCatalysts.length > 0 ? 'provider' : 'unavailable',
-      calendarProvider: data.payload.calendarProvider === 'FAIRECONOMY_PUBLIC' ? 'FAIRECONOMY_PUBLIC' : undefined,
+      calendarSource: data.payload.calendarSource === 'provider' ? 'provider' : 'unavailable',
+      calendarProvider: data.payload.calendarProvider === 'FAIRECONOMY_PUBLIC' ? 'FAIRECONOMY_PUBLIC'
+        : data.payload.calendarProvider === 'FINNHUB' ? 'FINNHUB'
+          : data.payload.calendarProvider === 'FMP' ? 'FMP' : undefined,
       ...(parsed.energyMarkets ? { energyMarkets: parsed.energyMarkets } : {}),
       asOf: data.refreshed_at,
       ...(ecbRates && Object.keys(ecbRates).length > 0 ? { ecbRates } : {}),
