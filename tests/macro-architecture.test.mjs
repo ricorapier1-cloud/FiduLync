@@ -153,3 +153,11 @@ test('architecture: one evidence-gated macro opportunity board is integrated int
   assert.ok(route.includes('NO_QUALIFIED_CANDIDATES'));
   assert.doesNotMatch(route, /divergence_pair: pair/);
 });
+
+test('MQL5 read-only bridge parses Sovereign Shield risk ceiling and remains fail-closed', () => {
+  const bridge = read('../public/mql5/MacroLyncBridge.mqh');
+  assert.match(bridge, /sovereign_max_risk_pct/);
+  assert.match(bridge, /sovereign_status/);
+  assert.match(bridge, /maxAllowedRiskPct/);
+  assert.match(bridge, /context\.sovereign_max_risk_pct > 0\.0/);
+});
