@@ -494,9 +494,10 @@ function getFairEconomyCatalysts(): Promise<EconomicCatalyst[]> {
       if (!isRecord(item)) return [];
       const code = typeof item.country === 'string' ? item.country : typeof item.currency === 'string' ? item.currency : '';
       if (!code || typeof item.title !== 'string' || typeof item.date !== 'string') return [];
-      const impact = item.impact === 'High' ? 'High' : item.impact === 'Medium' ? 'Medium' : null;
+      const impact = item.impact === 'High' ? 'High' : null;
       const scheduledAt = new Date(item.date);
-      if (!impact || !regionMap[code] || !Number.isFinite(scheduledAt.getTime())) return [];
+      if (!impact || !['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CHF', 'CAD'].includes(code)
+        || !regionMap[code] || !Number.isFinite(scheduledAt.getTime())) return [];
       return [{
         id: `fair-economy-${scheduledAt.toISOString()}-${index}`,
         region: regionMap[code],
@@ -750,7 +751,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     fmpKey ? getFmpCatalysts(fmpKey) : Promise.resolve(null),
     cotProviderUrl ? getCotProvider(cotProviderUrl, cotProviderToken) : getCftcCot(),
     getFrankfurterRates(),
-    process.env.FAIRECONOMY_COMMERCIAL_USE_APPROVED === 'true' ? getFairEconomyCatalysts() : Promise.resolve([]),
+    getFairEconomyCatalysts(),
     getEcbMacroInputs(),
     getBankOfCanadaMacroInputs(),
     getBankOfEnglandPolicyRate(),
@@ -855,10 +856,12 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
   if (providerCalendar.length > 0) {
     snapshot.catalysts = providerCalendar;
     snapshot.calendarSource = 'provider';
+    snapshot.calendarProvider = 'FAIRECONOMY_PUBLIC';
     hasAnyProviderData = true;
   } else {
     snapshot.catalysts = [];
     snapshot.calendarSource = 'unavailable';
+    snapshot.calendarProvider = undefined;
     if (calendarResult.status === 'rejected') {
       console.warn('Economic calendar is unavailable; no provider-backed events will be displayed:', calendarResult.reason);
     }
@@ -1145,6 +1148,7 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
       cotSource: data.payload.cotSource === 'provider' ? 'provider' : 'unavailable',
       catalysts: data.payload.calendarSource === 'provider' ? persistedCatalysts : [],
       calendarSource: data.payload.calendarSource === 'provider' && persistedCatalysts.length > 0 ? 'provider' : 'unavailable',
+      calendarProvider: data.payload.calendarProvider === 'FAIRECONOMY_PUBLIC' ? 'FAIRECONOMY_PUBLIC' : undefined,
       ...(parsed.energyMarkets ? { energyMarkets: parsed.energyMarkets } : {}),
       asOf: data.refreshed_at,
       ...(ecbRates && Object.keys(ecbRates).length > 0 ? { ecbRates } : {}),
