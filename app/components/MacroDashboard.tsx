@@ -67,21 +67,6 @@ function formatCountdown(target: string, now: number) {
   return `${hours}h ${minutes}m`;
 }
 
-function CatalystCountdownDisplay({ target }: { target: string }) {
-  const [countdown, setCountdown] = useState<string>('Syncing');
-
-  useEffect(() => {
-    const update = () => {
-      setCountdown(formatCountdown(target, Date.now()));
-    };
-    update();
-    const timer = setInterval(update, 30_000);
-    return () => clearInterval(timer);
-  }, [target]);
-
-  return <span>{countdown}</span>;
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -100,7 +85,6 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
   const sortedCatalysts = [...snapshot.catalysts]
     .filter((catalyst) => now === null || Date.parse(catalyst.scheduledAt) >= now)
     .sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt));
-  const nextHighImpactCatalyst = sortedCatalysts.find((catalyst) => catalyst.impact === 'High');
   const currencies = snapshot.currencies;
   const divergenceRanked = useMemo(() => {
     return currencies
@@ -725,28 +709,6 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
         </div>
       </section>
 
-      {/* Terminal Footer */}
-      <footer className="macro-footer">
-        <div>
-          <Link className="macro-footer-brand" href="/">
-            <span>Macro<span>Lync</span></span>
-            <small>INSTITUTIONAL MACRO INTELLIGENCE CENTER</small>
-          </Link>
-          <p>Quantitative macroeconomic analysis, monetary-policy divergence, and fundamental foreign-exchange models.</p>
-        </div>
-        <div className="macro-footer-actions">
-          <Link href="/notebook">
-            <BrandGlyph name="activity" size={15} /> Research Notebook <BrandGlyph name="arrow-up-right" size={13} />
-          </Link>
-          <Link href="/workbench">
-            <BrandGlyph name="trend" size={15} /> Validation Workbench <BrandGlyph name="arrow-up-right" size={13} />
-          </Link>
-          <a href="mailto:fidulync@gmail.com">
-            <BrandGlyph name="mail" size={15} /> fidulync@gmail.com
-          </a>
-        </div>
-        <span className="macro-footer-legal mono">PRIVATE RESEARCH PLATFORM / NOT INVESTMENT ADVICE</span>
-      </footer>
     </div>
   );
 }
