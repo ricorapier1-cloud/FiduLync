@@ -213,7 +213,7 @@ async function fetchMarketQuotes(): Promise<MarketQuote[]> {
     console.warn('MT5 broker quotes are unavailable:', error);
     return [];
   });
-  const apiKey = process.env.FINNHUB_COMMERCIAL_USE_APPROVED === 'true' ? process.env.FINNHUB_API_KEY?.trim() : undefined;
+  const apiKey = process.env.FINNHUB_PERSONAL_PLAN_ACTIVE === 'true' ? process.env.FINNHUB_API_KEY?.trim() : undefined;
   let liveQuotes: MarketQuote[] = [];
   if (apiKey) {
     try {
