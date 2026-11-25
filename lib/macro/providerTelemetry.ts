@@ -33,7 +33,7 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
     || process.env.FAIRECONOMY_COMMERCIAL_USE_APPROVED === 'true'
     || (process.env.FMP_COMMERCIAL_USE_APPROVED === 'true' && Boolean(process.env.FMP_API_KEY?.trim()));
   const bls = feedStatus(usd?.unemploymentProvider === 'BLS' && usd.wageGrowthProvider === 'BLS',
-    isFresh(usd?.unemploymentObservationDate, 120) && isFresh(usd?.wageGrowthObservationDate, 120), Boolean(process.env.BLS_API_KEY?.trim()));
+    isFresh(usd?.unemploymentObservationDate, 120) && isFresh(usd?.wageGrowthObservationDate, 120), true);
   const bea = feedStatus(usd?.gdpProvider === 'BEA' && Boolean(usd.gdpObservationDate), Boolean(usd?.gdpObservationDate), Boolean(process.env.BEA_API_KEY?.trim()));
 
   const fred = feedStatus(fredStorageAllowed && Boolean(usd?.policyRateProvider === 'FRED' && usd.inflationProvider === 'FRED'),
