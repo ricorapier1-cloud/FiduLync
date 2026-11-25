@@ -530,3 +530,33 @@ test('Force Sync refreshes the macro snapshot, gold context, BBO and spot refere
   assert.match(desk, /onSnapshotChange\(freshSnapshot\)/);
   assert.match(desk, /onGoldContextChange\(freshGold\)/);
 });
+
+
+test('technical confluence calculates Hurst, KER and ATR only from validated OHLC bars', () => {
+  const technical = read('../lib/quant/technicalConfluence.ts');
+  assert.match(technical, /estimateHurst/);
+  assert.match(technical, /kaufmanEfficiencyRatio14/);
+  assert.match(technical, /recommendedStopMin/);
+  assert.match(technical, /recommendedStopMax/);
+  assert.match(technical, /INSUFFICIENT_HISTORY/);
+  assert.match(technical, /INVALID_DATA/);
+});
+
+test('Sovereign Shield exposes hard volatility, event, crowding and account-risk controls', () => {
+  const shield = read('../lib/quant/sovereignShield.ts');
+  const macroApi = read('../app/api/v1/macro-context/route.ts');
+  const goldApi = read('../app/api/v1/xauusd-context/route.ts');
+  assert.match(shield, /VIX_AT_OR_ABOVE_28/);
+  assert.match(shield, /VIX_ELEVATED_HALF_RISK/);
+  assert.match(shield, /SPREAD_BLOWOUT_BLOCK/);
+  assert.match(shield, /CROWDED_UNWIND_RISK/);
+  assert.match(shield, /ROLLING_7D_DRAWDOWN_LIMIT/);
+  assert.match(macroApi, /sovereignShield/);
+  assert.match(goldApi, /sovereignShield/);
+});
+
+test('desk correlation guard blocks a repeated currency leg and macro/technical scores remain distinct', () => {
+  assert.match(dashboard, /correlationBlocked/);
+  assert.match(dashboard, /SHARED LEG/);
+  assert.match(dashboard, /Technical regime, Hurst, KER and session liquidity are separate/);
+});
