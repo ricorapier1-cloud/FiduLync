@@ -1,8 +1,8 @@
 import type { CrossAssetTelemetry, MacroRegime, MacroSnapshot } from '@/types/macro';
 
 /**
- * The app has no verified live adapters for the full cross-asset basket yet.
- * Never manufacture market levels or classify a regime from constants.
+ * Populate only independently sourced observations attached to the snapshot.
+ * Unsupported cross-asset inputs remain null; never infer regimes from placeholders.
  */
 export function getCrossAssetTelemetry(snapshot: MacroSnapshot): CrossAssetTelemetry {
   const usd = snapshot.currencies.find((currency) => currency.code === 'USD');
@@ -57,9 +57,5 @@ export function classifyMacroRegime(snapshot: MacroSnapshot): MacroRegime {
 
   const rates = verified.map((currency) => currency!.policyRate);
   const dispersion = Math.max(...rates) - Math.min(...rates);
-  const inflation = verified.map((currency) => currency!.inflation);
-  if (inflation.every(Number.isFinite) && inflation.reduce((sum, value) => sum + value, 0) / inflation.length >= 3.5) {
-    return 'INFLATION_SHOCK_HAWKISH';
-  }
   return dispersion >= 2.5 ? 'POLICY_DIVERGENCE_CARRY' : 'INSUFFICIENT_EVIDENCE';
 }
