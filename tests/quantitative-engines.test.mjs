@@ -327,6 +327,7 @@ test('gold quote parser uses parent-level Swissquote timestamps and Treasury dai
   assert.ok(gold.includes("requiredDailySeries = ['DFII10', 'T10YIE', 'DGS2', 'DTB3', 'VIXCLS']"));
   assert.ok(gold.includes('evidenceCoveragePct'));
   assert.ok(treasury.includes('history: history.slice(0, 260)'));
+  assert.ok(treasury.includes("fetchTreasuryRows('daily_treasury_real_yield_curve', ['TC_10YEAR'])"));
 });
 
 test('economic calendar never falls back to hardcoded central-bank dates or stale persisted fixtures', () => {
