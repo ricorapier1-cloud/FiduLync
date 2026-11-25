@@ -23,8 +23,8 @@ const JOURNAL_KEY = 'fidulync-desk-journal-v1';
 const FX_KEY = 'fidulync-desk-fx-v1';
 const blankJournal = (dateWAT: string): Journal => ({ dateWAT, trades: 0, wins: 0, losses: 0, netPnl: 0, entries: [] });
 const watDate = (date = new Date()) => { const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date); const part = (type: string) => parts.find((item) => item.type === type)?.value ?? '00'; return part('year') + '-' + part('month') + '-' + part('day'); };
-function watDecimalHour(date: Date) {
-  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Lagos', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date);
+function zonedDecimalHour(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date);
   return Number(parts.find((p) => p.type === 'hour')?.value ?? 0) + Number(parts.find((p) => p.type === 'minute')?.value ?? 0) / 60;
 }
 function readStorage<T>(key: string): T | null {
@@ -71,8 +71,10 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext }: { 
   const spreadUnits = quote?.spread === null || quote?.spread === undefined ? null : selected === 'XAUUSD' ? quote.spread : quote.spread / (selected === 'USDJPY' ? 0.01 : 0.0001);
   const spreadPct = spreadUnits !== null && stop > 0 ? spreadUnits / stop * 100 : null;
   const currentDateWAT = watDate(new Date(now));
-  const hourWAT = watDecimalHour(new Date(now));
-  const inSession = (hourWAT >= 8 && hourWAT < 12) || (hourWAT >= 13 && hourWAT < 17);
+  const sessionClock = new Date(now);
+  const hourWAT = zonedDecimalHour(sessionClock, 'Africa/Lagos');
+  const hourNewYork = zonedDecimalHour(sessionClock, 'America/New_York');
+  const inSession = (hourWAT >= 8 && hourWAT < 12) || (hourNewYork >= 8 && hourNewYork < 12);
   const locked = journal.trades >= 2 || journal.losses >= 2;
   const dossier = useMemo(() => generatePairDossier(initialSnapshot, selected), [initialSnapshot, selected]);
   const fxMacroPass = (dossier.confidence === 'HIGH' || dossier.confidence === 'MODERATE')
@@ -93,7 +95,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext }: { 
   const spreadPass = quoteIsFresh && rr >= 2 && spreadPct !== null && spreadPct < 15;
   const gates = [
     { name: 'Macro alignment', pass: macroPass, detail: selected === 'XAUUSD' ? (goldScore === null ? 'Gold engine evidence unavailable' : `${goldScore} gold score · ${initialGoldContext?.directionalVerdict} · ${direction}`) : dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? 'No verified pair bias available' : `${dossier.biasScore} score · ${dossier.confidence} · ${direction}` },
-    { name: 'Lagos session', pass: inSession, detail: 'London 08:00–12:00 / New York 13:00–17:00 WAT' },
+    { name: 'Lagos session', pass: inSession, detail: 'London 08:00–12:00 WAT / New York 08:00–12:00 ET (DST-aware)' },
     { name: 'Tier-1 event risk', pass: eventPass, detail: !verifiedCalendar ? 'Calendar unverified; fail-closed' : nearEvent ? 'Event within ±30 minutes' : 'Verified calendar: clear' },
     { name: 'H4/H1 structure and liquidity', pass: technicalConfirmed, detail: 'Requires manual MT5 chart confirmation' },
     { name: 'Reward/risk and spread', pass: spreadPass, detail: `${rr.toFixed(2)}R · ${quoteIsFresh ? 'fresh quote' : 'quote stale/unavailable'} · spread ${spreadPct === null ? 'unavailable' : spreadPct.toFixed(1) + '% of SL'}` },
