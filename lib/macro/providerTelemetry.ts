@@ -29,6 +29,9 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
   const fredKeyPresent = Boolean(process.env.FRED_API_KEY?.trim());
   const fredStorageAllowed = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true';
   const finnhubConfigured = process.env.FINNHUB_COMMERCIAL_USE_APPROVED === 'true' && Boolean(process.env.FINNHUB_API_KEY?.trim());
+  const calendarConfigured = finnhubConfigured
+    || process.env.FAIRECONOMY_COMMERCIAL_USE_APPROVED === 'true'
+    || (process.env.FMP_COMMERCIAL_USE_APPROVED === 'true' && Boolean(process.env.FMP_API_KEY?.trim()));
   const bls = feedStatus(usd?.unemploymentProvider === 'BLS' && usd.wageGrowthProvider === 'BLS',
     isFresh(usd?.unemploymentObservationDate, 120) && isFresh(usd?.wageGrowthObservationDate, 120), Boolean(process.env.BLS_API_KEY?.trim()));
   const bea = feedStatus(usd?.gdpProvider === 'BEA' && Boolean(usd.gdpObservationDate), Boolean(usd?.gdpObservationDate), Boolean(process.env.BEA_API_KEY?.trim()));
@@ -44,7 +47,7 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
   const cftc = feedStatus(snapshot.cotSource === 'provider' && snapshot.cot.length > 0,
     snapshot.cot.some((item) => isFresh(item.reportDate, 14)), true);
   const calendar = feedStatus(snapshot.calendarSource === 'provider' && snapshot.catalysts.length > 0,
-    snapshot.catalysts.some((item) => Date.parse(item.scheduledAt) >= Date.now() - 24 * 60 * 60 * 1000), finnhubConfigured);
+    snapshot.catalysts.some((item) => Date.parse(item.scheduledAt) >= Date.now() - 60 * 60 * 1000 && Date.parse(item.scheduledAt) <= Date.now() + 45 * 24 * 60 * 60 * 1000), calendarConfigured);
   const bisCoverage = snapshot.currencies.filter((item) => item.policyRateProvider === 'BIS' && item.inflationProvider === 'BIS').length;
   const bis = feedStatus(bisCoverage >= 4, bisCoverage >= 4, true);
   const riksbank = feedStatus(sek?.policyRateProvider === 'Sveriges Riksbank',
