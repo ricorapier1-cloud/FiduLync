@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { buildGoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
+import { getMacroSnapshot } from '@/lib/macroEngine';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -7,7 +8,8 @@ export const revalidate = 0;
 
 export async function GET() {
   try {
-    const context = await buildGoldMacroContext();
+    const snapshot = await getMacroSnapshot();
+    const context = await buildGoldMacroContext(snapshot);
     return NextResponse.json(context, { headers: { 'Cache-Control': 'private, no-store, max-age=0' } });
   } catch (error) {
     console.error('Gold macro context refresh failed:', error);
