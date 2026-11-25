@@ -5,7 +5,7 @@ import { generatePairDossier, G8_PAIRS } from '@/lib/macro/dossierEngine';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
 import { getMarketQuotes } from '@/lib/marketFeeds';
 import { buildGoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
-import type { MacroContextPayload } from '@/types/desk';
+import type { MacroContextPayload, MacroSymbolBias } from '@/types/desk';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -47,6 +47,21 @@ async function consumePersistentRateLimit(key: string, limit: number): Promise<{
       ? Math.max(1, Number(result.retry_after_seconds))
       : 60,
   };
+}
+
+function hourInZone(date: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date);
+  const hour = Number(parts.find((part) => part.type === 'hour')?.value ?? 0);
+  const minute = Number(parts.find((part) => part.type === 'minute')?.value ?? 0);
+  return hour + minute / 60;
+}
+
+function activeMarketSession(date = new Date()): 'LONDON' | 'NY' | 'CLOSED' {
+  const watHour = hourInZone(date, 'Africa/Lagos');
+  if (watHour >= 8 && watHour < 12) return 'LONDON';
+  const nyHour = hourInZone(date, 'America/New_York');
+  if (nyHour >= 8 && nyHour < 12) return 'NY';
+  return 'CLOSED';
 }
 
 const headers = {
@@ -98,19 +113,53 @@ export async function GET(request: Request) {
   }
 
   try {
-    const [snapshot, quotes, goldContext] = await Promise.all([
-      getMacroSnapshot(),
-      getMarketQuotes(),
-      symbol === 'XAUUSD' ? buildGoldMacroContext() : Promise.resolve(null),
-    ]);
+    const [snapshot, quotes] = await Promise.all([getMacroSnapshot(), getMarketQuotes()]);
+    const goldContext = await buildGoldMacroContext(snapshot);
     const dossier = generatePairDossier(snapshot, symbol);
-    const goldAvailable = symbol === 'XAUUSD' && goldContext?.overallState === 'AVAILABLE' && goldContext.goldBiasScore !== null;
-    const goldBias = goldContext?.goldBiasScore ?? null;
-    const goldVerdict = goldContext?.directionalVerdict ?? 'INSUFFICIENT_EVIDENCE';
+    const goldAvailable = goldContext.overallState === 'AVAILABLE' && goldContext.goldBiasScore !== null;
+    const goldBias = goldContext.goldBiasScore;
+    const goldVerdict = goldContext.directionalVerdict;
+    const activeSession = activeMarketSession();
+    const highImpactWindow = snapshot.catalysts.some((event) => event.impact === 'High'
+      && Math.abs(Date.parse(event.scheduledAt) - Date.now()) <= 30 * 60_000);
+    const newsLockoutActive = snapshot.calendarSource !== 'provider' || highImpactWindow || dossier.eventRiskLockout;
+    const symbolBiases: Record<string, MacroSymbolBias> = Object.fromEntries(G8_PAIRS.map((candidate) => {
+      if (candidate === 'XAUUSD') {
+        const available = goldContext.goldBiasScore !== null
+          && goldContext.directionalVerdict !== 'INSUFFICIENT_EVIDENCE';
+        return [candidate, {
+          biasScore: available ? goldContext.goldBiasScore : null,
+          directionalVerdict: available ? goldContext.directionalVerdict : 'INSUFFICIENT_EVIDENCE',
+          macroRiskRegime: goldContext.liquidityRegime,
+          confidence: available ? (goldContext.evidenceCoveragePct >= 100 ? 'MODERATE' : 'LOW') : 'INSUFFICIENT_EVIDENCE',
+        }];
+      }
+      const item = generatePairDossier(snapshot, candidate);
+      const available = item.confidence !== 'INSUFFICIENT_EVIDENCE';
+      return [candidate, {
+        biasScore: available ? item.biasScore : null,
+        directionalVerdict: !available ? 'INSUFFICIENT_EVIDENCE'
+          : item.fundamentalBias.includes('BULLISH') ? 'BULLISH'
+            : item.fundamentalBias.includes('BEARISH') ? 'BEARISH' : 'NEUTRAL',
+        macroRiskRegime: item.macroRegime,
+        confidence: item.confidence,
+      }];
+    }));
+    const selectedBias = symbolBiases[symbol];
+    const allowedToTrade = Boolean(selectedBias?.biasScore !== null
+      && selectedBias?.directionalVerdict !== 'INSUFFICIENT_EVIDENCE'
+      && Math.abs(selectedBias?.biasScore ?? 0) >= 20
+      && activeSession !== 'CLOSED' && !newsLockoutActive);
     const payload: MacroContextPayload = {
       schema_version: '1.0.0',
       generated_at_utc: new Date().toISOString(),
       timezone: 'Africa/Lagos',
+      allowedToTrade,
+      newsLockoutActive,
+      activeSession,
+      macroRiskRegime: selectedBias?.macroRiskRegime ?? 'INSUFFICIENT_EVIDENCE',
+      symbols: symbolBiases,
+      decisionScope: 'MACRO_GATE_ONLY',
       symbol: dossier.symbol,
       base: dossier.base,
       quote: dossier.quote,
@@ -151,9 +200,9 @@ export async function GET(request: Request) {
         locked: null,
         authority: 'MT5_ACCOUNT_SIDE_ENFORCEMENT_REQUIRED',
       },
-      calendar_verified: snapshot.calendarSource === 'provider',
+      calendar_verified: snapshot.calendarSource === 'provider' && Boolean(snapshot.calendarProvider),
       event_risk_status: snapshot.calendarSource === 'provider' ? 'PROVIDER_CALENDAR' : 'UNVERIFIED_CALENDAR',
-      news_lockout: dossier.eventRiskLockout || snapshot.calendarSource !== 'provider',
+      news_lockout: newsLockoutActive,
       next_catalyst: snapshot.calendarSource === 'provider' && dossier.nextCatalyst ? {
         title: dossier.nextCatalyst.title,
         scheduled_at_utc: dossier.nextCatalyst.scheduledAt,
@@ -166,6 +215,7 @@ export async function GET(request: Request) {
         as_of_utc: snapshot.asOf,
         source_mode: snapshot.source,
         calendar_source: snapshot.calendarSource ?? 'unavailable',
+        calendar_provider: snapshot.calendarProvider ?? null,
         cot_source: snapshot.cotSource ?? 'unavailable',
       },
       disclaimer: 'Read-only macroeconomic intelligence. No technical analysis or broker order execution.',
