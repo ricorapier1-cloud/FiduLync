@@ -130,14 +130,15 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
 
   const refreshQuotes = useCallback(async () => {
     if (document.visibilityState === 'hidden') return;
-    const response = await fetch('/api/v1/live-quotes', { cache: 'no-store' });
+    const query = satelliteSymbol ? '?satellite=' + encodeURIComponent(satelliteSymbol) : '';
+    const response = await fetch('/api/v1/live-quotes' + query, { cache: 'no-store' });
     if (!response.ok) throw new Error(`Live quote proxy HTTP ${response.status}`);
     const payload = await response.json() as QuoteResponse;
     setQuotes(payload.quotes);
     setQuoteStatus(payload.status);
     setLatency(payload.latencyMs);
     setQuoteSync(payload.generatedAtUtc);
-  }, []);
+  }, [satelliteSymbol]);
   const refreshFx = useCallback(async () => {
     if (document.visibilityState === 'hidden') return;
     try {
