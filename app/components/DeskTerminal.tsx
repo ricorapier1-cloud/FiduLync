@@ -90,7 +90,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
     && ((goldContext.directionalVerdict === 'BULLISH' && direction === 'BUY')
       || (goldContext.directionalVerdict === 'BEARISH' && direction === 'SELL'));
   const macroPass = selected === 'XAUUSD' ? goldMacroPass : fxMacroPass;
-  const verifiedCalendar = snapshot.calendarSource === 'provider';
+  const verifiedCalendar = snapshot.calendarSource === 'provider' && Boolean(snapshot.calendarProvider);
   const nearEvent = verifiedCalendar && snapshot.catalysts.some((event) => event.impact === 'High' && Math.abs(Date.parse(event.scheduledAt) - now) <= 30 * 60_000);
   const eventPass = verifiedCalendar && !nearEvent;
   const riskPass = Number.isFinite(account) && account > 0
