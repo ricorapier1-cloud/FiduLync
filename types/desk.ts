@@ -20,6 +20,8 @@ export type MacroContextPayload = {
   generated_at_utc: string;
   timezone: 'Africa/Lagos';
   allowedToTrade: boolean;
+  biasScore: number | null;
+  directionalVerdict: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | 'INSUFFICIENT_EVIDENCE';
   newsLockoutActive: boolean;
   activeSession: 'LONDON' | 'NY' | 'CLOSED';
   macroRiskRegime: string;
