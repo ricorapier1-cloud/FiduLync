@@ -222,7 +222,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, macr
         'time_utc,date_wat,symbol,result,pnl_usd',
         ...journal.entries.map((entry) => [entry.timeUtc, journal.dateWAT, entry.symbol, entry.result, entry.pnl]
           .map((value) => '"' + String(value).replace(/"/g, '""') + '"').join(',')),
-      ].join('\\n');
+      ].join('\n');
     const blob = new Blob([content], { type: format === 'json' ? 'application/json' : 'text/csv' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
