@@ -204,7 +204,7 @@ async function getEiaOilSeries(seriesId: 'PET.RWTC.D' | 'PET.RBRTE.D', apiKey: s
   url.searchParams.set('length', '30');
   url.searchParams.set('sort[0][column]', 'period');
   url.searchParams.set('sort[0][direction]', 'desc');
-  const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(10_000) });
+  const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(15_000) });
   if (!response.ok) throw new Error('EIA returned ' + response.status + ' for ' + seriesId + '.');
   const payload: unknown = await response.json();
   if (!isRecord(payload) || !isRecord(payload.response) || !Array.isArray(payload.response.data)) throw new Error('EIA returned an invalid ' + seriesId + ' response.');
@@ -760,7 +760,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     getBisG8MacroInputs(),
     getRiksbankPolicyRate(),
     getNorgesBankPolicyRate(),
-    eiaApiKey ? getEiaEnergyMarkets(eiaApiKey) : Promise.resolve(null),
+    eiaApiKey ? getCachedData('macro:eia-energy-markets-v1', () => getEiaEnergyMarkets(eiaApiKey), 6 * 60 * 60) : Promise.resolve(null),
     getCachedData('macro:us-treasury-yields-history-v2', getTreasuryYieldData, 60 * 60),
     getCachedData('macro:cboe-vix-history-v1', getCboeVixHistory, 60 * 60),
   ]);

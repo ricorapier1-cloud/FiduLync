@@ -48,7 +48,7 @@ async function generateGeminiBrief(
 ): Promise<MacroBrief> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   const fallback = ruleBasedBrief(snapshot);
-  if (!apiKey) return fallback;
+  if (!apiKey || process.env.GEMINI_MACRO_BRIEF_ENABLED !== 'true') return fallback;
 
   const inputs = {
     rateDifferentials: snapshot.currencies.filter((currency) => currency.policyRateSource === 'provider' && currency.inflationSource === 'provider'

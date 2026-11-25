@@ -405,3 +405,15 @@ test('Cboe daily VIX closes populate cross-asset risk telemetry without claiming
   assert.ok(dashboard.includes('Not an intraday volatility quote'));
   assert.ok(goldEngine.includes('getCboeVixHistory'));
 });
+
+
+test('provider resilience handles Riksbank single-observation payloads, caches EIA and gates Gemini by default', () => {
+  const international = read('../lib/internationalMacro.ts');
+  const macroData = read('../lib/macroData.ts');
+  const aiBrief = read('../lib/aiBrief.ts');
+  assert.ok(international.includes('nested && Array.isArray(nested.observations)'));
+  assert.ok(international.includes('typeof record.date === \'string\''));
+  assert.ok(macroData.includes("getCachedData('macro:eia-energy-markets-v1'"));
+  assert.ok(macroData.includes('AbortSignal.timeout(15_000)'));
+  assert.ok(aiBrief.includes("GEMINI_MACRO_BRIEF_ENABLED !== 'true'"));
+});

@@ -211,18 +211,25 @@ export async function getRiksbankPolicyRate(): Promise<OfficialPolicyRate> {
     });
     if (!response.ok) throw new Error(`Sveriges Riksbank returned ${response.status} for SECBREPOEFF.`);
     const payload: unknown = await response.json();
-    const rows = Array.isArray(payload) ? payload : isRecord(payload) && Array.isArray(payload.observations) ? payload.observations : [];
+    const record = isRecord(payload) ? payload : null;
+    const nested = record && isRecord(record.data) ? record.data : null;
+    const rows: unknown[] = Array.isArray(payload) ? payload
+      : record && Array.isArray(record.observations) ? record.observations
+        : nested && Array.isArray(nested.observations) ? nested.observations
+          : record && (typeof record.date === 'string' || typeof record.Date === 'string') ? [record]
+            : nested && (typeof nested.date === 'string' || typeof nested.Date === 'string') ? [nested] : [];
     const latest = rows.find((item) => isRecord(item)
-      && typeof item.date === 'string'
-      && (typeof item.value === 'number' || typeof item.value === 'string'));
-    if (!isRecord(latest) || typeof latest.date !== 'string') {
+      && (typeof item.date === 'string' || typeof item.Date === 'string')
+      && (typeof item.value === 'number' || typeof item.value === 'string' || typeof item.Value === 'number' || typeof item.Value === 'string'));
+    if (!isRecord(latest)) {
       throw new Error('Sveriges Riksbank returned no usable policy-rate observation.');
     }
-    const value = Number(latest.value);
-    if (!Number.isFinite(value) || !Number.isFinite(Date.parse(latest.date))) {
+    const date = typeof latest.date === 'string' ? latest.date : typeof latest.Date === 'string' ? latest.Date : '';
+    const value = Number(latest.value ?? latest.Value);
+    if (!Number.isFinite(value) || !Number.isFinite(Date.parse(date))) {
       throw new Error('Sveriges Riksbank policy-rate observation failed validation.');
     }
-    return { value, date: latest.date };
+    return { value, date };
   }, 3_600);
 }
 

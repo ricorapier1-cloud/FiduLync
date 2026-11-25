@@ -31,6 +31,7 @@ Configure these in Vercel → Project → Settings → Environment Variables. Ne
 | FAIRECONOMY_COMMERCIAL_USE_APPROVED | Enable only after applicable calendar-feed terms are reviewed |
 | FMP_API_KEY / FMP_COMMERCIAL_USE_APPROVED | Optional calendar fallback, only with applicable data-use permission |
 | UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN | Shared caching when configured |
+| GEMINI_API_KEY / GEMINI_MACRO_BRIEF_ENABLED | Optional source-constrained narrative; model calls remain disabled unless explicitly enabled |
 
 The service API also accepts MACROLYNC_API_SECRET or the legacy ALGO_PRIVATE_API_KEY as a compatibility secret. Prefer a dedicated MACRO_API_TOKEN; do not reuse CRON_SECRET.
 
