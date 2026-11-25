@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { MacroSnapshot } from '@/types/macro';
 import type { GoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
-import type { CurrencyStrength } from '@/lib/currencyStrength';
+import { getCurrencyStrengthIndex } from '@/lib/currencyStrength';
 import { generatePairDossier } from '@/lib/macro/dossierEngine';
 
 type Quote = {
@@ -34,7 +34,9 @@ function readStorage<T>(key: string): T | null {
 function display(value: number | null | undefined, digits: number) { return value === null || value === undefined || !Number.isFinite(value) ? '—' : value.toFixed(digits); }
 function clamp(value: number, min: number, max: number) { return Math.max(min, Math.min(max, value)); }
 
-export default function DeskTerminal({ initialSnapshot, initialGoldContext, macroStrength }: { initialSnapshot: MacroSnapshot; initialGoldContext: GoldMacroContext | null; macroStrength: CurrencyStrength[] }) {
+export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSnapshotChange, onGoldContextChange }: { initialSnapshot: MacroSnapshot; initialGoldContext: GoldMacroContext | null; onSnapshotChange: (snapshot: MacroSnapshot) => void; onGoldContextChange: (context: GoldMacroContext | null) => void }) {
+  const [snapshot, setSnapshot] = useState(initialSnapshot);
+  const [goldContext, setGoldContext] = useState(initialGoldContext);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [quoteStatus, setQuoteStatus] = useState('CONNECTING');
   const [latency, setLatency] = useState<number | null>(null);
@@ -77,19 +79,19 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, macr
   const hourNewYork = zonedDecimalHour(sessionClock, 'America/New_York');
   const activeSession = hourWAT >= 8 && hourWAT < 12 ? 'LONDON' : hourNewYork >= 8 && hourNewYork < 12 ? 'NEW YORK' : 'OFF-SESSION';
   const inSession = activeSession !== 'OFF-SESSION';
-  const healthyProviderCount = initialSnapshot.providerStatus?.filter((provider) => provider.status === 'HEALTHY').length ?? 0;
-  const totalProviderCount = initialSnapshot.providerStatus?.length ?? 0;
+  const healthyProviderCount = snapshot.providerStatus?.filter((provider) => provider.status === 'HEALTHY').length ?? 0;
+  const totalProviderCount = snapshot.providerStatus?.length ?? 0;
   const locked = journal.trades >= 2 || journal.losses >= 2;
-  const dossier = useMemo(() => generatePairDossier(initialSnapshot, selected), [initialSnapshot, selected]);
+  const dossier = useMemo(() => generatePairDossier(snapshot, selected), [snapshot, selected]);
   const fxMacroPass = (dossier.confidence === 'HIGH' || dossier.confidence === 'MODERATE')
     && ((dossier.biasScore > 0 && direction === 'BUY') || (dossier.biasScore < 0 && direction === 'SELL'));
-  const goldScore = initialGoldContext?.goldBiasScore ?? null;
-  const goldMacroPass = initialGoldContext?.overallState === 'AVAILABLE'
-    && ((initialGoldContext.directionalVerdict === 'BULLISH' && direction === 'BUY')
+  const goldScore = goldContext?.goldBiasScore ?? null;
+  const goldMacroPass = goldContext?.overallState === 'AVAILABLE'
+    && ((goldContext.directionalVerdict === 'BULLISH' && direction === 'BUY')
       || (initialGoldContext.directionalVerdict === 'BEARISH' && direction === 'SELL'));
   const macroPass = selected === 'XAUUSD' ? goldMacroPass : fxMacroPass;
-  const verifiedCalendar = initialSnapshot.calendarSource === 'provider';
-  const nearEvent = verifiedCalendar && initialSnapshot.catalysts.some((event) => event.impact === 'High' && Math.abs(Date.parse(event.scheduledAt) - now) <= 30 * 60_000);
+  const verifiedCalendar = snapshot.calendarSource === 'provider';
+  const nearEvent = verifiedCalendar && snapshot.catalysts.some((event) => event.impact === 'High' && Math.abs(Date.parse(event.scheduledAt) - now) <= 30 * 60_000);
   const eventPass = verifiedCalendar && !nearEvent;
   const riskPass = Number.isFinite(account) && account > 0
     && Number.isFinite(stop) && stop > 0 && Number.isFinite(target) && target > 0
@@ -98,7 +100,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, macr
   const quoteIsFresh = quote?.freshness === 'LIVE' && quote.ageMs !== null && quote.ageMs <= 60_000;
   const spreadPass = quoteIsFresh && rr >= 2 && spreadPct !== null && spreadPct < 15;
   const gates = [
-    { name: 'Macro alignment', pass: macroPass, detail: selected === 'XAUUSD' ? (goldScore === null ? 'Gold engine evidence unavailable' : `${goldScore} gold score · ${initialGoldContext?.directionalVerdict} · ${direction}`) : dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? 'No verified pair bias available' : `${dossier.biasScore} score · ${dossier.confidence} · ${direction}` },
+    { name: 'Macro alignment', pass: macroPass, detail: selected === 'XAUUSD' ? (goldScore === null ? 'Gold engine evidence unavailable' : `${goldScore} gold score · ${goldContext?.directionalVerdict} · ${direction}`) : dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? 'No verified pair bias available' : `${dossier.biasScore} score · ${dossier.confidence} · ${direction}` },
     { name: 'Lagos session', pass: inSession, detail: 'London 08:00–12:00 WAT / New York 08:00–12:00 ET (DST-aware)' },
     { name: 'Tier-1 event risk', pass: eventPass, detail: !verifiedCalendar ? 'Calendar unverified; fail-closed' : nearEvent ? 'Event within ±30 minutes' : 'Verified calendar: clear' },
     { name: 'H4/H1 structure and liquidity', pass: technicalConfirmed, detail: 'Requires manual MT5 chart confirmation' },
@@ -136,6 +138,8 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, macr
     }
   }, [fxRows.length]);
 
+  useEffect(() => { setSnapshot(initialSnapshot); }, [initialSnapshot]);
+  useEffect(() => { setGoldContext(initialGoldContext); }, [initialGoldContext]);
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const cached = readStorage<Journal>(JOURNAL_KEY);
@@ -193,6 +197,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, macr
       item.change === null ? [] : [{ currency: item.currency, score: clamp(5 - item.change * 2, 0, 10) }])];
     return rows.map((item) => ({ ...item, score: Number(item.score.toFixed(2)) })).sort((a, b) => b.score - a.score);
   }, [fxRows]);
+  const macroStrength = useMemo(() => getCurrencyStrengthIndex(snapshot), [snapshot]);
   const matrixCurrencies = Array.from(new Set([...strength.map((item) => item.currency), ...macroStrength.map((item) => item.currency)])).sort();
 
 
@@ -210,8 +215,35 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, macr
   };
   const forceSync = async () => {
     setForceSyncing(true);
-    try { await refreshQuotes(); await refreshFx(); } catch { setQuoteStatus('DEGRADED'); }
-    finally { setForceSyncing(false); }
+    try {
+      const macroResponse = await fetch('/api/macro/snapshot?force=true', { cache: 'no-store' });
+      if (!macroResponse.ok) throw new Error('Macro snapshot refresh HTTP ' + macroResponse.status);
+      const freshSnapshot = await macroResponse.json() as MacroSnapshot;
+      if (!Array.isArray(freshSnapshot.currencies) || !Array.isArray(freshSnapshot.catalysts)) {
+        throw new Error('Macro snapshot response failed validation');
+      }
+      setSnapshot(freshSnapshot);
+      onSnapshotChange(freshSnapshot);
+      const [goldResult] = await Promise.allSettled([
+        fetch('/api/macro/gold-context', { cache: 'no-store' }),
+        refreshQuotes(),
+        refreshFx(),
+      ]);
+      if (goldResult.status === 'fulfilled') {
+        const freshGold = await goldResult.value.json() as GoldMacroContext;
+        setGoldContext(freshGold);
+        onGoldContextChange(freshGold);
+      } else {
+        setGoldContext(null);
+        onGoldContextChange(null);
+      }
+      setNow(Date.now());
+    } catch (error) {
+      console.error('MacroLync force sync failed:', error);
+      setQuoteStatus('DEGRADED');
+    } finally {
+      setForceSyncing(false);
+    }
   };
   const watClock = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Lagos', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).format(new Date(now));
   const utcClock = new Date(now).toISOString().slice(11, 19);
