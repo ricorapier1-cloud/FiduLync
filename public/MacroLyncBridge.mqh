@@ -27,6 +27,8 @@ struct MacroLyncMacroContext
    bool   news_lockout_active;
    string active_session;
    string macro_risk_regime;
+   string sovereign_status;
+   double sovereign_max_risk_pct;
    bool   calendar_verified;
    string event_risk_status;
    bool   news_lockout;
@@ -148,6 +150,8 @@ bool ML_FetchMacroContext(const string symbol, const string endpoint, const stri
    context.news_lockout_active = true;
    context.active_session = "CLOSED";
    context.macro_risk_regime = "INSUFFICIENT_EVIDENCE";
+   context.sovereign_status = "BLACK_SWAN_LOCKOUT";
+   context.sovereign_max_risk_pct = 0.0;
    context.calendar_verified = false;
    context.event_risk_status = "UNVERIFIED_CALENDAR";
    context.news_lockout = true;
@@ -198,6 +202,8 @@ bool ML_FetchMacroContext(const string symbol, const string endpoint, const stri
    string news_active = ML_JsonScalar(response, "newsLockoutActive");
    string active_session = ML_JsonString(response, "activeSession");
    string macro_risk_regime = ML_JsonString(response, "macroRiskRegime");
+   string sovereign_status = ML_JsonString(response, "status");
+   string sovereign_risk = ML_JsonScalar(response, "maxAllowedRiskPct");
    string calendar = ML_JsonScalar(response, "calendar_verified");
    string news = ML_JsonScalar(response, "news_lockout");
    string event_status = ML_JsonString(response, "event_risk_status");
@@ -216,6 +222,8 @@ bool ML_FetchMacroContext(const string symbol, const string endpoint, const stri
       || (active_session != "LONDON" && active_session != "NY" && active_session != "CLOSED")
       || (directional != "BULLISH" && directional != "BEARISH" && directional != "NEUTRAL" && directional != "INSUFFICIENT_EVIDENCE")
       || macro_risk_regime == ""
+      || (sovereign_status != "NORMAL" && sovereign_status != "ELEVATED_VOLATILITY" && sovereign_status != "BLACK_SWAN_LOCKOUT")
+      || sovereign_risk == "" || sovereign_risk == "null"
       || (event_status != "PROVIDER_CALENDAR" && event_status != "UNVERIFIED_CALENDAR")
       || (source_mode != "fallback" && source_mode != "provider" && source_mode != "partial")
       || (calendar_source != "unavailable" && calendar_source != "reference" && calendar_source != "provider")
@@ -237,10 +245,13 @@ bool ML_FetchMacroContext(const string symbol, const string endpoint, const stri
    context.news_lockout_active = news_active == "true";
    context.active_session = active_session;
    context.macro_risk_regime = macro_risk_regime;
+   context.sovereign_status = sovereign_status;
+   context.sovereign_max_risk_pct = StringToDouble(sovereign_risk);
+   if(context.sovereign_max_risk_pct < 0.0 || context.sovereign_max_risk_pct > 1.0) return false;
    context.calendar_verified = calendar == "true";
    context.event_risk_status = event_status;
    context.news_lockout = context.news_lockout_active || news == "true" || !context.calendar_verified || decision == "INSUFFICIENT_EVIDENCE";
-   context.allowed_to_trade = allowed == "true" && !context.news_lockout;
+   context.allowed_to_trade = allowed == "true" && !context.news_lockout && context.sovereign_max_risk_pct > 0.0;
    context.next_catalyst_title = ML_JsonString(response, "title");
    context.next_catalyst_utc = ML_JsonString(response, "scheduled_at_utc");
    context.source_mode = source_mode;
