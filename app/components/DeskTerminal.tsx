@@ -74,19 +74,24 @@ export default function DeskTerminal({ initialSnapshot }: { initialSnapshot: Mac
   const inSession = (hourWAT >= 8 && hourWAT < 12) || (hourWAT >= 13 && hourWAT < 17);
   const locked = journal.trades >= 2 || journal.losses >= 2;
   const dossier = useMemo(() => generatePairDossier(initialSnapshot, selected), [initialSnapshot, selected]);
-  const macroPass = dossier.confidence !== 'INSUFFICIENT_EVIDENCE' && ((dossier.biasScore > 0 && direction === 'BUY') || (dossier.biasScore < 0 && direction === 'SELL'));
+  const macroPass = (dossier.confidence === 'HIGH' || dossier.confidence === 'MODERATE')
+    && ((dossier.biasScore > 0 && direction === 'BUY') || (dossier.biasScore < 0 && direction === 'SELL'));
   const verifiedCalendar = initialSnapshot.calendarSource === 'provider';
   const nearEvent = verifiedCalendar && initialSnapshot.catalysts.some((event) => event.impact === 'High' && Math.abs(Date.parse(event.scheduledAt) - now) <= 30 * 60_000);
   const eventPass = verifiedCalendar && !nearEvent;
-  const riskPass = risk > 0 && risk <= 1 && journal.trades < 2 && journal.losses < 2 && !locked;
-  const spreadPass = rr >= 2 && spreadPct !== null && spreadPct < 15;
+  const riskPass = Number.isFinite(account) && account > 0
+    && Number.isFinite(stop) && stop > 0 && Number.isFinite(target) && target > 0
+    && risk > 0 && risk <= 1 && lots >= 0.01
+    && journal.trades < 2 && journal.losses < 2 && !locked;
+  const quoteIsFresh = quote?.freshness === 'LIVE' && quote.ageMs !== null && quote.ageMs <= 60_000;
+  const spreadPass = quoteIsFresh && rr >= 2 && spreadPct !== null && spreadPct < 15;
   const gates = [
     { name: 'Macro alignment', pass: macroPass, detail: dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? 'No verified pair bias available' : `${dossier.biasScore} score · ${direction}` },
     { name: 'Lagos session', pass: inSession, detail: 'London 08:00–12:00 / New York 13:00–17:00 WAT' },
     { name: 'Tier-1 event risk', pass: eventPass, detail: !verifiedCalendar ? 'Calendar unverified; fail-closed' : nearEvent ? 'Event within ±30 minutes' : 'Verified calendar: clear' },
     { name: 'H4/H1 structure and liquidity', pass: technicalConfirmed, detail: 'Requires manual MT5 chart confirmation' },
-    { name: 'Reward/risk and spread', pass: spreadPass, detail: `${rr.toFixed(2)}R · spread ${spreadPct === null ? 'unavailable' : spreadPct.toFixed(1) + '% of SL'}` },
-    { name: 'Daily risk circuit breaker', pass: riskPass, detail: `${risk.toFixed(2)}% · ${journal.trades}/2 trades · ${journal.losses}/2 losses` },
+    { name: 'Reward/risk and spread', pass: spreadPass, detail: `${rr.toFixed(2)}R · ${quoteIsFresh ? 'fresh quote' : 'quote stale/unavailable'} · spread ${spreadPct === null ? 'unavailable' : spreadPct.toFixed(1) + '% of SL'}` },
+    { name: 'Daily risk circuit breaker', pass: riskPass, detail: `${risk.toFixed(2)}% · ${lots.toFixed(2)} lots · ${journal.trades}/2 trades · ${journal.losses}/2 losses` },
   ];
   const gatePassed = gates.every((gate) => gate.pass) && !locked;
 
@@ -197,10 +202,10 @@ export default function DeskTerminal({ initialSnapshot }: { initialSnapshot: Mac
   const watClock = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Lagos', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).format(new Date(now));
   const utcClock = new Date(now).toISOString().slice(11, 19);
 
-  return <section className="desk-terminal" aria-label="Quantitative trading desk terminal">
+  return <section id="desk-terminal" className="desk-terminal scroll-mt-24" aria-label="Quantitative trading desk terminal">
     <div className="desk-topbar">
       <div><span className="desk-kicker">FIDULYNC / SYSTEMATIC FX & COMMODITIES</span><h2>Quantitative Desk Terminal</h2></div>
-      <div className="desk-top-meta"><span className={quoteStatus === 'HEALTHY' ? 'desk-live' : 'desk-warning'}><i />{quoteStatus === 'HEALTHY' ? 'LIVE · 15s' : quoteStatus}</span><span>WAT {watClock}</span><span>UTC {utcClock}</span><button type="button" onClick={() => void forceSync()} disabled={forceSyncing}>{forceSyncing ? 'SYNCING…' : 'FORCE SYNC'}</button></div>
+      <div className="desk-top-meta"><span className={quoteStatus === 'HEALTHY' ? 'desk-live' : 'desk-warning'}><i />{quoteStatus === 'HEALTHY' && quotes.some((item) => item.freshness === 'LIVE' && item.ageMs !== null && item.ageMs <= 60_000) ? 'FRESH BBO · 15s' : quoteStatus === 'HEALTHY' ? 'STALE BBO' : quoteStatus}</span><span>WAT {watClock}</span><span>UTC {utcClock}</span><button type="button" onClick={() => void forceSync()} disabled={forceSyncing}>{forceSyncing ? 'SYNCING…' : 'FORCE SYNC'}</button></div>
     </div>
     <div className="desk-quote-grid">{symbols.map((symbol) => {
       const item = quoteFor(symbol); const digits = symbol === 'USDJPY' ? 3 : symbol === 'XAUUSD' ? 2 : 5;
