@@ -1,18 +1,7 @@
 import 'server-only';
+import type { TreasuryYieldData } from '@/types/macro';
 
-export type TreasuryYieldData = {
-  source: 'US TREASURY';
-  observationDate: string;
-  retrievedAtUtc: string;
-  nominal2YPct: number;
-  nominal3MPct: number;
-  nominal10YPct: number;
-  real10YPct: number;
-  twoYearTenYearSpreadBps: number;
-  twoYearThreeMonthSpreadBps: number;
-  breakevenTenYearPct: number;
-  freshness: 'LATEST PUBLISHED' | 'STALE';
-};
+
 
 type YieldRow = { date: string; values: Record<string, number> };
 
