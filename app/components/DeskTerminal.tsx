@@ -16,10 +16,10 @@ type QuoteResponse = { generatedAtUtc: string; latencyMs: number; status: string
 type FxRow = { date: string; rates: Record<string, number> };
 type JournalEntry = { id: string; timeUtc: string; symbol: string; result: 'WIN' | 'LOSS' | 'FLAT'; pnl: number };
 type Journal = { dateWAT: string; trades: number; wins: number; losses: number; netPnl: number; entries: JournalEntry[] };
-type SymbolCode = 'EURUSD' | 'GBPUSD' | 'XAUUSD' | 'USDJPY';
+type SymbolCode = string;
 type Direction = 'BUY' | 'SELL';
-const symbols: SymbolCode[] = ['EURUSD', 'GBPUSD', 'XAUUSD', 'USDJPY'];
-const currencies = ['EUR', 'GBP', 'JPY', 'AUD', 'CHF', 'CAD'] as const;
+const symbols: SymbolCode[] = ['EURUSD', 'XAUUSD', 'USDJPY'];
+const currencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CHF', 'CAD'] as const;
 const JOURNAL_KEY = 'fidulync-desk-journal-v1';
 const FX_KEY = 'fidulync-desk-fx-v1';
 const blankJournal = (dateWAT: string): Journal => ({ dateWAT, trades: 0, wins: 0, losses: 0, netPnl: 0, entries: [] });
@@ -38,6 +38,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const snapshot = initialSnapshot;
   const goldContext = initialGoldContext;
   const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [satelliteSymbol, setSatelliteSymbol] = useState<string | null>(null);
   const [quoteStatus, setQuoteStatus] = useState('CONNECTING');
   const [latency, setLatency] = useState<number | null>(null);
   const [quoteSync, setQuoteSync] = useState<string | null>(null);
@@ -66,12 +67,20 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const stop = Number(sl);
   const target = Number(tp);
   const account = Number(balance);
-  const pipValue = selected === 'USDJPY' ? (usdJpy && usdJpy > 0 ? 1000 / usdJpy : null) : selected === 'XAUUSD' ? 100 : 10;
+  const pipValue = selected === 'USDJPY' ? (usdJpy && usdJpy > 0 ? 1000 / usdJpy : null)
+    : selected === 'XAUUSD' ? 100
+      : selected.slice(3) === 'USD' ? 10
+        : selected.length === 6 && fxRows.length ? (() => {
+          const quoteCurrency = selected.slice(3, 6);
+          const usdCross = fxRows[fxRows.length - 1].rates[quoteCurrency];
+          if (!usdCross || usdCross <= 0) return null;
+          return quoteCurrency === 'JPY' ? 1000 / usdCross : 10 / usdCross;
+        })() : null;
   const riskAmount = account > 0 && risk > 0 ? account * risk / 100 : 0;
   const lots = pipValue && stop > 0 ? Math.floor((riskAmount / (stop * pipValue)) * 100) / 100 : 0;
   const rr = stop > 0 && target > 0 ? target / stop : 0;
   const gross = riskAmount * rr;
-  const spreadUnits = quote?.spread === null || quote?.spread === undefined ? null : selected === 'XAUUSD' ? quote.spread : quote.spread / (selected === 'USDJPY' ? 0.01 : 0.0001);
+  const spreadUnits = quote?.spread === null || quote?.spread === undefined ? null : selected === 'XAUUSD' ? quote.spread : quote.spread / (selected.slice(3) === 'JPY' ? 0.01 : 0.0001);
   const spreadPct = spreadUnits !== null && stop > 0 ? spreadUnits / stop * 100 : null;
   const currentDateWAT = watDate(new Date(now));
   const sessionClock = new Date(now);
@@ -82,6 +91,15 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const healthyProviderCount = snapshot.providerStatus?.filter((provider) => provider.status === 'HEALTHY').length ?? 0;
   const totalProviderCount = snapshot.providerStatus?.length ?? 0;
   const locked = journal.trades >= 2 || journal.losses >= 2;
+  const vixValue = goldContext?.drivers.VIXCLS.value ?? null;
+  const tailRiskStatus = vixValue === null ? 'UNAVAILABLE' : vixValue >= 28 ? 'BLACK_SWAN_LOCKOUT' : vixValue >= 22 ? 'ELEVATED_VOLATILITY' : 'NORMAL';
+  const riskCap = tailRiskStatus === 'UNAVAILABLE' || tailRiskStatus === 'BLACK_SWAN_LOCKOUT' ? 0 : tailRiskStatus === 'ELEVATED_VOLATILITY' ? 0.5 : 1;
+  const selectedLegs = selected === 'XAUUSD' ? ['USD'] : [selected.slice(0, 3), selected.slice(3, 6)];
+  const conflictingTrades = journal.entries.filter((entry) => {
+    const legs = entry.symbol === 'XAUUSD' ? ['USD'] : [entry.symbol.slice(0, 3), entry.symbol.slice(3, 6)];
+    return legs.some((leg) => selectedLegs.includes(leg));
+  });
+  const correlationPass = conflictingTrades.length === 0;
   const dossier = useMemo(() => generatePairDossier(snapshot, selected), [snapshot, selected]);
   const fxMacroPass = (dossier.confidence === 'HIGH' || dossier.confidence === 'MODERATE')
     && ((dossier.biasScore > 0 && direction === 'BUY') || (dossier.biasScore < 0 && direction === 'SELL'));
@@ -95,8 +113,9 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const eventPass = verifiedCalendar && !nearEvent;
   const riskPass = Number.isFinite(account) && account > 0
     && Number.isFinite(stop) && stop > 0 && Number.isFinite(target) && target > 0
-    && risk > 0 && risk <= 1 && lots >= 0.01
-    && journal.trades < 2 && journal.losses < 2 && !locked;
+    && risk > 0 && risk <= riskCap && lots >= 0.01
+    && journal.trades < 2 && journal.losses < 2 && !locked
+    && correlationPass && (tailRiskStatus === 'NORMAL' || tailRiskStatus === 'ELEVATED_VOLATILITY');
   const quoteIsFresh = quote?.freshness === 'LIVE' && quote.ageMs !== null && quote.ageMs <= 60_000;
   const spreadPass = quoteIsFresh && rr >= 2 && spreadPct !== null && spreadPct < 15;
   const gates = [
@@ -105,20 +124,21 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
     { name: 'Tier-1 event risk', pass: eventPass, detail: !verifiedCalendar ? 'Calendar unverified; fail-closed' : nearEvent ? 'Event within ±30 minutes' : 'Verified calendar: clear' },
     { name: 'H4/H1 structure and liquidity', pass: technicalConfirmed, detail: 'Requires manual MT5 chart confirmation' },
     { name: 'Reward/risk and spread', pass: spreadPass, detail: `${rr.toFixed(2)}R · ${quoteIsFresh ? 'fresh quote' : 'quote stale/unavailable'} · spread ${spreadPct === null ? 'unavailable' : spreadPct.toFixed(1) + '% of SL'}` },
-    { name: 'Daily risk circuit breaker', pass: riskPass, detail: `${risk.toFixed(2)}% · ${lots.toFixed(2)} lots · ${journal.trades}/2 trades · ${journal.losses}/2 losses` },
+    { name: 'Daily risk & correlation circuit breaker', pass: riskPass, detail: `${correlationPass ? 'Currency legs clear' : 'BLOCKED: shared leg with ' + conflictingTrades.map((entry) => entry.symbol).join(', ')} · ${risk.toFixed(2)}% / ${riskCap.toFixed(2)}% cap · ${journal.trades}/2 trades · ${journal.losses}/2 losses · ${tailRiskStatus}` },
   ];
   const gatePassed = gates.every((gate) => gate.pass) && !locked;
 
   const refreshQuotes = useCallback(async () => {
     if (document.visibilityState === 'hidden') return;
-    const response = await fetch('/api/v1/live-quotes', { cache: 'no-store' });
+    const query = satelliteSymbol ? '?satellite=' + encodeURIComponent(satelliteSymbol) : '';
+    const response = await fetch('/api/v1/live-quotes' + query, { cache: 'no-store' });
     if (!response.ok) throw new Error(`Live quote proxy HTTP ${response.status}`);
     const payload = await response.json() as QuoteResponse;
     setQuotes(payload.quotes);
     setQuoteStatus(payload.status);
     setLatency(payload.latencyMs);
     setQuoteSync(payload.generatedAtUtc);
-  }, []);
+  }, [satelliteSymbol]);
   const refreshFx = useCallback(async () => {
     if (document.visibilityState === 'hidden') return;
     try {
@@ -150,6 +170,23 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
     return () => window.clearTimeout(timer);
   }, []);
   useEffect(() => { if (ready) window.localStorage.setItem(JOURNAL_KEY, JSON.stringify(journal)); }, [journal, ready]);
+  const refreshSatellite = useCallback(async () => {
+    try {
+      const response = await fetch('/api/v1/top-pairs', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Macro opportunity ranking unavailable');
+      const payload = await response.json() as { candidates?: Array<{ symbol: string; uncrowded?: boolean }> };
+      const candidate = payload.candidates?.find((item) => item.uncrowded === true && !symbols.includes(item.symbol));
+      setSatelliteSymbol(candidate?.symbol ?? null);
+    } catch {
+      setSatelliteSymbol(null);
+    }
+  }, []);
+  useEffect(() => {
+    if (!ready) return;
+    const initial = window.setTimeout(() => void refreshSatellite(), 0);
+    const timer = window.setInterval(() => void refreshSatellite(), 300_000);
+    return () => { window.clearTimeout(initial); window.clearInterval(timer); };
+  }, [ready, refreshSatellite]);
   useEffect(() => {
     const tick = () => setNow(Date.now());
     tick(); const timer = window.setInterval(tick, 1000);
@@ -243,6 +280,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   };
   const watClock = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Lagos', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).format(new Date(now));
   const utcClock = new Date(now).toISOString().slice(11, 19);
+  const displaySymbols = [...symbols, ...(satelliteSymbol ? [satelliteSymbol] : [])];
   const exportJournal = (format: 'json' | 'csv') => {
     const content = format === 'json'
       ? JSON.stringify({ schemaVersion: '1.0.0', timezone: 'Africa/Lagos', dateWAT: journal.dateWAT, ...journal }, null, 2)
@@ -250,7 +288,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
         'time_utc,date_wat,symbol,result,pnl_usd',
         ...journal.entries.map((entry) => [entry.timeUtc, journal.dateWAT, entry.symbol, entry.result, entry.pnl]
           .map((value) => '"' + String(value).replace(/"/g, '""') + '"').join(',')),
-      ].join('\n');
+      ].join('\\n');
     const blob = new Blob([content], { type: format === 'json' ? 'application/json' : 'text/csv' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
@@ -265,9 +303,9 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
       <div><span className="desk-kicker">MACROLYNC / PRIVATE SYSTEMATIC RESEARCH</span><h2>MacroLync Terminal</h2></div>
       <div className="desk-top-meta"><span className={quoteStatus === 'HEALTHY' && quotes.every((item) => item.freshness === 'LIVE' && item.ageMs !== null && item.ageMs <= 60_000) ? 'desk-live' : 'desk-warning'}><i />{quoteStatus === 'HEALTHY' && quotes.some((item) => item.freshness === 'LIVE' && item.ageMs !== null && item.ageMs <= 60_000) ? 'FRESH BBO · 15s' : quoteStatus === 'HEALTHY' ? 'STALE BBO' : quoteStatus}</span><span>WAT {watClock}</span><span>UTC {utcClock}</span><span className={healthyProviderCount === totalProviderCount && totalProviderCount > 0 ? 'desk-live' : 'desk-warning'}>DATA HEALTH {healthyProviderCount}/{totalProviderCount}</span><button type="button" onClick={() => void forceSync()} disabled={forceSyncing}>{forceSyncing ? 'SYNCING…' : 'FORCE SYNC'}</button></div>
     </div>
-    <div className="desk-quote-grid">{symbols.map((symbol) => {
-      const item = quoteFor(symbol); const digits = symbol === 'USDJPY' ? 3 : symbol === 'XAUUSD' ? 2 : 5;
-      return <article className="desk-quote-card" key={symbol}><span>{symbol}</span><strong>{display(item?.mid, digits)}</strong><small>{item?.freshness ?? 'PENDING'} · {item?.latencyMs ?? '—'} ms · {activeSession}</small><div><span>BID {display(item?.bid, digits)}</span><span>ASK {display(item?.ask, digits)}</span></div><small>SPREAD {display(item?.spread, symbol === 'XAUUSD' ? 2 : 6)} · {item?.quoteTimeUtc ?? 'NO QUOTE'}</small></article>;
+    <div className="desk-quote-grid">{displaySymbols.map((symbol) => {
+      const item = quoteFor(symbol); const digits = symbol.slice(3) === 'JPY' ? 3 : symbol === 'XAUUSD' ? 2 : 5;
+      return <article className="desk-quote-card" key={symbol}><span>{symbol === satelliteSymbol ? 'SATELLITE #1 · ' + symbol : symbol === 'EURUSD' ? 'CORE #1 · EURUSD' : symbol === 'XAUUSD' ? 'CORE #2 · XAUUSD' : 'CORE #3 · USDJPY'}</span><strong>{display(item?.mid, digits)}</strong><small>{item?.freshness ?? 'PENDING'} · {item?.latencyMs ?? '—'} ms · {activeSession}</small><div><span>BID {display(item?.bid, digits)}</span><span>ASK {display(item?.ask, digits)}</span></div><small>SPREAD {display(item?.spread, symbol === 'XAUUSD' ? 2 : 6)} · {item?.quoteTimeUtc ?? 'NO QUOTE'}</small></article>;
     })}</div>
     <div className="desk-syncline"><span>Swissquote public BBO · {latency ?? '—'} ms</span><span>Retrieved {quoteSync ?? '—'}</span><span>Frankfurter {fxStatus} · {fxSync ?? '—'}</span></div>
     <div className="desk-workflow"><strong>DESK WORKFLOW</strong><span>1 Macro Bias</span><b>→</b><span>2 Position Sizing</span><b>→</b><span>3 6/6 Gate</span><b>→</b><span>4 MT5 Execution</span><b>→</b><span>5 Trade Journal</span></div>
@@ -287,7 +325,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
         <div className="desk-form-grid">
           <label>Account balance USD<input inputMode="decimal" value={balance} onChange={(e) => setBalance(e.target.value)} /></label>
           <label>Risk %<input inputMode="decimal" value={riskPct} onChange={(e) => setRiskPct(e.target.value)} /></label>
-          <label>Instrument<select value={selected} onChange={(e) => { setSelected(e.target.value as SymbolCode); setJournalSymbol(e.target.value as SymbolCode); }}><option value="EURUSD">EUR/USD</option><option value="GBPUSD">GBP/USD</option><option value="XAUUSD">XAU/USD</option><option value="USDJPY">USD/JPY</option></select></label>
+          <label>Instrument<select value={selected} onChange={(e) => { setSelected(e.target.value as SymbolCode); setJournalSymbol(e.target.value as SymbolCode); }}><option value="EURUSD">EUR/USD</option><option value="XAUUSD">XAU/USD</option><option value="USDJPY">USD/JPY</option>{satelliteSymbol && <option value={satelliteSymbol}>SATELLITE #1 · {satelliteSymbol}</option>}</select></label>
           <label>{selected === 'XAUUSD' ? 'Stop distance ($)' : 'Stop loss (pips)'}<input inputMode="decimal" value={sl} onChange={(e) => setSl(e.target.value)} /></label>
           <label>{selected === 'XAUUSD' ? 'Target distance ($)' : 'Take profit (pips)'}<input inputMode="decimal" value={tp} onChange={(e) => setTp(e.target.value)} /></label>
           <label>Direction<select value={direction} onChange={(e) => setDirection(e.target.value as Direction)}><option value="BUY">BUY</option><option value="SELL">SELL</option></select></label>
@@ -305,7 +343,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
       </article>
       <article className="desk-panel"><header><div><span className="desk-kicker">D / DAILY RISK CONTROL</span><h3>WAT Daily Circuit Breaker</h3></div><small>{currentDateWAT}</small></header>
         <div className="desk-journal-stats"><div><span>TRADES</span><b>{journal.trades}/2</b></div><div><span>WINS</span><b>{journal.wins}</b></div><div><span>LOSSES</span><b>{journal.losses}/2</b></div><div><span>NET P&amp;L</span><b className={journal.netPnl >= 0 ? 'desk-good' : 'desk-warning'}>${journal.netPnl.toFixed(2)}</b></div></div>
-        <div className="desk-form-grid desk-journal-form"><label>Result<select value={resultInput} onChange={(e) => setResultInput(e.target.value as 'WIN' | 'LOSS' | 'FLAT')}><option>WIN</option><option>LOSS</option><option>FLAT</option></select></label><label>Realized P&amp;L USD<input inputMode="decimal" value={pnlInput} onChange={(e) => setPnlInput(e.target.value)} placeholder="Closed trade P&L" /></label><label>Instrument<select value={journalSymbol} onChange={(e) => setJournalSymbol(e.target.value as SymbolCode)}>{symbols.map((s) => <option key={s}>{s}</option>)}</select></label></div>
+        <div className="desk-form-grid desk-journal-form"><label>Result<select value={resultInput} onChange={(e) => setResultInput(e.target.value as 'WIN' | 'LOSS' | 'FLAT')}><option>WIN</option><option>LOSS</option><option>FLAT</option></select></label><label>Realized P&amp;L USD<input inputMode="decimal" value={pnlInput} onChange={(e) => setPnlInput(e.target.value)} placeholder="Closed trade P&L" /></label><label>Instrument<select value={journalSymbol} onChange={(e) => setJournalSymbol(e.target.value as SymbolCode)}>{displaySymbols.map((s) => <option key={s}>{s}</option>)}</select></label></div>
         <button className="desk-record-button" type="button" disabled={!pnlInput.trim() || !Number.isFinite(Number(pnlInput)) || locked} onClick={recordTrade}>RECORD CLOSED TRADE</button>
         <div className="flex flex-wrap gap-2 mt-3"><button className="desk-record-button" type="button" onClick={() => exportJournal('json')}>EXPORT JSON</button><button className="desk-record-button" type="button" onClick={() => exportJournal('csv')}>EXPORT CSV</button></div>
         <div className="desk-journal-list">{journal.entries.slice(0, 5).map((entry) => <div key={entry.id}><span>{entry.symbol} · {entry.result}</span><b className={entry.pnl >= 0 ? 'desk-good' : 'desk-warning'}>{entry.pnl >= 0 ? '+' : ''}${entry.pnl.toFixed(2)}</b><small>{entry.timeUtc}</small></div>)}</div>

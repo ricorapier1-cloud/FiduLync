@@ -6,6 +6,7 @@ import { getSupabaseAdmin } from '@/lib/serverSupabase';
 import { getMarketQuotes } from '@/lib/marketFeeds';
 import { buildGoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
 import type { MacroContextPayload, MacroSymbolBias } from '@/types/desk';
+import { evaluateSovereignShield } from '@/lib/quant/sovereignShield';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -123,6 +124,22 @@ export async function GET(request: Request) {
     const highImpactWindow = snapshot.catalysts.some((event) => event.impact === 'High'
       && Math.abs(Date.parse(event.scheduledAt) - Date.now()) <= 30 * 60_000);
     const newsLockoutActive = snapshot.calendarSource !== 'provider' || !snapshot.calendarProvider || highImpactWindow || dossier.eventRiskLockout;
+    const nearestHighImpact = snapshot.catalysts
+      .filter((event) => event.impact === 'High')
+      .map((event) => ({ event, minutes: (Date.parse(event.scheduledAt) - Date.now()) / 60_000 }))
+      .filter((item) => Number.isFinite(item.minutes))
+      .sort((a, b) => Math.abs(a.minutes) - Math.abs(b.minutes))[0];
+    const isRateDecision = Boolean(nearestHighImpact && /rate decision|interest rate|monetary policy decision|policy rate/i.test(nearestHighImpact.event.title));
+    const crowdedPositions = snapshot.cot.map((position) => ({ symbol: position.market, percentile: position.percentile }));
+    const sovereignShield = evaluateSovereignShield({
+      vix: goldContext.drivers.VIXCLS.value,
+      eventMinutesAway: nearestHighImpact?.minutes ?? null,
+      isCentralBankRateDecision: isRateDecision,
+      cotPercentiles: crowdedPositions,
+      // No authenticated MT5 trade ledger is currently connected. Fail closed rather than
+      // pretending browser-local journal entries are authoritative account governance.
+      governance: { tradesToday: null, lossesToday: null, rollingSevenDayDrawdownPct: null, ledgerVerified: false },
+    });
     const symbolBiases: Record<string, MacroSymbolBias> = Object.fromEntries(G8_PAIRS.map((candidate) => {
       if (candidate === 'XAUUSD') {
         const available = goldContext.goldBiasScore !== null
@@ -146,7 +163,7 @@ export async function GET(request: Request) {
       }];
     }));
     const selectedBias = symbolBiases[symbol];
-    const allowedToTrade = Boolean(selectedBias?.biasScore !== null
+    const allowedToTrade = Boolean(sovereignShield.allowedToTrade && selectedBias?.biasScore !== null
       && selectedBias?.directionalVerdict !== 'INSUFFICIENT_EVIDENCE'
       && Math.abs(selectedBias?.biasScore ?? 0) >= 20
       && activeSession !== 'CLOSED' && !newsLockoutActive);
@@ -162,6 +179,14 @@ export async function GET(request: Request) {
       macroRiskRegime: selectedBias?.macroRiskRegime ?? 'INSUFFICIENT_EVIDENCE',
       symbols: symbolBiases,
       decisionScope: 'MACRO_GATE_ONLY',
+      sovereignShield: {
+        status: sovereignShield.status,
+        maxAllowedRiskPct: sovereignShield.maxAllowedRiskPct,
+        blockReasons: sovereignShield.blockReasons,
+        crowdedUnwindRisk: sovereignShield.crowdedUnwindRisk,
+        spreadBlowoutBlock: sovereignShield.spreadBlowoutBlock,
+        governanceVerified: sovereignShield.governanceVerified,
+      },
       symbol: dossier.symbol,
       base: dossier.base,
       quote: dossier.quote,

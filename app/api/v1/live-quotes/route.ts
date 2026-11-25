@@ -33,7 +33,7 @@ function isoTime(value: unknown): string | null {
   return Number.isFinite(date.getTime()) ? date.toISOString() : null;
 }
 
-async function fetchQuote(instrument: typeof instruments[number]) {
+async function fetchQuote(instrument: { symbol: string; path: string }) {
   const started = performance.now();
   try {
     const response = await fetch(
@@ -84,9 +84,15 @@ async function fetchQuote(instrument: typeof instruments[number]) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const started = performance.now();
-  const cachedQuotes = await getCachedData('macro:swissquote-bbo-v1', () => Promise.all(instruments.map(fetchQuote)), 5);
+  const satellite = new URL(request.url).searchParams.get('satellite')?.trim().toUpperCase() ?? '';
+  const validSatellites = new Set(['AUDUSD', 'NZDUSD', 'USDCAD', 'USDCHF', 'EURJPY', 'GBPJPY', 'AUDJPY', 'CADJPY', 'CHFJPY', 'NZDJPY', 'EURGBP', 'EURAUD', 'EURCAD', 'EURCHF', 'EURNZD', 'GBPAUD', 'GBPCAD', 'GBPCHF', 'GBPNZD', 'AUDCAD', 'AUDCHF', 'AUDNZD', 'CADCHF', 'NZDCAD', 'NZDCHF']);
+  const satelliteInstrument = validSatellites.has(satellite)
+    ? { symbol: satellite, path: satellite.slice(0, 3) + '/' + satellite.slice(3, 6) }
+    : null;
+  const requestedInstruments = [...instruments, ...(satelliteInstrument ? [satelliteInstrument] : [])];
+  const cachedQuotes = await getCachedData('macro:swissquote-bbo-v1' + ':' + (satelliteInstrument?.symbol ?? 'core'), () => Promise.all(requestedInstruments.map(fetchQuote)), 5);
   const quotes = cachedQuotes.map((quote) => {
     const ageMs = quote.quoteTimeUtc ? Math.max(0, Date.now() - Date.parse(quote.quoteTimeUtc)) : null;
     const freshness = ageMs === null ? 'UNAVAILABLE' as const : ageMs > 60_000 ? 'STALE' as const : 'LIVE' as const;
@@ -102,7 +108,7 @@ export async function GET() {
     pollIntervalSeconds: 15,
     staleAfterSeconds: 60,
     latencyMs: Math.max(0, Math.round(performance.now() - started)),
-    status: healthy === instruments.length ? 'HEALTHY' : healthy > 0 ? 'PARTIAL' : 'UNAVAILABLE',
+    status: healthy === requestedInstruments.length ? 'HEALTHY' : healthy > 0 ? 'PARTIAL' : 'UNAVAILABLE',
     quotes,
   }, { headers: { 'Cache-Control': 'no-store, max-age=0', 'X-Content-Type-Options': 'nosniff' } });
 }

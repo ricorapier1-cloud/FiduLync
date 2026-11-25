@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { buildGoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
 import { getMacroSnapshot } from '@/lib/macroEngine';
+import { evaluateSovereignShield } from '@/lib/quant/sovereignShield';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -52,8 +53,20 @@ export async function GET(request: Request): Promise<NextResponse> {
   try {
     const snapshot = await getMacroSnapshot();
     const context = await buildGoldMacroContext(snapshot);
+    const nearestEvent = snapshot.catalysts.filter((event) => event.impact === 'High')
+      .map((event) => ({ event, minutes: (Date.parse(event.scheduledAt) - Date.now()) / 60_000 }))
+      .filter((item) => Number.isFinite(item.minutes))
+      .sort((a, b) => Math.abs(a.minutes) - Math.abs(b.minutes))[0];
+    const rateDecision = Boolean(nearestEvent && /rate decision|interest rate|monetary policy decision|policy rate/i.test(nearestEvent.event.title));
+    const shield = evaluateSovereignShield({
+      vix: context.drivers.VIXCLS.value,
+      eventMinutesAway: nearestEvent?.minutes ?? null,
+      isCentralBankRateDecision: rateDecision,
+      cotPercentiles: snapshot.cot.map((position) => ({ symbol: position.market, percentile: position.percentile })),
+      governance: { tradesToday: null, lossesToday: null, rollingSevenDayDrawdownPct: null, ledgerVerified: false },
+    });
     const status = context.overallState === 'AVAILABLE' ? 200 : 503;
-    return NextResponse.json(context, { status, headers: responseHeaders });
+    return NextResponse.json({ ...context, sovereignShield: shield }, { status, headers: responseHeaders });
   } catch (error) {
     console.error('XAU/USD macro context engine failed:', error);
     const generatedAtUtc = new Date().toISOString();

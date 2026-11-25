@@ -19,6 +19,9 @@ type Candidate = {
   eventRiskLockout: boolean;
   eventRiskVerified: boolean;
   tradeReadiness: 'AWAIT_TECHNICAL_CONFIRMATION' | 'BLOCKED_CALENDAR_UNAVAILABLE' | 'BLOCKED_EVENT_LOCKOUT';
+  uncrowded: boolean;
+  baseCrowdingPercentile: number | null;
+  quoteCrowdingPercentile: number | null;
 };
 
 function isFresh(date: string | undefined, maxAgeDays: number): boolean {
@@ -59,11 +62,21 @@ export async function GET() {
           quote?.policyRateSource === 'provider' && isFresh(quote.policyRateObservationDate, 180),
           quote?.inflationSource === 'provider' && isFresh(quote.inflationObservationDate, dossier.quote === 'AUD' ? 180 : 120),
         ];
-        const hasFreshBaseCot = snapshot.cot.some((item) => item.market === dossier.base && isFresh(item.reportDate, 14));
-        const hasFreshQuoteCot = snapshot.cot.some((item) => item.market === dossier.quote && isFresh(item.reportDate, 14));
+        const baseCotPosition = snapshot.cot.find((item) => item.market === dossier.base && isFresh(item.reportDate, 14));
+        const quoteCotPosition = snapshot.cot.find((item) => item.market === dossier.quote && isFresh(item.reportDate, 14));
+        const hasFreshBaseCot = Boolean(baseCotPosition);
+        const hasFreshQuoteCot = Boolean(quoteCotPosition);
+        const baseCrowdingPercentile = baseCotPosition?.percentile ?? null;
+        const quoteCrowdingPercentile = quoteCotPosition?.percentile ?? null;
+        const uncrowded = baseCrowdingPercentile !== null && quoteCrowdingPercentile !== null
+          && baseCrowdingPercentile > 10 && baseCrowdingPercentile < 90
+          && quoteCrowdingPercentile > 10 && quoteCrowdingPercentile < 90;
         const optional = [dossier.twoYearYieldDiffBps !== null, hasFreshBaseCot && hasFreshQuoteCot];
         return {
           symbol: dossier.symbol,
+          uncrowded,
+          baseCrowdingPercentile,
+          quoteCrowdingPercentile,
           direction: dossier.fundamentalBias.includes('BULLISH') ? 'BUY' : 'SELL',
           macroScore: dossier.biasScore,
           confidence: dossier.confidence === 'HIGH' ? 'HIGH' : 'MODERATE',
@@ -87,6 +100,9 @@ export async function GET() {
       && (gold.directionalVerdict === 'BULLISH' || gold.directionalVerdict === 'BEARISH')
       ? {
         symbol: 'XAUUSD',
+        uncrowded: false,
+        baseCrowdingPercentile: null,
+        quoteCrowdingPercentile: null,
         direction: gold.directionalVerdict === 'BULLISH' ? 'BUY' : 'SELL',
         macroScore: gold.goldBiasScore,
         confidence: gold.evidenceCoveragePct >= 80 ? 'MODERATE' : 'LOW',

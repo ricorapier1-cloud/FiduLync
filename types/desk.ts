@@ -42,6 +42,14 @@ export type MacroContextPayload = {
   cot_percentile_diff: number | null;
   cross_asset_confirmation: string;
   live_quotes: DeskQuoteContext[];
+  sovereignShield: {
+    status: 'NORMAL' | 'ELEVATED_VOLATILITY' | 'BLACK_SWAN_LOCKOUT';
+    maxAllowedRiskPct: number;
+    blockReasons: string[];
+    crowdedUnwindRisk: string[];
+    spreadBlowoutBlock: boolean;
+    governanceVerified: boolean;
+  };
   daily_governance: {
     state: 'NOT_CONNECTED_TO_SERVER';
     trades_taken: null;

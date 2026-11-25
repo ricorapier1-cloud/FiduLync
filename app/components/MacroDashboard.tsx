@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import BrandGlyph from '@/components/BrandGlyph';
-import { generatePairDossier } from '@/lib/macro/dossierEngine';
+import { generatePairDossier, G8_PAIRS } from '@/lib/macro/dossierEngine';
 import type { MacroSnapshot, PairDossier } from '@/types/macro';
 import type { GoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
 import DeskTerminal from '@/app/components/DeskTerminal';
@@ -14,18 +14,11 @@ type MacroDashboardProps = {
   initialGoldContext: GoldMacroContext | null;
 };
 
-const pairs = [
-  { symbol: 'EURUSD', base: 'EUR', quote: 'USD' },
-  { symbol: 'USDJPY', base: 'USD', quote: 'JPY' },
-  { symbol: 'GBPUSD', base: 'GBP', quote: 'USD' },
-  { symbol: 'AUDUSD', base: 'AUD', quote: 'USD' },
-  { symbol: 'NZDUSD', base: 'NZD', quote: 'USD' },
-  { symbol: 'USDCAD', base: 'USD', quote: 'CAD' },
-  { symbol: 'USDCHF', base: 'USD', quote: 'CHF' },
-  { symbol: 'EURJPY', base: 'EUR', quote: 'JPY' },
-  { symbol: 'GBPJPY', base: 'GBP', quote: 'JPY' },
-  { symbol: 'AUDJPY', base: 'AUD', quote: 'JPY' },
-] as const;
+const pairs = G8_PAIRS.map((symbol) => ({
+  symbol,
+  base: symbol.slice(0, 3),
+  quote: symbol.slice(3, 6),
+}));
 
 function inflationFreshnessDays(currencyCode: string) { return currencyCode === 'AUD' ? 180 : 120; }
 
@@ -73,7 +66,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export default function MacroDashboard({ initialSnapshot, initialGoldContext }: MacroDashboardProps) {
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [goldContext, setGoldContext] = useState(initialGoldContext);
-  const [pair, setPair] = useState<(typeof pairs)[number]['symbol']>('EURUSD');
+  const [pair, setPair] = useState<string>('EURUSD');
   const [now, setNow] = useState<number | null>(null);
   const [, setRefreshing] = useState(false);
   const [aiBrief, setAiBrief] = useState<{ bullets: string[]; source: 'gemini' | 'rules' } | null>(null);
@@ -185,11 +178,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
       </nav>
 
       <PairOpportunityBoard onSelectPair={(symbol) => {
-        if (symbol === 'XAUUSD') {
-          document.getElementById('gold-research')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          return;
-        }
-        setPair(symbol as (typeof pairs)[number]['symbol']);
+        setPair(symbol);
         document.getElementById('bias')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }} />
 
@@ -360,7 +349,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
               </span>
             </div>
             <div className="macro-select-wrap">
-              <select id="macro-pair" value={pair} onChange={(event) => setPair(event.target.value as (typeof pairs)[number]['symbol'])}>
+              <select id="macro-pair" value={pair} onChange={(event) => setPair(event.target.value)}>
                 {pairs.map((item) => <option key={item.symbol} value={item.symbol}>{item.symbol}</option>)}
               </select>
               <BrandGlyph name="chevron-down" size={16} />
