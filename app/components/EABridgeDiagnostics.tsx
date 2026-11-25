@@ -4,6 +4,8 @@ export default function EABridgeDiagnostics() {
     generated_at_utc: 'ISO-8601 UTC',
     timezone: 'Africa/Lagos',
     allowedToTrade: false,
+    biasScore: null,
+    directionalVerdict: 'INSUFFICIENT_EVIDENCE',
     newsLockoutActive: true,
     activeSession: 'LONDON | NY | CLOSED',
     macroRiskRegime: 'REGIME_ENUM',
