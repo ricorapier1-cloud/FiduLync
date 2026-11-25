@@ -40,7 +40,7 @@ export default function DeskTerminal({ initialSnapshot }: { initialSnapshot: Mac
   const [fxRows, setFxRows] = useState<FxRow[]>([]);
   const [fxStatus, setFxStatus] = useState('NOT SYNCED');
   const [fxSync, setFxSync] = useState<string | null>(null);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(0);
   const [balance, setBalance] = useState('1000');
   const [riskPct, setRiskPct] = useState('1');
   const [selected, setSelected] = useState<SymbolCode>('EURUSD');
@@ -120,11 +120,14 @@ export default function DeskTerminal({ initialSnapshot }: { initialSnapshot: Mac
   }, [fxRows.length]);
 
   useEffect(() => {
-    const cached = readStorage<Journal>(JOURNAL_KEY);
-    if (cached?.dateWAT === watDate()) setJournal(cached);
-    const cachedFx = readStorage<{ rows: FxRow[]; retrievedAtUtc: string }>(FX_KEY);
-    if (cachedFx?.rows?.length) { setFxRows(cachedFx.rows); setFxSync(cachedFx.retrievedAtUtc); setFxStatus('CACHED'); }
-    setReady(true);
+    const timer = window.setTimeout(() => {
+      const cached = readStorage<Journal>(JOURNAL_KEY);
+      if (cached?.dateWAT === watDate()) setJournal(cached);
+      const cachedFx = readStorage<{ rows: FxRow[]; retrievedAtUtc: string }>(FX_KEY);
+      if (cachedFx?.rows?.length) { setFxRows(cachedFx.rows); setFxSync(cachedFx.retrievedAtUtc); setFxStatus('CACHED'); }
+      setReady(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
   useEffect(() => { if (ready) window.localStorage.setItem(JOURNAL_KEY, JSON.stringify(journal)); }, [journal, ready]);
   useEffect(() => {
@@ -151,7 +154,10 @@ export default function DeskTerminal({ initialSnapshot }: { initialSnapshot: Mac
     return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisibility); };
   }, [ready, refreshFx]);
   useEffect(() => {
-    if (journal.dateWAT !== currentDateWAT) setJournal(blankJournal(currentDateWAT));
+    if (journal.dateWAT !== currentDateWAT) {
+      const timer = window.setTimeout(() => setJournal(blankJournal(currentDateWAT)), 0);
+      return () => window.clearTimeout(timer);
+    }
   }, [journal.dateWAT, currentDateWAT]);
 
   const strength = useMemo(() => {
