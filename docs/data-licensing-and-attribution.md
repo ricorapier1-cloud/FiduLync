@@ -4,7 +4,7 @@ This document is an engineering control, not legal advice. FiduLync is currently
 
 ## Default-deny provider policy
 
-All third-party data integrations must be server-side, credential-protected, HTTPS-only, timestamped, source-labelled and bounded by provider rate limits. Commercial display, derived-data display, caching, storage and redistribution must be separately permitted by the provider and any underlying exchange.
+All third-party data integrations must be server-side, credential-protected, HTTPS-only, timestamped, source-labelled and bounded by provider rate limits. Caching, storage, derived-data use, display and redistribution must be permitted by the provider and any underlying exchange for the intended personal research scope.
 
 The following flags default to `false`. They must not be enabled merely because a key is present:
 
@@ -14,29 +14,27 @@ The following flags default to `false`. They must not be enabled merely because 
 - `FMP_COMMERCIAL_USE_APPROVED`
 - `FAIRECONOMY_COMMERCIAL_USE_APPROVED`
 - `COT_DATA_PROVIDER_LICENSE_APPROVED`
-- `MACRO_DATA_PROVIDER_LICENSE_APPROVED`
-- `MARKET_DATA_PROVIDER_LICENSE_APPROVED`
 
-The owner must document the relevant written permission and the exact scope before changing a flag. A permission for internal research does not automatically permit customer-facing display, redistribution, caching, or derived-data delivery.
+The operator must confirm the relevant provider plan and exact scope before changing a flag. A personal-use entitlement does not automatically permit long-term storage, redistribution, public display or derived-data delivery.
 
 ## Provider-specific controls
 
 ### FRED / Federal Reserve Bank of St. Louis
 
-FRED series can be owned by third parties. Its API terms require compliance with each series owner's restrictions and include specific prohibitions concerning caching/archiving and use in AI development. Therefore the current FRED adapter is disabled unless the exact proposed commercial use and data handling have been reviewed and expressly approved. Do not assume all series are public domain.
+FRED series can be owned by third parties. Its API terms require compliance with each series owner's restrictions and include specific prohibitions concerning caching/archiving and use in AI development. Therefore the current FRED adapter is disabled unless the intended private research use, series-level restrictions and data-storage/caching method have been reviewed and expressly approved. Do not assume all series are public domain.
 
 Terms: https://fred.stlouisfed.org/docs/api/terms_of_use.html
 
 ### BEA
 
-BEA API terms permit services to analyze and display BEA data, subject to their terms. Display the required notice: "This product uses the Bureau of Economic Analysis (BEA) Data API but is not endorsed or certified by BEA." The BEA adapter is not yet integrated into the macro calculation pipeline; diagnostics alone do not constitute integration.
+BEA API terms permit services to analyze and display BEA data, subject to their terms. Display the required notice: "This product uses the Bureau of Economic Analysis (BEA) Data API but is not endorsed or certified by BEA." The application integrates selected BEA real-GDP observations into the macro snapshot. Each observation must retain its actual reference period and source attribution.
 
 Terms: https://apps.bea.gov/api/_pdf/bea_api_tos.pdf
 API documentation: https://apps.bea.gov/API/docs/
 
 ### Bureau of Labor Statistics (BLS)
 
-When public API data is used, cite the date retrieved and state: "BLS.gov cannot vouch for the data or analyses derived from these data after the data have been retrieved from BLS.gov." Do not use BLS logos or falsely represent modified data as official BLS output. The BLS adapter is not yet integrated into the macro calculation pipeline.
+When public API data is used, cite the date retrieved and state: "BLS.gov cannot vouch for the data or analyses derived from these data after the data have been retrieved from BLS.gov." Do not use BLS logos or falsely represent modified data as official BLS output. The application integrates selected BLS labour and price observations where validated provider responses are available. Missing or stale series remain unavailable rather than being replaced with estimates.
 
 Terms: https://www.bls.gov/developers/termsOfService.htm
 
