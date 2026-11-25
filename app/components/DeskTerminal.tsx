@@ -41,7 +41,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext }: { 
   const [fxRows, setFxRows] = useState<FxRow[]>([]);
   const [fxStatus, setFxStatus] = useState('NOT SYNCED');
   const [fxSync, setFxSync] = useState<string | null>(null);
-  const [now, setNow] = useState(0);
+  const [now, setNow] = useState(() => Date.parse(initialSnapshot.asOf) || 0);
   const [balance, setBalance] = useState('1000');
   const [riskPct, setRiskPct] = useState('1');
   const [selected, setSelected] = useState<SymbolCode>('EURUSD');
