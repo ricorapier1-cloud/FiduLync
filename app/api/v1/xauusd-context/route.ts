@@ -54,8 +54,8 @@ export async function GET(request: Request): Promise<NextResponse> {
     const snapshot = await getMacroSnapshot();
     const context = await buildGoldMacroContext(snapshot);
     const now = Date.now();
-    const nearestMinutes = (predicate: (title: string) => boolean) => {
-      const events = snapshot.catalysts.filter((event) => predicate(event.title));
+    const nearestMinutes = (predicate: (event: typeof snapshot.catalysts[number]) => boolean) => {
+      const events = snapshot.catalysts.filter(predicate);
       return events.length ? Math.round(Math.min(...events.map((event) => Math.abs(Date.parse(event.scheduledAt) - now))) / 60_000) : null;
     };
     const sovereignShield = evaluateSovereignShield({
@@ -63,8 +63,8 @@ export async function GET(request: Request): Promise<NextResponse> {
       intradayRange: null,
       atr20: null,
       spreadRatio: null,
-      minutesToHighImpactEvent: nearestMinutes(() => true),
-      minutesToRateDecision: nearestMinutes((title) => /rate decision|interest rate|monetary policy|policy rate|fomc|ecb meeting|boe rate|boj rate/i.test(title)),
+      minutesToHighImpactEvent: nearestMinutes((event) => event.impact === 'High'),
+      minutesToRateDecision: nearestMinutes((event) => /rate decision|interest rate|monetary policy|policy rate|fomc|ecb meeting|boe rate|boj rate/i.test(event.title)),
       cotPercentiles: Object.fromEntries(snapshot.cot.map((position) => [position.market, Number.isFinite(position.percentile) ? position.percentile : null])),
       rollingSevenDayDrawdownPct: null,
       tradesToday: null,
