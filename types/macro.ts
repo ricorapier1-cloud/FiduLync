@@ -87,19 +87,19 @@ export type EconomicCatalyst = {
 };
 
 export type CrossAssetTelemetry = {
-  usTwoYearYield: number;
-  usTenYearYield: number;
-  usTenYearRealYield: number;
-  usBreakevenTenYear: number;
-  broadTradeWeightedUsd: number;
-  vix: number;
-  vixRegime: 'LOW' | 'ELEVATED' | 'STRESS';
-  goldUsd: number;
-  crudeWti: number;
-  brentCrude: number;
-  copperUsd: number;
-  highYieldSpreadBps: number;
-  globalRiskAppetite: 'RISK_ON' | 'RISK_OFF' | 'NEUTRAL';
+  usTwoYearYield: number | null;
+  usTenYearYield: number | null;
+  usTenYearRealYield: number | null;
+  usBreakevenTenYear: number | null;
+  broadTradeWeightedUsd: number | null;
+  vix: number | null;
+  vixRegime: 'LOW' | 'ELEVATED' | 'STRESS' | 'UNAVAILABLE';
+  goldUsd: number | null;
+  crudeWti: number | null;
+  brentCrude: number | null;
+  copperUsd: number | null;
+  highYieldSpreadBps: number | null;
+  globalRiskAppetite: 'RISK_ON' | 'RISK_OFF' | 'NEUTRAL' | 'UNAVAILABLE';
   timestampUtc: string;
   freshness: DataFreshness;
 };
