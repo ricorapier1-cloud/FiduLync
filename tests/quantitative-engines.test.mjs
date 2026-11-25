@@ -211,6 +211,50 @@ test('FRED and Finnhub API keys are used only behind explicit provider approval'
 });
 
 
+test('official Treasury TIPS series joins using the real-yield field and powers the no-key gold fallback', () => {
+  const treasury = read('../lib/treasuryData.ts');
+  const gold = read('../lib/macro/goldAndRegimeEngine.ts');
+  assert.match(treasury, /row\.values\.TC_10YEAR/);
+  assert.doesNotMatch(treasury, /row\.values\.BC_10YEAR\]\)/);
+  assert.match(gold, /treasuryHistory\.map\(\(item\) => \(\{ date: item\.date, value: item\.real10YPct \}\)\)/);
+  assert.match(gold, /snapshotVix/);
+  assert.match(gold, /cot\.nonCommercialNet/);
+});
+
+test('gold refresh route reuses the synchronized macro snapshot and CBOE observation', () => {
+  const route = read('../app/api/macro/gold-context/route.ts');
+  assert.match(route, /getMacroSnapshot\(\)/);
+  assert.match(route, /buildGoldMacroContext\(snapshot\)/);
+});
+
+test('public FairEconomy calendar is no-key, Tier-1-only, and records source provenance', () => {
+  const macroData = read('../lib/macroData.ts');
+  const types = read('../types/macro.ts');
+  const desk = read('../app/components/DeskTerminal.tsx');
+  assert.match(macroData, /getFairEconomyCatalysts\(\),/);
+  assert.doesNotMatch(macroData, /FAIRECONOMY_COMMERCIAL_USE_APPROVED === 'true' \? getFairEconomyCatalysts/);
+  assert.match(macroData, /item\.impact === 'High'/);
+  assert.match(macroData, /snapshot\.calendarProvider = calendarResult/);
+  assert.match(types, /calendarProvider\?: 'FAIRECONOMY_PUBLIC'/);
+  assert.match(desk, /initialSnapshot\.calendarSource === 'provider'/);
+});
+
+test('live quote API rounds each instrument to its display precision before JSON serialization', () => {
+  const route = read('../app/api/v1/live-quotes/route.ts');
+  assert.match(route, /quote\.symbol === 'XAUUSD' \? 2 : quote\.symbol === 'USDJPY' \? 3 : 5/);
+  assert.match(route, /Number\(value\.toFixed\(digits\)\)/);
+});
+
+test('gold research cards wrap long values and desk execution workflow is placed once before research detail', () => {
+  const dashboard = read('../app/components/MacroDashboard.tsx');
+  assert.equal((dashboard.match(/07 \/ XAUUSD DEDICATED RESEARCH/g) ?? []).length, 1);
+  assert.equal((dashboard.match(/<DeskTerminal initialSnapshot=/g) ?? []).length, 1);
+  assert.ok(dashboard.indexOf('<DeskTerminal initialSnapshot=') < dashboard.indexOf('06 / CROSS-ASSET TELEMETRY'));
+  assert.match(dashboard, /min-w-0 break-words/);
+  assert.match(dashboard, /text-sm sm:text-lg/);
+  assert.match(dashboard, /3M CMT · TREASURY PROXY/);
+});
+
 test('XAUUSD macro context engine requires verified spot, official macro series, and weekly CFTC evidence', () => {
   const engine = read('../lib/macro/goldAndRegimeEngine.ts');
   const route = read('../app/api/v1/xauusd-context/route.ts');
@@ -282,20 +326,21 @@ test('XAUUSD dashboard, desk gate and MT5 context use the dedicated gold macro e
   const dashboard = read('../app/components/MacroDashboard.tsx');
   const desk = read('../app/components/DeskTerminal.tsx');
   const route = read('../app/api/v1/macro-context/route.ts');
-  assert.match(page, /buildGoldMacroContext\(\)/);
+  assert.match(page, /buildGoldMacroContext\(initialSnapshot\)/);
   assert.match(dashboard, /Gold Macro &amp; Liquidity Intelligence/);
   assert.match(desk, /selected === 'XAUUSD' \? goldMacroPass : fxMacroPass/);
   assert.match(route, /symbol === 'XAUUSD' \? buildGoldMacroContext\(\)/);
   assert.match(route, /goldAvailable/);
   assert.match(route, /goldContext\?\.invalidationTriggers/);
 });
-test('licensed or permission-dependent providers fail closed unless their explicit approval flag is true', () => {
+test('keyed providers remain approval-gated while the public economic calendar works without a key', () => {
   const macroData = read('../lib/macroData.ts');
   const marketFeeds = read('../lib/marketFeeds.ts');
   const goldEngine = read('../lib/macro/goldAndRegimeEngine.ts');
   assert.match(macroData, /FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true' \? process\.env\.FRED_API_KEY/);
   assert.match(macroData, /FINNHUB_PERSONAL_PLAN_ACTIVE === 'true' \? process\.env\.FINNHUB_API_KEY/);
-  assert.match(macroData, /FAIRECONOMY_COMMERCIAL_USE_APPROVED === 'true'/);
+  assert.match(macroData, /getFairEconomyCatalysts\(\),/);
+  assert.doesNotMatch(macroData, /FAIRECONOMY_COMMERCIAL_USE_APPROVED === 'true' \? getFairEconomyCatalysts/);
   assert.match(marketFeeds, /FINNHUB_PERSONAL_PLAN_ACTIVE === 'true' \? process\.env\.FINNHUB_API_KEY/);
   assert.match(goldEngine, /FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true'/);
 });

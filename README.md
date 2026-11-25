@@ -36,7 +36,7 @@ The ingestion layer prioritizes official public sources and preserves source att
 | US BLS | US CPI, unemployment and average hourly earnings | API key may be required for higher limits |
 | US BEA | US national-accounts and real GDP observations | Registered API key |
 | FRED / ALFRED | US macro series and historical vintages | API key; storage permission gate applies |
-| FairEconomy / ForexFactory weekly calendar feed | High/medium impact event calendar | Disabled unless the configured use approval is explicitly enabled |
+| FairEconomy weekly calendar feed | High-impact G7 event calendar with UTC/WAT display | Public no-key fallback for personal research; provenance labelled |
 | Finnhub / FMP | Optional calendar fallback | Disabled unless provider permissions are explicitly approved |
 
 Public central-bank and statistical APIs provide published economic observations, not tick-by-tick executable FX quotes. Frankfurter/ECB reference exchange rates are indicative reference rates and must never be labelled as broker bid/ask prices.
@@ -89,10 +89,9 @@ Configure secrets only in the Vercel project environment settings, never in this
 | `FINNHUB_PERSONAL_PLAN_ACTIVE` | Set true only while the private personal-plan entitlement is active and its terms permit this personal use |
 | `FMP_API_KEY` | Optional calendar provider key |
 | `FMP_COMMERCIAL_USE_APPROVED` | Explicit provider-use approval gate |
-| `FAIRECONOMY_COMMERCIAL_USE_APPROVED` | Explicit calendar-feed use gate |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Shared caching and telemetry |
 
-Never set an approval flag merely because an API key exists. Confirm the provider's applicable terms, plan and data-use rights first. Twelve Data is not required for the macro-only product scope. No paid data subscription is required for the official public central-bank feeds listed above. U.S. Treasury daily nominal/TIPS yields and Cboe daily VIX closes are also ingested from public official sources without API keys; both are daily closing observations, not intraday feeds. BLS public v1 is cached conservatively when no registration key is supplied. The economic calendar remains explicitly unavailable until an approved calendar provider is enabled.
+Never set an approval flag merely because an API key exists. Confirm the provider's applicable terms, plan and data-use rights first. Twelve Data is not required for the macro-only product scope. No paid data subscription is required for the official public central-bank feeds listed above. U.S. Treasury daily nominal/TIPS yields and Cboe daily VIX closes are also ingested from public official sources without API keys; both are daily closing observations, not intraday feeds. BLS public v1 is cached conservatively when no registration key is supplied. The weekly FairEconomy public calendar is fetched without a key for high-impact USD/EUR/GBP/JPY/AUD/CHF/CAD events and is tagged `FAIRECONOMY_PUBLIC`; Finnhub and FMP remain optional approval-gated providers. Calendar timestamps are normalized to UTC and displayed in Lagos WAT.
 
 ## Verification
 

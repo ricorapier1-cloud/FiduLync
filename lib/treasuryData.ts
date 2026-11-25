@@ -51,7 +51,7 @@ export async function getTreasuryYieldData(): Promise<TreasuryYieldData> {
     fetchTreasuryRows('daily_treasury_yield_curve', ['BC_2YEAR', 'BC_3MONTH', 'BC_10YEAR']),
     fetchTreasuryRows('daily_treasury_real_yield_curve', ['TC_10YEAR']),
   ]);
-  const realByDate = new Map(realRows.map((row) => [row.date, row.values.BC_10YEAR]));
+  const realByDate = new Map(realRows.map((row) => [row.date, row.values.TC_10YEAR]));
   const history = nominalRows.flatMap((row) => {
     const nominal2Y = row.values.BC_2YEAR;
     const nominal3M = row.values.BC_3MONTH;

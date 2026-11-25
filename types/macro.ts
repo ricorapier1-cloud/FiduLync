@@ -215,6 +215,7 @@ export type MacroSnapshot = {
   source: 'fallback' | 'provider' | 'partial';
   cotSource?: 'unavailable' | 'provider';
   calendarSource?: 'unavailable' | 'reference' | 'provider';
+  calendarProvider?: 'FAIRECONOMY_PUBLIC' | 'FINNHUB' | 'FMP';
   ecbRates?: Record<string, number>;
   currencies: MacroCurrency[];
   cot: CotPosition[];

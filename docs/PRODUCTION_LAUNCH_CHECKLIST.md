@@ -28,7 +28,6 @@ Configure these in Vercel → Project → Settings → Environment Variables. Ne
 | FRED_DATA_STORAGE_PERMISSION_APPROVED | Set true only after confirming the exact FRED series storage/use rights |
 | FINNHUB_API_KEY | Optional economic calendar provider key |
 | FINNHUB_PERSONAL_PLAN_ACTIVE | Set true only while the personal-plan entitlement is active and terms allow this use |
-| FAIRECONOMY_COMMERCIAL_USE_APPROVED | Enable only after applicable calendar-feed terms are reviewed |
 | FMP_API_KEY / FMP_COMMERCIAL_USE_APPROVED | Optional calendar fallback, only with applicable data-use permission |
 | UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN | Shared caching when configured |
 | GEMINI_API_KEY / GEMINI_MACRO_BRIEF_ENABLED | Optional source-constrained narrative; model calls remain disabled unless explicitly enabled |
@@ -40,8 +39,8 @@ The service API also accepts MACROLYNC_API_SECRET or the legacy ALGO_PRIVATE_API
 - Swissquote supplies the terminal's four-symbol bid/ask feed without a user API key. It is a quote source, not a complete FX candle history feed.
 - U.S. Treasury daily nominal/TIPS yields, Cboe daily VIX closes, CFTC weekly COT, BLS, BIS, ECB, BoE, BoC, Riksbank, Norges Bank and World Bank public data provide the no-paid-key research baseline.
 - EIA requires the configured EIA API key for daily energy observations.
-- FRED remains permission-gated. When disabled, the active macro snapshot strips cached FRED-derived values and the gold model uses validated Treasury history plus Cboe VIX, CFTC positioning and the available Swissquote quote. The optional high-yield credit-spread component remains unavailable.
-- Economic calendar data remains UNAVAILABLE until an approved provider is configured. No static meeting dates are substituted. Pair candidates remain visible for research but are marked BLOCKED · CALENDAR UNVERIFIED.
+- FRED remains permission-gated. When disabled, the active macro snapshot strips cached FRED-derived values and the gold model uses validated Treasury history plus Cboe VIX, CFTC positioning and the available Swissquote quote. Treasury's 3-month constant-maturity yield is labelled as a proxy for the DTB3 input (not an exact series match); the optional ICE BofA high-yield credit-spread component remains unavailable.
+- The no-key FairEconomy weekly calendar is the default personal-research fallback for High-impact USD/EUR/GBP/JPY/AUD/CHF/CAD events. It is tagged `FAIRECONOMY_PUBLIC`, stored in UTC and displayed in Lagos WAT. If the public feed fails validation or is unreachable, the calendar remains UNAVAILABLE and the event gate fails closed.
 - Do not set a provider approval flag merely because an API key exists. Confirm applicable personal-plan, caching, display and storage rights first.
 
 ## MT5 bridge setup (when a laptop is available)

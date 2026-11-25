@@ -6,13 +6,11 @@ import type { GoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
 export const dynamic = 'force-dynamic';
 
 export default async function Home() {
-  const [initialSnapshot, initialGoldContext] = await Promise.all([
-    getMacroSnapshot(),
-    buildGoldMacroContext().catch((error: unknown) => {
-      console.warn('Initial gold macro context is unavailable; no directional claim will be shown.', error);
-      return null as GoldMacroContext | null;
-    }),
-  ]);
+  const initialSnapshot = await getMacroSnapshot();
+  const initialGoldContext = await buildGoldMacroContext(initialSnapshot).catch((error: unknown) => {
+    console.warn('Initial gold macro context is unavailable; no directional claim will be shown.', error);
+    return null as GoldMacroContext | null;
+  });
 
   return (
     <MacroDashboard
