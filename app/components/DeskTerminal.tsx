@@ -122,7 +122,8 @@ export default function DeskTerminal({ initialSnapshot }: { initialSnapshot: Mac
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const cached = readStorage<Journal>(JOURNAL_KEY);
-      if (cached?.dateWAT === watDate()) setJournal(cached);\n      else setJournal(blankJournal(watDate()));
+      if (cached?.dateWAT === watDate()) setJournal(cached);
+      else setJournal(blankJournal(watDate()));
       const cachedFx = readStorage<{ rows: FxRow[]; retrievedAtUtc: string }>(FX_KEY);
       if (cachedFx?.rows?.length) { setFxRows(cachedFx.rows); setFxSync(cachedFx.retrievedAtUtc); setFxStatus('CACHED'); }
       setReady(true);
