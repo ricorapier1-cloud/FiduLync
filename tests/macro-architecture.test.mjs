@@ -12,9 +12,22 @@ const notebookPage = read('../app/notebook/page.tsx');
 const legacySignalRoute = read('../app/api/v1/macro-signal/route.ts');
 const macroEngine = read('../lib/macroEngine.ts');
 
-test('security: /owner returns a genuine 404 via notFound()', () => {
+test('security: owner login and control-console implementation is absent; /owner remains a genuine 404', () => {
   assert.match(ownerPage, /notFound\(\)/);
   assert.doesNotMatch(ownerPage, /password|auth|login|Supabase/i);
+  for (const retiredPath of [
+    '../components/OwnerConsole.tsx',
+    '../app/owner/OwnerOperations.tsx',
+    '../app/owner/OwnerControlPlane.tsx',
+    '../lib/ownerAuth.ts',
+    '../app/api/owner/verify/route.ts',
+    '../app/api/owner/operations/route.ts',
+    '../app/api/owner/control-plane/route.ts',
+    '../app/api/owner/diagnostics/route.ts',
+    '../app/api/owner/mt5-installations/route.ts',
+    '../app/api/owner/licenses/route.ts',
+    '../app/api/mt5/installations/route.ts',
+  ]) assert.equal(existsSync(new URL(retiredPath, import.meta.url)), false, retiredPath);
 });
 
 test('security: commercial account/store surfaces redirect to the research terminal', () => {
