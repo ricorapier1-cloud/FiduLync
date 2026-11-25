@@ -730,7 +730,8 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     eiaApiKey ? getEiaEnergyMarkets(eiaApiKey) : Promise.resolve(null),
     getCachedData('macro:us-treasury-yields-v1', getTreasuryYieldData, 60 * 60),
   ]);
-  let hasLiveData = false;
+  let hasMacroData = false;
+  let hasAnyProviderData = false;
   if (eiaResult.status === 'fulfilled' && eiaResult.value) { snapshot.energyMarkets = eiaResult.value; }
   else if (eiaResult.status === 'rejected') console.warn('EIA crude oil spot observations are unavailable:', eiaResult.reason);
   if (treasuryResult.status === 'fulfilled') snapshot.usTreasury = treasuryResult.value;
@@ -760,7 +761,8 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
         usd.policyRateSource = 'provider';
         usd.policyRateProvider = 'FRED';
         usd.policyRateObservationDate = typeof fredResult.value.policyRateObservationDate === 'string' ? fredResult.value.policyRateObservationDate : undefined;
-        hasLiveData = true;
+        hasMacroData = true;
+        hasAnyProviderData = true;
       }
       if (isFiniteNumber(fredResult.value.corePce)) {
         usd.inflation = fredResult.value.corePce;
@@ -769,20 +771,23 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
         usd.inflationSource = 'provider';
         usd.inflationObservationDate = typeof fredResult.value.corePceObservationDate === 'string' ? fredResult.value.corePceObservationDate : undefined;
         usd.inflationProvider = 'FRED';
-        hasLiveData = true;
+        hasMacroData = true;
+        hasAnyProviderData = true;
       }
       if (isFiniteNumber(fredResult.value.cpi)) {
         usd.cpi = fredResult.value.cpi;
         usd.inflationSource = 'provider';
         usd.inflationObservationDate = typeof fredResult.value.cpiObservationDate === 'string' ? fredResult.value.cpiObservationDate : undefined;
         usd.inflationProvider = 'FRED';
-        hasLiveData = true;
+        hasMacroData = true;
+        hasAnyProviderData = true;
       }
       if (isFiniteNumber(fredResult.value.twoYearYield)) {
         usd.twoYearYield = fredResult.value.twoYearYield;
         usd.twoYearYieldSource = 'provider';
         usd.twoYearYieldObservationDate = typeof fredResult.value.twoYearYieldObservationDate === 'string' ? fredResult.value.twoYearYieldObservationDate : undefined;
-        hasLiveData = true;
+        hasMacroData = true;
+        hasAnyProviderData = true;
       }
       if (!isFiniteNumber(fredResult.value.corePce) && isFiniteNumber(fredResult.value.cpi)) {
         usd.inflation = fredResult.value.cpi;
@@ -798,7 +803,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
   }
   if (frankfurterResult.status === 'fulfilled' && isRecord(frankfurterResult.value)) {
     snapshot.ecbRates = frankfurterResult.value;
-    hasLiveData = true;
+    hasAnyProviderData = true;
   } else if (frankfurterResult.status === 'rejected') {
     console.warn('ECB benchmark exchange rates are unavailable:', frankfurterResult.reason);
   }
@@ -814,7 +819,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
   if (providerCalendar.length > 0) {
     snapshot.catalysts = providerCalendar;
     snapshot.calendarSource = 'provider';
-    hasLiveData = true;
+    hasAnyProviderData = true;
   } else {
     snapshot.catalysts = [];
     snapshot.calendarSource = 'unavailable';
@@ -830,7 +835,8 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
         eur.policyRateSource = 'provider';
         eur.policyRateObservationDate = ecbResult.value.policyRateObservationDate;
         eur.policyRateProvider = 'ECB';
-        hasLiveData = true;
+        hasMacroData = true;
+        hasAnyProviderData = true;
       }
       if (isFiniteNumber(ecbResult.value.inflation)) {
         eur.inflation = ecbResult.value.inflation;
@@ -838,13 +844,15 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
         eur.inflationSource = 'provider';
         eur.inflationObservationDate = ecbResult.value.inflationObservationDate;
         eur.inflationProvider = 'ECB';
-        hasLiveData = true;
+        hasMacroData = true;
+        hasAnyProviderData = true;
       }
       if (isFiniteNumber(ecbResult.value.twoYearYield)) {
         eur.twoYearYield = ecbResult.value.twoYearYield;
         eur.twoYearYieldSource = 'provider';
         eur.twoYearYieldObservationDate = ecbResult.value.twoYearYieldObservationDate;
-        hasLiveData = true;
+        hasMacroData = true;
+        hasAnyProviderData = true;
       }
     }
   } else {
@@ -858,7 +866,8 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
         cad.policyRateSource = 'provider';
         cad.policyRateObservationDate = bocResult.value.policyRateObservationDate;
         cad.policyRateProvider = 'Bank of Canada';
-        hasLiveData = true;
+        hasMacroData = true;
+        hasAnyProviderData = true;
       }
       if (isFiniteNumber(bocResult.value.inflation)) {
         cad.inflation = bocResult.value.inflation;
@@ -866,7 +875,8 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
         cad.inflationSource = 'provider';
         cad.inflationObservationDate = bocResult.value.inflationObservationDate;
         cad.inflationProvider = 'Bank of Canada';
-        hasLiveData = true;
+        hasMacroData = true;
+        hasAnyProviderData = true;
       }
     }
   } else {
@@ -879,7 +889,8 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
       gbp.policyRateSource = 'provider';
       gbp.policyRateObservationDate = boeResult.value.date;
       gbp.policyRateProvider = 'Bank of England';
-      hasLiveData = true;
+      hasMacroData = true;
+        hasAnyProviderData = true;
     }
   } else {
     console.warn('Bank of England official Bank Rate is unavailable:', boeResult.reason);
@@ -891,7 +902,8 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
       sek.policyRateSource = 'provider';
       sek.policyRateObservationDate = riksbankResult.value.date;
       sek.policyRateProvider = 'Sveriges Riksbank';
-      hasLiveData = true;
+      hasMacroData = true;
+        hasAnyProviderData = true;
     }
   } else {
     console.warn('Sveriges Riksbank policy rate is unavailable:', riksbankResult.reason);
@@ -903,7 +915,8 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
       nok.policyRateSource = 'provider';
       nok.policyRateObservationDate = norgesBankResult.value.date;
       nok.policyRateProvider = 'Norges Bank';
-      hasLiveData = true;
+      hasMacroData = true;
+        hasAnyProviderData = true;
     }
   } else {
     console.warn('Norges Bank policy rate is unavailable:', norgesBankResult.reason);
@@ -917,7 +930,8 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
       currency.inflationSource = 'provider';
       currency.inflationObservationDate = observation.observationDate || observation.year;
       currency.inflationProvider = 'World Bank';
-      hasLiveData = true;
+      hasMacroData = true;
+        hasAnyProviderData = true;
     }
   } else {
     console.warn('World Bank G10 inflation data is unavailable:', worldBankResult.reason);
@@ -931,21 +945,24 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
         usd.inflationSource = 'provider';
         usd.inflationObservationDate = typeof blsResult.value.inflationObservationDate === 'string' ? blsResult.value.inflationObservationDate : undefined;
         usd.inflationProvider = 'BLS';
-        hasLiveData = true;
+        hasMacroData = true;
+        hasAnyProviderData = true;
       }
       if (isFiniteNumber(blsResult.value.unemploymentRate)) {
         usd.unemploymentRate = blsResult.value.unemploymentRate;
         usd.unemploymentSource = 'provider';
         usd.unemploymentProvider = 'BLS';
         usd.unemploymentObservationDate = typeof blsResult.value.unemploymentObservationDate === 'string' ? blsResult.value.unemploymentObservationDate : undefined;
-        hasLiveData = true;
+        hasMacroData = true;
+        hasAnyProviderData = true;
       }
       if (isFiniteNumber(blsResult.value.wageGrowthYoY)) {
         usd.wageGrowthYoY = blsResult.value.wageGrowthYoY;
         usd.wageGrowthSource = 'provider';
         usd.wageGrowthProvider = 'BLS';
         usd.wageGrowthObservationDate = typeof blsResult.value.wageGrowthObservationDate === 'string' ? blsResult.value.wageGrowthObservationDate : undefined;
-        hasLiveData = true;
+        hasMacroData = true;
+        hasAnyProviderData = true;
       }
     }
   } else if (blsResult.status === 'rejected') {
@@ -958,7 +975,8 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
       usd.gdpSource = 'provider';
       usd.gdpProvider = 'BEA';
       usd.gdpObservationDate = typeof beaResult.value.gdpObservationDate === 'string' ? beaResult.value.gdpObservationDate : undefined;
-      hasLiveData = true;
+      hasMacroData = true;
+        hasAnyProviderData = true;
     }
   } else if (beaResult.status === 'rejected') {
     console.warn('BEA real GDP data unavailable:', beaResult.reason);
@@ -974,7 +992,8 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
         currency.policyRateSource = 'provider';
         currency.policyRateProvider = 'BIS';
         currency.policyRateObservationDate = observation.policyDate;
-        hasLiveData = true;
+        hasMacroData = true;
+        hasAnyProviderData = true;
       }
       if (isFiniteNumber(observation.inflation)
         && observation.inflationDate
@@ -984,7 +1003,8 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
         currency.inflationSource = 'provider';
         currency.inflationProvider = 'BIS';
         currency.inflationObservationDate = observation.inflationDate;
-        hasLiveData = true;
+        hasMacroData = true;
+        hasAnyProviderData = true;
       }
     }
   } else {
@@ -1015,7 +1035,8 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
           usd.policyRate = alphaResult.value.policyRate;
           usd.policyRateSource = 'provider';
           usd.policyRateObservationDate = typeof alphaResult.value.policyRateObservationDate === 'string' ? alphaResult.value.policyRateObservationDate : undefined;
-          hasLiveData = true;
+          hasMacroData = true;
+        hasAnyProviderData = true;
         }
         if (isFiniteNumber(alphaResult.value.inflation)) {
           usd.inflation = alphaResult.value.inflation;
@@ -1023,7 +1044,8 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
           usd.inflationLabel = 'CPI';
           usd.inflationSource = 'provider';
           usd.inflationObservationDate = typeof alphaResult.value.inflationObservationDate === 'string' ? alphaResult.value.inflationObservationDate : undefined;
-          hasLiveData = true;
+          hasMacroData = true;
+        hasAnyProviderData = true;
         }
       }
     } else if (alphaResult.status === 'rejected') {
@@ -1036,11 +1058,11 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
   if (cotResult.status === 'fulfilled' && Array.isArray(cotResult.value) && cotResult.value.every(isCotPosition)) {
     snapshot.cot = cotResult.value;
     snapshot.cotSource = 'provider';
-    hasLiveData = true;
+    hasAnyProviderData = true;
   } else if (cotResult.status === 'rejected') {
     console.error('COT provider unavailable; retaining cached positioning:', cotResult.reason);
   }
-  if (hasLiveData) {
+  if (hasMacroData) {
     const coreG10 = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'SEK', 'NOK'];
     const completeG10MacroCoverage = coreG10.every((code) => {
       const currency = snapshot.currencies.find((item) => item.code === code);
@@ -1053,7 +1075,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     // macro snapshot look fully provider-verified.
     snapshot.source = completeG10MacroCoverage ? 'provider' : 'partial';
   }
-  return hasLiveData ? snapshot : null;
+  return hasAnyProviderData ? snapshot : null;
 }
 
 async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
