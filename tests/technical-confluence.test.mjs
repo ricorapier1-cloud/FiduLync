@@ -14,8 +14,8 @@ test('technical confluence exposes Hurst regime boundaries and 14-period KER', (
 
 test('ATR confluence uses true range and exposes 1.2x–1.5x calibration', () => {
   assert.match(source, /Math\.max\(\s*bar\.high - bar\.low/);
-  assert.match(source, /recommendedStopLossLow: atrDisplay \* 1\.2/);
-  assert.match(source, /recommendedStopLossHigh: atrDisplay \* 1\.5/);
+  assert.match(source, /recommendedStopLossLow: atrDisplay === null \? null : atrDisplay \* 1\.2/);
+  assert.match(source, /recommendedStopLossHigh: atrDisplay === null \? null : atrDisplay \* 1\.5/);
   assert.match(source, /STOP_TIGHTER_THAN_1X_ATR/);
 });
 
