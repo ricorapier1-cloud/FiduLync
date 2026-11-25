@@ -8,6 +8,7 @@ import { generatePairDossier } from '@/lib/macro/dossierEngine';
 import type { MacroSnapshot, PairDossier } from '@/types/macro';
 import type { GoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
 import DeskTerminal from '@/app/components/DeskTerminal';
+import PairOpportunityBoard from '@/app/components/PairOpportunityBoard';
 
 type MacroDashboardProps = {
   initialSnapshot: MacroSnapshot;
@@ -269,16 +270,21 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
       {/* Unified research workspace navigation */}
       <nav aria-label="Research workspaces" className="sticky top-0 z-30 flex flex-wrap gap-2 border-y border-white/10 bg-[#080d14]/95 px-3 py-3 backdrop-blur">
         <a className="macro-refresh" href="#desk-terminal">01 / DESK &amp; EXECUTION</a>
-        <a className="macro-refresh" href="#matrix">02 / GLOBAL MACRO</a>
-        <a className="macro-refresh" href="#bias">03 / PAIR RESEARCH</a>
-        <a className="macro-refresh" href="#regimes">04 / CROSS-ASSET</a>
-        <a className="macro-refresh" href="#gold-research">05 / GOLD RESEARCH</a>
-        <a className="macro-refresh" href="#positioning">06 / POSITIONING</a>
-        <a className="macro-refresh" href="#catalysts">07 / CATALYSTS</a>
-        <a className="macro-refresh" href="#health">08 / DATA HEALTH</a>
+        <a className="macro-refresh" href="#opportunities">02 / OPPORTUNITIES</a>
+        <a className="macro-refresh" href="#matrix">03 / GLOBAL MACRO</a>
+        <a className="macro-refresh" href="#bias">04 / PAIR RESEARCH</a>
+        <a className="macro-refresh" href="#regimes">05 / CROSS-ASSET</a>
+        <a className="macro-refresh" href="#gold-research">06 / GOLD RESEARCH</a>
+        <a className="macro-refresh" href="#positioning">07 / POSITIONING</a>
+        <a className="macro-refresh" href="#catalysts">08 / CATALYSTS</a>
+        <a className="macro-refresh" href="#health">09 / DATA HEALTH</a>
       </nav>
 
       <DeskTerminal initialSnapshot={snapshot} initialGoldContext={initialGoldContext} />
+      <PairOpportunityBoard onSelectPair={(symbol) => {
+        setPair(symbol as (typeof pairs)[number]['symbol']);
+        document.getElementById('bias')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }} />
 
       {/* Top Macro Divergence Banner */}
 
@@ -550,10 +556,10 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
 
             {/* Scenarios Breakdown */}
             <div className="flex items-center justify-between border-t border-white/[0.08] pt-3 text-xs font-mono">
-              <span className="text-emerald-400">Bull {dossier.scenarios.bullish.probabilityPct}%</span>
-              <span className="text-slate-300">Base {dossier.scenarios.neutral.probabilityPct}%</span>
-              <span className="text-rose-400">Bear {dossier.scenarios.bearish.probabilityPct}%</span>
-              <span className="text-[10px] text-slate-500">EVENT LOCKOUT: {dossier.eventRiskLockout ? 'ACTIVE' : 'CLEAR'}</span>
+              <span className="text-emerald-400">Bull —</span>
+              <span className="text-slate-300">Base —</span>
+              <span className="text-rose-400">Bear —</span>
+              <span className="text-[10px] text-slate-500">PROBABILITY NOT CALIBRATED · EVENT LOCKOUT: {dossier.eventRiskLockout ? 'ACTIVE' : 'CLEAR'}</span>
             </div>
           </div>
         </section>
