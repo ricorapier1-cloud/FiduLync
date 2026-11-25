@@ -42,7 +42,7 @@ async function fetchQuote(instrument: typeof instruments[number]) {
     if (!response.ok) throw new Error(`Swissquote HTTP ${response.status}`);
     const payload: unknown = await response.json();
     if (!Array.isArray(payload)) throw new Error('Invalid Swissquote response shape');
-    let quote: { bid: number; ask: number; quoteTimeUtc: string } | null = null;
+    const observations: Array<{ bid: number; ask: number; quoteTimeUtc: string }> = [];
     for (const item of payload) {
       if (!isRecord(item) || !Array.isArray(item.spreadProfilePrices)) continue;
       for (const raw of item.spreadProfilePrices) {
@@ -50,13 +50,14 @@ async function fetchQuote(instrument: typeof instruments[number]) {
         const bid = numberValue(raw.bid);
         const ask = numberValue(raw.ask);
         const quoteTimeUtc = isoTime(raw.ts ?? item.ts);
-        if (bid !== null && ask !== null && bid > 0 && ask >= bid && quoteTimeUtc) {
-          quote = { bid, ask, quoteTimeUtc };
-          break;
+        const quoteTimestamp = quoteTimeUtc ? Date.parse(quoteTimeUtc) : Number.NaN;
+        if (bid !== null && ask !== null && bid > 0 && ask >= bid
+          && Number.isFinite(quoteTimestamp) && quoteTimestamp <= Date.now() + 5 * 60_000) {
+          observations.push({ bid, ask, quoteTimeUtc: quoteTimeUtc! });
         }
       }
-      if (quote) break;
     }
+    const quote = observations.sort((left, right) => Date.parse(right.quoteTimeUtc) - Date.parse(left.quoteTimeUtc))[0];
     if (!quote) throw new Error('No valid bid/ask observation');
     const ageMs = Math.max(0, Date.now() - Date.parse(quote.quoteTimeUtc));
     return {
@@ -65,7 +66,7 @@ async function fetchQuote(instrument: typeof instruments[number]) {
       spread: quote.ask - quote.bid,
       retrievedAtUtc: new Date().toISOString(),
       ageMs,
-      freshness: ageMs > 3_600_000 ? 'STALE' as const : 'LIVE' as const,
+      freshness: ageMs > 60_000 ? 'STALE' as const : 'LIVE' as const,
       latencyMs: Math.max(0, Math.round(performance.now() - started)),
       source: 'SWISSQUOTE' as const,
       error: null,
@@ -91,7 +92,7 @@ export async function GET() {
     generatedAtUtc: new Date().toISOString(),
     source: 'Swissquote public BBO feed',
     pollIntervalSeconds: 15,
-    staleAfterSeconds: 3600,
+    staleAfterSeconds: 60,
     latencyMs: Math.max(0, Math.round(performance.now() - started)),
     status: healthy === instruments.length ? 'HEALTHY' : healthy > 0 ? 'PARTIAL' : 'UNAVAILABLE',
     quotes,
