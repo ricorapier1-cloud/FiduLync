@@ -35,7 +35,7 @@ test('cross-asset engine does not embed fabricated market levels', () => {
   for (const value of ['4.45', '1.95', '124.8', '14.6', '2680.0', '71.4', '75.2', '4.12', '312']) {
     assert.doesNotMatch(crossAsset, new RegExp(value.replace('.', '\\.'), 'g'));
   }
-  assert.match(crossAsset, /freshness: treasury \? 'LATEST PUBLISHED' : 'UNAVAILABLE'/);
+  assert.ok(crossAsset.includes("freshness: treasury ? 'LATEST PUBLISHED' : wti !== null || brent !== null ? 'LATEST PUBLISHED' : 'UNAVAILABLE'"));
 });
 
 test('country profile engine does not publish hardcoded macro baselines', () => {
@@ -170,8 +170,8 @@ test('EIA adapter validates daily WTI and Brent observations and preserves publi
 test('EIA crude feed is reported independently and cannot promote macro snapshot provenance', () => {
   const macroData = read('../lib/macroData.ts');
   const telemetry = read('../lib/macro/providerTelemetry.ts');
-  assert.match(macroData, /snapshot\.energyMarkets = eiaResult\.value;\s*\}/);
-  assert.doesNotMatch(macroData, /snapshot\.energyMarkets = eiaResult\.value; hasLiveData = true/);
+  assert.ok(macroData.includes('snapshot.energyMarkets = eiaResult.value; hasAnyProviderData = true;'));
+  assert.doesNotMatch(macroData, /snapshot\.energyMarkets = eiaResult\.value;\s*hasMacroData = true/);
   assert.match(telemetry, /U\.S\. Energy Information Administration \(WTI \/ Brent\)/);
 });
 
@@ -305,7 +305,7 @@ test('economic calendar never falls back to hardcoded central-bank dates or stal
   assert.doesNotMatch(macroData, /getCentralBankDecisionsSchedule/);
   assert.match(macroData, /snapshot\.catalysts = \[\]/);
   assert.match(macroData, /calendarSource = 'unavailable'/);
-  assert.match(macroData, /catalysts: data\.payload\.calendarSource === 'provider' \? parsed\.catalysts : \[\]/);
+  assert.ok(macroData.includes("catalysts: data.payload.calendarSource === 'provider' ? persistedCatalysts : []"));
 });
 
 test('pair scenario probabilities remain uncalibrated until point-in-time backtests exist', () => {
