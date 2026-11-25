@@ -575,7 +575,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
           </div>
 
           <div className="macro-panel macro-catalyst-panel">
-            {sortedCatalysts.length === 0 && <p className="macro-empty">No upcoming events in the current snapshot.</p>}
+            {sortedCatalysts.length === 0 && <p className="macro-empty">{snapshot.calendarSource === 'provider' ? 'No upcoming provider events in the current calendar window.' : 'Economic calendar unavailable: no approved provider feed returned verified events. Event lockout remains conservative.'}</p>}
             {sortedCatalysts.map((catalyst) => (
               <article className="macro-event" key={catalyst.id}>
                 <div className="macro-event-time">
