@@ -105,7 +105,7 @@ export async function GET() {
       dataSourceState: snapshot.source,
       status: candidates.length ? 'CANDIDATES_AVAILABLE' : 'NO_QUALIFIED_CANDIDATES',
       candidates,
-      methodology: 'Screens the supported G8 FX cross universe and independent XAU/USD macro engine. FX candidates require fresh provider policy and inflation evidence; COT and yield inputs increase evidence coverage. Gold uses official Treasury history, CBOE VIX, CFTC positioning and optional approved FRED credit-spread evidence. Scores rank relative macro evidence; they are not calibrated win probabilities.',
+      methodology: 'Screens the supported G8 FX cross universe and independent XAU/USD macro engine. FX candidates require fresh provider policy and inflation evidence; COT and yield inputs increase evidence coverage. Gold uses official Treasury history, CBOE VIX, CFTC positioning and optional approved FRED credit-spread evidence. Scores rank relative macro evidence; they are not a calibrated win probability.',
       disclaimer: 'Research shortlist only. A candidate is not an entry signal. Verify event risk, broker quotes, technical structure, spread, session and EA-enforced account risk before any trade.',
     }, { headers: { 'Cache-Control': 'private, no-store, max-age=0' } });
   } catch (error) {

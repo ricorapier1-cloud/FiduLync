@@ -351,7 +351,9 @@ test('pair ranking only publishes provider-evidenced candidates and never labels
   const board = read('../app/components/PairOpportunityBoard.tsx');
   assert.match(route, /confidence === 'HIGH' \|\| dossier\.confidence === 'MODERATE'/);
   assert.match(route, /Math\.abs\(dossier\.biasScore\) >= 20/);
-  assert.match(route, /!dossier\.eventRiskLockout/);
+  assert.match(route, /BLOCKED_EVENT_LOCKOUT/);
+  assert.match(route, /G8_PAIRS/);
+  assert.match(route, /buildGoldMacroContext/);
   assert.match(route, /not a calibrated win probability/);
   assert.match(board, /NO QUALIFIED MACRO OPPORTUNITIES/);
   assert.match(board, /No historical win probability is claimed/);
