@@ -5,13 +5,12 @@ import Link from 'next/link';
 import BrandGlyph from '@/components/BrandGlyph';
 import { getCurrencyStrengthIndex } from '@/lib/currencyStrength';
 import { generatePairDossier } from '@/lib/macro/dossierEngine';
-import type { MacroSnapshot, MarketQuote, PairDossier } from '@/types/macro';
+import type { MacroSnapshot, PairDossier } from '@/types/macro';
 import type { GoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
 import DeskTerminal from '@/app/components/DeskTerminal';
 
 type MacroDashboardProps = {
   initialSnapshot: MacroSnapshot;
-  initialQuotes: MarketQuote[];
   initialGoldContext: GoldMacroContext | null;
 };
 
@@ -102,10 +101,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export default function MacroDashboard({ initialSnapshot, initialQuotes, initialGoldContext }: MacroDashboardProps) {
+export default function MacroDashboard({ initialSnapshot, initialGoldContext }: MacroDashboardProps) {
   const [snapshot, setSnapshot] = useState(initialSnapshot);
-  const [quotes, setQuotes] = useState(initialQuotes);
-  const [liveFeed, setLiveFeed] = useState(false);
   const [pair, setPair] = useState<(typeof pairs)[number]['symbol']>('EURUSD');
   const [now, setNow] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -120,15 +117,6 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes, initial
   const nextHighImpactCatalyst = sortedCatalysts.find((catalyst) => catalyst.impact === 'High');
   const currencies = snapshot.currencies;
   const verifiedCurrencyCount = currencies.filter((currency) => currency.policyRateSource === 'provider' && currency.inflationSource === 'provider').length;
-
-  const liveQuoteAvailable = liveFeed && now !== null && quotes.some((quote) => {
-    const age = now - Date.parse(quote.timestamp);
-    return quote.source === 'finnhub' && age >= 0 && age <= 120_000;
-  });
-  const liveReferenceAvailable = now !== null && (
-    quotes.some((quote) => quote.source !== 'finnhub')
-    || Object.keys(snapshot.ecbRates ?? {}).length > 0
-  );
 
   const verifiedPolicyRates = currencies.filter((currency) => currency.policyRateSource === 'provider').map((currency) => currency.policyRate);
   const policySpread = verifiedPolicyRates.length > 1
@@ -163,20 +151,6 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes, initial
     const clockTimer = window.setInterval(() => setNow(Date.now()), 30_000);
     const controller = new AbortController();
 
-    const refreshQuotes = async () => {
-      try {
-        const response = await fetch('/api/macro/quotes', { cache: 'no-store', signal: controller.signal });
-        if (!response.ok) return;
-        const payload: unknown = await response.json();
-        if (isRecord(payload) && Array.isArray(payload.quotes)) {
-          setQuotes(payload.quotes as MarketQuote[]);
-          setLiveFeed(payload.live === true);
-        }
-      } catch {
-        // Keep quote set on failure
-      }
-    };
-
     const refresh = async () => {
       setRefreshing(true);
       try {
@@ -195,7 +169,6 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes, initial
     };
 
     void refresh();
-    void refreshQuotes();
 
     void fetch('/api/v1/ai-brief', { cache: 'no-store', signal: controller.signal })
       .then(async (response) => {
@@ -210,12 +183,10 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes, initial
       .catch(() => {});
 
     const refreshTimer = window.setInterval(() => void refresh(), 300_000);
-    const quoteTimer = window.setInterval(() => void refreshQuotes(), 60_000);
 
     return () => {
       window.clearInterval(clockTimer);
       window.clearInterval(refreshTimer);
-      window.clearInterval(quoteTimer);
       window.clearTimeout(initialClockTimer);
       controller.abort();
     };
@@ -225,10 +196,10 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes, initial
     <div className="macro-page pb-36 sm:pb-12 md:pb-8">
       {/* Top Statusline */}
       <div className="macro-statusline mono">
-        <span><span className={`macro-pulse${liveQuoteAvailable ? ' macro-pulse-live' : ''}`} /> MACROLYNC / INSTITUTIONAL RESEARCH TERMINAL</span>
+        <span><span className={`macro-pulse${snapshot.source === 'provider' ? ' macro-pulse-live' : ''}`} /> MACROLYNC / INSTITUTIONAL RESEARCH TERMINAL</span>
         <span className="macro-status-right">
-          <span className={`macro-feed-badge${liveQuoteAvailable || liveReferenceAvailable ? ' macro-feed-live' : ''}`}>
-            {liveQuoteAvailable ? 'LIVE FX QUOTES' : liveReferenceAvailable ? 'REFERENCE FX DATA' : snapshot.source === 'provider' ? 'MACRO PROVIDERS' : snapshot.source === 'partial' ? 'PARTIAL MACRO' : 'NO VERIFIED FEED'}
+          <span className={`macro-feed-badge${snapshot.source === 'provider' ? ' macro-feed-live' : ''}`}>
+            {snapshot.source === 'provider' ? 'PROVIDER MACRO SNAPSHOT' : snapshot.source === 'partial' ? 'PARTIAL MACRO DATA' : 'FALLBACK / NO VERIFIED SNAPSHOT'}
           </span>
           <button type="button" className="macro-refresh" aria-label="Refresh macro data" onClick={() => window.location.reload()}>
             <BrandGlyph name="refresh" size={13} className={refreshing ? 'macro-spin' : ''} /> REFRESH
@@ -236,36 +207,6 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes, initial
           <Link href="/notebook" className="macro-refresh">RESEARCH NOTEBOOK</Link>
           <Link href="/workbench" className="macro-refresh">VALIDATION WORKBENCH</Link>
         </span>
-      </div>
-
-      {/* Quote Strip */}
-      <div className="macro-quote-strip" aria-label="Live FX quotes">
-        {quotes.map((quote) => (
-          <span key={quote.symbol} className="macro-quote mono">
-            <strong>{quote.symbol}</strong>
-            <b>{quote.price.toFixed(quote.symbol.startsWith('XAU') ? 2 : quote.symbol.endsWith('JPY') ? 3 : 5)}</b>
-            {quote.changePercent !== null && (
-              <span className={`macro-change ${quote.changePercent >= 0 ? 'macro-positive' : 'macro-negative'}`}>
-                {quote.changePercent >= 0 ? '+' : ''}{quote.changePercent.toFixed(2)}%
-              </span>
-            )}
-            <small className={quote.source === 'finnhub' && liveFeed && now !== null
-              && now - Date.parse(quote.timestamp) >= 0 && now - Date.parse(quote.timestamp) <= 120_000
-              ? 'macro-positive' : ''}>
-              {quote.source === 'finnhub'
-                ? liveFeed && now !== null && now - Date.parse(quote.timestamp) >= 0 && now - Date.parse(quote.timestamp) <= 120_000
-                  ? 'LIVE · FINNHUB' : 'STALE / DELAYED'
-                : quote.source === 'frankfurter' ? 'ECB REF' : quote.source === 'gold-api' ? 'GOLD REF' : 'FX REF'}
-            </small>
-          </span>
-        ))}
-        {Object.entries(snapshot.ecbRates ?? {}).map(([currency, value]) => (
-          <span key={`ecb-${currency}`} className="macro-quote mono">
-            <strong>EUR/{currency}</strong>
-            <b>{value.toFixed(4)}</b>
-            <small>ECB REF</small>
-          </span>
-        ))}
       </div>
 
       {/* Terminal Hero Section */}
