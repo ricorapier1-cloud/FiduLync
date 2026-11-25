@@ -519,3 +519,14 @@ test('trade journal offers JSON and CSV exports and desk sections use non-collid
   assert.match(diagnostics, /ZONE 4/);
   assert.match(diagnostics, /MacroLyncBridge\.mqh/);
 });
+
+test('Force Sync refreshes the macro snapshot, gold context, BBO and spot reference inputs', () => {
+  const snapshotRoute = read('../app/api/macro/snapshot/route.ts');
+  const desk = read('../app/components/DeskTerminal.tsx');
+  assert.match(snapshotRoute, /searchParams\.get\('force'\) === 'true'/);
+  assert.match(snapshotRoute, /getMacroSnapshot\(forceRefresh\)/);
+  assert.match(desk, /api\/macro\/snapshot\?force=true/);
+  assert.match(desk, /api\/macro\/gold-context/);
+  assert.match(desk, /onSnapshotChange\(freshSnapshot\)/);
+  assert.match(desk, /onGoldContextChange\(freshGold\)/);
+});
