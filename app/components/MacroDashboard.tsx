@@ -171,7 +171,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
   return (
     <div className="macro-page pb-36 sm:pb-12 md:pb-8">
       {/* Execution workflow is surfaced before the research detail panels. */}
-      <DeskTerminal initialSnapshot={snapshot} initialGoldContext={goldContext} />
+      <DeskTerminal initialSnapshot={snapshot} initialGoldContext={goldContext} macroStrength={currencyStrength} />
 
       {/* Unified research workspace navigation */}
       <nav aria-label="Research workspaces" className="sticky top-0 z-30 flex flex-wrap gap-2 border-y border-white/10 bg-[#080d14]/95 px-3 py-3 backdrop-blur">
@@ -199,31 +199,6 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
 
       {/* Currency Strength Index & AI Desk Brief */}
       <section className="macro-intelligence-grid" aria-label="Currency strength and AI desk brief">
-        <div className="macro-strength-panel">
-          <div className="macro-section-heading">
-            <div>
-              <span className="eyebrow">MACRO RELATIVE STRENGTH</span>
-              <h2>Relative Macro Rate Strength</h2>
-            </div>
-            <span className="macro-section-note mono">−100 / +100</span>
-          </div>
-          <div className="macro-csi-ranking">
-            {currencyStrength.map(({ currency, score: strength }, index) => (
-              <div className="macro-csi-item" key={currency}>
-                <span className="macro-csi-rank mono">{String(index + 1).padStart(2, '0')}</span>
-                <strong className="mono">{currency}</strong>
-                <span className="macro-csi-track">
-                  <span className={strength >= 0 ? 'macro-csi-positive' : 'macro-csi-negative'} style={{ width: `${Math.abs(strength)}%` }} />
-                </span>
-                <span className={`macro-csi-score mono ${strength >= 0 ? 'macro-positive' : 'macro-negative'}`}>
-                  {strength > 0 ? '+' : ''}{strength}
-                </span>
-              </div>
-            ))}
-          </div>
-          <p className="macro-csi-note">Relative policy-rate and real-policy-rate heuristic. COT positioning is shown separately; this is not spot momentum or a calibrated probability.</p>
-        </div>
-
         <div className="macro-brief-panel">
           <div className="macro-section-heading">
             <div>
