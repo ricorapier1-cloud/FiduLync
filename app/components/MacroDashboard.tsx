@@ -616,20 +616,20 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
-            { label: 'US 10Y benchmark', observation: null, source: 'No verified live adapter' },
-            { label: 'US 2s10s curve', observation: null, source: 'No verified live adapter' },
-            { label: '10Y TIPS real yield', observation: null, source: 'No verified live adapter' },
-            { label: 'CBOE VIX', observation: null, source: 'No verified live adapter' },
-            { label: 'WTI crude oil', observation: snapshot.energyMarkets?.wti ?? null, source: 'EIA · USD/barrel' },
-            { label: 'Brent crude oil', observation: snapshot.energyMarkets?.brent ?? null, source: 'EIA · USD/barrel' },
-          ].map(({ label, observation, source }) => (
+            { label: 'US 10Y benchmark', value: snapshot.usTreasury?.nominal10YPct ?? null, unit: '%', source: 'U.S. Treasury', observationDate: snapshot.usTreasury?.observationDate ?? null },
+            { label: 'US 2s10s curve', value: snapshot.usTreasury?.twoYearTenYearSpreadBps ?? null, unit: 'bps', source: 'U.S. Treasury', observationDate: snapshot.usTreasury?.observationDate ?? null },
+            { label: '10Y TIPS real yield', value: snapshot.usTreasury?.real10YPct ?? null, unit: '%', source: 'U.S. Treasury', observationDate: snapshot.usTreasury?.observationDate ?? null },
+            { label: 'CBOE VIX', value: null, unit: '', source: 'No verified adapter', observationDate: null },
+            { label: 'WTI crude oil', value: snapshot.energyMarkets?.wti.valueUsdPerBarrel ?? null, unit: 'USD/bbl', source: 'EIA', observationDate: snapshot.energyMarkets?.wti.observationDate ?? null },
+            { label: 'Brent crude oil', value: snapshot.energyMarkets?.brent.valueUsdPerBarrel ?? null, unit: 'USD/bbl', source: 'EIA', observationDate: snapshot.energyMarkets?.brent.observationDate ?? null },
+          ].map(({ label, value, unit, source, observationDate }) => (
             <div className="macro-panel p-3" key={label}>
               <span className="text-[10px] font-mono text-slate-400 block">{label.toUpperCase()}</span>
               <strong className="text-sm font-mono text-slate-100 block mt-1">
-                {observation ? '$' + observation.valueUsdPerBarrel.toFixed(2) : 'UNAVAILABLE'}
+                {value !== null ? value.toFixed(2) + (unit ? ' ' + unit : '') : 'UNAVAILABLE'}
               </strong>
               <small className="text-[10px] text-amber-400 font-mono">
-                {observation ? source + ' · OBS ' + observation.observationDate : source}
+                {observationDate ? source + ' · OBS ' + observationDate + (snapshot.usTreasury?.freshness === 'STALE' && source === 'U.S. Treasury' ? ' · STALE' : '') : source}
               </small>
             </div>
           ))}
@@ -637,6 +637,11 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
         {snapshot.energyMarkets && (
           <p className="text-[10px] text-slate-500 font-mono mt-2">
             EIA Brent–WTI spot spread: ${snapshot.energyMarkets.brentWtiSpreadUsd.toFixed(2)}/barrel · Retrieved {snapshot.energyMarkets.wti.retrievedAtUtc} · Daily published spot observations, not intraday futures or live ticks.
+          </p>
+        )}
+        {snapshot.usTreasury && (
+          <p className="text-[10px] text-slate-500 font-mono mt-2">
+            U.S. Treasury nominal and TIPS curves: observation {snapshot.usTreasury.observationDate} · Retrieved {snapshot.usTreasury.retrievedAtUtc} · Daily published closing-market estimates, not intraday streaming yields.
           </p>
         )}
       </section>
