@@ -349,3 +349,11 @@ test('provider telemetry does not treat FRED key presence as data-use approval',
   assert.doesNotMatch(telemetry, /FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true' \\|\\| fredKeyPresent/);
 });
 
+
+test('BLS USD inflation and labour data can use the public no-registration API with a safe cache window', () => {
+  const macroData = read('../lib/macroData.ts');
+  assert.match(macroData, /const version = apiKey \? 'v2' : 'v1'/);
+  assert.match(macroData, /if \(apiKey\) requestBody\.registrationkey = apiKey/);
+  assert.match(macroData, /macro:bls-usd-updates-v1/);
+  assert.match(macroData, /getBlsUsdUpdates\(process\.env\.BLS_API_KEY\?\.trim\(\)\)/);
+});
