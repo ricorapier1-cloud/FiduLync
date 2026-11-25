@@ -611,7 +611,7 @@ export async function buildGoldMacroContext(snapshot?: MacroSnapshot): Promise<G
     && cotNet !== null) {
     const cotDirection = clamp(cotNet / Math.max(Math.abs(cot.nonCommercialLong ?? 0) + Math.abs(cot.nonCommercialShort ?? 0), 1), -1, 1);
     const components: Array<{ name: string; score: number; weight: number; evidence: string }> = [
-      { name: '10Y real-yield pressure', weight: 35, score: -35 * clamp(realYieldSignal / 1.0, -1, 1), evidence: 'US Treasury 10Y TIPS real yield ' + realYield.toFixed(2) + '% (bearish-gold threshold 2.25%)' },
+      { name: '10Y real-yield pressure', weight: 35, score: -35 * clamp(realYieldSignal / 0.5, -1, 1), evidence: 'US Treasury 10Y TIPS real yield ' + realYield.toFixed(2) + '% (bearish-gold threshold 2.25%)' },
       { name: 'breakeven inflation', weight: 15, score: 15 * clamp((breakevenChange ?? (breakevenLevel - 2.0)) / 0.5, -1, 1), evidence: breakevenChange === null ? 'US Treasury 10Y breakeven level ' + breakevenLevel.toFixed(2) + '% (20-observation momentum unavailable)' : 'US Treasury 10Y breakeven 20-observation change ' + breakevenChange.toFixed(3) + ' percentage points' },
       { name: '2Y minus 3M curve', weight: 10, score: 10 * clamp(forwardSpread / 1.5, -1, 1), evidence: 'US Treasury 2Y minus 3M curve ' + forwardSpread.toFixed(3) + ' percentage points' },
       { name: 'volatility stress', weight: 10, score: 10 * clamp((vix - 20) / 20, -1, 1), evidence: 'CBOE VIX latest published value ' + vix.toFixed(2) },
@@ -624,6 +624,7 @@ export async function buildGoldMacroContext(snapshot?: MacroSnapshot): Promise<G
     });
     evidenceCoveragePct = components.reduce((sum, item) => sum + item.weight, 0);
     goldBiasScore = Math.round(clamp(components.reduce((sum, item) => sum + item.score, 0), -100, 100));
+    if (realYield > 2.25) goldBiasScore = Math.min(goldBiasScore, -20);
     directionalVerdict = realYield > 2.25
       ? 'BEARISH'
       : goldBiasScore >= 20
@@ -636,6 +637,9 @@ export async function buildGoldMacroContext(snapshot?: MacroSnapshot): Promise<G
     for (const component of components) {
       if (component.score >= 3) supportingEvidence.push(component.evidence);
       else if (component.score <= -3) contradictingEvidence.push(component.evidence);
+    }
+    if (realYield > 2.25 && !contradictingEvidence.some((item) => item.includes('bearish-gold threshold'))) {
+      contradictingEvidence.push('US Treasury 10Y TIPS real yield ' + realYield.toFixed(2) + '% is above the 2.25% bearish-gold threshold.');
     }
     if (realYield > 2.25) invalidationTriggers.push('Real-yield headwind: reassess bearish gold exposure if the 10Y TIPS yield falls back below 2.25%.');
     if (realYield <= 2.25 && realYieldZ !== null && realYieldZ > 1) invalidationTriggers.push('Reassess bullish gold exposure if the DFII10 rolling z-score remains above +1.0.');
