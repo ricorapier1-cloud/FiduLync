@@ -48,6 +48,14 @@ test('security: commercial account/store surfaces redirect and retired storefron
   ]) assert.equal(existsSync(new URL(retiredPath, import.meta.url)), false, retiredPath);
 });
 
+test('architecture: quote display and polling are consolidated into the Swissquote desk terminal', () => {
+  const dashboard = read('../app/components/MacroDashboard.tsx');
+  const desk = read('../app/components/DeskTerminal.tsx');
+  assert.doesNotMatch(dashboard, /api\/macro\/quotes|macro-quote-strip|MarketQuote|initialQuotes/);
+  assert.match(desk, /api\/v1\/live-quotes/);
+  assert.match(desk, /FRESH BBO/);
+});
+
 test('architecture: /analytics redirects to /workbench', () => {
   assert.match(analyticsPage, /redirect\('\/workbench'\)/);
 });
