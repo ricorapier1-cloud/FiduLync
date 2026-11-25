@@ -145,9 +145,9 @@ export type PairDossier = {
   supportingEvidence: string[];
   contradictingEvidence: string[];
   scenarios: {
-    bullish: { probabilityPct: number; title: string; catalysts: string[] };
-    bearish: { probabilityPct: number; title: string; catalysts: string[] };
-    neutral: { probabilityPct: number; title: string; catalysts: string[] };
+    bullish: { probabilityPct: number | null; title: string; catalysts: string[] };
+    bearish: { probabilityPct: number | null; title: string; catalysts: string[] };
+    neutral: { probabilityPct: number | null; title: string; catalysts: string[] };
   };
   invalidationTriggers: string[];
   nextCatalyst: {
@@ -178,7 +178,7 @@ export type MacroSnapshot = {
   asOf: string;
   source: 'fallback' | 'provider' | 'partial';
   cotSource?: 'unavailable' | 'provider';
-  calendarSource?: 'reference' | 'provider';
+  calendarSource?: 'unavailable' | 'reference' | 'provider';
   ecbRates?: Record<string, number>;
   currencies: MacroCurrency[];
   cot: CotPosition[];
