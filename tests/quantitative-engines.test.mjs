@@ -497,6 +497,7 @@ test('private desk layout removes duplicated page footer and floating retail sup
   assert.equal((shell.match(/<PlatformFooter \/>/g) ?? []).length, 1);
   assert.doesNotMatch(shell, /WhatsAppSupportButton/);
   assert.doesNotMatch(footer, /wa\.me|WhatsApp Desk/);
+  assert.ok(dashboard.indexOf('<EABridgeDiagnostics />') < dashboard.indexOf('id="health"'));
 });
 
 test('public FairEconomy calendar is represented as healthy telemetry without Finnhub plan approval', () => {
