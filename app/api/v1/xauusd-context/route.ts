@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { buildGoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
 import { getMacroSnapshot } from '@/lib/macroEngine';
+import { evaluateSovereignShield } from '@/lib/quant/sovereignShield';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -52,8 +53,25 @@ export async function GET(request: Request): Promise<NextResponse> {
   try {
     const snapshot = await getMacroSnapshot();
     const context = await buildGoldMacroContext(snapshot);
+    const now = Date.now();
+    const nearestMinutes = (predicate: (title: string) => boolean) => {
+      const events = snapshot.catalysts.filter((event) => predicate(event.title));
+      return events.length ? Math.round(Math.min(...events.map((event) => Math.abs(Date.parse(event.scheduledAt) - now))) / 60_000) : null;
+    };
+    const sovereignShield = evaluateSovereignShield({
+      vix: snapshot.vix?.freshness === 'LATEST PUBLISHED' ? snapshot.vix.value : null,
+      intradayRange: null,
+      atr20: null,
+      spreadRatio: null,
+      minutesToHighImpactEvent: nearestMinutes(() => true),
+      minutesToRateDecision: nearestMinutes((title) => /rate decision|interest rate|monetary policy|policy rate|fomc|ecb meeting|boe rate|boj rate/i.test(title)),
+      cotPercentiles: Object.fromEntries(snapshot.cot.map((position) => [position.market, Number.isFinite(position.percentile) ? position.percentile : null])),
+      rollingSevenDayDrawdownPct: null,
+      tradesToday: null,
+      lossesToday: null,
+    });
     const status = context.overallState === 'AVAILABLE' ? 200 : 503;
-    return NextResponse.json(context, { status, headers: responseHeaders });
+    return NextResponse.json({ ...context, sovereignShield }, { status, headers: responseHeaders });
   } catch (error) {
     console.error('XAU/USD macro context engine failed:', error);
     const generatedAtUtc = new Date().toISOString();
