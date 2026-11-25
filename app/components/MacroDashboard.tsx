@@ -14,7 +14,7 @@ type MacroDashboardProps = {
   initialGoldContext: GoldMacroContext | null;
 };
 
-const pairs = G8_PAIRS.filter((symbol) => symbol !== 'XAUUSD').map((symbol) => ({
+const pairs = G8_PAIRS.map((symbol) => ({
   symbol,
   base: symbol.slice(0, 3),
   quote: symbol.slice(3, 6),
@@ -178,10 +178,6 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
       </nav>
 
       <PairOpportunityBoard onSelectPair={(symbol) => {
-        if (symbol === 'XAUUSD') {
-          document.getElementById('gold-research')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          return;
-        }
         setPair(symbol);
         document.getElementById('bias')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }} />
