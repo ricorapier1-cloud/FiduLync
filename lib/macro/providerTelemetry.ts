@@ -27,7 +27,7 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
   const nok = snapshot.currencies.find((item) => item.code === 'NOK');
   const worldBankCurrencies = snapshot.currencies.filter((item) => item.inflationProvider === 'World Bank' && item.inflationObservationDate);
   const fredKeyPresent = Boolean(process.env.FRED_API_KEY?.trim());
-  const fredStorageAllowed = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true' || fredKeyPresent;
+  const fredStorageAllowed = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true';
   const finnhubConfigured = Boolean(process.env.FINNHUB_API_KEY?.trim());
   const bls = feedStatus(usd?.unemploymentProvider === 'BLS' && usd.wageGrowthProvider === 'BLS',
     isFresh(usd?.unemploymentObservationDate, 120) && isFresh(usd?.wageGrowthObservationDate, 120), Boolean(process.env.BLS_API_KEY?.trim()));
