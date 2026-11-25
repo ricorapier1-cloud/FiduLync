@@ -526,7 +526,21 @@ export async function buildGoldMacroContext(snapshot?: MacroSnapshot): Promise<G
       retrievedAtUtc: cboeVixResult.retrievedAtUtc,
     });
   }
-  const treasuryHistory = treasuryResult?.history ?? [];
+  const snapshotTreasury = snapshot?.usTreasury;
+  const treasuryHistory = treasuryResult?.history?.length
+    ? treasuryResult.history
+    : snapshotTreasury?.history?.length
+      ? snapshotTreasury.history
+      : snapshotTreasury ? [{
+        date: snapshotTreasury.observationDate,
+        nominal2YPct: snapshotTreasury.nominal2YPct,
+        nominal3MPct: snapshotTreasury.nominal3MPct,
+        nominal10YPct: snapshotTreasury.nominal10YPct,
+        real10YPct: snapshotTreasury.real10YPct,
+        breakevenTenYearPct: snapshotTreasury.breakevenTenYearPct,
+      }] : [];
+  const treasuryRetrievedAtUtc = treasuryResult?.retrievedAtUtc ?? snapshotTreasury?.retrievedAtUtc ?? new Date().toISOString();
+  const treasuryObservedLatencyMs = treasuryResult ? treasuryLatencyMs : snapshotTreasury ? 0 : null;
   const newestFirst = (items: Observation[]) => items.sort((left, right) => right.date.localeCompare(left.date));
   const treasurySeries: Record<string, Observation[]> = {
     DFII10: newestFirst(treasuryHistory.map((item) => ({ date: item.date, value: item.real10YPct }))),
@@ -534,9 +548,13 @@ export async function buildGoldMacroContext(snapshot?: MacroSnapshot): Promise<G
     DGS2: newestFirst(treasuryHistory.map((item) => ({ date: item.date, value: item.nominal2YPct }))),
     DTB3: newestFirst(treasuryHistory.map((item) => ({ date: item.date, value: item.nominal3MPct }))),
   };
-  if (treasuryResult) for (const [seriesId, observations] of Object.entries(treasurySeries)) {
+  if (treasuryHistory.length > 0) for (const [seriesId, observations] of Object.entries(treasurySeries)) {
     if (!fredBySeries.get(seriesId) && observations.length > 0) {
-      fredBySeries.set(seriesId, { value: observations, latencyMs: treasuryLatencyMs, retrievedAtUtc: treasuryResult.retrievedAtUtc });
+      fredBySeries.set(seriesId, {
+        value: observations,
+        latencyMs: treasuryObservedLatencyMs ?? 0,
+        retrievedAtUtc: treasuryRetrievedAtUtc,
+      });
     }
   }
   const drivers = {
@@ -674,7 +692,7 @@ export async function buildGoldMacroContext(snapshot?: MacroSnapshot): Promise<G
     telemetry: {
       totalLatencyMs,
       fredLatencyMs,
-      treasuryLatencyMs: treasuryResult ? treasuryLatencyMs : null,
+      treasuryLatencyMs: treasuryObservedLatencyMs,
       cftcLatencyMs,
       quoteLatencyMs,
     },
