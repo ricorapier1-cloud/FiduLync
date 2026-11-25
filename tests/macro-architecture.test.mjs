@@ -115,3 +115,15 @@ test('legacy storefront, licensing, payments and execution APIs are blocked at t
   ]) assert.ok(proxy.includes(route), route);
   assert.doesNotMatch(read('../app/components/MacroDashboard.tsx'), /TopPairBanner|top-pairs/);
 });
+
+test('architecture: one evidence-gated macro opportunity board is integrated into the main research flow', () => {
+  const dashboard = read('../app/components/MacroDashboard.tsx');
+  const board = read('../app/components/PairOpportunityBoard.tsx');
+  const route = read('../app/api/v1/top-pairs/route.ts');
+  assert.match(dashboard, /PairOpportunityBoard/);
+  assert.match(dashboard, /href="#opportunities"/);
+  assert.match(board, /api\\/v1\\/top-pairs/);
+  assert.match(route, /confidence === 'HIGH' \\|\\| dossier\\.confidence === 'MODERATE'/);
+  assert.match(route, /NO_QUALIFIED_CANDIDATES/);
+  assert.doesNotMatch(route, /divergence_pair: pair/);
+});
