@@ -167,6 +167,23 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
     return () => window.clearTimeout(timer);
   }, []);
   useEffect(() => { if (ready) window.localStorage.setItem(JOURNAL_KEY, JSON.stringify(journal)); }, [journal, ready]);
+  const refreshSatellite = useCallback(async () => {
+    try {
+      const response = await fetch('/api/v1/top-pairs', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Macro opportunity ranking unavailable');
+      const payload = await response.json() as { candidates?: Array<{ symbol: string; uncrowded?: boolean }> };
+      const candidate = payload.candidates?.find((item) => item.uncrowded === true && !symbols.includes(item.symbol));
+      setSatelliteSymbol(candidate?.symbol ?? null);
+    } catch {
+      setSatelliteSymbol(null);
+    }
+  }, []);
+  useEffect(() => {
+    if (!ready) return;
+    void refreshSatellite();
+    const timer = window.setInterval(() => void refreshSatellite(), 300_000);
+    return () => window.clearInterval(timer);
+  }, [ready, refreshSatellite]);
   useEffect(() => {
     const tick = () => setNow(Date.now());
     tick(); const timer = window.setInterval(tick, 1000);
