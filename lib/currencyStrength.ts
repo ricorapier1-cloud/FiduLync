@@ -23,12 +23,10 @@ export function getCurrencyStrengthIndex(snapshot: MacroSnapshot): CurrencyStren
     && isFreshObservation(item.policyRateObservationDate, 180)
     && isFreshObservation(item.inflationObservationDate, inflationFreshnessDays(item.code)));
   if (!currencies.length) return [];
-  const cot = new Map(snapshot.cot.map((item) => [item.market, item.percentile]));
   const rawScores = currencies.map((currency) => ({
     currency: currency.code as MajorCurrency,
     raw: currency.policyRate * 0.5
-      + (currency.policyRate - currency.inflation) * 0.5
-      + (((cot.get(currency.code) ?? 50) - 50) / 50) * 0.0,
+      + (currency.policyRate - currency.inflation) * 0.5,
   }));
   const mean = rawScores.reduce((total, item) => total + item.raw, 0) / rawScores.length;
   const maxDeviation = Math.max(...rawScores.map((item) => Math.abs(item.raw - mean)), 0.01);
