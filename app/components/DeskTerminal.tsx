@@ -82,6 +82,10 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const healthyProviderCount = snapshot.providerStatus?.filter((provider) => provider.status === 'HEALTHY').length ?? 0;
   const totalProviderCount = snapshot.providerStatus?.length ?? 0;
   const locked = journal.trades >= 2 || journal.losses >= 2;
+  const legsFor = (instrument: string) => instrument === 'XAUUSD' ? ['USD'] : [instrument.slice(0, 3), instrument.slice(3, 6)];
+  const tradedLegs = Array.from(new Set(journal.entries.flatMap((entry) => legsFor(entry.symbol))));
+  const conflictingLegs = legsFor(selected).filter((leg) => tradedLegs.includes(leg));
+  const correlationBlocked = conflictingLegs.length > 0;
   const dossier = useMemo(() => generatePairDossier(snapshot, selected), [snapshot, selected]);
   const fxMacroPass = (dossier.confidence === 'HIGH' || dossier.confidence === 'MODERATE')
     && ((dossier.biasScore > 0 && direction === 'BUY') || (dossier.biasScore < 0 && direction === 'SELL'));
@@ -96,7 +100,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const riskPass = Number.isFinite(account) && account > 0
     && Number.isFinite(stop) && stop > 0 && Number.isFinite(target) && target > 0
     && risk > 0 && risk <= 1 && lots >= 0.01
-    && journal.trades < 2 && journal.losses < 2 && !locked;
+    && journal.trades < 2 && journal.losses < 2 && !locked && !correlationBlocked;
   const quoteIsFresh = quote?.freshness === 'LIVE' && quote.ageMs !== null && quote.ageMs <= 60_000;
   const spreadPass = quoteIsFresh && rr >= 2 && spreadPct !== null && spreadPct < 15;
   const gates = [
@@ -105,7 +109,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
     { name: 'Tier-1 event risk', pass: eventPass, detail: !verifiedCalendar ? 'Calendar unverified; fail-closed' : nearEvent ? 'Event within ±30 minutes' : 'Verified calendar: clear' },
     { name: 'H4/H1 structure and liquidity', pass: technicalConfirmed, detail: 'Requires manual MT5 chart confirmation' },
     { name: 'Reward/risk and spread', pass: spreadPass, detail: `${rr.toFixed(2)}R · ${quoteIsFresh ? 'fresh quote' : 'quote stale/unavailable'} · spread ${spreadPct === null ? 'unavailable' : spreadPct.toFixed(1) + '% of SL'}` },
-    { name: 'Daily risk circuit breaker', pass: riskPass, detail: `${risk.toFixed(2)}% · ${lots.toFixed(2)} lots · ${journal.trades}/2 trades · ${journal.losses}/2 losses` },
+    { name: 'Daily risk circuit breaker', pass: riskPass, detail: `${risk.toFixed(2)}% · ${lots.toFixed(2)} lots · ${journal.trades}/2 trades · ${journal.losses}/2 losses${correlationBlocked ? ' · SHARED LEG: ' + conflictingLegs.join('/') : ''}` },
   ];
   const gatePassed = gates.every((gate) => gate.pass) && !locked;
 
@@ -301,7 +305,8 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
       <article className="desk-panel"><header><div><span className="desk-kicker">C / GOVERNANCE</span><h3>Mandatory 6/6 Pre-Trade Gate</h3></div><small>{gates.filter((gate) => gate.pass).length}/6 PASSED</small></header>
         <div className="desk-gate-list">{gates.map((gate, index) => <div className="desk-gate-row" key={gate.name}><span className={gate.pass ? 'desk-gate-pass' : 'desk-gate-fail'}>{gate.pass ? 'PASS' : 'BLOCK'}</span><div><b>{index + 1}. {gate.name}</b><small>{gate.detail}</small></div>{index === 3 && <label className="desk-check"><input type="checkbox" checked={technicalConfirmed} onChange={(e) => setTechnicalConfirmed(e.target.checked)} /> MT5 confirmed</label>}</div>)}</div>
         <div className={locked ? 'desk-lockout' : gatePassed ? 'desk-clear' : 'desk-blocked'}>{locked ? 'DAILY CIRCUIT BREAKER ACTIVE · LOCKED UNTIL 00:00 WAT' : gatePassed ? '6/6 CHECKS PASSED · MT5 EXECUTION REMAINS MANUAL' : 'GATE CLOSED · ALL SIX CONDITIONS MUST PASS'}</div>
-        <p className="desk-footnote">Calendar must be verified before the event gate can pass. This checklist does not submit orders or control MT5. Local state is not a broker-enforced lockout.</p>
+        {correlationBlocked && <p className="desk-warning-text">CORRELATION GUARD · BLOCKED: {selected} shares {conflictingLegs.join(', ')} with today's recorded trade legs ({tradedLegs.join(', ')}). A single currency shock could compound daily losses.</p>}
+        <p className="desk-footnote">Calendar must be verified before the event gate can pass. Currency-leg checks use this browser's WAT-day trade journal; open MT5 positions and cross-device history are not visible here. This checklist does not submit orders or control MT5.</p>
       </article>
       <article className="desk-panel"><header><div><span className="desk-kicker">D / DAILY RISK CONTROL</span><h3>WAT Daily Circuit Breaker</h3></div><small>{currentDateWAT}</small></header>
         <div className="desk-journal-stats"><div><span>TRADES</span><b>{journal.trades}/2</b></div><div><span>WINS</span><b>{journal.wins}</b></div><div><span>LOSSES</span><b>{journal.losses}/2</b></div><div><span>NET P&amp;L</span><b className={journal.netPnl >= 0 ? 'desk-good' : 'desk-warning'}>${journal.netPnl.toFixed(2)}</b></div></div>
