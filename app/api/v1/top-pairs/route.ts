@@ -61,10 +61,9 @@ export async function GET() {
           quote?.policyRateSource === 'provider' && isFresh(quote.policyRateObservationDate, 180),
           quote?.inflationSource === 'provider' && isFresh(quote.inflationObservationDate, dossier.quote === 'AUD' ? 180 : 120),
         ];
-        const optional = [
-          dossier.twoYearYieldDiffBps !== null,
-          Boolean(snapshot.cot.find((item) => item.market === dossier.base) && snapshot.cot.find((item) => item.market === dossier.quote)),
-        ];
+        const hasFreshBaseCot = snapshot.cot.some((item) => item.market === dossier.base && isFresh(item.reportDate, 14));
+        const hasFreshQuoteCot = snapshot.cot.some((item) => item.market === dossier.quote && isFresh(item.reportDate, 14));
+        const optional = [dossier.twoYearYieldDiffBps !== null, hasFreshBaseCot && hasFreshQuoteCot];
         return {
           symbol: dossier.symbol,
           direction: dossier.fundamentalBias.includes('BULLISH') ? 'BUY' : 'SELL',
