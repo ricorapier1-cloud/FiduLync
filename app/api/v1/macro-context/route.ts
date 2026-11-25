@@ -6,6 +6,7 @@ import { getSupabaseAdmin } from '@/lib/serverSupabase';
 import { getMarketQuotes } from '@/lib/marketFeeds';
 import { buildGoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
 import type { MacroContextPayload, MacroSymbolBias } from '@/types/desk';
+import { evaluateSovereignShield } from '@/lib/quant/sovereignShield';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -146,11 +147,33 @@ export async function GET(request: Request) {
       }];
     }));
     const selectedBias = symbolBiases[symbol];
-    const allowedToTrade = Boolean(selectedBias?.biasScore !== null
+    const now = Date.now();
+    const minutesToEvent = (impact: 'High' | 'Rate') => {
+      const events = snapshot.catalysts.filter((event) => impact === 'High'
+        ? event.impact === 'High'
+        : /rate decision|interest rate|monetary policy|policy rate|fomc|ecb meeting|boe rate|boj rate/i.test(event.title));
+      if (!events.length) return null;
+      return Math.round(Math.min(...events.map((event) => Math.abs(Date.parse(event.scheduledAt) - now))) / 60_000);
+    };
+    const cotPercentiles = Object.fromEntries(snapshot.cot.map((position) => [position.market, Number.isFinite(position.percentile) ? position.percentile : null]));
+    const sovereignShield = evaluateSovereignShield({
+      vix: snapshot.vix?.freshness === 'LATEST PUBLISHED' ? snapshot.vix.value : null,
+      intradayRange: null,
+      atr20: null,
+      spreadRatio: null,
+      minutesToHighImpactEvent: minutesToEvent('High'),
+      minutesToRateDecision: minutesToEvent('Rate'),
+      cotPercentiles,
+      rollingSevenDayDrawdownPct: null,
+      tradesToday: null,
+      lossesToday: null,
+    });
+    const allowedToTrade = Boolean(sovereignShield.allowedToTrade
+      && selectedBias?.biasScore !== null
       && selectedBias?.directionalVerdict !== 'INSUFFICIENT_EVIDENCE'
       && Math.abs(selectedBias?.biasScore ?? 0) >= 20
       && activeSession !== 'CLOSED' && !newsLockoutActive);
-    const payload: MacroContextPayload = {
+    const payload: MacroContextPayload & { sovereignShield: ReturnType<typeof evaluateSovereignShield> } = {
       schema_version: '1.0.0',
       generated_at_utc: new Date().toISOString(),
       timezone: 'Africa/Lagos',
@@ -161,6 +184,7 @@ export async function GET(request: Request) {
       activeSession,
       macroRiskRegime: selectedBias?.macroRiskRegime ?? 'INSUFFICIENT_EVIDENCE',
       symbols: symbolBiases,
+      sovereignShield,
       decisionScope: 'MACRO_GATE_ONLY',
       symbol: dossier.symbol,
       base: dossier.base,
