@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import BrandGlyph from '@/components/BrandGlyph';
-import { getCurrencyStrengthIndex } from '@/lib/currencyStrength';
 import { generatePairDossier } from '@/lib/macro/dossierEngine';
 import type { MacroSnapshot, PairDossier } from '@/types/macro';
 import type { GoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
@@ -79,7 +78,6 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
   const [, setRefreshing] = useState(false);
   const [aiBrief, setAiBrief] = useState<{ bullets: string[]; source: 'gemini' | 'rules' } | null>(null);
 
-  const currencyStrength = getCurrencyStrengthIndex(snapshot);
   const dossier: PairDossier = generatePairDossier(snapshot, pair);
 
   const sortedCatalysts = [...snapshot.catalysts]
@@ -171,7 +169,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
   return (
     <div className="macro-page pb-36 sm:pb-12 md:pb-8">
       {/* Execution workflow is surfaced before the research detail panels. */}
-      <DeskTerminal initialSnapshot={snapshot} initialGoldContext={goldContext} macroStrength={currencyStrength} />
+      <DeskTerminal initialSnapshot={snapshot} initialGoldContext={goldContext} onSnapshotChange={setSnapshot} onGoldContextChange={setGoldContext} />
 
       {/* Unified research workspace navigation */}
       <nav aria-label="Research workspaces" className="sticky top-0 z-30 flex flex-wrap gap-2 border-y border-white/10 bg-[#080d14]/95 px-3 py-3 backdrop-blur">
