@@ -8,10 +8,23 @@ export type DeskQuoteContext = {
   quote_type: 'PROVIDER_QUOTE' | 'REFERENCE_RATE';
 };
 
+export type MacroSymbolBias = {
+  biasScore: number | null;
+  directionalVerdict: 'BULLISH' | 'BEARISH' | 'NEUTRAL' | 'INSUFFICIENT_EVIDENCE';
+  macroRiskRegime: string;
+  confidence: 'HIGH' | 'MODERATE' | 'LOW' | 'INSUFFICIENT_EVIDENCE';
+};
+
 export type MacroContextPayload = {
   schema_version: '1.0.0';
   generated_at_utc: string;
   timezone: 'Africa/Lagos';
+  allowedToTrade: boolean;
+  newsLockoutActive: boolean;
+  activeSession: 'LONDON' | 'NY' | 'CLOSED';
+  macroRiskRegime: string;
+  symbols: Record<string, MacroSymbolBias>;
+  decisionScope: 'MACRO_GATE_ONLY';
   symbol: string;
   base: string;
   quote: string;
