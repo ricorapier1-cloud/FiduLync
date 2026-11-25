@@ -699,14 +699,64 @@ export default function MacroDashboard({ initialSnapshot, initialQuotes, initial
       {/* Dedicated gold macro engine: not scored through the generic FX dossier */}
       <section id="gold-research" className="macro-section" aria-labelledby="gold-research-title">
         <div className="macro-section-heading">
-          <div><span className="eyebrow">04A / XAUUSD DEDICATED RESEARCH</span><h2 id="gold-research-title">Gold Macro &amp; Liquidity Intelligence</h2></div>
+          <div>
+            <span className="eyebrow">04A / XAUUSD DEDICATED RESEARCH</span>
+            <h2 id="gold-research-title">Gold Macro &amp; Liquidity Intelligence</h2>
+          </div>
           <span className="macro-section-note mono">{initialGoldContext?.overallState ?? 'UNAVAILABLE'}</span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="macro-panel p-3"><span className="text-[10px] font-mono text-slate-400">GOLD BIAS SCORE</span><strong className="block text-xl font-mono mt-1">{initialGoldContext?.goldBiasScore === null || initialGoldContext?.goldBiasScore === undefined ? '—' : initialGoldContext.goldBiasScore + ' / 100'}</strong><small className="text-[10px] text-slate-500">Only when required evidence is healthy</small></div>
-          <div className="macro-panel p-3"><span className="text-[10px] font-mono text-slate-400">DIRECTIONAL VERDICT</span><strong className="block text-sm font-mono mt-2">{initialGoldContext?.directionalVerdict ?? 'UNAVAILABLE'}</strong><small className="text-[10px] text-slate-500">Research context, not an entry signal</small></div>
-          <div className="macro-panel p-3"><span className="text-[10px] font-mono text-slate-400">LIQUIDITY REGIME</span><strong className="block text-sm font-mono mt-2">{initialGoldContext?.liquidityRegime ?? 'INSUFFICIENT_EVIDENCE'}</strong><small className="text-[10px] text-slate-500">Cross-asset stress / carry context</small></div>
-          <div className="macro-panel p-3"><span className="text-[10px] font-mono text-slate-400">SPOT OBSERVATION</span><strong className="block text-sm font-mono mt-2">{initialGoldContext?.quote.mid === null || initialGoldContext?.quote.mid === undefined ? '—' : '
+          <div className="macro-panel p-3">
+            <span className="text-[10px] font-mono text-slate-400">GOLD BIAS SCORE</span>
+            <strong className="block text-xl font-mono mt-1">{initialGoldContext?.goldBiasScore ?? '—'}</strong>
+            <small className="text-[10px] text-slate-500">Only when required evidence is healthy</small>
+          </div>
+          <div className="macro-panel p-3">
+            <span className="text-[10px] font-mono text-slate-400">DIRECTIONAL VERDICT</span>
+            <strong className="block text-sm font-mono mt-2">{initialGoldContext?.directionalVerdict ?? 'UNAVAILABLE'}</strong>
+            <small className="text-[10px] text-slate-500">Research context, not an entry signal</small>
+          </div>
+          <div className="macro-panel p-3">
+            <span className="text-[10px] font-mono text-slate-400">LIQUIDITY REGIME</span>
+            <strong className="block text-sm font-mono mt-2">{initialGoldContext?.liquidityRegime ?? 'INSUFFICIENT_EVIDENCE'}</strong>
+            <small className="text-[10px] text-slate-500">Cross-asset stress / carry context</small>
+          </div>
+          <div className="macro-panel p-3">
+            <span className="text-[10px] font-mono text-slate-400">SPOT OBSERVATION</span>
+            <strong className="block text-sm font-mono mt-2">{initialGoldContext?.quote.mid ?? '—'}</strong>
+            <small className="text-[10px] text-slate-500">{initialGoldContext?.quote.state ?? 'UNAVAILABLE'} · {initialGoldContext?.quote.quoteTimestampUtc ?? 'NO VERIFIED TIME'}</small>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-3">
+          <div className="macro-panel p-4">
+            <h3 className="text-xs font-mono text-slate-300 mb-3">SUPPORTING EVIDENCE</h3>
+            {initialGoldContext?.supportingEvidence.length
+              ? <ul className="macro-brief-list">{initialGoldContext.supportingEvidence.map((item, index) => <li key={index}>{item}</li>)}</ul>
+              : <p className="macro-empty">No verified supporting evidence is currently available.</p>}
+          </div>
+          <div className="macro-panel p-4">
+            <h3 className="text-xs font-mono text-slate-300 mb-3">CONTRADICTING EVIDENCE / INVALIDATION</h3>
+            {initialGoldContext?.contradictingEvidence.length
+              ? <ul className="macro-brief-list">{initialGoldContext.contradictingEvidence.map((item, index) => <li key={index}>{item}</li>)}</ul>
+              : <p className="macro-empty">No verified contradicting evidence is currently available.</p>}
+            {initialGoldContext?.invalidationTriggers.length
+              ? <ul className="macro-brief-list mt-3">{initialGoldContext.invalidationTriggers.map((item, index) => <li key={index}>{item}</li>)}</ul>
+              : null}
+          </div>
+        </div>
+        <div className="macro-panel p-3 mt-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div><span className="block text-[10px] font-mono text-slate-500">DFII10 · REAL YIELD</span><strong className="block text-sm font-mono mt-1">{initialGoldContext?.drivers.DFII10.value ?? '—'}</strong><small className="text-[10px] text-slate-500">{initialGoldContext?.drivers.DFII10.state ?? 'UNAVAILABLE'} · {initialGoldContext?.drivers.DFII10.observationDate ?? '—'}</small></div>
+            <div><span className="block text-[10px] font-mono text-slate-500">T10YIE · BREAKEVEN</span><strong className="block text-sm font-mono mt-1">{initialGoldContext?.drivers.T10YIE.value ?? '—'}</strong><small className="text-[10px] text-slate-500">{initialGoldContext?.drivers.T10YIE.state ?? 'UNAVAILABLE'} · {initialGoldContext?.drivers.T10YIE.observationDate ?? '—'}</small></div>
+            <div><span className="block text-[10px] font-mono text-slate-500">DGS2 · 2Y TREASURY</span><strong className="block text-sm font-mono mt-1">{initialGoldContext?.drivers.DGS2.value ?? '—'}</strong><small className="text-[10px] text-slate-500">{initialGoldContext?.drivers.DGS2.state ?? 'UNAVAILABLE'} · {initialGoldContext?.drivers.DGS2.observationDate ?? '—'}</small></div>
+            <div><span className="block text-[10px] font-mono text-slate-500">DTB3 · 3M BILL</span><strong className="block text-sm font-mono mt-1">{initialGoldContext?.drivers.DTB3.value ?? '—'}</strong><small className="text-[10px] text-slate-500">{initialGoldContext?.drivers.DTB3.state ?? 'UNAVAILABLE'} · {initialGoldContext?.drivers.DTB3.observationDate ?? '—'}</small></div>
+            <div><span className="block text-[10px] font-mono text-slate-500">HY OAS · CREDIT</span><strong className="block text-sm font-mono mt-1">{initialGoldContext?.drivers.BAMLH0A0HYM2.value ?? '—'}</strong><small className="text-[10px] text-slate-500">{initialGoldContext?.drivers.BAMLH0A0HYM2.state ?? 'UNAVAILABLE'} · {initialGoldContext?.drivers.BAMLH0A0HYM2.observationDate ?? '—'}</small></div>
+            <div><span className="block text-[10px] font-mono text-slate-500">VIX · VOLATILITY</span><strong className="block text-sm font-mono mt-1">{initialGoldContext?.drivers.VIXCLS.value ?? '—'}</strong><small className="text-[10px] text-slate-500">{initialGoldContext?.drivers.VIXCLS.state ?? 'UNAVAILABLE'} · {initialGoldContext?.drivers.VIXCLS.observationDate ?? '—'}</small></div>
+          </div>
+          <p className="text-[10px] text-slate-500 font-mono mt-3">CFTC gold positioning report: {initialGoldContext?.cot.reportDate ?? 'UNAVAILABLE'} · Retrieved {initialGoldContext?.generatedAtUtc ?? '—'} · FRED daily-published series and CFTC weekly positioning are not intraday streaming feeds.</p>
+        </div>
+      </section>
+
       <section id="positioning" className="macro-section" aria-labelledby="cot-title">
         <div className="macro-section-heading">
           <div>
