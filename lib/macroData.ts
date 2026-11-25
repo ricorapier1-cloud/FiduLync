@@ -1,5 +1,5 @@
 import 'server-only';
-import type { CotPosition, EconomicCatalyst, MacroCurrency, MacroSnapshot } from '@/types/macro';
+import type { CotPosition, EconomicCatalyst, MacroCurrency, MacroSnapshot, TreasuryYieldData } from '@/types/macro';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
 import {
   getBankOfCanadaMacroInputs,
@@ -11,6 +11,7 @@ import {
 } from '@/lib/internationalMacro';
 import { getCachedData } from '@/lib/redisCache';
 import { persistMacroObservations } from '@/lib/macro/observationPersistence';
+import { getTreasuryYieldData } from '@/lib/treasuryData';
 
 export const EMPTY_SNAPSHOT: MacroSnapshot = {
   asOf: '',
@@ -127,7 +128,7 @@ function isCatalyst(value: unknown): value is EconomicCatalyst {
     && (typeof value.actual === 'string' || value.actual === null);
 }
 
-function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies' | 'cot' | 'catalysts' | 'energyMarkets'> | null {
+function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies' | 'cot' | 'catalysts' | 'energyMarkets' | 'usTreasury'> | null {
   if (!isRecord(value)
     || !Array.isArray(value.currencies)
     || !Array.isArray(value.cot)
@@ -144,6 +145,13 @@ function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies'
       && value.energyMarkets.wti.source === 'EIA' && value.energyMarkets.brent.source === 'EIA'
       && isFiniteNumber(value.energyMarkets.brentWtiSpreadUsd)
       ? { energyMarkets: value.energyMarkets as unknown as MacroSnapshot['energyMarkets'] } : {}),
+    ...(isRecord(value.usTreasury)
+      && value.usTreasury.source === 'US TREASURY'
+      && typeof value.usTreasury.observationDate === 'string'
+      && typeof value.usTreasury.retrievedAtUtc === 'string'
+      && ['nominal2YPct', 'nominal3MPct', 'nominal10YPct', 'real10YPct', 'twoYearTenYearSpreadBps', 'twoYearThreeMonthSpreadBps', 'breakevenTenYearPct'].every((key) => isFiniteNumber(value.usTreasury[key]))
+      && (value.usTreasury.freshness === 'LATEST PUBLISHED' || value.usTreasury.freshness === 'STALE')
+      ? { usTreasury: value.usTreasury as unknown as TreasuryYieldData } : {}),
   };
 }
 
@@ -692,7 +700,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     asOf: new Date().toISOString(),
     source: cachedSnapshot.source === 'fallback' ? 'fallback' : 'partial',
   };
-  const [fredResult, finnhubResult, alphaResult, fmpResult, cotResult, frankfurterResult, calendarResult, ecbResult, bocResult, boeResult, worldBankResult, blsResult, beaResult, bisResult, riksbankResult, norgesBankResult, eiaResult] = await Promise.allSettled([
+  const [fredResult, finnhubResult, alphaResult, fmpResult, cotResult, frankfurterResult, calendarResult, ecbResult, bocResult, boeResult, worldBankResult, blsResult, beaResult, bisResult, riksbankResult, norgesBankResult, eiaResult, treasuryResult] = await Promise.allSettled([
     fredApiKey ? getFredUsdUpdates(fredApiKey) : Promise.resolve(null),
     finnhubApiKey ? getFinnhubCatalysts(finnhubApiKey) : Promise.resolve(null),
     alphaVantageKey ? getAlphaVantageUsdUpdates(alphaVantageKey) : Promise.resolve(null),
@@ -710,10 +718,13 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     getRiksbankPolicyRate(),
     getNorgesBankPolicyRate(),
     eiaApiKey ? getEiaEnergyMarkets(eiaApiKey) : Promise.resolve(null),
+    getCachedData('macro:us-treasury-yields-v1', getTreasuryYieldData, 60 * 60),
   ]);
   let hasLiveData = false;
   if (eiaResult.status === 'fulfilled' && eiaResult.value) { snapshot.energyMarkets = eiaResult.value; }
   else if (eiaResult.status === 'rejected') console.warn('EIA crude oil spot observations are unavailable:', eiaResult.reason);
+  if (treasuryResult.status === 'fulfilled') snapshot.usTreasury = treasuryResult.value;
+  else if (treasuryResult.status === 'rejected') console.warn('Official U.S. Treasury yield observations are unavailable:', treasuryResult.reason);
   if (fredResult.status === 'fulfilled' && isRecord(fredResult.value)) {
     let usd = snapshot.currencies.find((currency) => currency.code === 'USD');
     const policyRate = isFiniteNumber(fredResult.value.policyRate)
