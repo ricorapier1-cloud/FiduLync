@@ -230,13 +230,11 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
           <span>TERMINAL MODE / PRIVATE RESEARCH</span>
           <DashboardUtcClock />
           <span className="macro-provenance">
-            {liveReferenceAvailable && currencies.length === 0
-              ? 'ECB reference exchange rates active; official statistical feeds pending.'
-              : snapshot.source === 'fallback'
+            {snapshot.source === 'fallback'
               ? 'No verified macro provider observations are currently available.'
               : snapshot.source === 'partial'
-              ? 'Live and reference inputs synthesized; verify release vintages before positioning.'
-              : 'Provider payload validated across edge gateways.'}
+              ? 'Mixed provider and reference observations; verify source dates before positioning.'
+              : 'Provider snapshot received; verify source and observation date for each field.'}
           </span>
         </div>
       </section>
