@@ -27,6 +27,9 @@ struct MacroLyncMacroContext
    bool   news_lockout_active;
    string active_session;
    string macro_risk_regime;
+   string sovereign_shield_status;
+   double sovereign_max_risk_pct;
+   bool   sovereign_shield_blocked;
    bool   calendar_verified;
    string event_risk_status;
    bool   news_lockout;
@@ -148,6 +151,9 @@ bool ML_FetchMacroContext(const string symbol, const string endpoint, const stri
    context.news_lockout_active = true;
    context.active_session = "CLOSED";
    context.macro_risk_regime = "INSUFFICIENT_EVIDENCE";
+   context.sovereign_shield_status = "UNVERIFIED";
+   context.sovereign_max_risk_pct = 0.0;
+   context.sovereign_shield_blocked = true;
    context.calendar_verified = false;
    context.event_risk_status = "UNVERIFIED_CALENDAR";
    context.news_lockout = true;
@@ -198,6 +204,8 @@ bool ML_FetchMacroContext(const string symbol, const string endpoint, const stri
    string news_active = ML_JsonScalar(response, "newsLockoutActive");
    string active_session = ML_JsonString(response, "activeSession");
    string macro_risk_regime = ML_JsonString(response, "macroRiskRegime");
+   string shield_status = ML_JsonString(response, "status");
+   string shield_max_risk = ML_JsonScalar(response, "maxAllowedRiskPct");
    string calendar = ML_JsonScalar(response, "calendar_verified");
    string news = ML_JsonScalar(response, "news_lockout");
    string event_status = ML_JsonString(response, "event_risk_status");
@@ -241,6 +249,10 @@ bool ML_FetchMacroContext(const string symbol, const string endpoint, const stri
    context.event_risk_status = event_status;
    context.news_lockout = context.news_lockout_active || news == "true" || !context.calendar_verified || decision == "INSUFFICIENT_EVIDENCE";
    context.allowed_to_trade = allowed == "true" && !context.news_lockout;
+   context.sovereign_shield_status = shield_status == "" ? "UNVERIFIED" : shield_status;
+   context.sovereign_max_risk_pct = StringToDouble(shield_max_risk);
+   context.sovereign_shield_blocked = shield_status == "BLACK_SWAN_LOCKOUT" || shield_max_risk == "" || context.sovereign_max_risk_pct <= 0.0;
+   if(context.sovereign_shield_blocked) context.allowed_to_trade = false;
    context.next_catalyst_title = ML_JsonString(response, "title");
    context.next_catalyst_utc = ML_JsonString(response, "scheduled_at_utc");
    context.source_mode = source_mode;
