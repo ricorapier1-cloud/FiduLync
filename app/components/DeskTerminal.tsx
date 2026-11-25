@@ -96,17 +96,21 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const macroPass = selected === 'XAUUSD' ? goldMacroPass : fxMacroPass;
   const verifiedCalendar = snapshot.calendarSource === 'provider' && Boolean(snapshot.calendarProvider);
   const nearEvent = verifiedCalendar && snapshot.catalysts.some((event) => event.impact === 'High' && Math.abs(Date.parse(event.scheduledAt) - now) <= 30 * 60_000);
-  const eventPass = verifiedCalendar && !nearEvent;
+  const nearRateDecision = verifiedCalendar && snapshot.catalysts.some((event) => /rate decision|interest rate|monetary policy|policy rate|fomc|ecb meeting|boe rate|boj rate/i.test(event.title) && Math.abs(Date.parse(event.scheduledAt) - now) <= 60 * 60_000);
+  const eventPass = verifiedCalendar && !nearEvent && !nearRateDecision;
+  const vix = snapshot.vix?.freshness === 'LATEST PUBLISHED' ? snapshot.vix.value : null;
+  const sovereignRiskCap = vix === null ? 0 : vix >= 28 ? 0 : vix >= 22 ? 0.5 : 1;
+  const sovereignStatus = vix === null ? 'UNAVAILABLE' : vix >= 28 ? 'BLACK_SWAN_LOCKOUT' : vix >= 22 ? 'ELEVATED_VOLATILITY' : 'NORMAL';
   const riskPass = Number.isFinite(account) && account > 0
     && Number.isFinite(stop) && stop > 0 && Number.isFinite(target) && target > 0
-    && risk > 0 && risk <= 1 && lots >= 0.01
+    && risk > 0 && risk <= sovereignRiskCap && lots >= 0.01
     && journal.trades < 2 && journal.losses < 2 && !locked && !correlationBlocked;
   const quoteIsFresh = quote?.freshness === 'LIVE' && quote.ageMs !== null && quote.ageMs <= 60_000;
   const spreadPass = quoteIsFresh && rr >= 2 && spreadPct !== null && spreadPct < 15;
   const gates = [
     { name: 'Macro alignment', pass: macroPass, detail: selected === 'XAUUSD' ? (goldScore === null ? 'Gold engine evidence unavailable' : `${goldScore} gold score · ${goldContext?.directionalVerdict} · ${direction}`) : dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? 'No verified pair bias available' : `${dossier.biasScore} score · ${dossier.confidence} · ${direction}` },
     { name: 'Lagos session', pass: inSession, detail: 'London 08:00–12:00 WAT / New York 08:00–12:00 ET (DST-aware)' },
-    { name: 'Tier-1 event risk', pass: eventPass, detail: !verifiedCalendar ? 'Calendar unverified; fail-closed' : nearEvent ? 'Event within ±30 minutes' : 'Verified calendar: clear' },
+    { name: 'Tier-1 event risk', pass: eventPass, detail: !verifiedCalendar ? 'Calendar unverified; fail-closed' : nearRateDecision ? 'Central-bank decision within ±60 minutes' : nearEvent ? 'Event within ±30 minutes' : 'Verified calendar: clear' },
     { name: 'H4/H1 structure and liquidity', pass: technicalConfirmed, detail: 'Requires manual MT5 chart confirmation' },
     { name: 'Reward/risk and spread', pass: spreadPass, detail: `${rr.toFixed(2)}R · ${quoteIsFresh ? 'fresh quote' : 'quote stale/unavailable'} · spread ${spreadPct === null ? 'unavailable' : spreadPct.toFixed(1) + '% of SL'}` },
     { name: 'Daily risk circuit breaker', pass: riskPass, detail: `${risk.toFixed(2)}% · ${lots.toFixed(2)} lots · ${journal.trades}/2 trades · ${journal.losses}/2 losses${correlationBlocked ? ' · SHARED LEG: ' + conflictingLegs.join('/') : ''}` },
