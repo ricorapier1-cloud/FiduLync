@@ -1,7 +1,9 @@
 export type DeskQuoteContext = {
   symbol: string;
-  mid: number;
+  mid: number | null;
   observation_time_utc: string;
+  age_ms: number | null;
+  freshness: 'FRESH' | 'STALE' | 'REFERENCE';
   source: string;
   quote_type: 'PROVIDER_QUOTE' | 'REFERENCE_RATE';
 };
