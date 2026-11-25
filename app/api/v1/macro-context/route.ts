@@ -133,7 +133,7 @@ export async function GET(request: Request) {
       fundamental_bias: symbol === 'XAUUSD' ? (goldVerdict === 'BULLISH' ? 'BULLISH' : goldVerdict === 'BEARISH' ? 'BEARISH' : 'NEUTRAL') : dossier.fundamentalBias,
       decision_status: symbol === 'XAUUSD' ? (goldAvailable ? 'RESEARCH_CONTEXT_AVAILABLE' : 'INSUFFICIENT_EVIDENCE') : dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? 'INSUFFICIENT_EVIDENCE' : 'RESEARCH_CONTEXT_AVAILABLE',
       bias_score: symbol === 'XAUUSD' ? (goldAvailable ? goldBias : null) : dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier.biasScore,
-      confidence: symbol === 'XAUUSD' ? (goldAvailable ? 'MODERATE' : 'INSUFFICIENT_EVIDENCE') : dossier.confidence,
+      confidence: symbol === 'XAUUSD' ? (goldAvailable ? 'LOW' : 'INSUFFICIENT_EVIDENCE') : dossier.confidence,
       policy_diff_bps: symbol === 'XAUUSD' ? null : dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier.policyDiffBps,
       real_policy_rate_diff_bps: symbol === 'XAUUSD' ? null : dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier.realPolicyRateDiffBps,
       real_yield_diff_bps: null,
