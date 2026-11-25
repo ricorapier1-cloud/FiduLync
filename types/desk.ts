@@ -62,6 +62,7 @@ export type MacroContextPayload = {
     as_of_utc: string;
     source_mode: 'fallback' | 'provider' | 'partial';
     calendar_source: 'unavailable' | 'reference' | 'provider';
+    calendar_provider?: string | null;
     cot_source: 'unavailable' | 'provider';
   };
   disclaimer: string;
