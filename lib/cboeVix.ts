@@ -1,14 +1,7 @@
 import 'server-only';
 import type { CboeVixData } from '@/types/macro';
 
-type CboeVixResult = {
-  source: 'CBOE';
-  value: number;
-  observationDate: string;
-  retrievedAtUtc: string;
-  freshness: 'LATEST PUBLISHED' | 'STALE';
-  history: Array<{ date: string; value: number }>;
-};
+
 
 function normalizeDate(raw: string): string | null {
   const value = raw.trim().replace(/^"|"$/g, '');
@@ -25,7 +18,7 @@ function normalizeDate(raw: string): string | null {
 }
 
 /** Official Cboe daily VIX close history; this is not an intraday VIX feed. */
-export async function getCboeVixHistory(): Promise<CboeVixResult> {
+export async function getCboeVixHistory(): Promise<CboeVixData> {
   const response = await fetch('https://cdn-api.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv', {
     cache: 'no-store',
     headers: { Accept: 'text/csv' },
