@@ -284,6 +284,5 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, macr
         <p className="desk-footnote">Journal persists in this browser only. Browser storage clearing or switching devices resets it. MT5 must independently enforce the same hard limits.</p>
       </article>
     </div>
-ils>
   </section>;
 }
