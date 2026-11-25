@@ -4,6 +4,7 @@ import { getMacroSnapshot } from '@/lib/macroEngine';
 import { generatePairDossier, G8_PAIRS } from '@/lib/macro/dossierEngine';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
 import { getMarketQuotes } from '@/lib/marketFeeds';
+import { buildGoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
 import type { MacroContextPayload } from '@/types/desk';
 
 export const runtime = 'nodejs';
@@ -112,8 +113,15 @@ export async function GET(request: Request) {
   }
 
   try {
-    const [snapshot, quotes] = await Promise.all([getMacroSnapshot(), getMarketQuotes()]);
+    const [snapshot, quotes, goldContext] = await Promise.all([
+      getMacroSnapshot(),
+      getMarketQuotes(),
+      symbol === 'XAUUSD' ? buildGoldMacroContext() : Promise.resolve(null),
+    ]);
     const dossier = generatePairDossier(snapshot, symbol);
+    const goldAvailable = symbol === 'XAUUSD' && goldContext?.overallState === 'AVAILABLE' && goldContext.goldBiasScore !== null;
+    const goldBias = goldContext?.goldBiasScore ?? null;
+    const goldVerdict = goldContext?.directionalVerdict ?? 'INSUFFICIENT_EVIDENCE';
     const payload: MacroContextPayload = {
       schema_version: '1.0.0',
       generated_at_utc: new Date().toISOString(),
@@ -121,20 +129,20 @@ export async function GET(request: Request) {
       symbol: dossier.symbol,
       base: dossier.base,
       quote: dossier.quote,
-      macro_regime: dossier.macroRegime,
-      fundamental_bias: dossier.fundamentalBias,
-      decision_status: dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? 'INSUFFICIENT_EVIDENCE' : 'RESEARCH_CONTEXT_AVAILABLE',
-      bias_score: dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier.biasScore,
-      confidence: dossier.confidence,
-      policy_diff_bps: dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier.policyDiffBps,
-      real_policy_rate_diff_bps: dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier.realPolicyRateDiffBps,
+      macro_regime: symbol === 'XAUUSD' ? (goldContext?.liquidityRegime ?? 'INSUFFICIENT_EVIDENCE') : dossier.macroRegime,
+      fundamental_bias: symbol === 'XAUUSD' ? (goldVerdict === 'BULLISH' ? 'BULLISH' : goldVerdict === 'BEARISH' ? 'BEARISH' : 'NEUTRAL') : dossier.fundamentalBias,
+      decision_status: symbol === 'XAUUSD' ? (goldAvailable ? 'RESEARCH_CONTEXT_AVAILABLE' : 'INSUFFICIENT_EVIDENCE') : dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? 'INSUFFICIENT_EVIDENCE' : 'RESEARCH_CONTEXT_AVAILABLE',
+      bias_score: symbol === 'XAUUSD' ? (goldAvailable ? goldBias : null) : dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier.biasScore,
+      confidence: symbol === 'XAUUSD' ? (goldAvailable ? 'MODERATE' : 'INSUFFICIENT_EVIDENCE') : dossier.confidence,
+      policy_diff_bps: symbol === 'XAUUSD' ? null : dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier.policyDiffBps,
+      real_policy_rate_diff_bps: symbol === 'XAUUSD' ? null : dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier.realPolicyRateDiffBps,
       real_yield_diff_bps: null,
-      two_year_yield_diff_bps: dossier.twoYearYieldDiffBps,
-      cot_percentile_diff: snapshot.cotSource === 'provider'
-        && snapshot.cot.some((position) => position.market === (dossier.base === 'XAU' ? 'GOLD' : dossier.base))
+      two_year_yield_diff_bps: symbol === 'XAUUSD' ? null : dossier.twoYearYieldDiffBps,
+      cot_percentile_diff: symbol === 'XAUUSD' ? null : snapshot.cotSource === 'provider'
+        && snapshot.cot.some((position) => position.market === dossier.base)
         && snapshot.cot.some((position) => position.market === dossier.quote)
           ? dossier.cotPercentileDiff : null,
-      cross_asset_confirmation: dossier.crossAssetConfirmation,
+      cross_asset_confirmation: symbol === 'XAUUSD' ? (goldContext?.liquidityRegime ?? 'INSUFFICIENT_EVIDENCE') : dossier.crossAssetConfirmation,
       live_quotes: quotes.map((quote) => {
         const ageMs = Math.max(0, Date.now() - Date.parse(quote.timestamp));
         const providerQuote = quote.source === 'finnhub' || quote.source === 'mt5';
@@ -168,7 +176,7 @@ export async function GET(request: Request) {
         impact: dossier.nextCatalyst.impact,
         lockout_active: dossier.nextCatalyst.lockoutActive,
       } : null,
-      invalidation_triggers: dossier.invalidationTriggers,
+      invalidation_triggers: symbol === 'XAUUSD' ? (goldContext?.invalidationTriggers ?? []) : dossier.invalidationTriggers,
       provenance: {
         as_of_utc: snapshot.asOf,
         source_mode: snapshot.source,
