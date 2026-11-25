@@ -30,7 +30,7 @@ export function evaluateSovereignShield(input: SovereignShieldInput): SovereignS
   const volatilityLock = (vix !== null && vix >= 28)
     || (input.intradayRangeAtrMultiple !== null && input.intradayRangeAtrMultiple !== undefined && input.intradayRangeAtrMultiple > 2.5);
   const elevated = !volatilityLock && vix !== null && vix >= 22;
-  let status: SovereignShieldStatus = volatilityLock ? 'BLACK_SWAN_LOCKOUT' : elevated ? 'ELEVATED_VOLATILITY' : 'NORMAL';
+  const status: SovereignShieldStatus = volatilityLock ? 'BLACK_SWAN_LOCKOUT' : elevated ? 'ELEVATED_VOLATILITY' : 'NORMAL';
   let maxAllowedRiskPct = status === 'BLACK_SWAN_LOCKOUT' ? 0 : status === 'ELEVATED_VOLATILITY' ? 0.5 : 1;
 
   if (vix === null) reasons.push('VIX_UNAVAILABLE');
