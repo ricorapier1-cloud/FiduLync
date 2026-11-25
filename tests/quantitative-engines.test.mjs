@@ -252,6 +252,7 @@ test('gold research cards wrap long values and desk execution workflow is placed
   assert.ok(dashboard.indexOf('<DeskTerminal initialSnapshot=') < dashboard.indexOf('06 / CROSS-ASSET TELEMETRY'));
   assert.match(dashboard, /min-w-0 break-words/);
   assert.match(dashboard, /text-sm sm:text-lg/);
+  assert.match(dashboard, /3M CMT · TREASURY PROXY/);
 });
 
 test('XAUUSD macro context engine requires verified spot, official macro series, and weekly CFTC evidence', () => {
