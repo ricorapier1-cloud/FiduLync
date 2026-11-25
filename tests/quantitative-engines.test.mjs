@@ -221,6 +221,12 @@ test('official Treasury TIPS series joins using the real-yield field and powers 
   assert.match(gold, /cot\.nonCommercialNet/);
 });
 
+test('gold refresh route reuses the synchronized macro snapshot and CBOE observation', () => {
+  const route = read('../app/api/macro/gold-context/route.ts');
+  assert.match(route, /getMacroSnapshot\(\)/);
+  assert.match(route, /buildGoldMacroContext\(snapshot\)/);
+});
+
 test('public FairEconomy calendar is no-key, Tier-1-only, and records source provenance', () => {
   const macroData = read('../lib/macroData.ts');
   const types = read('../types/macro.ts');
