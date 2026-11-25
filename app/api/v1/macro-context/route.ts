@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { getMacroSnapshot } from '@/lib/macroEngine';
-import { generatePairDossier } from '@/lib/macro/dossierEngine';
+import { generatePairDossier, G8_PAIRS } from '@/lib/macro/dossierEngine';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
 import { getMarketQuotes } from '@/lib/marketFeeds';
 import type { MacroContextPayload } from '@/types/desk';
@@ -107,7 +107,7 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const symbol = (searchParams.get('symbol') ?? searchParams.get('pair') ?? 'EURUSD').trim().toUpperCase();
-  if (!/^[A-Z]{6}$/.test(symbol) && symbol !== 'XAUUSD') {
+  if (!G8_PAIRS.includes(symbol as typeof G8_PAIRS[number])) {
     return NextResponse.json({ error: 'Invalid symbol. Use a six-character FX pair or XAUUSD.' }, { status: 400, headers });
   }
 
@@ -135,13 +135,22 @@ export async function GET(request: Request) {
         && snapshot.cot.some((position) => position.market === dossier.quote)
           ? dossier.cotPercentileDiff : null,
       cross_asset_confirmation: dossier.crossAssetConfirmation,
-      live_quotes: quotes.map((quote) => ({
-        symbol: quote.symbol,
-        mid: quote.price,
-        observation_time_utc: quote.timestamp,
-        source: quote.source,
-        quote_type: quote.source === 'finnhub' || quote.source === 'mt5' ? 'PROVIDER_QUOTE' : 'REFERENCE_RATE',
-      })),
+      live_quotes: quotes.map((quote) => {
+        const ageMs = Math.max(0, Date.now() - Date.parse(quote.timestamp));
+        const providerQuote = quote.source === 'finnhub' || quote.source === 'mt5';
+        const freshness = providerQuote
+          ? ageMs <= 120_000 ? 'FRESH' as const : 'STALE' as const
+          : 'REFERENCE' as const;
+        return {
+          symbol: quote.symbol,
+          mid: freshness === 'STALE' ? null : quote.price,
+          observation_time_utc: quote.timestamp,
+          age_ms: Number.isFinite(ageMs) ? ageMs : null,
+          freshness,
+          source: quote.source,
+          quote_type: providerQuote ? 'PROVIDER_QUOTE' as const : 'REFERENCE_RATE' as const,
+        };
+      }),
       daily_governance: {
         state: 'NOT_CONNECTED_TO_SERVER',
         trades_taken: null,
