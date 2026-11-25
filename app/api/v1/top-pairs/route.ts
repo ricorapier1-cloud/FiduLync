@@ -15,6 +15,7 @@ export async function GET() {
         (dossier.confidence === 'HIGH' || dossier.confidence === 'MODERATE')
         && Math.abs(dossier.biasScore) >= 20
         && dossier.macroRegime !== 'INSUFFICIENT_EVIDENCE'
+        && snapshot.calendarSource === 'provider'
         && !dossier.eventRiskLockout
       )
       .sort((left, right) => {
@@ -34,6 +35,7 @@ export async function GET() {
         contradictingEvidence: dossier.contradictingEvidence.filter((item) => !item.startsWith('No verified')).slice(0, 2),
         nextCatalyst: dossier.nextCatalyst,
         eventRiskLockout: dossier.eventRiskLockout,
+        eventRiskVerified: true,
       }));
 
     return NextResponse.json({
@@ -43,7 +45,7 @@ export async function GET() {
       dataSourceState: snapshot.source,
       status: candidates.length ? 'CANDIDATES_AVAILABLE' : 'NO_QUALIFIED_CANDIDATES',
       candidates,
-      methodology: 'Provider-sourced policy and inflation observations, freshness-gated yield differentials and recent CFTC positioning where available. Rank is a relative macro score, not a calibrated win probability or trade signal.',
+      methodology: 'Provider-sourced policy and inflation observations, freshness-gated yield differentials, a verified provider calendar and recent CFTC positioning where available. Rank is a relative macro score, not a calibrated win probability or trade signal.',
       disclaimer: 'Research shortlist only. Confirm live broker quotes, technical structure, event risk and EA risk controls before any trade.',
     }, { headers: { 'Cache-Control': 'private, no-store, max-age=0' } });
   } catch (error) {
