@@ -90,7 +90,9 @@ export async function GET() {
   const quotes = cachedQuotes.map((quote) => {
     const ageMs = quote.quoteTimeUtc ? Math.max(0, Date.now() - Date.parse(quote.quoteTimeUtc)) : null;
     const freshness = ageMs === null ? 'UNAVAILABLE' as const : ageMs > 60_000 ? 'STALE' as const : 'LIVE' as const;
-    return { ...quote, ageMs, freshness };
+    const digits = quote.symbol === 'XAUUSD' ? 2 : quote.symbol === 'USDJPY' ? 3 : 5;
+    const normalize = (value: number | null) => value === null ? null : Number(value.toFixed(digits));
+    return { ...quote, bid: normalize(quote.bid), ask: normalize(quote.ask), mid: normalize(quote.mid), spread: normalize(quote.spread), ageMs, freshness };
   });
   const healthy = quotes.filter((quote) => quote.freshness === 'LIVE').length;
   return NextResponse.json({
