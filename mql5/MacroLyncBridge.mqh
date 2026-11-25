@@ -124,7 +124,7 @@ string ML_BaseUrl(string endpoint)
 
 bool ML_IsAllowedBias(const string value)
 {
-   return value == "BULLISH" || value == "BEARISH" || value == "NEUTRAL";
+   return value == "BULLISH" || value == "BEARISH" || value == "NEUTRAL" || value == "STRONG_BULLISH" || value == "STRONG_BEARISH";
 }
 
 bool ML_FetchMacroContext(const string symbol, const string endpoint, const string token,
@@ -149,6 +149,9 @@ bool ML_FetchMacroContext(const string symbol, const string endpoint, const stri
    context.disclaimer = "Read-only macroeconomic intelligence. No technical analysis or broker order execution.";
 
    string root = ML_BaseUrl(endpoint);
+   int legacy_path = StringFind(root, "/api/v1/macro-signal");
+   if(legacy_path >= 0) root = StringSubstr(root, 0, legacy_path) + "/api/v1/macro-context";
+   else if(StringFind(root, "/api/v1/macro-context") < 0) root += "/api/v1/macro-context";
    string normalized_symbol = symbol;
    StringToUpper(normalized_symbol);
    if(root == "" || token == "" || normalized_symbol == "") return false;
