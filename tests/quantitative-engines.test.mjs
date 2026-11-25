@@ -287,3 +287,13 @@ test('XAUUSD dashboard, desk gate and MT5 context use the dedicated gold macro e
   assert.match(route, /goldAvailable/);
   assert.match(route, /goldContext\?\.invalidationTriggers/);
 });
+test('licensed or permission-dependent providers fail closed unless their explicit approval flag is true', () => {
+  const macroData = read('../lib/macroData.ts');
+  const marketFeeds = read('../lib/marketFeeds.ts');
+  const goldEngine = read('../lib/macro/goldAndRegimeEngine.ts');
+  assert.match(macroData, /FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true' \? process\.env\.FRED_API_KEY/);
+  assert.match(macroData, /FINNHUB_COMMERCIAL_USE_APPROVED === 'true' \? process\.env\.FINNHUB_API_KEY/);
+  assert.match(macroData, /FAIRECONOMY_COMMERCIAL_USE_APPROVED === 'true'/);
+  assert.match(marketFeeds, /FINNHUB_COMMERCIAL_USE_APPROVED === 'true' \? process\.env\.FINNHUB_API_KEY/);
+  assert.match(goldEngine, /FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true'/);
+});
