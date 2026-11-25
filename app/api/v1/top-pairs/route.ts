@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getMacroSnapshot } from '@/lib/macroEngine';
-import { generatePairDossier, G8_PAIRS } from '@/lib/macro/dossierEngine';
+import { generatePairDossier } from '@/lib/macro/dossierEngine';
+
+const SCREENED_PAIRS = ['EURUSD', 'USDJPY', 'GBPUSD', 'AUDUSD', 'NZDUSD', 'USDCAD', 'USDCHF', 'EURJPY', 'GBPJPY', 'AUDJPY'] as const;
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
     const snapshot = await getMacroSnapshot();
-    const candidates = G8_PAIRS
-      .filter((symbol) => symbol !== 'XAUUSD')
+    const candidates = SCREENED_PAIRS
       .map((symbol) => generatePairDossier(snapshot, symbol))
       .filter((dossier) =>
         (dossier.confidence === 'HIGH' || dossier.confidence === 'MODERATE')
