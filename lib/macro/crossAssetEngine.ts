@@ -8,22 +8,24 @@ export function getCrossAssetTelemetry(snapshot: MacroSnapshot): CrossAssetTelem
   const usd = snapshot.currencies.find((currency) => currency.code === 'USD');
   const verifiedTwoYear = usd?.twoYearYieldSource === 'provider' ? usd.twoYearYield : null;
   const treasury = snapshot.usTreasury?.freshness === 'LATEST PUBLISHED' ? snapshot.usTreasury : undefined;
+  const wti = snapshot.energyMarkets?.wti.freshness === 'LATEST PUBLISHED' ? snapshot.energyMarkets.wti.valueUsdPerBarrel : null;
+  const brent = snapshot.energyMarkets?.brent.freshness === 'LATEST PUBLISHED' ? snapshot.energyMarkets.brent.valueUsdPerBarrel : null;
   return {
-    usTwoYearYield: treasury?.nominal2YPct ?? verifiedTwoYear ?? 0,
-    usTenYearYield: treasury?.nominal10YPct ?? 0,
-    usTenYearRealYield: treasury?.real10YPct ?? 0,
-    usBreakevenTenYear: treasury?.breakevenTenYearPct ?? 0,
-    broadTradeWeightedUsd: 0,
-    vix: 0,
-    vixRegime: 'LOW',
-    goldUsd: 0,
-    crudeWti: 0,
-    brentCrude: 0,
-    copperUsd: 0,
-    highYieldSpreadBps: 0,
-    globalRiskAppetite: 'NEUTRAL',
+    usTwoYearYield: treasury?.nominal2YPct ?? verifiedTwoYear ?? null,
+    usTenYearYield: treasury?.nominal10YPct ?? null,
+    usTenYearRealYield: treasury?.real10YPct ?? null,
+    usBreakevenTenYear: treasury?.breakevenTenYearPct ?? null,
+    broadTradeWeightedUsd: null,
+    vix: null,
+    vixRegime: 'UNAVAILABLE',
+    goldUsd: null,
+    crudeWti: wti,
+    brentCrude: brent,
+    copperUsd: null,
+    highYieldSpreadBps: null,
+    globalRiskAppetite: 'UNAVAILABLE',
     timestampUtc: treasury?.observationDate ?? snapshot.asOf ?? '',
-    freshness: treasury ? 'LATEST PUBLISHED' : 'UNAVAILABLE',
+    freshness: treasury ? 'LATEST PUBLISHED' : wti !== null || brent !== null ? 'LATEST PUBLISHED' : 'UNAVAILABLE',
   };
 }
 
