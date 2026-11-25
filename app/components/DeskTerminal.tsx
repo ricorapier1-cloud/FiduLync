@@ -224,11 +224,12 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
       }
       setSnapshot(freshSnapshot);
       onSnapshotChange(freshSnapshot);
-      const [goldResult] = await Promise.allSettled([
+      const [goldResult, quoteResult] = await Promise.allSettled([
         fetch('/api/macro/gold-context', { cache: 'no-store' }),
         refreshQuotes(),
         refreshFx(),
       ]);
+      if (quoteResult.status === 'rejected') setQuoteStatus('DEGRADED');
       if (goldResult.status === 'fulfilled') {
         const freshGold = await goldResult.value.json() as GoldMacroContext;
         setGoldContext(freshGold);
