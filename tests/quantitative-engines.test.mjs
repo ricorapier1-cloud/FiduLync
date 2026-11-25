@@ -266,3 +266,12 @@ test('dashboard exposes one coherent set of anchored research workspaces and avo
   assert.match(dashboard, /STALE \/ DELAYED/);
   assert.match(dashboard, /LIVE · FINNHUB/);
 });
+test('MT5 macro bridge rejects unsupported instruments and withholds stale provider prices', () => {
+  const route = read('../app/api/v1/macro-context/route.ts');
+  const types = read('../types/desk.ts');
+  assert.match(route, /G8_PAIRS\.includes/);
+  assert.match(route, /ageMs <= 120_000/);
+  assert.match(route, /freshness === 'STALE' \? null : quote\.price/);
+  assert.match(route, /age_ms: Number\.isFinite\(ageMs\)/);
+  assert.match(types, /freshness: 'FRESH' \| 'STALE' \| 'REFERENCE'/);
+});
