@@ -14,6 +14,7 @@ type Opportunity = {
   nextCatalyst: { title: string; scheduledAt: string; impact: 'High' | 'Medium' } | null;
   eventRiskLockout: boolean;
   eventRiskVerified: boolean;
+  tradeReadiness: 'AWAIT_TECHNICAL_CONFIRMATION' | 'BLOCKED_CALENDAR_UNAVAILABLE';
 };
 
 type OpportunityResponse = {
@@ -68,7 +69,7 @@ export default function PairOpportunityBoard({ onSelectPair }: { onSelectPair: (
       </div>
       <div className="macro-panel p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-          <p className="text-sm text-slate-300">Pairs qualify only when policy and inflation observations are fresh, a provider calendar is verified, and no high-impact lockout is active.</p>
+          <p className="text-sm text-slate-300">Pairs qualify on fresh policy and inflation evidence plus directional macro divergence. Calendar and technical readiness are shown separately; unverified event risk blocks the desk gate.</p>
           <span className="text-[10px] font-mono text-slate-400">{loading ? 'RANKING…' : data?.status ?? 'UNAVAILABLE'}</span>
         </div>
         {candidates.length > 0 ? (
@@ -106,10 +107,10 @@ export default function PairOpportunityBoard({ onSelectPair }: { onSelectPair: (
         ) : (
           <div className="rounded-lg border border-dashed border-white/15 p-5 text-center">
             <strong className="block text-sm font-mono text-slate-200">{loading ? 'ASSEMBLING QUALIFIED PAIRS' : data?.status === 'UNAVAILABLE' ? 'RANKING DATA UNAVAILABLE' : 'NO QUALIFIED MACRO OPPORTUNITIES'}</strong>
-            <p className="text-xs text-slate-400 mt-2">{loading ? 'Waiting for the evidence screen.' : 'The current observations do not meet the minimum evidence, freshness, verified-calendar and directional-score requirements. This is an intentional no-trade research state, not a data substitute.'}</p>
+            <p className="text-xs text-slate-400 mt-2">{loading ? 'Waiting for the evidence screen.' : 'The current observations do not meet the minimum macro evidence, freshness and directional-score requirements. This is an intentional no-trade research state, not a data substitute.'}</p>
           </div>
         )}
-        <p className="mt-4 text-[10px] leading-relaxed text-slate-500">{data?.methodology ?? 'Provider-backed relative macro research only.'} No historical win probability is claimed. Technical confirmation, broker spreads, session conditions and account risk remain with the MT5 EA.</p>
+        <p className="mt-4 text-[10px] leading-relaxed text-slate-500">{data?.methodology ?? 'Provider-backed relative macro research only.'} No historical win probability is claimed. {data?.candidates?.some((item) => !item.eventRiskVerified) ? 'Economic calendar is unverified: the desk pre-trade gate remains blocked until a licensed/approved calendar provider is available. ' : ''}Technical confirmation, broker spreads, session conditions and account risk remain with the MT5 EA.</p>
         <p className="mt-1 text-[10px] font-mono text-slate-600">SNAPSHOT {data?.snapshotAsOfUtc ?? '—'} · GENERATED {data?.generatedAtUtc ?? '—'} · SOURCE {data?.dataSourceState ?? '—'}</p>
       </div>
     </section>
