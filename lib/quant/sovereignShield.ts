@@ -70,6 +70,8 @@ export function evaluateSovereignShield(input: SovereignShieldInput): SovereignS
   else if (input.rollingSevenDayDrawdownPct <= -4) blockReasons.push('ROLLING_7D_DRAWDOWN_LIMIT');
 
   if (status === 'BLACK_SWAN_LOCKOUT') maxAllowedRiskPct = 0;
+  const authoritativeLedgerUnavailable = input.tradesToday === null || input.lossesToday === null || input.rollingSevenDayDrawdownPct === null;
+  if (authoritativeLedgerUnavailable) blockReasons.push('AUTHORITATIVE_ACCOUNT_RISK_LEDGER_UNAVAILABLE');
   const hardBlocked = status === 'BLACK_SWAN_LOCKOUT' || blockReasons.length > 0;
   return { status, maxAllowedRiskPct, allowedToTrade: !hardBlocked, spreadBlowoutBlock, crowdedUnwindRisk, blockReasons, warnings, dataGaps };
 }
