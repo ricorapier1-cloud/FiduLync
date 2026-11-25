@@ -853,12 +853,15 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
           ? fmpResult.value
           : [],
   ).filter((event) => event.impact === 'High' && ['US', 'EU', 'UK', 'JP', 'AU', 'CH', 'CA'].includes(event.region));
-  if (providerCalendar.length > 0) {
+  const calendarVerified = calendarResult.status === 'fulfilled'
+    || (finnhubResult.status === 'fulfilled' && Array.isArray(finnhubResult.value))
+    || (fmpResult.status === 'fulfilled' && Array.isArray(fmpResult.value));
+  if (calendarVerified) {
     snapshot.catalysts = providerCalendar;
     snapshot.calendarSource = 'provider';
-    snapshot.calendarProvider = calendarResult.status === 'fulfilled' && calendarResult.value.length > 0
+    snapshot.calendarProvider = calendarResult.status === 'fulfilled'
       ? 'FAIRECONOMY_PUBLIC'
-      : finnhubResult.status === 'fulfilled' && finnhubResult.value?.length ? 'FINNHUB' : 'FMP';
+      : finnhubResult.status === 'fulfilled' && Array.isArray(finnhubResult.value) ? 'FINNHUB' : 'FMP';
     hasAnyProviderData = true;
   } else {
     snapshot.catalysts = [];
