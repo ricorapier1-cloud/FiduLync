@@ -619,7 +619,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
             { label: 'US 10Y benchmark', value: snapshot.usTreasury?.nominal10YPct ?? null, unit: '%', source: 'U.S. Treasury', observationDate: snapshot.usTreasury?.observationDate ?? null },
             { label: 'US 2s10s curve', value: snapshot.usTreasury?.twoYearTenYearSpreadBps ?? null, unit: 'bps', source: 'U.S. Treasury', observationDate: snapshot.usTreasury?.observationDate ?? null },
             { label: '10Y TIPS real yield', value: snapshot.usTreasury?.real10YPct ?? null, unit: '%', source: 'U.S. Treasury', observationDate: snapshot.usTreasury?.observationDate ?? null },
-            { label: 'CBOE VIX', value: null, unit: '', source: 'No verified adapter', observationDate: null },
+            { label: 'CBOE VIX', value: snapshot.vix?.freshness === 'LATEST PUBLISHED' ? snapshot.vix.value : null, unit: '', source: 'CBOE daily close', observationDate: snapshot.vix?.observationDate ?? null },
             { label: 'WTI crude oil', value: snapshot.energyMarkets?.wti.valueUsdPerBarrel ?? null, unit: 'USD/bbl', source: 'EIA', observationDate: snapshot.energyMarkets?.wti.observationDate ?? null },
             { label: 'Brent crude oil', value: snapshot.energyMarkets?.brent.valueUsdPerBarrel ?? null, unit: 'USD/bbl', source: 'EIA', observationDate: snapshot.energyMarkets?.brent.observationDate ?? null },
           ].map(({ label, value, unit, source, observationDate }) => (
@@ -642,6 +642,11 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
         {snapshot.usTreasury && (
           <p className="text-[10px] text-slate-500 font-mono mt-2">
             U.S. Treasury nominal and TIPS curves: observation {snapshot.usTreasury.observationDate} · Retrieved {snapshot.usTreasury.retrievedAtUtc} · Daily published closing-market estimates, not intraday streaming yields.
+          </p>
+        )}
+        {snapshot.vix && (
+          <p className="text-[10px] text-slate-500 font-mono mt-2">
+            Cboe VIX: daily closing index observation {snapshot.vix.observationDate} · Retrieved {snapshot.vix.retrievedAtUtc} · Not an intraday volatility quote.
           </p>
         )}
       </section>
