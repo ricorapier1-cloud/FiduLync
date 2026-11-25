@@ -81,7 +81,16 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const inSession = activeSession !== 'OFF-SESSION';
   const healthyProviderCount = snapshot.providerStatus?.filter((provider) => provider.status === 'HEALTHY').length ?? 0;
   const totalProviderCount = snapshot.providerStatus?.length ?? 0;
-  const locked = journal.trades >= 2 || journal.losses >= 2;\n  const vixValue = goldContext?.drivers.VIXCLS.value ?? null;\n  const tailRiskStatus = vixValue === null ? 'UNAVAILABLE' : vixValue >= 28 ? 'BLACK_SWAN_LOCKOUT' : vixValue >= 22 ? 'ELEVATED_VOLATILITY' : 'NORMAL';\n  const riskCap = tailRiskStatus === 'UNAVAILABLE' || tailRiskStatus === 'BLACK_SWAN_LOCKOUT' ? 0 : tailRiskStatus === 'ELEVATED_VOLATILITY' ? 0.5 : 1;\n  const selectedLegs = selected === 'XAUUSD' ? ['USD'] : [selected.slice(0, 3), selected.slice(3, 6)];\n  const conflictingTrades = journal.entries.filter((entry) => {\n    const legs = entry.symbol === 'XAUUSD' ? ['USD'] : [entry.symbol.slice(0, 3), entry.symbol.slice(3, 6)];\n    return legs.some((leg) => selectedLegs.includes(leg));\n  });\n  const correlationPass = conflictingTrades.length === 0;
+  const locked = journal.trades >= 2 || journal.losses >= 2;
+  const vixValue = goldContext?.drivers.VIXCLS.value ?? null;
+  const tailRiskStatus = vixValue === null ? 'UNAVAILABLE' : vixValue >= 28 ? 'BLACK_SWAN_LOCKOUT' : vixValue >= 22 ? 'ELEVATED_VOLATILITY' : 'NORMAL';
+  const riskCap = tailRiskStatus === 'UNAVAILABLE' || tailRiskStatus === 'BLACK_SWAN_LOCKOUT' ? 0 : tailRiskStatus === 'ELEVATED_VOLATILITY' ? 0.5 : 1;
+  const selectedLegs = selected === 'XAUUSD' ? ['USD'] : [selected.slice(0, 3), selected.slice(3, 6)];
+  const conflictingTrades = journal.entries.filter((entry) => {
+    const legs = entry.symbol === 'XAUUSD' ? ['USD'] : [entry.symbol.slice(0, 3), entry.symbol.slice(3, 6)];
+    return legs.some((leg) => selectedLegs.includes(leg));
+  });
+  const correlationPass = conflictingTrades.length === 0;
   const dossier = useMemo(() => generatePairDossier(snapshot, selected), [snapshot, selected]);
   const fxMacroPass = (dossier.confidence === 'HIGH' || dossier.confidence === 'MODERATE')
     && ((dossier.biasScore > 0 && direction === 'BUY') || (dossier.biasScore < 0 && direction === 'SELL'));
@@ -95,8 +104,9 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const eventPass = verifiedCalendar && !nearEvent;
   const riskPass = Number.isFinite(account) && account > 0
     && Number.isFinite(stop) && stop > 0 && Number.isFinite(target) && target > 0
-    && risk > 0 && risk <= 1 && lots >= 0.01
-    && journal.trades < 2 && journal.losses < 2 && !locked;
+    && risk > 0 && risk <= riskCap && lots >= 0.01
+    && journal.trades < 2 && journal.losses < 2 && !locked
+    && correlationPass && (tailRiskStatus === 'NORMAL' || tailRiskStatus === 'ELEVATED_VOLATILITY');
   const quoteIsFresh = quote?.freshness === 'LIVE' && quote.ageMs !== null && quote.ageMs <= 60_000;
   const spreadPass = quoteIsFresh && rr >= 2 && spreadPct !== null && spreadPct < 15;
   const gates = [
@@ -250,7 +260,8 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
         'time_utc,date_wat,symbol,result,pnl_usd',
         ...journal.entries.map((entry) => [entry.timeUtc, journal.dateWAT, entry.symbol, entry.result, entry.pnl]
           .map((value) => '"' + String(value).replace(/"/g, '""') + '"').join(',')),
-      ].join('\n');
+      ].join('
+');
     const blob = new Blob([content], { type: format === 'json' ? 'application/json' : 'text/csv' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
