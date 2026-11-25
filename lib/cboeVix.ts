@@ -26,7 +26,7 @@ export async function getCboeVixHistory(): Promise<CboeVixData> {
   });
   if (!response.ok) throw new Error('Cboe VIX history returned HTTP ' + response.status + '.');
   const csv = await response.text();
-  const [headerLine, ...dataLines] = csv.trim().split(/\r?\n/);
+  const [headerLine, ...dataLines] = csv.trim().replace(/^\uFEFF/, '').split(/\r?\n/);
   if (!headerLine || !dataLines.length) throw new Error('Cboe VIX history returned an empty CSV file.');
   const headers = headerLine.split(',').map((item) => item.trim().replace(/^"|"$/g, '').toUpperCase());
   const dateIndex = headers.indexOf('DATE');
