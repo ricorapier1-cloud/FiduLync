@@ -556,7 +556,8 @@ test('Sovereign Shield exposes hard volatility, event, crowding and account-risk
 });
 
 test('desk correlation guard blocks a repeated currency leg and macro/technical scores remain distinct', () => {
-  assert.match(dashboard, /correlationBlocked/);
-  assert.match(dashboard, /SHARED LEG/);
+  const desk = read('../app/components/DeskTerminal.tsx');
+  assert.match(desk, /correlationBlocked/);
+  assert.match(desk, /SHARED LEG/);
   assert.match(dashboard, /Technical regime, Hurst, KER and session liquidity are separate/);
 });
