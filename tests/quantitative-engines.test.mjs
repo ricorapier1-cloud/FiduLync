@@ -35,7 +35,7 @@ test('cross-asset engine does not embed fabricated market levels', () => {
   for (const value of ['4.45', '1.95', '124.8', '14.6', '2680.0', '71.4', '75.2', '4.12', '312']) {
     assert.doesNotMatch(crossAsset, new RegExp(value.replace('.', '\\.'), 'g'));
   }
-  assert.match(crossAsset, /freshness: 'UNAVAILABLE'/);
+  assert.match(crossAsset, /freshness: treasury \? 'LATEST PUBLISHED' : 'UNAVAILABLE'/);
 });
 
 test('country profile engine does not publish hardcoded macro baselines', () => {
