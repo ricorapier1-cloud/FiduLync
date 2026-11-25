@@ -174,6 +174,20 @@ export type ProviderStatus = {
 export type EnergyMarketObservation = { valueUsdPerBarrel: number; observationDate: string; retrievedAtUtc: string; source: 'EIA'; freshness: 'LATEST PUBLISHED' | 'STALE' };
 export type EnergyMarkets = { wti: EnergyMarketObservation; brent: EnergyMarketObservation; brentWtiSpreadUsd: number };
 
+export type TreasuryYieldData = {
+  source: 'US TREASURY';
+  observationDate: string;
+  retrievedAtUtc: string;
+  nominal2YPct: number;
+  nominal3MPct: number;
+  nominal10YPct: number;
+  real10YPct: number;
+  twoYearTenYearSpreadBps: number;
+  twoYearThreeMonthSpreadBps: number;
+  breakevenTenYearPct: number;
+  freshness: 'LATEST PUBLISHED' | 'STALE';
+};
+
 export type MacroSnapshot = {
   asOf: string;
   source: 'fallback' | 'provider' | 'partial';
@@ -188,6 +202,7 @@ export type MacroSnapshot = {
   countryProfiles?: CountryFundamentalProfile[];
   providerStatus?: ProviderStatus[];
   energyMarkets?: EnergyMarkets;
+  usTreasury?: TreasuryYieldData;
 };
 
 export type MarketQuote = {
