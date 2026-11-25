@@ -373,6 +373,8 @@ test('gold quote parser uses parent-level Swissquote timestamps and Treasury dai
   assert.ok(gold.includes('macro:us-treasury-yields-history-v2'));
   assert.ok(gold.includes("requiredDailySeries = ['DFII10', 'T10YIE', 'DGS2', 'DTB3', 'VIXCLS']"));
   assert.ok(gold.includes('evidenceCoveragePct'));
+  assert.ok(gold.includes('snapshotTreasury?.history'));
+  assert.ok(gold.includes('treasuryObservedLatencyMs'));
   assert.ok(treasury.includes('history: history.slice(0, 260)'));
   assert.ok(treasury.includes("fetchTreasuryRows('daily_treasury_real_yield_curve', ['TC_10YEAR'])"));
 });
