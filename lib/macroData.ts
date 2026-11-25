@@ -65,6 +65,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function filterCurrentCatalysts(catalysts: EconomicCatalyst[]): EconomicCatalyst[] {
+  const now = Date.now();
+  const earliest = now - 60 * 60 * 1000;
+  const latest = now + 45 * 24 * 60 * 60 * 1000;
+  return catalysts.filter((event) => {
+    const scheduledAt = Date.parse(event.scheduledAt);
+    return Number.isFinite(scheduledAt) && scheduledAt >= earliest && scheduledAt <= latest;
+  });
+}
+
 function isFreshProviderObservation(date: string | undefined, maxAgeDays: number): boolean {
   if (!date) return false;
   const timestamp = Date.parse(date);
@@ -792,14 +802,16 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
   } else if (frankfurterResult.status === 'rejected') {
     console.warn('ECB benchmark exchange rates are unavailable:', frankfurterResult.reason);
   }
-  const providerCalendar = calendarResult.status === 'fulfilled' && calendarResult.value.length > 0
-    ? calendarResult.value
-    : finnhubResult.status === 'fulfilled' && finnhubResult.value?.length
-      ? finnhubResult.value
-      : fmpResult.status === 'fulfilled' && fmpResult.value?.length
-        ? fmpResult.value
-        : null;
-  if (providerCalendar && providerCalendar.length > 0) {
+  const providerCalendar = filterCurrentCatalysts(
+    calendarResult.status === 'fulfilled' && calendarResult.value.length > 0
+      ? calendarResult.value
+      : finnhubResult.status === 'fulfilled' && finnhubResult.value?.length
+        ? finnhubResult.value
+        : fmpResult.status === 'fulfilled' && fmpResult.value?.length
+          ? fmpResult.value
+          : [],
+  );
+  if (providerCalendar.length > 0) {
     snapshot.catalysts = providerCalendar;
     snapshot.calendarSource = 'provider';
     hasLiveData = true;
@@ -1059,6 +1071,7 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
     if (data.payload.source !== 'provider' && data.payload.source !== 'partial') return null;
     const parsed = parseProviderSnapshot(data.payload);
     if (!parsed || !Number.isFinite(Date.parse(data.refreshed_at))) return null;
+    const persistedCatalysts = filterCurrentCatalysts(parsed.catalysts);
     const ecbRates = isRecord(data.payload.ecbRates)
       ? Object.fromEntries(Object.entries(data.payload.ecbRates)
         .filter((entry): entry is [string, number] => /^[A-Z]{3}$/.test(entry[0])
@@ -1072,8 +1085,8 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
           ? 'provider'
           : 'fallback',
       cotSource: data.payload.cotSource === 'provider' ? 'provider' : 'unavailable',
-      catalysts: data.payload.calendarSource === 'provider' ? parsed.catalysts : [],
-      calendarSource: data.payload.calendarSource === 'provider' ? 'provider' : 'unavailable',
+      catalysts: data.payload.calendarSource === 'provider' ? persistedCatalysts : [],
+      calendarSource: data.payload.calendarSource === 'provider' && persistedCatalysts.length > 0 ? 'provider' : 'unavailable',
       ...(parsed.energyMarkets ? { energyMarkets: parsed.energyMarkets } : {}),
       asOf: data.refreshed_at,
       ...(ecbRates && Object.keys(ecbRates).length > 0 ? { ecbRates } : {}),
@@ -1123,6 +1136,7 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
 
       const parsed = parseProviderSnapshot(await response.json() as unknown);
       if (!parsed) throw new Error('Macro provider payload failed validation.');
+      const providerCatalysts = filterCurrentCatalysts(parsed.catalysts);
       let ecbRates = persisted?.ecbRates;
       try {
         ecbRates = await getFrankfurterRates();
@@ -1141,10 +1155,10 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
           })),
         ],
         cot: parsed.cot.length > 0 ? parsed.cot : baseline.cot,
-        catalysts: parsed.catalysts.length > 0 ? parsed.catalysts : baseline.catalysts,
+        catalysts: providerCatalysts,
         source: 'provider',
         cotSource: 'provider',
-        calendarSource: parsed.catalysts.length > 0 ? 'provider' : 'unavailable',
+        calendarSource: providerCatalysts.length > 0 ? 'provider' : 'unavailable',
         asOf: new Date().toISOString(),
         ...(ecbRates ? { ecbRates } : {}),
       });
