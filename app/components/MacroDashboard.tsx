@@ -456,11 +456,11 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
               <span className="eyebrow">05 / EVENT RISK</span>
               <h2 id="catalyst-title">Tier-1 Economic Catalysts</h2>
             </div>
-            <span className="macro-section-note mono"><BrandGlyph name="calendar-clock" size={13} /> {snapshot.calendarProvider ?? 'CALENDAR SOURCE UNAVAILABLE'} · UTC / WAT</span>
+            <span className="macro-section-note mono"><BrandGlyph name="calendar-clock" size={13} /> {snapshot.calendarSource === 'provider' && snapshot.calendarProvider ? 'HEALTHY · ' + snapshot.calendarProvider : 'UNAVAILABLE'} · UTC / WAT</span>
           </div>
 
           <div className="macro-panel macro-catalyst-panel">
-            {sortedCatalysts.length === 0 && <p className="macro-empty">{snapshot.calendarSource === 'provider' ? 'No upcoming provider events in the current calendar window.' : 'Economic calendar unavailable: no approved provider feed returned verified events. Event lockout remains conservative.'}</p>}
+            {sortedCatalysts.length === 0 && <p className="macro-empty">{snapshot.calendarSource === 'provider' ? 'No upcoming provider events in the current calendar window.' : 'Economic calendar unavailable: no verified provider feed returned events. Event lockout remains conservative.'}</p>}
             {sortedCatalysts.map((catalyst) => (
               <article className="macro-event" key={catalyst.id}>
                 <div className="macro-event-time">
