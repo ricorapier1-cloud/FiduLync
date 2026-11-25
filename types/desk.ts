@@ -48,7 +48,7 @@ export type MacroContextPayload = {
   provenance: {
     as_of_utc: string;
     source_mode: 'fallback' | 'provider' | 'partial';
-    calendar_source: 'reference' | 'provider';
+    calendar_source: 'unavailable' | 'reference' | 'provider';
     cot_source: 'unavailable' | 'provider';
   };
   disclaimer: string;
