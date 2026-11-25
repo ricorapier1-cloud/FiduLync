@@ -155,8 +155,8 @@ export async function GET(request: Request) {
       provenance: {
         as_of_utc: snapshot.asOf,
         source_mode: snapshot.source,
-        calendar_source: snapshot.calendarSource,
-        cot_source: snapshot.cotSource,
+        calendar_source: snapshot.calendarSource ?? 'reference',
+        cot_source: snapshot.cotSource ?? 'unavailable',
       },
       disclaimer: 'Read-only macroeconomic intelligence. No technical analysis or broker order execution.',
     }, { status: 200, headers });
