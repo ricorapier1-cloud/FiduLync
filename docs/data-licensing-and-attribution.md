@@ -12,12 +12,16 @@ The following flags default to `false`. They must not be enabled merely because 
 - `FINNHUB_PERSONAL_PLAN_ACTIVE`
 - `ALPHA_VANTAGE_COMMERCIAL_USE_APPROVED`
 - `FMP_COMMERCIAL_USE_APPROVED`
-- `FAIRECONOMY_COMMERCIAL_USE_APPROVED`
 - `COT_DATA_PROVIDER_LICENSE_APPROVED`
 
 The operator must confirm the relevant provider plan and exact scope before changing a flag. A personal-use entitlement does not automatically permit long-term storage, redistribution, public display or derived-data delivery.
 
 ## Provider-specific controls
+
+### FairEconomy weekly public calendar
+
+The application can read the public weekly JSON feed at https://nfs.faireconomy.media/ff_calendar_thisweek.json without an API key. The personal research fallback is limited to High-impact USD, EUR, GBP, JPY, AUD, CHF and CAD events, preserves provider timestamps in UTC, displays Africa/Lagos WAT, and records `FAIRECONOMY_PUBLIC` provenance. This no-key path is not a grant of redistribution or commercial-use rights; review the provider's current terms before expanding use or redistributing event data.
+
 
 ### FRED / Federal Reserve Bank of St. Louis
 
