@@ -35,8 +35,8 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
   const finnhubKeyPresent = Boolean(process.env.FINNHUB_API_KEY?.trim());
   const finnhubPlanActive = process.env.FINNHUB_PERSONAL_PLAN_ACTIVE === 'true';
   const finnhubConfigured = finnhubPlanActive && finnhubKeyPresent;
-  const calendarConfigured = finnhubConfigured
-    || process.env.FAIRECONOMY_COMMERCIAL_USE_APPROVED === 'true'
+  const fairEconomyActive = snapshot.calendarSource === 'provider' && snapshot.calendarProvider === 'FAIRECONOMY_PUBLIC';
+  const calendarConfigured = fairEconomyActive || finnhubConfigured
     || (process.env.FMP_COMMERCIAL_USE_APPROVED === 'true' && Boolean(process.env.FMP_API_KEY?.trim()));
   const bls = feedStatus(usd?.unemploymentProvider === 'BLS' && usd.wageGrowthProvider === 'BLS',
     isFresh(usd?.unemploymentObservationDate, 120) && isFresh(usd?.wageGrowthObservationDate, 120), true);
@@ -54,10 +54,10 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
     isFresh(cad?.policyRateObservationDate, 180) && isFresh(cad?.inflationObservationDate, 120), true);
   const cftc = feedStatus(snapshot.cotSource === 'provider' && snapshot.cot.length > 0,
     snapshot.cot.some((item) => isFresh(item.reportDate, 14)), true);
-  const calendar = finnhubKeyPresent && !finnhubPlanActive && !calendarConfigured
-    ? { status: 'PERMISSION_REQUIRED' as const, freshness: 'UNAVAILABLE' as const }
-    : feedStatus(snapshot.calendarSource === 'provider' && snapshot.catalysts.length > 0,
-      snapshot.catalysts.some((item) => Date.parse(item.scheduledAt) >= Date.now() - 60 * 60 * 1000 && Date.parse(item.scheduledAt) <= Date.now() + 45 * 24 * 60 * 60 * 1000), calendarConfigured);
+  const calendarActive = snapshot.calendarSource === 'provider' && Boolean(snapshot.calendarProvider);
+  const calendar = feedStatus(calendarActive,
+    calendarActive && (snapshot.calendarProvider === 'FAIRECONOMY_PUBLIC'
+      || snapshot.catalysts.some((item) => Date.parse(item.scheduledAt) >= Date.now() - 60 * 60 * 1000 && Date.parse(item.scheduledAt) <= Date.now() + 45 * 24 * 60 * 60 * 1000)), calendarConfigured);
   const bisCoverage = snapshot.currencies.filter((item) => item.policyRateProvider === 'BIS' && item.inflationProvider === 'BIS').length;
   const bis = feedStatus(bisCoverage >= 4, bisCoverage >= 4, true);
   const riksbank = feedStatus(sek?.policyRateProvider === 'Sveriges Riksbank',
@@ -89,6 +89,6 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
     { name: 'Norges Bank policy rate', endpoint: 'https://data.norges-bank.no/api/data/IR/B.KPRA.SD.R', ...norgesBank, latencyMs: null, lastSuccessfulSyncUtc: null, latestObservationDate: nok?.policyRateObservationDate ?? null, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'US Bureau of Labor Statistics', endpoint: 'https://api.bls.gov/publicAPI/v2/timeseries/data/', ...bls, latencyMs: null, lastSuccessfulSyncUtc: null, latestObservationDate: latestDate(usd?.unemploymentObservationDate, usd?.wageGrowthObservationDate), rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'US Bureau of Economic Analysis', endpoint: 'https://apps.bea.gov/api/data/', ...bea, latencyMs: null, lastSuccessfulSyncUtc: null, latestObservationDate: usd?.gdpObservationDate ?? null, rateLimitRemaining: null, circuitBreakerTripped: false },
-    { name: 'Economic Calendar', endpoint: 'Provider calendar adapter', ...calendar, latencyMs: null, lastSuccessfulSyncUtc: null, detail: snapshot.calendarSource === 'provider' ? 'Provider calendar events are available.' : 'No approved provider returned verified upcoming events. Event risk remains fail-closed; no static dates are inserted.', nextAction: !finnhubPlanActive && finnhubKeyPresent ? 'Confirm Finnhub personal-plan rights, then set FINNHUB_PERSONAL_PLAN_ACTIVE=true in Vercel Production. Otherwise approve an eligible FairEconomy/FMP feed.' : 'Enable an approved calendar adapter or keep the event gate blocked.', rateLimitRemaining: null, circuitBreakerTripped: false },
+    { name: 'Economic Calendar' + (snapshot.calendarProvider ? ' · ' + snapshot.calendarProvider : ''), endpoint: snapshot.calendarProvider === 'FAIRECONOMY_PUBLIC' ? 'https://nfs.faireconomy.media/ff_calendar_thisweek.json' : 'Provider calendar adapter', ...calendar, latencyMs: null, lastSuccessfulSyncUtc: null, detail: calendarActive ? 'Verified ' + snapshot.calendarProvider + ' calendar feed; high-impact event coverage is available in UTC.' : 'No verified calendar provider is active. Event risk remains fail-closed; no static dates are inserted.', nextAction: calendarActive ? undefined : 'Restore an eligible public or entitled calendar adapter; event risk remains blocked until verified.', rateLimitRemaining: null, circuitBreakerTripped: false },
   ];
 }
