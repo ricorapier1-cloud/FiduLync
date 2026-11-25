@@ -236,7 +236,7 @@ test('public FairEconomy calendar is no-key, Tier-1-only, and records source pro
   assert.match(macroData, /item\.impact === 'High'/);
   assert.match(macroData, /snapshot\.calendarProvider = calendarResult/);
   assert.match(types, /calendarProvider\?: 'FAIRECONOMY_PUBLIC'/);
-  assert.match(desk, /initialSnapshot\.calendarSource === 'provider'/);
+  assert.match(desk, /snapshot\.calendarSource === 'provider' && Boolean\(snapshot\.calendarProvider\)/);
 });
 
 test('live quote API rounds each instrument to its display precision before JSON serialization', () => {
@@ -329,7 +329,7 @@ test('XAUUSD dashboard, desk gate and MT5 context use the dedicated gold macro e
   assert.match(page, /buildGoldMacroContext\(initialSnapshot\)/);
   assert.match(dashboard, /Gold Macro &amp; Liquidity Intelligence/);
   assert.match(desk, /selected === 'XAUUSD' \? goldMacroPass : fxMacroPass/);
-  assert.match(route, /symbol === 'XAUUSD' \? buildGoldMacroContext\(\)/);
+  assert.match(route, /const goldContext = await buildGoldMacroContext\(snapshot\)/);
   assert.match(route, /goldAvailable/);
   assert.match(route, /goldContext\?\.invalidationTriggers/);
 });
@@ -373,6 +373,8 @@ test('gold quote parser uses parent-level Swissquote timestamps and Treasury dai
   assert.ok(gold.includes('macro:us-treasury-yields-history-v2'));
   assert.ok(gold.includes("requiredDailySeries = ['DFII10', 'T10YIE', 'DGS2', 'DTB3', 'VIXCLS']"));
   assert.ok(gold.includes('evidenceCoveragePct'));
+  assert.ok(gold.includes('snapshotTreasury?.history'));
+  assert.ok(gold.includes('treasuryObservedLatencyMs'));
   assert.ok(treasury.includes('history: history.slice(0, 260)'));
   assert.ok(treasury.includes("fetchTreasuryRows('daily_treasury_real_yield_curve', ['TC_10YEAR'])"));
 });
@@ -464,4 +466,67 @@ test('provider resilience handles Riksbank single-observation payloads, caches E
   assert.ok(macroData.includes('AbortSignal.timeout(15_000)'));
   assert.ok(aiBrief.includes("GEMINI_MACRO_BRIEF_ENABLED !== 'true'"));
   assert.ok(aiBrief.includes("'macro:ai-brief:v3'"));
+});
+
+test('gold score uses healthy Treasury levels, canonical CBOE VIX and CFTC positioning without a FRED z-score gate', () => {
+  const engine = read('../lib/macro/goldAndRegimeEngine.ts');
+  assert.match(engine, /const realYield = drivers\.DFII10\.value/);
+  assert.match(engine, /realYield > 2\.25/);
+  assert.match(engine, /snapshotVix/);
+  assert.match(engine, /cot\.nonCommercialNet/);
+  assert.match(engine, /drivers\.twoYearMinusThreeMonthPct !== null/);
+  assert.doesNotMatch(engine, /drivers\.DFII10\.zScore65 !== null && drivers\.twoYearMinusThreeMonthPct/);
+});
+
+test('EA macro context exposes flat deterministic session, lockout, regime and per-symbol bias fields', () => {
+  const route = read('../app/api/v1/macro-context/route.ts');
+  const types = read('../types/desk.ts');
+  assert.match(route, /allowedToTrade/);
+  assert.match(route, /newsLockoutActive/);
+  assert.match(route, /activeMarketSession/);
+  assert.match(route, /macroRiskRegime/);
+  assert.match(route, /symbolBiases/);
+  assert.match(route, /buildGoldMacroContext\(snapshot\)/);
+  assert.match(types, /symbols: Record<string, MacroSymbolBias>/);
+  assert.match(types, /decisionScope: 'MACRO_GATE_ONLY'/);
+});
+
+test('private desk layout removes duplicated page footer and floating retail support widget', () => {
+  const dashboard = read('../app/components/MacroDashboard.tsx');
+  const shell = read('../components/PlatformShell.tsx');
+  const footer = read('../components/PlatformFooter.tsx');
+  assert.doesNotMatch(dashboard, /macro-footer|<footer/);
+  assert.equal((shell.match(/<PlatformFooter \/>/g) ?? []).length, 1);
+  assert.doesNotMatch(shell, /WhatsAppSupportButton/);
+  assert.doesNotMatch(footer, /wa\.me|WhatsApp Desk/);
+  assert.ok(dashboard.indexOf('<EABridgeDiagnostics />') < dashboard.indexOf('id="health"'));
+});
+
+test('public FairEconomy calendar is represented as healthy telemetry without Finnhub plan approval', () => {
+  const telemetry = read('../lib/macro/providerTelemetry.ts');
+  assert.match(telemetry, /snapshot\.calendarProvider === 'FAIRECONOMY_PUBLIC'/);
+  assert.match(telemetry, /const calendarActive = snapshot\.calendarSource === 'provider' && Boolean\(snapshot\.calendarProvider\)/);
+  assert.match(telemetry, /Economic Calendar' \+ \(snapshot\.calendarProvider/);
+  assert.doesNotMatch(telemetry, /const calendar = finnhubKeyPresent && !finnhubPlanActive/);
+});
+
+test('trade journal offers JSON and CSV exports and desk sections use non-colliding letter labels', () => {
+  const desk = read('../app/components/DeskTerminal.tsx');
+  assert.match(desk, /exportJournal\('json'\)/);
+  assert.match(desk, /exportJournal\('csv'\)/);
+  assert.match(desk, /A \/ UNIFIED CURRENCY MATRIX/);
+  const diagnostics = read('../app/components/EABridgeDiagnostics.tsx');
+  assert.match(diagnostics, /ZONE 4/);
+  assert.match(diagnostics, /MacroLyncBridge\.mqh/);
+});
+
+test('Force Sync refreshes the macro snapshot, gold context, BBO and spot reference inputs', () => {
+  const snapshotRoute = read('../app/api/macro/snapshot/route.ts');
+  const desk = read('../app/components/DeskTerminal.tsx');
+  assert.match(snapshotRoute, /searchParams\.get\('force'\) === 'true'/);
+  assert.match(snapshotRoute, /getMacroSnapshot\(forceRefresh\)/);
+  assert.match(desk, /api\/macro\/snapshot\?force=true/);
+  assert.match(desk, /api\/macro\/gold-context/);
+  assert.match(desk, /onSnapshotChange\(freshSnapshot\)/);
+  assert.match(desk, /onGoldContextChange\(freshGold\)/);
 });

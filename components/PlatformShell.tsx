@@ -4,7 +4,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import BrandGlyph, { type BrandGlyphName } from '@/components/BrandGlyph';
-import WhatsAppSupportButton from '@/components/WhatsAppSupportButton';
 import PlatformFooter from '@/components/PlatformFooter';
 
 const navigationLinks = [
@@ -125,7 +124,6 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
       <main className="page-frame">{children}</main>
 
       <PlatformFooter />
-      <WhatsAppSupportButton />
 
       {!isHome && (
         <nav className="mobile-tabbar" aria-label="Bottom navigation">

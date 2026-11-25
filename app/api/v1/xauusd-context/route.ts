@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { buildGoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
+import { getMacroSnapshot } from '@/lib/macroEngine';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -49,7 +50,8 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   try {
-    const context = await buildGoldMacroContext();
+    const snapshot = await getMacroSnapshot();
+    const context = await buildGoldMacroContext(snapshot);
     const status = context.overallState === 'AVAILABLE' ? 200 : 503;
     return NextResponse.json(context, { status, headers: responseHeaders });
   } catch (error) {

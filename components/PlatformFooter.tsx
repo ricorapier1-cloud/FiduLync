@@ -66,21 +66,11 @@ export default function PlatformFooter() {
           </div>
 
           <div>
-            <span className="font-mono text-[10px] uppercase tracking-widest text-slate-300">Research Desk</span>
+            <span className="font-mono text-[10px] uppercase tracking-widest text-slate-300">Desk Operations</span>
             <ul className="mt-3 space-y-2 text-xs">
-              <li>
-                <a
-                  href="https://wa.me/2348037212445?text=Hello%20Desk%2C%20I%20have%20an%20enquiry%20regarding%20MacroLync%20Research"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-emerald-300 transition hover:underline"
-                >
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                  WhatsApp Desk: +234 803 721 2445
-                </a>
-              </li>
-              <li className="text-slate-400">Global Macro Research Support</li>
-              <li className="text-slate-500 font-mono text-[11px]">UTC Coverage: 07:00 – 21:00</li>
+              <li className="text-slate-300">PRIVATE PERSONAL RESEARCH</li>
+              <li className="text-slate-400">Macro intelligence · WAT / UTC</li>
+              <li className="text-slate-500 font-mono text-[11px]">Read-only EA context · No order execution</li>
             </ul>
           </div>
 

@@ -1,14 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import BrandGlyph from '@/components/BrandGlyph';
-import { getCurrencyStrengthIndex } from '@/lib/currencyStrength';
 import { generatePairDossier } from '@/lib/macro/dossierEngine';
 import type { MacroSnapshot, PairDossier } from '@/types/macro';
 import type { GoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
 import DeskTerminal from '@/app/components/DeskTerminal';
 import PairOpportunityBoard from '@/app/components/PairOpportunityBoard';
+import EABridgeDiagnostics from '@/app/components/EABridgeDiagnostics';
 
 type MacroDashboardProps = {
   initialSnapshot: MacroSnapshot;
@@ -67,36 +66,6 @@ function formatCountdown(target: string, now: number) {
   return `${hours}h ${minutes}m`;
 }
 
-function DashboardUtcClock() {
-  const [timeStr, setTimeStr] = useState<string>('');
-
-  useEffect(() => {
-    const update = () => {
-      setTimeStr(new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC');
-    };
-    update();
-    const timer = setInterval(update, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  return <strong className="font-mono text-emerald-400 tracking-wider">{timeStr || 'UTC / SYNCING'}</strong>;
-}
-
-function CatalystCountdownDisplay({ target }: { target: string }) {
-  const [countdown, setCountdown] = useState<string>('Syncing');
-
-  useEffect(() => {
-    const update = () => {
-      setCountdown(formatCountdown(target, Date.now()));
-    };
-    update();
-    const timer = setInterval(update, 30_000);
-    return () => clearInterval(timer);
-  }, [target]);
-
-  return <span>{countdown}</span>;
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -106,26 +75,15 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
   const [goldContext, setGoldContext] = useState(initialGoldContext);
   const [pair, setPair] = useState<(typeof pairs)[number]['symbol']>('EURUSD');
   const [now, setNow] = useState<number | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
+  const [, setRefreshing] = useState(false);
   const [aiBrief, setAiBrief] = useState<{ bullets: string[]; source: 'gemini' | 'rules' } | null>(null);
 
-  const currencyStrength = getCurrencyStrengthIndex(snapshot);
   const dossier: PairDossier = generatePairDossier(snapshot, pair);
 
   const sortedCatalysts = [...snapshot.catalysts]
     .filter((catalyst) => now === null || Date.parse(catalyst.scheduledAt) >= now)
     .sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt));
-  const nextHighImpactCatalyst = sortedCatalysts.find((catalyst) => catalyst.impact === 'High');
   const currencies = snapshot.currencies;
-  const verifiedCurrencyCount = currencies.filter((currency) => currency.policyRateSource === 'provider' && currency.inflationSource === 'provider'
-    && isFreshObservation(currency.policyRateObservationDate, 180)
-    && isFreshObservation(currency.inflationObservationDate, inflationFreshnessDays(currency.code))).length;
-  const verifiedPolicyRates = currencies.filter((currency) => currency.policyRateSource === 'provider'
-    && isFreshObservation(currency.policyRateObservationDate, 180)).map((currency) => currency.policyRate);
-  const policySpread = verifiedPolicyRates.length > 1
-    ? Math.max(...verifiedPolicyRates) - Math.min(...verifiedPolicyRates)
-    : null;
-
   const divergenceRanked = useMemo(() => {
     return currencies
       .map((c) => {
@@ -210,80 +168,8 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
 
   return (
     <div className="macro-page pb-36 sm:pb-12 md:pb-8">
-      {/* Top Statusline */}
-      <div className="macro-statusline mono">
-        <span><span className={`macro-pulse${snapshot.source === 'provider' ? ' macro-pulse-live' : ''}`} /> MACROLYNC / INSTITUTIONAL RESEARCH TERMINAL</span>
-        <span className="macro-status-right">
-          <span className={`macro-feed-badge${snapshot.source === 'provider' ? ' macro-feed-live' : ''}`}>
-            {snapshot.source === 'provider' ? 'PROVIDER MACRO SNAPSHOT' : snapshot.source === 'partial' ? 'PARTIAL MACRO DATA' : 'FALLBACK / NO VERIFIED SNAPSHOT'}
-          </span>
-          <button type="button" className="macro-refresh" aria-label="Refresh macro data" onClick={() => window.location.reload()}>
-            <BrandGlyph name="refresh" size={13} className={refreshing ? 'macro-spin' : ''} /> REFRESH
-          </button>
-          <Link href="/notebook" className="macro-refresh">RESEARCH NOTEBOOK</Link>
-          <Link href="/workbench" className="macro-refresh">VALIDATION WORKBENCH</Link>
-        </span>
-      </div>
-
-      {/* Terminal Hero Section */}
-      <section className="macro-intro" aria-labelledby="macro-title">
-        <div>
-          <span className="eyebrow">INSTITUTIONAL MACRO INTELLIGENCE</span>
-          <h1 id="macro-title">Understand the drivers.<br /><span>Navigate the macro regime.</span></h1>
-          <p>
-            Monetary policy divergence, real-yield differentials, cross-asset capital flows, and CFTC speculative positioning across the G10. Objective fundamental context, strictly separated from technical trade execution.
-          </p>
-          <div className="flex flex-wrap items-center gap-3 mt-4">
-            <Link className="macro-intro-action" href="/notebook">
-              <BrandGlyph name="activity" size={15} /> Open Research Notebook <BrandGlyph name="arrow-up-right" size={13} />
-            </Link>
-            <Link className="macro-intro-action" href="/workbench">
-              <BrandGlyph name="trend" size={15} /> Validation Workbench <BrandGlyph name="arrow-up-right" size={13} />
-            </Link>
-          </div>
-        </div>
-        <div className="macro-intro-meta mono">
-          <span>TERMINAL MODE / PRIVATE RESEARCH</span>
-          <DashboardUtcClock />
-          <span className="macro-provenance">
-            {snapshot.source === 'fallback'
-              ? 'No verified macro provider observations are currently available.'
-              : snapshot.source === 'partial'
-              ? 'Mixed provider and reference observations; verify source dates before positioning.'
-              : 'Provider snapshot received; verify source and observation date for each field.'}
-          </span>
-        </div>
-      </section>
-
       {/* Execution workflow is surfaced before the research detail panels. */}
-      <DeskTerminal initialSnapshot={snapshot} initialGoldContext={goldContext} />
-
-      {/* Primary KPI Ribbon */}
-      <section className="macro-kpis" aria-label="Macro overview">
-        <article className="macro-kpi">
-          <span className="macro-kpi-label">POLICY SPREAD <span>G8 DISPERSION</span></span>
-          <strong className="mono">{policySpread === null ? '—' : `${Math.round(policySpread * 100)} bps`}</strong>
-          <small>Highest to lowest central bank policy rate</small>
-        </article>
-        <article className="macro-kpi">
-          <span className="macro-kpi-label">POLICY INPUTS <span>AUTHENTICATED</span></span>
-          <strong className="mono">{String(verifiedCurrencyCount).padStart(2, '0')} <em>/ 11</em></strong>
-          <small>{currencies.length >= 11 ? 'Currency records received; verify source status per field' : 'Incomplete provider coverage'}</small>
-        </article>
-        <article className="macro-kpi">
-          <span className="macro-kpi-label">NEXT CATALYST <span>HIGH IMPACT</span></span>
-          <strong className="mono">{nextHighImpactCatalyst ? <CatalystCountdownDisplay target={nextHighImpactCatalyst.scheduledAt} />  : 'UNAVAILABLE'}</strong>
-          <small>{nextHighImpactCatalyst?.title ?? 'No verified calendar event'}</small>
-        </article>
-        <article className="macro-kpi macro-kpi-source">
-          <span className="macro-kpi-label">DATA PROVENANCE <span>STATUS</span></span>
-          <strong className="macro-source-value">
-            <span className={currencies.length >= 11 ? 'macro-source-dot macro-source-live' : 'macro-source-dot'} />
-            {snapshot.source === 'provider' ? 'PROVIDER' : snapshot.source === 'partial' ? 'PARTIAL' : 'UNAVAILABLE'}
-          </strong>
-          <small>{refreshing ? 'Polling provider telemetry…' : currencies.length >= 11 ? 'All 11 currency inputs present' : 'Provider coverage incomplete'}</small>
-        </article>
-      </section>
+      <DeskTerminal initialSnapshot={snapshot} initialGoldContext={goldContext} onSnapshotChange={setSnapshot} onGoldContextChange={setGoldContext} />
 
       {/* Unified research workspace navigation */}
       <nav aria-label="Research workspaces" className="sticky top-0 z-30 flex flex-wrap gap-2 border-y border-white/10 bg-[#080d14]/95 px-3 py-3 backdrop-blur">
@@ -311,31 +197,6 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
 
       {/* Currency Strength Index & AI Desk Brief */}
       <section className="macro-intelligence-grid" aria-label="Currency strength and AI desk brief">
-        <div className="macro-strength-panel">
-          <div className="macro-section-heading">
-            <div>
-              <span className="eyebrow">MACRO RELATIVE STRENGTH</span>
-              <h2>Relative Macro Rate Strength</h2>
-            </div>
-            <span className="macro-section-note mono">−100 / +100</span>
-          </div>
-          <div className="macro-csi-ranking">
-            {currencyStrength.map(({ currency, score: strength }, index) => (
-              <div className="macro-csi-item" key={currency}>
-                <span className="macro-csi-rank mono">{String(index + 1).padStart(2, '0')}</span>
-                <strong className="mono">{currency}</strong>
-                <span className="macro-csi-track">
-                  <span className={strength >= 0 ? 'macro-csi-positive' : 'macro-csi-negative'} style={{ width: `${Math.abs(strength)}%` }} />
-                </span>
-                <span className={`macro-csi-score mono ${strength >= 0 ? 'macro-positive' : 'macro-negative'}`}>
-                  {strength > 0 ? '+' : ''}{strength}
-                </span>
-              </div>
-            ))}
-          </div>
-          <p className="macro-csi-note">Relative policy-rate and real-policy-rate heuristic. COT positioning is shown separately; this is not spot momentum or a calibrated probability.</p>
-        </div>
-
         <div className="macro-brief-panel">
           <div className="macro-section-heading">
             <div>
@@ -592,11 +453,11 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
               <span className="eyebrow">05 / EVENT RISK</span>
               <h2 id="catalyst-title">Tier-1 Economic Catalysts</h2>
             </div>
-            <span className="macro-section-note mono"><BrandGlyph name="calendar-clock" size={13} /> {snapshot.calendarProvider ?? 'CALENDAR SOURCE UNAVAILABLE'} · UTC / WAT</span>
+            <span className="macro-section-note mono"><BrandGlyph name="calendar-clock" size={13} /> {snapshot.calendarSource === 'provider' && snapshot.calendarProvider ? 'HEALTHY · ' + snapshot.calendarProvider : 'UNAVAILABLE'} · UTC / WAT</span>
           </div>
 
           <div className="macro-panel macro-catalyst-panel">
-            {sortedCatalysts.length === 0 && <p className="macro-empty">{snapshot.calendarSource === 'provider' ? 'No upcoming provider events in the current calendar window.' : 'Economic calendar unavailable: no approved provider feed returned verified events. Event lockout remains conservative.'}</p>}
+            {sortedCatalysts.length === 0 && <p className="macro-empty">{snapshot.calendarSource === 'provider' ? 'No upcoming provider events in the current calendar window.' : 'Economic calendar unavailable: no verified provider feed returned events. Event lockout remains conservative.'}</p>}
             {sortedCatalysts.map((catalyst) => (
               <article className="macro-event" key={catalyst.id}>
                 <div className="macro-event-time">
@@ -795,6 +656,8 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
         </div>
       </section>
 
+      <EABridgeDiagnostics />
+
       {/* Provider Health & Telemetry Diagnostics */}
       <section id="health" className="macro-section" aria-labelledby="health-title">
         <div className="macro-section-heading">
@@ -821,28 +684,6 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
         </div>
       </section>
 
-      {/* Terminal Footer */}
-      <footer className="macro-footer">
-        <div>
-          <Link className="macro-footer-brand" href="/">
-            <span>Macro<span>Lync</span></span>
-            <small>INSTITUTIONAL MACRO INTELLIGENCE CENTER</small>
-          </Link>
-          <p>Quantitative macroeconomic analysis, monetary-policy divergence, and fundamental foreign-exchange models.</p>
-        </div>
-        <div className="macro-footer-actions">
-          <Link href="/notebook">
-            <BrandGlyph name="activity" size={15} /> Research Notebook <BrandGlyph name="arrow-up-right" size={13} />
-          </Link>
-          <Link href="/workbench">
-            <BrandGlyph name="trend" size={15} /> Validation Workbench <BrandGlyph name="arrow-up-right" size={13} />
-          </Link>
-          <a href="mailto:fidulync@gmail.com">
-            <BrandGlyph name="mail" size={15} /> fidulync@gmail.com
-          </a>
-        </div>
-        <span className="macro-footer-legal mono">PRIVATE RESEARCH PLATFORM / NOT INVESTMENT ADVICE</span>
-      </footer>
     </div>
   );
 }

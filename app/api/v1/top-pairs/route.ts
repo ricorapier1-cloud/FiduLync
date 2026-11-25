@@ -35,13 +35,11 @@ function readiness(calendarVerified: boolean, eventLockout: boolean): Candidate[
 
 export async function GET() {
   try {
-    const [snapshot, gold] = await Promise.all([
-      getMacroSnapshot(),
-      buildGoldMacroContext().catch((error) => {
-        console.warn('Gold opportunity input unavailable; continuing with FX candidates:', error);
-        return null;
-      }),
-    ]);
+    const snapshot = await getMacroSnapshot();
+    const gold = await buildGoldMacroContext(snapshot).catch((error) => {
+      console.warn('Gold opportunity input unavailable; continuing with FX candidates:', error);
+      return null;
+    });
     const fx = G8_PAIRS.filter((symbol) => symbol !== 'XAUUSD')
       .map((symbol) => generatePairDossier(snapshot, symbol))
       .filter((dossier) => (dossier.confidence === 'HIGH' || dossier.confidence === 'MODERATE')
@@ -91,7 +89,7 @@ export async function GET() {
         symbol: 'XAUUSD',
         direction: gold.directionalVerdict === 'BULLISH' ? 'BUY' : 'SELL',
         macroScore: gold.goldBiasScore,
-        confidence: gold.evidenceCoveragePct >= 100 ? 'MODERATE' : 'LOW',
+        confidence: gold.evidenceCoveragePct >= 80 ? 'MODERATE' : 'LOW',
         evidenceCoveragePct: gold.evidenceCoveragePct,
         regime: gold.liquidityRegime,
         supportingEvidence: gold.supportingEvidence.slice(0, 3),
@@ -102,7 +100,18 @@ export async function GET() {
         tradeReadiness: readiness(snapshot.calendarSource === 'provider', goldEventLockout),
       } : null;
 
-    const candidates = [...fx, ...(goldCandidate ? [goldCandidate] : [])].map((candidate, index) => ({ ...candidate, rank: index + 1 }));
+    // Reserve one slot for independently evidenced XAU/USD whenever its
+    // dedicated gold engine has sufficient coverage; rank all shown candidates
+    // by evidence confidence and directional magnitude.
+    const shortlist = [...fx.slice(0, goldCandidate ? 4 : 5), ...(goldCandidate ? [goldCandidate] : [])]
+      .sort((left, right) => {
+        const rank = (value: Candidate['confidence']) => value === 'HIGH' ? 3 : value === 'MODERATE' ? 2 : 1;
+        return rank(right.confidence) - rank(left.confidence)
+          || Math.abs(right.macroScore) - Math.abs(left.macroScore)
+          || right.evidenceCoveragePct - left.evidenceCoveragePct;
+      })
+      .slice(0, 5);
+    const candidates = shortlist.map((candidate, index) => ({ ...candidate, rank: index + 1 }));
     return NextResponse.json({
       schemaVersion: '1.1.0',
       generatedAtUtc: new Date().toISOString(),
