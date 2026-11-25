@@ -44,8 +44,10 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
 
   const baseCcy = snapshot.currencies.find((c) => c.code === base);
   const quoteCcy = snapshot.currencies.find((c) => c.code === quote);
-  const baseCot = snapshot.cot.find((c) => c.market === (isGold ? 'GOLD' : base));
-  const quoteCot = snapshot.cot.find((c) => c.market === quote);
+  const baseCotRaw = snapshot.cot.find((c) => c.market === (isGold ? 'GOLD' : base));
+  const quoteCotRaw = snapshot.cot.find((c) => c.market === quote);
+  const baseCot = baseCotRaw && isFreshObservation(baseCotRaw.reportDate, 14) ? baseCotRaw : undefined;
+  const quoteCot = quoteCotRaw && isFreshObservation(quoteCotRaw.reportDate, 14) ? quoteCotRaw : undefined;
 
   // Missing data detection and penalty
   let missingComponents = 0;
@@ -175,14 +177,11 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
     `Global risk sentiment regime flipping to ${crossAsset.globalRiskAppetite === 'RISK_ON' ? 'STRESS / RISK-OFF' : 'RISK-ON'}.`,
   ];
 
-  // Scenarios
-  const bullProb = confidence === 'INSUFFICIENT_EVIDENCE' ? 0 : biasScore > 0 ? Math.min(75, 45 + Math.round(biasScore / 3)) : Math.max(15, 30 + Math.round(biasScore / 3));
-  const bearProb = confidence === 'INSUFFICIENT_EVIDENCE' ? 0 : biasScore < 0 ? Math.min(75, 45 + Math.round(Math.abs(biasScore) / 3)) : Math.max(15, 30 - Math.round(biasScore / 3));
-  const neutralProb = confidence === 'INSUFFICIENT_EVIDENCE' ? 0 : Math.max(15, 100 - bullProb - bearProb);
-
+  // Scenario probabilities are deliberately null until calibrated against
+  // reproducible point-in-time, out-of-sample return data.
   const scenarios = {
     bullish: {
-      probabilityPct: bullProb,
+      probabilityPct: null,
       title: `${base} Relative Strength Expansion`,
       catalysts: [
         `Central bank stance remains more restrictive than markets price.`,
@@ -190,7 +189,7 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
       ],
     },
     bearish: {
-      probabilityPct: bearProb,
+      probabilityPct: null,
       title: `${quote} Dominance / Carry Drawdown`,
       catalysts: [
         `Disinflation acceleration in ${base} prompts accelerated rate cuts.`,
@@ -198,7 +197,7 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
       ],
     },
     neutral: {
-      probabilityPct: neutralProb,
+      probabilityPct: null,
       title: 'Range-Bound Equilibrium',
       catalysts: [
         `Central banks maintain balanced pause; no policy divergence catalyst.`,
