@@ -3,6 +3,7 @@ import 'server-only';
 import { getCachedData } from '@/lib/redisCache';
 import { getCboeVixHistory } from '@/lib/cboeVix';
 import { getTreasuryYieldData } from '@/lib/treasuryData';
+import type { MacroSnapshot } from '@/types/macro';
 
 type Observation = {
   date: string;
@@ -474,7 +475,7 @@ function classifyRegime(
   return 'NEUTRAL_BALANCED';
 }
 
-export async function buildGoldMacroContext(): Promise<GoldMacroContext> {
+export async function buildGoldMacroContext(snapshot?: MacroSnapshot): Promise<GoldMacroContext> {
   const totalStarted = performance.now();
   const fredApiKey = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true' ? process.env.FRED_API_KEY?.trim() ?? '' : '';
 
@@ -505,7 +506,16 @@ export async function buildGoldMacroContext(): Promise<GoldMacroContext> {
 
   const fredBySeries = new Map<string, TimedResult<Observation[]> | null>();
   for (const [seriesId, result] of fredResults) fredBySeries.set(seriesId, result);
-  if (cboeVixResult && !fredBySeries.get('VIXCLS')) {
+  // Prefer the validated snapshot observation so gold research and the
+  // cross-asset board use the same current CBOE vintage.
+  const snapshotVix = snapshot?.vix?.freshness === 'LATEST PUBLISHED' ? snapshot.vix : null;
+  if (snapshotVix) {
+    fredBySeries.set('VIXCLS', {
+      value: snapshotVix.history.map((item) => ({ date: item.date, value: item.value })),
+      latencyMs: Math.max(0, Math.round(performance.now() - cboeVixStarted)),
+      retrievedAtUtc: snapshotVix.retrievedAtUtc,
+    });
+  } else if (cboeVixResult) {
     fredBySeries.set('VIXCLS', {
       value: cboeVixResult.history.map((item) => ({ date: item.date, value: item.value })),
       latencyMs: Math.max(0, Math.round(performance.now() - cboeVixStarted)),
