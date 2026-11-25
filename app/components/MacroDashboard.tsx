@@ -26,7 +26,6 @@ const pairs = [
   { symbol: 'EURJPY', base: 'EUR', quote: 'JPY' },
   { symbol: 'GBPJPY', base: 'GBP', quote: 'JPY' },
   { symbol: 'AUDJPY', base: 'AUD', quote: 'JPY' },
-  { symbol: 'XAUUSD', base: 'XAU', quote: 'USD' },
 ] as const;
 
 function inflationFreshnessDays(currencyCode: string) { return currencyCode === 'AUD' ? 180 : 120; }
@@ -297,6 +296,10 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
       </nav>
 
       <PairOpportunityBoard onSelectPair={(symbol) => {
+        if (symbol === 'XAUUSD') {
+          document.getElementById('gold-research')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          return;
+        }
         setPair(symbol as (typeof pairs)[number]['symbol']);
         document.getElementById('bias')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }} />
@@ -445,7 +448,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
           </table>
           <div className="macro-panel-foot">
             <span>Real rate = nominal policy rate − headline inflation. Yield spreads reflect 2-year sovereign debt obligations.</span>
-            <span className="mono">SOURCE VINTAGE NOT YET VERIFIED</span>
+            <span className="mono">OBSERVATION DATES &amp; PROVIDERS SHOWN PER ROW · NOT INTRADAY DATA</span>
           </div>
         </div>
       </section>
