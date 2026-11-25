@@ -357,3 +357,19 @@ test('BLS USD inflation and labour data can use the public no-registration API w
   assert.match(macroData, /macro:bls-usd-updates-v1/);
   assert.match(macroData, /getBlsUsdUpdates\(process\.env\.BLS_API_KEY\?\.trim\(\)\)/);
 });
+
+test('Cboe daily VIX closes populate cross-asset risk telemetry without claiming intraday data', () => {
+  const adapter = read('../lib/cboeVix.ts');
+  const macroData = read('../lib/macroData.ts');
+  const crossAsset = read('../lib/macro/crossAssetEngine.ts');
+  const dashboard = read('../app/components/MacroDashboard.tsx');
+  const goldEngine = read('../lib/macro/goldAndRegimeEngine.ts');
+  assert.ok(adapter.includes('cdn-api.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv'));
+  assert.ok(adapter.includes('CLOSE'));
+  assert.ok(macroData.includes('getCboeVixHistory'));
+  assert.ok(crossAsset.includes('snapshot.vix?.freshness'));
+  assert.ok(crossAsset.includes("vixRegime: vixObservation"));
+  assert.ok(dashboard.includes('CBOE VIX'));
+  assert.ok(dashboard.includes('Not an intraday volatility quote'));
+  assert.ok(goldEngine.includes('getCboeVixHistory'));
+});
