@@ -77,7 +77,8 @@ test('architecture: macro context API is read-only and contains no order executi
   assert.match(macroContextRoute, /consume_api_rate_limit/);
   assert.match(macroContextRoute, /decision_status/);
   assert.match(macroContextRoute, /UNVERIFIED_CALENDAR/);
-  assert.match(macroContextRoute, /news_lockout: dossier\.eventRiskLockout \|\| snapshot\.calendarSource !== 'provider'/);
+  assert.match(macroContextRoute, /news_lockout: newsLockoutActive/);
+  assert.match(macroContextRoute, /const newsLockoutActive = snapshot\.calendarSource !== 'provider'/);
   assert.match(macroContextRoute, /Retry-After/);
 });
 
