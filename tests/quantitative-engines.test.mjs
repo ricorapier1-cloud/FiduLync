@@ -316,7 +316,7 @@ test('cached FRED observations are excluded when storage permission is not appro
   const engine = read('../lib/macroEngine.ts');
   assert.match(macroData, /sanitizeMacroSnapshotPermissions/);
   assert.match(macroData, /policyRateProvider === 'FRED'/);
-  assert.match(engine, /sanitizeMacroSnapshotPermissions\\(await getCachedData/);
+  assert.ok(engine.includes('sanitizeMacroSnapshotPermissions(await getCachedData'));
 });
 
 test('gold quote parser uses parent-level Swissquote timestamps and Treasury daily history when FRED storage is disabled', () => {
