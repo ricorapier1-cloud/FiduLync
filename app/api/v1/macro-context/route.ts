@@ -4,6 +4,7 @@ import { getMacroSnapshot } from '@/lib/macroEngine';
 import { generatePairDossier } from '@/lib/macro/dossierEngine';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
 import { getMarketQuotes } from '@/lib/marketFeeds';
+import type { MacroContextPayload } from '@/types/desk';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
