@@ -170,11 +170,14 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
   const eventRiskLockout = nextCatalyst?.lockoutActive ?? false;
 
   // Invalidation triggers
+  const riskRegimeInvalidation = crossAsset.globalRiskAppetite === 'UNAVAILABLE'
+    ? 'Cross-asset risk-regime invalidation cannot be assessed until a verified risk feed is connected.'
+    : `Global risk sentiment regime flipping to ${crossAsset.globalRiskAppetite === 'RISK_ON' ? 'STRESS / RISK-OFF' : 'RISK-ON'}.`;
   const invalidationTriggers: string[] = [
     `Unexpected central bank policy rate change or forward guidance shift by ${baseProfile?.centralBank ?? base}.`,
     `Tier-1 inflation print diverging more than 40 bps from consensus for ${quoteProfile?.country ?? quote}.`,
     `Rapid expansion of sovereign yield curve spread violating the ${policyDiffBps} bps nominal threshold.`,
-    `Global risk sentiment regime flipping to ${crossAsset.globalRiskAppetite === 'RISK_ON' ? 'STRESS / RISK-OFF' : 'RISK-ON'}.`,
+    riskRegimeInvalidation,
   ];
 
   // Scenario probabilities are deliberately null until calibrated against
