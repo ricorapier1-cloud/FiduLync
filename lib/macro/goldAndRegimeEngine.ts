@@ -78,6 +78,7 @@ export type GoldMacroContext = {
   telemetry: {
     totalLatencyMs: number;
     fredLatencyMs: number | null;
+    treasuryLatencyMs: number | null;
     cftcLatencyMs: number | null;
     quoteLatencyMs: number | null;
   };
@@ -463,13 +464,11 @@ function classifyRegime(
   vix: number | null,
   twoYearThreeMonthSpread: number | null,
 ): GoldMacroContext['liquidityRegime'] {
-  if (realYieldZ === null || creditOasZ === null || vix === null || twoYearThreeMonthSpread === null) {
-    return 'INSUFFICIENT_EVIDENCE';
-  }
-  if ((creditOasZ >= 1.0 && vix >= 22) || creditOasZ >= 2.0) {
+  if (realYieldZ === null || vix === null || twoYearThreeMonthSpread === null) return 'INSUFFICIENT_EVIDENCE';
+  if (vix >= 30 || (creditOasZ !== null && ((creditOasZ >= 1.0 && vix >= 22) || creditOasZ >= 2.0))) {
     return 'RISK_OFF_DELEVERAGING';
   }
-  if (creditOasZ <= 0.5 && vix < 20 && twoYearThreeMonthSpread >= -0.5) {
+  if (creditOasZ !== null && creditOasZ <= 0.5 && vix < 20 && twoYearThreeMonthSpread >= -0.5) {
     return 'RISK_ON_CARRY';
   }
   return 'NEUTRAL_BALANCED';
@@ -571,7 +570,7 @@ export async function buildGoldMacroContext(): Promise<GoldMacroContext> {
     && drivers.DFII10.zScore65 !== null && drivers.twoYearMinusThreeMonthPct !== null);
 
   const realYieldZ = drivers.DFII10.zScore65;
-  const creditOasZ = drivers.BAMLH0A0HYM2.zScore65;
+  const creditOasZ = drivers.BAMLH0A0HYM2.state === 'HEALTHY' ? drivers.BAMLH0A0HYM2.zScore65 : null;
   const vix = drivers.VIXCLS.value;
   const breakevenChange = latestChange(fredBySeries.get('T10YIE')?.value ?? [], 20);
   const forwardSpread = drivers.twoYearMinusThreeMonthPct;

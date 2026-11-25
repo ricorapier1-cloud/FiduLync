@@ -104,6 +104,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export default function MacroDashboard({ initialSnapshot, initialGoldContext }: MacroDashboardProps) {
   const [snapshot, setSnapshot] = useState(initialSnapshot);
+  const [goldContext, setGoldContext] = useState(initialGoldContext);
   const [pair, setPair] = useState<(typeof pairs)[number]['symbol']>('EURUSD');
   const [now, setNow] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -117,9 +118,11 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
     .sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt));
   const nextHighImpactCatalyst = sortedCatalysts.find((catalyst) => catalyst.impact === 'High');
   const currencies = snapshot.currencies;
-  const verifiedCurrencyCount = currencies.filter((currency) => currency.policyRateSource === 'provider' && currency.inflationSource === 'provider').length;
-
-  const verifiedPolicyRates = currencies.filter((currency) => currency.policyRateSource === 'provider').map((currency) => currency.policyRate);
+  const verifiedCurrencyCount = currencies.filter((currency) => currency.policyRateSource === 'provider' && currency.inflationSource === 'provider'
+    && isFreshObservation(currency.policyRateObservationDate, 180)
+    && isFreshObservation(currency.inflationObservationDate, inflationFreshnessDays(currency.code))).length;
+  const verifiedPolicyRates = currencies.filter((currency) => currency.policyRateSource === 'provider'
+    && isFreshObservation(currency.policyRateObservationDate, 180)).map((currency) => currency.policyRate);
   const policySpread = verifiedPolicyRates.length > 1
     ? Math.max(...verifiedPolicyRates) - Math.min(...verifiedPolicyRates)
     : null;
@@ -152,6 +155,16 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
     const clockTimer = window.setInterval(() => setNow(Date.now()), 30_000);
     const controller = new AbortController();
 
+    const refreshGold = async () => {
+      try {
+        const response = await fetch('/api/macro/gold-context', { cache: 'no-store', signal: controller.signal });
+        if (!response.ok) return;
+        const payload: unknown = await response.json();
+        if (isRecord(payload) && typeof payload.generatedAtUtc === 'string'
+          && ['AVAILABLE', 'INSUFFICIENT_EVIDENCE', 'UNAVAILABLE'].includes(String(payload.overallState))) setGoldContext(payload as unknown as GoldMacroContext);
+      } catch { /* retain the last verified context */ }
+    };
+
     const refresh = async () => {
       setRefreshing(true);
       try {
@@ -170,6 +183,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
     };
 
     void refresh();
+    void refreshGold();
 
     void fetch('/api/v1/ai-brief', { cache: 'no-store', signal: controller.signal })
       .then(async (response) => {
@@ -184,10 +198,12 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
       .catch(() => {});
 
     const refreshTimer = window.setInterval(() => void refresh(), 300_000);
+    const goldRefreshTimer = window.setInterval(() => void refreshGold(), 300_000);
 
     return () => {
       window.clearInterval(clockTimer);
       window.clearInterval(refreshTimer);
+      window.clearInterval(goldRefreshTimer);
       window.clearTimeout(initialClockTimer);
       controller.abort();
     };
@@ -269,18 +285,17 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
 
       {/* Unified research workspace navigation */}
       <nav aria-label="Research workspaces" className="sticky top-0 z-30 flex flex-wrap gap-2 border-y border-white/10 bg-[#080d14]/95 px-3 py-3 backdrop-blur">
-        <a className="macro-refresh" href="#desk-terminal">01 / DESK &amp; EXECUTION</a>
-        <a className="macro-refresh" href="#opportunities">02 / OPPORTUNITIES</a>
-        <a className="macro-refresh" href="#matrix">03 / GLOBAL MACRO</a>
-        <a className="macro-refresh" href="#bias">04 / PAIR RESEARCH</a>
-        <a className="macro-refresh" href="#catalysts">05 / CATALYSTS</a>
-        <a className="macro-refresh" href="#regimes">06 / CROSS-ASSET</a>
-        <a className="macro-refresh" href="#gold-research">07 / GOLD RESEARCH</a>
-        <a className="macro-refresh" href="#positioning">08 / POSITIONING</a>
+        <a className="macro-refresh" href="#opportunities">01 / OPPORTUNITIES</a>
+        <a className="macro-refresh" href="#matrix">02 / GLOBAL MACRO</a>
+        <a className="macro-refresh" href="#bias">03 / PAIR RESEARCH</a>
+        <a className="macro-refresh" href="#catalysts">04 / CATALYSTS</a>
+        <a className="macro-refresh" href="#regimes">05 / CROSS-ASSET</a>
+        <a className="macro-refresh" href="#gold-research">06 / GOLD RESEARCH</a>
+        <a className="macro-refresh" href="#positioning">07 / POSITIONING</a>
+        <a className="macro-refresh" href="#desk-terminal">08 / DESK &amp; EXECUTION</a>
         <a className="macro-refresh" href="#health">09 / DATA HEALTH</a>
       </nav>
 
-      <DeskTerminal initialSnapshot={snapshot} initialGoldContext={initialGoldContext} />
       <PairOpportunityBoard onSelectPair={(symbol) => {
         setPair(symbol as (typeof pairs)[number]['symbol']);
         document.getElementById('bias')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -658,57 +673,57 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
             <span className="eyebrow">07 / XAUUSD DEDICATED RESEARCH</span>
             <h2 id="gold-research-title">Gold Macro &amp; Liquidity Intelligence</h2>
           </div>
-          <span className="macro-section-note mono">{initialGoldContext?.overallState ?? 'UNAVAILABLE'}</span>
+          <span className="macro-section-note mono">{goldContext?.overallState ?? 'UNAVAILABLE'}</span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="macro-panel p-3">
             <span className="text-[10px] font-mono text-slate-400">GOLD BIAS SCORE</span>
-            <strong className="block text-xl font-mono mt-1">{initialGoldContext?.goldBiasScore ?? '—'}</strong>
-            <small className="text-[10px] text-slate-500">Only when required evidence is healthy</small>
+            <strong className="block text-xl font-mono mt-1">{goldContext?.goldBiasScore ?? '—'}</strong>
+            <small className="text-[10px] text-slate-500">{goldContext?.evidenceCoveragePct ?? 0}% evidence coverage · not a probability</small>
           </div>
           <div className="macro-panel p-3">
             <span className="text-[10px] font-mono text-slate-400">DIRECTIONAL VERDICT</span>
-            <strong className="block text-sm font-mono mt-2">{initialGoldContext?.directionalVerdict ?? 'UNAVAILABLE'}</strong>
+            <strong className="block text-sm font-mono mt-2">{goldContext?.directionalVerdict ?? 'UNAVAILABLE'}</strong>
             <small className="text-[10px] text-slate-500">Research context, not an entry signal</small>
           </div>
           <div className="macro-panel p-3">
             <span className="text-[10px] font-mono text-slate-400">LIQUIDITY REGIME</span>
-            <strong className="block text-sm font-mono mt-2">{initialGoldContext?.liquidityRegime ?? 'INSUFFICIENT_EVIDENCE'}</strong>
+            <strong className="block text-sm font-mono mt-2">{goldContext?.liquidityRegime ?? 'INSUFFICIENT_EVIDENCE'}</strong>
             <small className="text-[10px] text-slate-500">Cross-asset stress / carry context</small>
           </div>
           <div className="macro-panel p-3">
             <span className="text-[10px] font-mono text-slate-400">SPOT OBSERVATION</span>
-            <strong className="block text-sm font-mono mt-2">{initialGoldContext?.quote.mid ?? '—'}</strong>
-            <small className="text-[10px] text-slate-500">{initialGoldContext?.quote.state ?? 'UNAVAILABLE'} · {initialGoldContext?.quote.quoteTimestampUtc ?? 'NO VERIFIED TIME'}</small>
+            <strong className="block text-sm font-mono mt-2">{goldContext?.quote.mid ?? '—'}</strong>
+            <small className="text-[10px] text-slate-500">{goldContext?.quote.state ?? 'UNAVAILABLE'} · {goldContext?.quote.quoteTimestampUtc ?? 'NO VERIFIED TIME'}</small>
           </div>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-3">
           <div className="macro-panel p-4">
             <h3 className="text-xs font-mono text-slate-300 mb-3">SUPPORTING EVIDENCE</h3>
-            {initialGoldContext?.supportingEvidence.length
+            {goldContext?.supportingEvidence.length
               ? <ul className="macro-brief-list">{initialGoldContext.supportingEvidence.map((item, index) => <li key={index}>{item}</li>)}</ul>
               : <p className="macro-empty">No verified supporting evidence is currently available.</p>}
           </div>
           <div className="macro-panel p-4">
             <h3 className="text-xs font-mono text-slate-300 mb-3">CONTRADICTING EVIDENCE / INVALIDATION</h3>
-            {initialGoldContext?.contradictingEvidence.length
+            {goldContext?.contradictingEvidence.length
               ? <ul className="macro-brief-list">{initialGoldContext.contradictingEvidence.map((item, index) => <li key={index}>{item}</li>)}</ul>
               : <p className="macro-empty">No verified contradicting evidence is currently available.</p>}
-            {initialGoldContext?.invalidationTriggers.length
+            {goldContext?.invalidationTriggers.length
               ? <ul className="macro-brief-list mt-3">{initialGoldContext.invalidationTriggers.map((item, index) => <li key={index}>{item}</li>)}</ul>
               : null}
           </div>
         </div>
         <div className="macro-panel p-3 mt-3">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <div><span className="block text-[10px] font-mono text-slate-500">DFII10 · REAL YIELD</span><strong className="block text-sm font-mono mt-1">{initialGoldContext?.drivers.DFII10.value ?? '—'}</strong><small className="text-[10px] text-slate-500">{initialGoldContext?.drivers.DFII10.state ?? 'UNAVAILABLE'} · {initialGoldContext?.drivers.DFII10.observationDate ?? '—'}</small></div>
-            <div><span className="block text-[10px] font-mono text-slate-500">T10YIE · BREAKEVEN</span><strong className="block text-sm font-mono mt-1">{initialGoldContext?.drivers.T10YIE.value ?? '—'}</strong><small className="text-[10px] text-slate-500">{initialGoldContext?.drivers.T10YIE.state ?? 'UNAVAILABLE'} · {initialGoldContext?.drivers.T10YIE.observationDate ?? '—'}</small></div>
-            <div><span className="block text-[10px] font-mono text-slate-500">DGS2 · 2Y TREASURY</span><strong className="block text-sm font-mono mt-1">{initialGoldContext?.drivers.DGS2.value ?? '—'}</strong><small className="text-[10px] text-slate-500">{initialGoldContext?.drivers.DGS2.state ?? 'UNAVAILABLE'} · {initialGoldContext?.drivers.DGS2.observationDate ?? '—'}</small></div>
-            <div><span className="block text-[10px] font-mono text-slate-500">DTB3 · 3M BILL</span><strong className="block text-sm font-mono mt-1">{initialGoldContext?.drivers.DTB3.value ?? '—'}</strong><small className="text-[10px] text-slate-500">{initialGoldContext?.drivers.DTB3.state ?? 'UNAVAILABLE'} · {initialGoldContext?.drivers.DTB3.observationDate ?? '—'}</small></div>
-            <div><span className="block text-[10px] font-mono text-slate-500">HY OAS · CREDIT</span><strong className="block text-sm font-mono mt-1">{initialGoldContext?.drivers.BAMLH0A0HYM2.value ?? '—'}</strong><small className="text-[10px] text-slate-500">{initialGoldContext?.drivers.BAMLH0A0HYM2.state ?? 'UNAVAILABLE'} · {initialGoldContext?.drivers.BAMLH0A0HYM2.observationDate ?? '—'}</small></div>
-            <div><span className="block text-[10px] font-mono text-slate-500">VIX · VOLATILITY</span><strong className="block text-sm font-mono mt-1">{initialGoldContext?.drivers.VIXCLS.value ?? '—'}</strong><small className="text-[10px] text-slate-500">{initialGoldContext?.drivers.VIXCLS.state ?? 'UNAVAILABLE'} · {initialGoldContext?.drivers.VIXCLS.observationDate ?? '—'}</small></div>
+            <div><span className="block text-[10px] font-mono text-slate-500">DFII10 · REAL YIELD</span><strong className="block text-sm font-mono mt-1">{goldContext?.drivers.DFII10.value ?? '—'}</strong><small className="text-[10px] text-slate-500">{goldContext?.drivers.DFII10.state ?? 'UNAVAILABLE'} · {goldContext?.drivers.DFII10.observationDate ?? '—'}</small></div>
+            <div><span className="block text-[10px] font-mono text-slate-500">T10YIE · BREAKEVEN</span><strong className="block text-sm font-mono mt-1">{goldContext?.drivers.T10YIE.value ?? '—'}</strong><small className="text-[10px] text-slate-500">{goldContext?.drivers.T10YIE.state ?? 'UNAVAILABLE'} · {goldContext?.drivers.T10YIE.observationDate ?? '—'}</small></div>
+            <div><span className="block text-[10px] font-mono text-slate-500">DGS2 · 2Y TREASURY</span><strong className="block text-sm font-mono mt-1">{goldContext?.drivers.DGS2.value ?? '—'}</strong><small className="text-[10px] text-slate-500">{goldContext?.drivers.DGS2.state ?? 'UNAVAILABLE'} · {goldContext?.drivers.DGS2.observationDate ?? '—'}</small></div>
+            <div><span className="block text-[10px] font-mono text-slate-500">DTB3 · 3M BILL</span><strong className="block text-sm font-mono mt-1">{goldContext?.drivers.DTB3.value ?? '—'}</strong><small className="text-[10px] text-slate-500">{goldContext?.drivers.DTB3.state ?? 'UNAVAILABLE'} · {goldContext?.drivers.DTB3.observationDate ?? '—'}</small></div>
+            <div><span className="block text-[10px] font-mono text-slate-500">HY OAS · CREDIT</span><strong className="block text-sm font-mono mt-1">{goldContext?.drivers.BAMLH0A0HYM2.value ?? '—'}</strong><small className="text-[10px] text-slate-500">{goldContext?.drivers.BAMLH0A0HYM2.state ?? 'UNAVAILABLE'} · {goldContext?.drivers.BAMLH0A0HYM2.observationDate ?? '—'}</small></div>
+            <div><span className="block text-[10px] font-mono text-slate-500">VIX · VOLATILITY</span><strong className="block text-sm font-mono mt-1">{goldContext?.drivers.VIXCLS.value ?? '—'}</strong><small className="text-[10px] text-slate-500">{goldContext?.drivers.VIXCLS.state ?? 'UNAVAILABLE'} · {goldContext?.drivers.VIXCLS.observationDate ?? '—'}</small></div>
           </div>
-          <p className="text-[10px] text-slate-500 font-mono mt-3">CFTC gold positioning report: {initialGoldContext?.cot.reportDate ?? 'UNAVAILABLE'} · Retrieved {initialGoldContext?.generatedAtUtc ?? '—'} · FRED daily-published series and CFTC weekly positioning are not intraday streaming feeds.</p>
+          <p className="text-[10px] text-slate-500 font-mono mt-3">CFTC gold positioning report: {goldContext?.cot.reportDate ?? 'UNAVAILABLE'} · Retrieved {goldContext?.generatedAtUtc ?? '—'} · FRED daily-published series and CFTC weekly positioning are not intraday streaming feeds.</p>
         </div>
       </section>
 
@@ -772,6 +787,8 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
           </aside>
         </div>
       </section>
+
+      <DeskTerminal initialSnapshot={snapshot} initialGoldContext={goldContext} />
 
       {/* Provider Health & Telemetry Diagnostics */}
       <section id="health" className="macro-section" aria-labelledby="health-title">
