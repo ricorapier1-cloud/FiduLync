@@ -144,7 +144,7 @@ test('BIS monthly CPI adapter maps Sweden and Norway when official observations 
 
 test('cron provenance distinguishes live macro data from a reference-only economic calendar', () => {
   const cron = read('../app/api/cron/sync-macro/route.ts');
-  assert.match(cron, /LIVE_MACRO_REFERENCE_CALENDAR/);
+  assert.match(cron, /LIVE_MACRO_CALENDAR_UNAVAILABLE/);
   assert.match(cron, /hasLiveMacroData/);
   assert.match(cron, /hasLiveCalendar/);
   assert.match(cron, /status === 'partial'/);
@@ -296,4 +296,32 @@ test('licensed or permission-dependent providers fail closed unless their explic
   assert.match(macroData, /FAIRECONOMY_COMMERCIAL_USE_APPROVED === 'true'/);
   assert.match(marketFeeds, /FINNHUB_COMMERCIAL_USE_APPROVED === 'true' \? process\.env\.FINNHUB_API_KEY/);
   assert.match(goldEngine, /FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true'/);
+});
+
+test('economic calendar never falls back to hardcoded central-bank dates or stale persisted fixtures', () => {
+  const macroData = read('../lib/macroData.ts');
+  assert.doesNotMatch(macroData, /getCentralBankDecisionsSchedule/);
+  assert.match(macroData, /snapshot\.catalysts = \[\]/);
+  assert.match(macroData, /calendarSource = 'unavailable'/);
+  assert.match(macroData, /catalysts: data\.payload\.calendarSource === 'provider' \? parsed\.catalysts : \[\]/);
+});
+
+test('pair scenario probabilities remain uncalibrated until point-in-time backtests exist', () => {
+  const dossier = read('../lib/macro/dossierEngine.ts');
+  const types = read('../types/macro.ts');
+  const dashboard = read('../app/components/MacroDashboard.tsx');
+  assert.match(dossier, /probabilityPct: null/);
+  assert.match(types, /probabilityPct: number \| null/);
+  assert.match(dashboard, /PROBABILITY NOT CALIBRATED/);
+});
+
+test('pair ranking only publishes provider-evidenced candidates and never labels scores as win probabilities', () => {
+  const route = read('../app/api/v1/top-pairs/route.ts');
+  const board = read('../app/components/PairOpportunityBoard.tsx');
+  assert.match(route, /confidence === 'HIGH' \|\| dossier\.confidence === 'MODERATE'/);
+  assert.match(route, /Math\.abs\(dossier\.biasScore\) >= 20/);
+  assert.match(route, /!dossier\.eventRiskLockout/);
+  assert.match(route, /not a calibrated win probability/);
+  assert.match(board, /NO QUALIFIED MACRO OPPORTUNITIES/);
+  assert.match(board, /No historical win probability is claimed/);
 });
