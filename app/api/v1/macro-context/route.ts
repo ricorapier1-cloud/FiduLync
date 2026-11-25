@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getMacroSnapshot } from '@/lib/macroEngine';
 import { generatePairDossier } from '@/lib/macro/dossierEngine';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
+import { getMarketQuotes } from '@/lib/marketFeeds';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -73,7 +74,7 @@ export async function GET(request: Request) {
   }
 
   if (!identity) {
-    const secret = process.env.MACROLYNC_API_SECRET?.trim() || process.env.ALGO_PRIVATE_API_KEY?.trim();
+    const secret = process.env.MACRO_API_TOKEN?.trim() || process.env.MACROLYNC_API_SECRET?.trim() || process.env.ALGO_PRIVATE_API_KEY?.trim();
     const status = !secret || secret.length < 32 ? 503 : 401;
     return NextResponse.json(
       { error: status === 503 ? 'Macro context API is not configured for authenticated access.' : 'Unauthorized.' },
@@ -124,7 +125,7 @@ export async function GET(request: Request) {
         && snapshot.cot.some((position) => position.market === (dossier.base === 'XAU' ? 'GOLD' : dossier.base))
         && snapshot.cot.some((position) => position.market === dossier.quote)
           ? dossier.cotPercentileDiff : null,
-      cross_asset_confirmation: dossier.crossAssetConfirmation,
+      cross_asset_confirmation: dossier.crossAssetConfirmation,\n      live_quotes: quotes.map((quote) => ({\n        symbol: quote.symbol,\n        mid: quote.price,\n        observation_time_utc: quote.timestamp,\n        source: quote.source,\n        quote_type: quote.source === 'finnhub' || quote.source === 'mt5' ? 'PROVIDER_QUOTE' : 'REFERENCE_RATE',\n      })),\n      daily_governance: {\n        state: 'NOT_CONNECTED_TO_SERVER',\n        trades_taken: null,\n        losses: null,\n        locked: null,\n        authority: 'MT5_ACCOUNT_SIDE_ENFORCEMENT_REQUIRED',\n      },
       calendar_verified: snapshot.calendarSource === 'provider',
       event_risk_status: snapshot.calendarSource === 'provider' ? 'PROVIDER_CALENDAR' : 'UNVERIFIED_CALENDAR',
       news_lockout: dossier.eventRiskLockout || snapshot.calendarSource !== 'provider',
