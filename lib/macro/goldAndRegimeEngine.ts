@@ -466,7 +466,8 @@ function classifyRegime(
   twoYearThreeMonthSpread: number | null,
 ): GoldMacroContext['liquidityRegime'] {
   if (realYieldZ === null || vix === null || twoYearThreeMonthSpread === null) return 'INSUFFICIENT_EVIDENCE';
-  if (vix >= 30 || (creditOasZ !== null && ((creditOasZ >= 1.0 && vix >= 22) || creditOasZ >= 2.0))) {
+  if (vix >= 30 || (realYieldZ !== null && realYieldZ > 0 && vix >= 22)
+    || (creditOasZ !== null && ((creditOasZ >= 1.0 && vix >= 22) || creditOasZ >= 2.0))) {
     return 'RISK_OFF_DELEVERAGING';
   }
   if (creditOasZ !== null && creditOasZ <= 0.5 && vix < 20 && twoYearThreeMonthSpread >= -0.5) {
@@ -511,7 +512,10 @@ export async function buildGoldMacroContext(snapshot?: MacroSnapshot): Promise<G
   const snapshotVix = snapshot?.vix?.freshness === 'LATEST PUBLISHED' ? snapshot.vix : null;
   if (snapshotVix) {
     fredBySeries.set('VIXCLS', {
-      value: snapshotVix.history.map((item) => ({ date: item.date, value: item.value })),
+      value: [
+        { date: snapshotVix.observationDate, value: snapshotVix.value },
+        ...snapshotVix.history.filter((item) => item.date !== snapshotVix.observationDate).map((item) => ({ date: item.date, value: item.value })),
+      ].sort((left, right) => right.date.localeCompare(left.date)),
       latencyMs: Math.max(0, Math.round(performance.now() - cboeVixStarted)),
       retrievedAtUtc: snapshotVix.retrievedAtUtc,
     });
