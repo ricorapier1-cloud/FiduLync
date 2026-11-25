@@ -658,6 +658,8 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
         </div>
       </section>
 
+      <EABridgeDiagnostics />
+
       {/* Provider Health & Telemetry Diagnostics */}
       <section id="health" className="macro-section" aria-labelledby="health-title">
         <div className="macro-section-heading">
@@ -684,7 +686,6 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
         </div>
       </section>
 
-      <EABridgeDiagnostics />
     </div>
   );
 }
