@@ -294,7 +294,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
           <div className="macro-section-heading">
             <div>
               <span className="eyebrow">MACRO RELATIVE STRENGTH</span>
-              <h2>Currency Strength Index (CSI)</h2>
+              <h2>Relative Macro Rate Strength</h2>
             </div>
             <span className="macro-section-note mono">−100 / +100</span>
           </div>
@@ -312,7 +312,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
               </div>
             ))}
           </div>
-          <p className="macro-csi-note">Relative policy rate and real-rate score adjusted for COT positioning; not an intraday price-action index.</p>
+          <p className="macro-csi-note">Relative policy-rate and real-policy-rate heuristic. COT positioning is shown separately; this is not spot momentum or a calibrated probability.</p>
         </div>
 
         <div className="macro-brief-panel">
