@@ -238,3 +238,31 @@ test('XAUUSD fallback spot never fabricates bid, ask, or spread from a mid-only 
   assert.match(engine, /bid: null, ask: null, mid/);
   assert.match(engine, /spreadUsd: null/);
 });
+
+test('authenticated macro bridge accepts the configured MACRO_API_TOKEN through constant-time comparison', () => {
+  const route = read('../app/api/v1/macro-context/route.ts');
+  assert.match(route, /process\.env\.MACRO_API_TOKEN\?\.trim\(\)/);
+  assert.match(route, /timingSafeEqual/);
+  assert.match(route, /candidate, secret/);
+  assert.match(route, /consumePersistentRateLimit/);
+});
+
+test('desk pre-trade gate blocks stale quotes, low-confidence bias and below-minimum lot sizes', () => {
+  const desk = read('../app/components/DeskTerminal.tsx');
+  assert.match(desk, /dossier\.confidence === 'HIGH' \|\| dossier\.confidence === 'MODERATE'/);
+  assert.match(desk, /quoteIsFresh = quote\?\.freshness === 'LIVE'/);
+  assert.match(desk, /spreadPass = quoteIsFresh/);
+  assert.match(desk, /lots >= 0\.01/);
+  assert.match(desk, /account > 0/);
+});
+
+test('dashboard exposes one coherent set of anchored research workspaces and avoids stale LIVE quote labels', () => {
+  const dashboard = read('../app/components/MacroDashboard.tsx');
+  const desk = read('../app/components/DeskTerminal.tsx');
+  for (const anchor of ['desk-terminal', 'matrix', 'bias', 'regimes', 'positioning', 'catalysts', 'health']) {
+    assert.match(dashboard, new RegExp('href="#' + anchor + '"'));
+  }
+  assert.match(desk, /id="desk-terminal"/);
+  assert.match(dashboard, /STALE \/ DELAYED/);
+  assert.match(dashboard, /LIVE · FINNHUB/);
+});
