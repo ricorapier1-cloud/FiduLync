@@ -207,7 +207,7 @@ test('market quote feeds include G8 currency pairs for Finnhub and Frankfurter',
 test('FRED and Finnhub API keys are used only behind explicit provider approval', () => {
   const macroData = read('../lib/macroData.ts');
   assert.match(macroData, /FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true'/);
-  assert.match(macroData, /FINNHUB_COMMERCIAL_USE_APPROVED === 'true'/);
+  assert.match(macroData, /FINNHUB_PERSONAL_PLAN_ACTIVE === 'true'/);
 });
 
 
@@ -294,9 +294,9 @@ test('licensed or permission-dependent providers fail closed unless their explic
   const marketFeeds = read('../lib/marketFeeds.ts');
   const goldEngine = read('../lib/macro/goldAndRegimeEngine.ts');
   assert.match(macroData, /FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true' \? process\.env\.FRED_API_KEY/);
-  assert.match(macroData, /FINNHUB_COMMERCIAL_USE_APPROVED === 'true' \? process\.env\.FINNHUB_API_KEY/);
+  assert.match(macroData, /FINNHUB_PERSONAL_PLAN_ACTIVE === 'true' \? process\.env\.FINNHUB_API_KEY/);
   assert.match(macroData, /FAIRECONOMY_COMMERCIAL_USE_APPROVED === 'true'/);
-  assert.match(marketFeeds, /FINNHUB_COMMERCIAL_USE_APPROVED === 'true' \? process\.env\.FINNHUB_API_KEY/);
+  assert.match(marketFeeds, /FINNHUB_PERSONAL_PLAN_ACTIVE === 'true' \? process\.env\.FINNHUB_API_KEY/);
   assert.match(goldEngine, /FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true'/);
 });
 
