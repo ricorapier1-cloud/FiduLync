@@ -178,7 +178,7 @@ export type MacroSnapshot = {
   asOf: string;
   source: 'fallback' | 'provider' | 'partial';
   cotSource?: 'unavailable' | 'provider';
-  calendarSource?: 'unavailable' | 'reference' | 'provider';
+  calendarSource?: 'reference' | 'provider';
   ecbRates?: Record<string, number>;
   currencies: MacroCurrency[];
   cot: CotPosition[];
