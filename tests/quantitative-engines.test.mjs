@@ -50,7 +50,9 @@ test('currency strength uses only provider-sourced policy and inflation data', (
 });
 
 test('dashboard marks cross-asset values unavailable until verified feeds exist', () => {
-  assert.match(dashboard, /No verified live adapter/);
+  assert.match(dashboard, /No verified adapter/);
+  assert.match(dashboard, /US 10Y benchmark/);
+  assert.match(dashboard, /10Y TIPS real yield/);
   assert.match(dashboard, /snapshot\.providerStatus\?\.length/);
   assert.doesNotMatch(dashboard, /FRED \(St\. Louis Fed\)[\s\S]{0,200}HEALTHY/);
   assert.doesNotMatch(dashboard, /4\.35%|2\.05%|14\.80|\$76\.40|\$2,740/);
