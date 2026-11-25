@@ -59,6 +59,8 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
   const eiaConfigured = Boolean(process.env.EIA_API_KEY?.trim());
   const treasury = feedStatus(Boolean(snapshot.usTreasury),
     snapshot.usTreasury?.freshness === 'LATEST PUBLISHED', true);
+  const cboeVix = feedStatus(Boolean(snapshot.vix),
+    snapshot.vix?.freshness === 'LATEST PUBLISHED', true);
   const eia = feedStatus(Boolean(snapshot.energyMarkets),
     Boolean(snapshot.energyMarkets && isFresh(snapshot.energyMarkets.wti.observationDate, 10) && isFresh(snapshot.energyMarkets.brent.observationDate, 10)), eiaConfigured);
 
@@ -72,6 +74,7 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
     { name: 'World Bank CPI', endpoint: 'https://api.worldbank.org/v2/country', ...worldBank, latencyMs: null, lastSuccessfulSyncUtc: worldBank.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'U.S. Energy Information Administration (WTI / Brent)', endpoint: 'https://api.eia.gov/v2/seriesid/', ...eia, latencyMs: null, lastSuccessfulSyncUtc: snapshot.energyMarkets?.wti.retrievedAtUtc ?? null, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'U.S. Treasury daily nominal and TIPS yield curves', endpoint: 'https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages/xml', ...treasury, latencyMs: null, lastSuccessfulSyncUtc: snapshot.usTreasury?.retrievedAtUtc ?? null, rateLimitRemaining: null, circuitBreakerTripped: false },
+    { name: 'Cboe VIX daily closing history', endpoint: 'https://cdn-api.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv', ...cboeVix, latencyMs: null, lastSuccessfulSyncUtc: snapshot.vix?.retrievedAtUtc ?? null, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'Sveriges Riksbank policy rate', endpoint: 'https://api.riksbank.se/swea/v1/Observations/Latest/SECBREPOEFF', ...riksbank, latencyMs: null, lastSuccessfulSyncUtc: riksbank.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'Norges Bank policy rate', endpoint: 'https://data.norges-bank.no/api/data/IR/B.KPRA.SD.R', ...norgesBank, latencyMs: null, lastSuccessfulSyncUtc: norgesBank.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'US Bureau of Labor Statistics', endpoint: 'https://api.bls.gov/publicAPI/v2/timeseries/data/', ...bls, latencyMs: null, lastSuccessfulSyncUtc: bls.status === 'HEALTHY' ? snapshot.asOf : null, rateLimitRemaining: null, circuitBreakerTripped: false },
