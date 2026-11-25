@@ -81,9 +81,9 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
   const quoteRealPolicyRate = quotePolicy - quoteInflation;
   const realPolicyRateDiffBps = essentialEvidenceVerified ? Math.round((baseRealPolicyRate - quoteRealPolicyRate) * 100) : 0;
 
-  const base2Y = !isGold && baseCcy?.twoYearYieldSource === 'provider' && isFreshObservation(baseCcy.twoYearYieldObservationDate, 60)
+  const base2Y = !isGold && baseCcy?.twoYearYieldSource === 'provider' && isFreshObservation(baseCcy.twoYearYieldObservationDate, 14)
     ? baseCcy.twoYearYield ?? null : null;
-  const quote2Y = quoteCcy?.twoYearYieldSource === 'provider' && isFreshObservation(quoteCcy.twoYearYieldObservationDate, 60)
+  const quote2Y = quoteCcy?.twoYearYieldSource === 'provider' && isFreshObservation(quoteCcy.twoYearYieldObservationDate, 14)
     ? quoteCcy.twoYearYield ?? null : null;
   const twoYearYieldDiffBps = base2Y !== null && quote2Y !== null
     ? Math.round((base2Y - quote2Y) * 100)
