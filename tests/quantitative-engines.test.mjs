@@ -304,6 +304,8 @@ test('Swissquote BBO timestamp parsing accepts parent-level item timestamps and 
   const quotes = read('../app/api/v1/live-quotes/route.ts');
   assert.ok(quotes.includes('raw.ts ?? item.ts'));
   assert.ok(quotes.includes('/^\\d{10,13}$/'));
+  assert.ok(quotes.includes("getCachedData('macro:swissquote-bbo-v1'"));
+  assert.ok(quotes.includes("ageMs > 60_000 ? 'STALE'"));
 });
 
 test('GDP quarter parsing uses a real digit matcher', () => {
