@@ -1,5 +1,5 @@
 import 'server-only';
-import type { CotPosition, EconomicCatalyst, MacroCurrency, MacroSnapshot, TreasuryYieldData } from '@/types/macro';
+import type { CotPosition, EconomicCatalyst, MacroCurrency, MacroSnapshot, TreasuryYieldData, CboeVixData } from '@/types/macro';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
 import {
   getBankOfCanadaMacroInputs,
@@ -12,6 +12,7 @@ import {
 import { getCachedData } from '@/lib/redisCache';
 import { persistMacroObservations } from '@/lib/macro/observationPersistence';
 import { getTreasuryYieldData } from '@/lib/treasuryData';
+import { getCboeVixHistory } from '@/lib/cboeVix';
 
 export const EMPTY_SNAPSHOT: MacroSnapshot = {
   asOf: '',
@@ -138,7 +139,7 @@ function isCatalyst(value: unknown): value is EconomicCatalyst {
     && (typeof value.actual === 'string' || value.actual === null);
 }
 
-function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies' | 'cot' | 'catalysts' | 'energyMarkets' | 'usTreasury'> | null {
+function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies' | 'cot' | 'catalysts' | 'energyMarkets' | 'usTreasury' | 'vix'> | null {
   if (!isRecord(value)
     || !Array.isArray(value.currencies)
     || !Array.isArray(value.cot)
@@ -162,6 +163,15 @@ function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies'
       && ['nominal2YPct', 'nominal3MPct', 'nominal10YPct', 'real10YPct', 'twoYearTenYearSpreadBps', 'twoYearThreeMonthSpreadBps', 'breakevenTenYearPct'].every((key) => isFiniteNumber(value.usTreasury[key]))
       && (value.usTreasury.freshness === 'LATEST PUBLISHED' || value.usTreasury.freshness === 'STALE')
       ? { usTreasury: value.usTreasury as unknown as TreasuryYieldData } : {}),
+    ...(isRecord(value.vix)
+      && value.vix.source === 'CBOE'
+      && isFiniteNumber(value.vix.value)
+      && typeof value.vix.observationDate === 'string'
+      && typeof value.vix.retrievedAtUtc === 'string'
+      && (value.vix.freshness === 'LATEST PUBLISHED' || value.vix.freshness === 'STALE')
+      && Array.isArray(value.vix.history)
+      && value.vix.history.every((item) => isRecord(item) && typeof item.date === 'string' && isFiniteNumber(item.value))
+      ? { vix: value.vix as unknown as CboeVixData } : {}),
   };
 }
 
@@ -712,7 +722,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     asOf: new Date().toISOString(),
     source: cachedSnapshot.source === 'fallback' ? 'fallback' : 'partial',
   };
-  const [fredResult, finnhubResult, alphaResult, fmpResult, cotResult, frankfurterResult, calendarResult, ecbResult, bocResult, boeResult, worldBankResult, blsResult, beaResult, bisResult, riksbankResult, norgesBankResult, eiaResult, treasuryResult] = await Promise.allSettled([
+  const [fredResult, finnhubResult, alphaResult, fmpResult, cotResult, frankfurterResult, calendarResult, ecbResult, bocResult, boeResult, worldBankResult, blsResult, beaResult, bisResult, riksbankResult, norgesBankResult, eiaResult, treasuryResult, vixResult] = await Promise.allSettled([
     fredApiKey ? getFredUsdUpdates(fredApiKey) : Promise.resolve(null),
     finnhubApiKey ? getFinnhubCatalysts(finnhubApiKey) : Promise.resolve(null),
     alphaVantageKey ? getAlphaVantageUsdUpdates(alphaVantageKey) : Promise.resolve(null),
@@ -731,6 +741,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     getNorgesBankPolicyRate(),
     eiaApiKey ? getEiaEnergyMarkets(eiaApiKey) : Promise.resolve(null),
     getCachedData('macro:us-treasury-yields-v1', getTreasuryYieldData, 60 * 60),
+    getCachedData('macro:cboe-vix-history-v1', getCboeVixHistory, 60 * 60),
   ]);
   let hasMacroData = false;
   let hasAnyProviderData = false;
@@ -738,6 +749,8 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
   else if (eiaResult.status === 'rejected') console.warn('EIA crude oil spot observations are unavailable:', eiaResult.reason);
   if (treasuryResult.status === 'fulfilled') { snapshot.usTreasury = treasuryResult.value; hasAnyProviderData = true; }
   else if (treasuryResult.status === 'rejected') console.warn('Official U.S. Treasury yield observations are unavailable:', treasuryResult.reason);
+  if (vixResult.status === 'fulfilled') { snapshot.vix = vixResult.value; hasAnyProviderData = true; }
+  else if (vixResult.status === 'rejected') console.warn('Official Cboe daily VIX observations are unavailable:', vixResult.reason);
   if (fredResult.status === 'fulfilled' && isRecord(fredResult.value)) {
     let usd = snapshot.currencies.find((currency) => currency.code === 'USD');
     const policyRate = isFiniteNumber(fredResult.value.policyRate)
