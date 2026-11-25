@@ -36,11 +36,16 @@ test('security: owner login and control-console implementation is absent; /owner
   ]) assert.equal(existsSync(new URL(retiredPath, import.meta.url)), false, retiredPath);
 });
 
-test('security: commercial account/store surfaces redirect to the research terminal', () => {
+test('security: commercial account/store surfaces redirect and retired storefront components are absent', () => {
   assert.match(storePage, /redirect\('\/'\)/);
   assert.match(accountPage, /redirect\('\/'\)/);
   assert.doesNotMatch(storePage, /PaystackCheckout|paystack/i);
   assert.doesNotMatch(accountPage, /PaystackCheckout|paystack/i);
+  for (const retiredPath of [
+    '../components/CustomerLicensePortal.tsx',
+    '../components/QuantStrategyCatalog.tsx',
+    '../components/TopPairBanner.tsx',
+  ]) assert.equal(existsSync(new URL(retiredPath, import.meta.url)), false, retiredPath);
 });
 
 test('architecture: /analytics redirects to /workbench', () => {
