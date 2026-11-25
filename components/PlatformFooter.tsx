@@ -84,7 +84,7 @@ export default function PlatformFooter() {
                 GET /api/v1/macro-context?symbol=EURUSD
               </code>
               <a
-                href="/mql5/MacroLyncBridge.mqh"
+                href="/MacroLyncBridge.mqh"
                 download
                 className="inline-flex items-center gap-2 rounded border border-white/[0.1] bg-white/[0.03] px-3 py-1.5 text-[11px] text-slate-300 transition hover:border-emerald-400/40 hover:text-emerald-300 mt-1"
               >
