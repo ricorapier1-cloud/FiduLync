@@ -11,6 +11,10 @@ export function getCrossAssetTelemetry(snapshot: MacroSnapshot): CrossAssetTelem
   const vixObservation = snapshot.vix?.freshness === 'LATEST PUBLISHED' ? snapshot.vix : undefined;
   const wti = snapshot.energyMarkets?.wti.freshness === 'LATEST PUBLISHED' ? snapshot.energyMarkets.wti.valueUsdPerBarrel : null;
   const brent = snapshot.energyMarkets?.brent.freshness === 'LATEST PUBLISHED' ? snapshot.energyMarkets.brent.valueUsdPerBarrel : null;
+  const latestObservationDate = [treasury?.observationDate, vixObservation?.observationDate, snapshot.energyMarkets?.wti.observationDate, snapshot.energyMarkets?.brent.observationDate]
+    .filter((date): date is string => Boolean(date))
+    .sort()
+    .at(-1);
   return {
     usTwoYearYield: treasury?.nominal2YPct ?? verifiedTwoYear ?? null,
     usTenYearYield: treasury?.nominal10YPct ?? null,
@@ -25,7 +29,7 @@ export function getCrossAssetTelemetry(snapshot: MacroSnapshot): CrossAssetTelem
     copperUsd: null,
     highYieldSpreadBps: null,
     globalRiskAppetite: 'UNAVAILABLE',
-    timestampUtc: treasury?.observationDate ?? vixObservation?.observationDate ?? snapshot.energyMarkets?.wti.observationDate ?? snapshot.asOf ?? '',
+    timestampUtc: latestObservationDate ?? snapshot.asOf ?? '',
     freshness: treasury || vixObservation || wti !== null || brent !== null ? 'LATEST PUBLISHED' : 'UNAVAILABLE',
   };
 }
