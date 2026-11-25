@@ -122,8 +122,8 @@ test('architecture: one evidence-gated macro opportunity board is integrated int
   const route = read('../app/api/v1/top-pairs/route.ts');
   assert.match(dashboard, /PairOpportunityBoard/);
   assert.match(dashboard, /href="#opportunities"/);
-  assert.match(board, /api\\/v1\\/top-pairs/);
-  assert.match(route, /confidence === 'HIGH' \\|\\| dossier\\.confidence === 'MODERATE'/);
-  assert.match(route, /NO_QUALIFIED_CANDIDATES/);
+  assert.ok(board.includes("api/v1/top-pairs"));
+  assert.ok(route.includes("confidence === 'HIGH' || dossier.confidence === 'MODERATE'"));
+  assert.ok(route.includes('NO_QUALIFIED_CANDIDATES'));
   assert.doesNotMatch(route, /divergence_pair: pair/);
 });
