@@ -67,7 +67,15 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const stop = Number(sl);
   const target = Number(tp);
   const account = Number(balance);
-  const pipValue = selected === 'USDJPY' ? (usdJpy && usdJpy > 0 ? 1000 / usdJpy : null) : selected === 'XAUUSD' ? 100 : 10;
+  const pipValue = selected === 'USDJPY' ? (usdJpy && usdJpy > 0 ? 1000 / usdJpy : null)
+    : selected === 'XAUUSD' ? 100
+      : selected.slice(3) === 'USD' ? 10
+        : selected.length === 6 && fxRows.length ? (() => {
+          const quoteCurrency = selected.slice(3, 6);
+          const usdCross = fxRows[fxRows.length - 1].rates[quoteCurrency];
+          if (!usdCross || usdCross <= 0) return null;
+          return quoteCurrency === 'JPY' ? 1000 / usdCross : 10 / usdCross;
+        })() : null;
   const riskAmount = account > 0 && risk > 0 ? account * risk / 100 : 0;
   const lots = pipValue && stop > 0 ? Math.floor((riskAmount / (stop * pipValue)) * 100) / 100 : 0;
   const rr = stop > 0 && target > 0 ? target / stop : 0;
