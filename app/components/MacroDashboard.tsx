@@ -806,7 +806,9 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
                     <span className={provider.status === 'HEALTHY' ? 'text-emerald-400' : provider.status === 'UNCONFIGURED' || provider.status === 'OFFLINE' ? 'text-rose-400' : 'text-amber-300'}>{provider.status}</span>
                   </div>
                   <div className="text-[11px] text-slate-500 font-mono mt-1">{provider.freshness} · {provider.latencyMs === null ? 'Latency unmeasured' : `${provider.latencyMs} ms`}</div>
-                  <div className="text-[10px] text-slate-600 font-mono mt-1">{provider.lastSuccessfulSyncUtc ? `Last success ${provider.lastSuccessfulSyncUtc}` : 'No successful health check recorded'}</div>
+                  <div className="text-[10px] text-slate-600 font-mono mt-1">{provider.latestObservationDate ? `Latest observation ${provider.latestObservationDate}` : 'Observation date not recorded'}{provider.lastSuccessfulSyncUtc ? ` · Retrieved ${provider.lastSuccessfulSyncUtc}` : ''}</div>
+                  {provider.detail && <p className="text-[10px] text-slate-400 mt-2 leading-relaxed">{provider.detail}</p>}
+                  {provider.nextAction && <p className="text-[10px] text-amber-300 mt-2 leading-relaxed">ACTION: {provider.nextAction}</p>}
                 </div>
               ))}
             </div>
