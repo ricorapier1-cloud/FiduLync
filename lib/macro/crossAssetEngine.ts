@@ -8,6 +8,7 @@ export function getCrossAssetTelemetry(snapshot: MacroSnapshot): CrossAssetTelem
   const usd = snapshot.currencies.find((currency) => currency.code === 'USD');
   const verifiedTwoYear = usd?.twoYearYieldSource === 'provider' ? usd.twoYearYield : null;
   const treasury = snapshot.usTreasury?.freshness === 'LATEST PUBLISHED' ? snapshot.usTreasury : undefined;
+  const vixObservation = snapshot.vix?.freshness === 'LATEST PUBLISHED' ? snapshot.vix : undefined;
   const wti = snapshot.energyMarkets?.wti.freshness === 'LATEST PUBLISHED' ? snapshot.energyMarkets.wti.valueUsdPerBarrel : null;
   const brent = snapshot.energyMarkets?.brent.freshness === 'LATEST PUBLISHED' ? snapshot.energyMarkets.brent.valueUsdPerBarrel : null;
   return {
@@ -16,16 +17,16 @@ export function getCrossAssetTelemetry(snapshot: MacroSnapshot): CrossAssetTelem
     usTenYearRealYield: treasury?.real10YPct ?? null,
     usBreakevenTenYear: treasury?.breakevenTenYearPct ?? null,
     broadTradeWeightedUsd: null,
-    vix: null,
-    vixRegime: 'UNAVAILABLE',
+    vix: vixObservation?.value ?? null,
+    vixRegime: vixObservation ? vixObservation.value < 20 ? 'LOW' : vixObservation.value < 30 ? 'ELEVATED' : 'STRESS' : 'UNAVAILABLE',
     goldUsd: null,
     crudeWti: wti,
     brentCrude: brent,
     copperUsd: null,
     highYieldSpreadBps: null,
     globalRiskAppetite: 'UNAVAILABLE',
-    timestampUtc: treasury?.observationDate ?? snapshot.asOf ?? '',
-    freshness: treasury ? 'LATEST PUBLISHED' : wti !== null || brent !== null ? 'LATEST PUBLISHED' : 'UNAVAILABLE',
+    timestampUtc: treasury?.observationDate ?? vixObservation?.observationDate ?? snapshot.energyMarkets?.wti.observationDate ?? snapshot.asOf ?? '',
+    freshness: treasury || vixObservation || wti !== null || brent !== null ? 'LATEST PUBLISHED' : 'UNAVAILABLE',
   };
 }
 
