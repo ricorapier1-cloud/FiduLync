@@ -137,13 +137,15 @@ export default function DeskTerminal({ initialSnapshot }: { initialSnapshot: Mac
   }, []);
   useEffect(() => {
     if (!ready) return;
+    let timer: number | undefined;
     const poll = () => { if (document.visibilityState === 'visible') void refreshQuotes().catch(() => setQuoteStatus('DEGRADED')); };
-    const onVisibility = () => { if (document.visibilityState === 'visible') poll(); };
-    poll();
-    const timer = window.setInterval(poll, 15_000);
+    const startPolling = () => { if (timer === undefined) { poll(); timer = window.setInterval(poll, 15_000); } };
+    const stopPolling = () => { if (timer !== undefined) { window.clearInterval(timer); timer = undefined; } };
+    const onVisibility = () => { if (document.visibilityState === 'visible') startPolling(); else stopPolling(); };
+    startPolling();
     document.addEventListener('visibilitychange', onVisibility);
-    window.addEventListener('focus', poll);
-    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('focus', poll); };
+    window.addEventListener('focus', startPolling);
+    return () => { stopPolling(); document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('focus', startPolling); };
   }, [ready, refreshQuotes]);
   useEffect(() => {
     if (!ready) return;
