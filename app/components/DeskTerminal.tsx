@@ -284,16 +284,6 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, macr
         <p className="desk-footnote">Journal persists in this browser only. Browser storage clearing or switching devices resets it. MT5 must independently enforce the same hard limits.</p>
       </article>
     </div>
-    <details className="desk-panel desk-bridge mt-4"><summary className="cursor-pointer font-mono text-xs text-slate-200">EA BRIDGE &amp; SYSTEM DIAGNOSTICS · EXPAND</summary>
-      <header><div><span className="desk-kicker">E / MT5 MACRO CONTEXT BRIDGE</span><h3>Typed Context Preview</h3></div><small>READ-ONLY JSON</small></header>
-      <p>The authenticated read-only API provides macro context to the EA. The EA must independently use broker-native prices, contract specifications, daily lockout and account-level risk before execution. No Python publisher or VPS is required for the macro bridge.</p>
-      <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3 text-xs text-slate-300">
-        <b className="font-mono text-emerald-300">MQL5 CONNECTION GUIDE</b>
-        <p className="mt-2">Configure the terminal WebRequest allow-list for this domain, then send one GET request to <code>/api/v1/macro-context?symbol=EURUSD</code> with the read-only secret in the <code>x-macro-key</code> header (or Bearer authorization). The payload exposes flat <code>allowedToTrade</code>, <code>newsLockoutActive</code>, <code>activeSession</code>, <code>macroRiskRegime</code>, and <code>symbols</code> fields. Gold-only evidence is also available at <code>/api/v1/xauusd-context</code>.</p>
-        <a className="mt-2 inline-flex text-emerald-300 underline" href="/mql5/MacroLyncBridge.mqh" download>Download MacroLyncBridge.mqh</a>
-      </div>
-      <pre>{JSON.stringify({ schemaVersion: '1.0.0', generatedAtUtc: new Date(now).toISOString(), timezone: 'Africa/Lagos', quotes: quotes.map((q) => ({ symbol: q.symbol, bid: q.bid, ask: q.ask, mid: q.mid, spread: q.spread, quoteTimeUtc: q.quoteTimeUtc, freshness: q.freshness, source: q.source })), pairBias: { symbol: selected, score: dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier.biasScore, confidence: dossier.confidence }, newsLockout: { calendarVerified: verifiedCalendar, active: !eventPass }, dailyGovernance: { dateWAT: journal.dateWAT, trades: journal.trades, losses: journal.losses, locked, authority: 'LOCAL_BROWSER_ONLY' } }, null, 2)}</pre>
-      <p className="desk-footnote">This is a browser-side preview. The authenticated /api/v1/macro-context endpoint remains the server-side EA bridge.</p>
-    </details>
+ils>
   </section>;
 }
