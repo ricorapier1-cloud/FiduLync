@@ -35,7 +35,7 @@ test('cross-asset engine does not embed fabricated market levels', () => {
   for (const value of ['4.45', '1.95', '124.8', '14.6', '2680.0', '71.4', '75.2', '4.12', '312']) {
     assert.doesNotMatch(crossAsset, new RegExp(value.replace('.', '\\.'), 'g'));
   }
-  assert.ok(crossAsset.includes("freshness: treasury ? 'LATEST PUBLISHED' : wti !== null || brent !== null ? 'LATEST PUBLISHED' : 'UNAVAILABLE'"));
+  assert.ok(crossAsset.includes("freshness: treasury || vixObservation || wti !== null || brent !== null ? 'LATEST PUBLISHED' : 'UNAVAILABLE'"));
 });
 
 test('country profile engine does not publish hardcoded macro baselines', () => {
@@ -50,7 +50,7 @@ test('currency strength uses only provider-sourced policy and inflation data', (
 });
 
 test('dashboard marks cross-asset values unavailable until verified feeds exist', () => {
-  assert.match(dashboard, /No verified adapter/);
+  assert.ok(dashboard.includes('CBOE daily close'));
   assert.ok(dashboard.includes('US 10Y benchmark'));
   assert.ok(dashboard.includes('10Y TIPS real yield'));
   assert.match(dashboard, /snapshot\.providerStatus\?\.length/);
