@@ -9,6 +9,7 @@ import type { MacroSnapshot, PairDossier } from '@/types/macro';
 import type { GoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
 import DeskTerminal from '@/app/components/DeskTerminal';
 import PairOpportunityBoard from '@/app/components/PairOpportunityBoard';
+import EABridgeDiagnostics from '@/app/components/EABridgeDiagnostics';
 
 type MacroDashboardProps = {
   initialSnapshot: MacroSnapshot;
@@ -684,6 +685,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
         </div>
       </section>
 
+      <EABridgeDiagnostics />
     </div>
   );
 }
