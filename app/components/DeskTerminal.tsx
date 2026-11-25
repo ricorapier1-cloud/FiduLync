@@ -223,7 +223,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext }: { 
         {strength.length ? strength.map((item) => <div className="desk-strength-row" key={item.currency}><b>{item.currency}</b><span><i style={{ width: `${item.score * 10}%` }} /></span><strong>{item.score.toFixed(2)}</strong></div>) : <p className="desk-empty">Awaiting dated FX reference observations. Reference rates are not executable prices.</p>}
         <p className="desk-footnote">Scores compare the latest 20 available business-day observations with USD. They are reference-rate strength estimates, not intraday market momentum.</p>
       </article>
-      <article className="desk-panel"><header><div><span className="desk-kicker">02 / LIVE RISK CALCULATOR</span><h3>Position Sizing</h3></div><small>IC MARKETS · STANDARD LOT ASSUMPTIONS</small></header>
+      <article className="desk-panel"><header><div><span className="desk-kicker">02 / LIVE RISK CALCULATOR</span><h3>Position Sizing</h3></div><small>USD ACCOUNT · STANDARD LOT ESTIMATE</small></header>
         <div className="desk-form-grid">
           <label>Account balance USD<input inputMode="decimal" value={balance} onChange={(e) => setBalance(e.target.value)} /></label>
           <label>Risk %<input inputMode="decimal" value={riskPct} onChange={(e) => setRiskPct(e.target.value)} /></label>
@@ -233,7 +233,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext }: { 
           <label>Direction<select value={direction} onChange={(e) => setDirection(e.target.value as Direction)}><option value="BUY">BUY</option><option value="SELL">SELL</option></select></label>
         </div>
         <div className="desk-calc-results"><div><span>RISK AMOUNT</span><strong>${riskAmount.toFixed(2)}</strong></div><div><span>LOT SIZE · ROUNDED DOWN</span><strong>{lots.toFixed(2)}</strong></div><div><span>REWARD / RISK</span><strong className={rr >= 2 ? 'desk-good' : 'desk-warning'}>{rr.toFixed(2)}R</strong></div><div><span>EXPECTED GROSS PROFIT</span><strong>${gross.toFixed(2)}</strong></div></div>
-        <p className="desk-footnote">{selected === 'USDJPY' ? `USDJPY pip value: 1,000 / live ${display(usdJpy, 3)} = ${pipValue?.toFixed(4) ?? 'unavailable'} USD per pip per lot.` : selected === 'XAUUSD' ? 'Gold assumption: 100 oz per standard lot; $100 P/L per $1.00 price move per lot.' : 'FX assumption: $10 USD pip value per standard lot for EUR/USD and GBP/USD.'} Excludes commissions, slippage, swaps and broker contract variations.</p>
+        <p className="desk-footnote">{selected === 'USDJPY' ? `USDJPY pip value: 1,000 / live ${display(usdJpy, 3)} = ${pipValue?.toFixed(4) ?? 'unavailable'} USD per pip per lot.` : selected === 'XAUUSD' ? 'Gold assumption: 100 oz per standard lot; $100 P/L per $1.00 price move per lot.' : 'FX assumption: $10 USD pip value per standard lot for EUR/USD and GBP/USD.'} Excludes commissions, slippage, swaps and broker contract variations. Planning estimate only: verify the broker's MT5 symbol specification and account currency; the EA's broker-native sizing is authoritative.</p>
         {risk > 1 && <p className="desk-warning-text">Risk exceeds the 1.0% governance ceiling.</p>}{lots > 0 && lots < 0.01 && <p className="desk-warning-text">Below 0.01 lot: skip, never round size up.</p>}{rr < 2 && <p className="desk-warning-text">R:R is below the required 1:2.0.</p>}
       </article>
     </div>
@@ -251,8 +251,8 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext }: { 
         <p className="desk-footnote">Journal persists in this browser only. Browser storage clearing or switching devices resets it. MT5 must independently enforce the same hard limits.</p>
       </article>
     </div>
-    <article className="desk-panel desk-bridge"><header><div><span className="desk-kicker">05 / V2 PYTHON + MT5 BRIDGE</span><h3>Typed Context Preview</h3></div><small>READ-ONLY JSON</small></header>
-      <p>V2 will pass server-verified macro context and quote provenance to the Python VPS adapter. MT5 must independently validate the daily lockout and account-level risk before execution.</p>
+    <article className="desk-panel desk-bridge"><header><div><span className="desk-kicker">05 / MT5 MACRO CONTEXT BRIDGE</span><h3>Typed Context Preview</h3></div><small>READ-ONLY JSON</small></header>
+      <p>The authenticated read-only API provides macro context to the EA. The EA must independently use broker-native prices, contract specifications, daily lockout and account-level risk before execution. No Python publisher or VPS is required for the macro bridge.</p>
       <pre>{JSON.stringify({ schemaVersion: '1.0.0', generatedAtUtc: new Date(now).toISOString(), timezone: 'Africa/Lagos', quotes: quotes.map((q) => ({ symbol: q.symbol, bid: q.bid, ask: q.ask, mid: q.mid, spread: q.spread, quoteTimeUtc: q.quoteTimeUtc, freshness: q.freshness, source: q.source })), pairBias: { symbol: selected, score: dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier.biasScore, confidence: dossier.confidence }, newsLockout: { calendarVerified: verifiedCalendar, active: !eventPass }, dailyGovernance: { dateWAT: journal.dateWAT, trades: journal.trades, losses: journal.losses, locked, authority: 'LOCAL_BROWSER_ONLY' } }, null, 2)}</pre>
       <p className="desk-footnote">This is a browser-side preview. The authenticated /api/v1/macro-context endpoint remains the server-side EA bridge.</p>
     </article>
