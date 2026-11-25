@@ -329,7 +329,7 @@ test('XAUUSD dashboard, desk gate and MT5 context use the dedicated gold macro e
   assert.match(page, /buildGoldMacroContext\(initialSnapshot\)/);
   assert.match(dashboard, /Gold Macro &amp; Liquidity Intelligence/);
   assert.match(desk, /selected === 'XAUUSD' \? goldMacroPass : fxMacroPass/);
-  assert.match(route, /symbol === 'XAUUSD' \? buildGoldMacroContext\(\)/);
+  assert.match(route, /const goldContext = await buildGoldMacroContext\(snapshot\)/);
   assert.match(route, /goldAvailable/);
   assert.match(route, /goldContext\?\.invalidationTriggers/);
 });
