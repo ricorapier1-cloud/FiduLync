@@ -372,6 +372,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
               <strong>{dossier.fundamentalBias.replace(/_/g, ' ')}</strong>
               <span className="mono">REGIME: {dossier.macroRegime.replace(/_/g, ' ')}</span>
             </div>
+            <p className="mt-2 text-[10px] leading-relaxed text-slate-400">MACRO SCORE (−100 to +100) measures fundamental directional pressure from verified macro evidence. Technical regime, Hurst, KER and session liquidity are separate execution-timing filters; no technical confirmation is inferred from this macro score.</p>
 
             <div className="macro-bias-meter">
               <span className="macro-meter-mid" />
