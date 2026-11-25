@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export default async function Home() {
   const [initialSnapshot, initialGoldContext] = await Promise.all([
     getMacroSnapshot(),
-    buildGoldMacroContext().catch((error: unknown) => {
+    buildGoldMacroContext(initialSnapshot).catch((error: unknown) => {
       console.warn('Initial gold macro context is unavailable; no directional claim will be shown.', error);
       return null as GoldMacroContext | null;
     }),
