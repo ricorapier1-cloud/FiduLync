@@ -256,15 +256,15 @@ test('desk pre-trade gate blocks stale quotes, low-confidence bias and below-min
   assert.match(desk, /account > 0/);
 });
 
-test('dashboard exposes one coherent set of anchored research workspaces and avoids stale LIVE quote labels', () => {
+test('dashboard exposes anchored research workspaces and keeps BBO presentation in the desk terminal', () => {
   const dashboard = read('../app/components/MacroDashboard.tsx');
   const desk = read('../app/components/DeskTerminal.tsx');
-  for (const anchor of ['desk-terminal', 'matrix', 'bias', 'regimes', 'positioning', 'catalysts', 'health']) {
+  for (const anchor of ['desk-terminal', 'matrix', 'bias', 'regimes', 'gold-research', 'positioning', 'catalysts', 'health']) {
     assert.match(dashboard, new RegExp('href="#' + anchor + '"'));
   }
   assert.match(desk, /id="desk-terminal"/);
-  assert.match(dashboard, /STALE \/ DELAYED/);
-  assert.match(dashboard, /LIVE · FINNHUB/);
+  assert.match(desk, /FRESH BBO/);
+  assert.doesNotMatch(dashboard, /api\/macro\/quotes|macro-quote-strip|LIVE · FINNHUB/);
 });
 test('MT5 macro bridge rejects unsupported instruments and withholds stale provider prices', () => {
   const route = read('../app/api/v1/macro-context/route.ts');
