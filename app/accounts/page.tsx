@@ -1,0 +1,207 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
+type Deal = {
+  account_key: string; deal_ticket: string; symbol: string; side: string; entry_type: string;
+  volume: number; price: number; profit: number; commission: number; swap: number; fee: number;
+  deal_time_utc: string; magic: string | null; comment: string | null;
+};
+type Position = {
+  ticket: string; symbol: string; side: string; volume: number; openPrice: number;
+  currentPrice: number; profit: number; swap: number; stopLoss: number | null;
+  takeProfit: number | null; openedAtUtc: string; magic: string | null; comment: string | null;
+};
+type Account = {
+  account_key: string; account_login: string; broker: string | null; server: string;
+  currency: string; leverage: number; account_mode: string; balance: number; equity: number;
+  margin: number; free_margin: number; margin_level: number | null; positions: Position[];
+  observed_at: string; received_at: string;
+};
+type Payload = { status: string; generatedAtUtc: string; accounts: Account[]; deals: Deal[] };
+
+const money = (value: number, currency: string) => new Intl.NumberFormat(undefined, {
+  style: 'currency', currency, maximumFractionDigits: 2,
+}).format(value);
+const dateTime = (value: string) => new Intl.DateTimeFormat(undefined, {
+  dateStyle: 'medium', timeStyle: 'medium', timeZone: 'Africa/Lagos',
+}).format(new Date(value));
+const netDeal = (deal: Deal) => Number(deal.profit) + Number(deal.commission) + Number(deal.swap) + Number(deal.fee);
+const closed = (deal: Deal) => ['OUT','OUT_BY','INOUT'].includes(deal.entry_type);
+
+export default function AccountsPage() {
+  const [token, setToken] = useState('');
+  const [payload, setPayload] = useState<Payload | null>(null);
+  const [status, setStatus] = useState<'DISCONNECTED'|'CONNECTING'|'CONNECTED'|'ERROR'>('DISCONNECTED');
+  const [message, setMessage] = useState('');
+  const [lastRefresh, setLastRefresh] = useState<string | null>(null);
+
+  const refresh = useCallback(async (credential: string) => {
+    setStatus('CONNECTING');
+    try {
+      const response = await fetch('/api/v1/accounts', {
+        cache: 'no-store', headers: { Authorization: 'Bearer ' + credential },
+      });
+      const data = await response.json() as Payload & { error?: string };
+      if (!response.ok) throw new Error(data.error ?? 'Account service unavailable.');
+      setPayload(data);
+      setLastRefresh(new Date().toISOString());
+      setStatus('CONNECTED');
+      setMessage(data.status === 'AWAITING_FIRST_SYNC' ? 'Access verified. Waiting for the first MT5 publisher sync.' : '');
+    } catch (error) {
+      setStatus('ERROR');
+      setMessage(error instanceof Error ? error.message : 'Could not retrieve private account data.');
+    }
+  }, []);
+
+  useEffect(() => {
+    const saved = window.sessionStorage.getItem('macrolinc-account-read-token');
+    if (saved) {
+      setToken(saved);
+      void refresh(saved);
+    }
+  }, [refresh]);
+
+  useEffect(() => {
+    if (status !== 'CONNECTED' || !token || !payload?.accounts.length) return;
+    const timer = window.setInterval(() => void refresh(token), 30_000);
+    return () => window.clearInterval(timer);
+  }, [status, token, payload?.accounts.length, refresh]);
+
+  const selected = payload?.accounts[0] ?? null;
+  const selectedDeals = useMemo(() => selected
+    ? (payload?.deals ?? []).filter((deal) => deal.account_key === selected.account_key && closed(deal))
+    : [], [payload?.deals, selected]);
+  const analytics = useMemo(() => {
+    const values = selectedDeals.map(netDeal);
+    const wins = values.filter((value) => value > 0);
+    const losses = values.filter((value) => value < 0);
+    const grossWin = wins.reduce((sum, value) => sum + value, 0);
+    const grossLoss = Math.abs(losses.reduce((sum, value) => sum + value, 0));
+    return {
+      count: values.length,
+      net: values.reduce((sum, value) => sum + value, 0),
+      winRate: values.length ? wins.length / values.length * 100 : null,
+      profitFactor: grossLoss > 0 ? grossWin / grossLoss : null,
+    };
+  }, [selectedDeals]);
+
+  const connect = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const value = token.trim();
+    if (value.length < 32) { setMessage('Enter the private account-read token configured in Vercel.'); return; }
+    window.sessionStorage.setItem('macrolinc-account-read-token', value);
+    void refresh(value);
+  };
+  const disconnect = () => {
+    window.sessionStorage.removeItem('macrolinc-account-read-token');
+    setToken('');
+    setPayload(null);
+    setStatus('DISCONNECTED');
+    setMessage('Private account view disconnected in this browser tab.');
+  };
+
+  const observedAge = selected ? Math.max(0, Date.now() - Date.parse(selected.observed_at)) : null;
+  const freshness = observedAge === null ? 'NO DATA' : observedAge <= 90_000 ? 'FRESH' : observedAge <= 300_000 ? 'DELAYED' : 'STALE';
+
+  return (
+    <div className="macro-page pb-24">
+      <div className="macro-statusline mono">
+        <span><span className="macro-pulse" /> PRIVATE PORTFOLIO INTELLIGENCE</span>
+        <span className="macro-status-right">READ-ONLY · MT5</span>
+      </div>
+      <section className="macro-intro" aria-labelledby="accounts-title">
+        <div>
+          <span className="eyebrow">ACCOUNT &amp; PERFORMANCE INTELLIGENCE</span>
+          <h1 id="accounts-title">Portfolio &amp; Accounts.<br /><span>Broker evidence, not manual entries.</span></h1>
+          <p>Connect an MT5 terminal publisher to review account equity, open exposure and verified closed-deal history alongside your macro research.</p>
+        </div>
+        <div className="macro-intro-meta mono">
+          <span>CONNECTION STATUS</span>
+          <span className={status === 'CONNECTED' ? 'text-emerald-300' : status === 'ERROR' ? 'text-amber-300' : 'text-slate-400'}>{status}</span>
+          {selected && <span className="text-slate-500">{freshness} · {observedAge === null ? '—' : Math.round(observedAge / 1000) + 's'} old</span>}
+        </div>
+      </section>
+
+      <section className="macro-section">
+        <div className="macro-section-heading">
+          <div><span className="eyebrow">PRIVATE DATA ACCESS</span><h2>Connect your account view</h2></div>
+          {status === 'CONNECTED' && <button type="button" className="macro-refresh" onClick={disconnect}>DISCONNECT VIEW</button>}
+        </div>
+        <div className="macro-panel p-5">
+          <form onSubmit={connect} className="flex flex-col gap-3 sm:flex-row">
+            <label className="flex-1 text-xs text-slate-400">
+              Private account-read token
+              <input type="password" autoComplete="off" value={token} onChange={(event) => setToken(event.target.value)}
+                placeholder="Paste MT5_ACCOUNT_READ_TOKEN (32+ characters)"
+                className="mt-2 w-full rounded-lg border border-white/10 bg-[#080c12] px-3 py-3 font-mono text-xs text-slate-100 outline-none focus:border-emerald-400/50" />
+            </label>
+            <button type="submit" disabled={status === 'CONNECTING'} className="self-end rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-5 py-3 text-xs font-semibold text-emerald-300 disabled:opacity-50">
+              {status === 'CONNECTING' ? 'CONNECTING…' : 'CONNECT ACCOUNT VIEW'}
+            </button>
+          </form>
+          {message && <p role="status" className="mt-3 text-xs text-amber-300">{message}</p>}
+          <p className="mt-3 text-[11px] leading-relaxed text-slate-500">The read token is kept in this browser tab's session storage only. It is not a broker password. Never paste your IC Markets master or investor password here.</p>
+        </div>
+      </section>
+
+      {selected ? <>
+        <section className="macro-section">
+          <div className="macro-section-heading">
+            <div><span className="eyebrow">BROKER ACCOUNT SNAPSHOT</span><h2>{selected.broker || 'MT5'} · {selected.server}</h2></div>
+            <span className="macro-section-note mono">{selected.account_mode} · {selected.currency} · 1:{selected.leverage}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            {[
+              ['BALANCE', money(Number(selected.balance), selected.currency)],
+              ['EQUITY', money(Number(selected.equity), selected.currency)],
+              ['FLOATING P/L', money(Number(selected.equity) - Number(selected.balance), selected.currency)],
+              ['FREE MARGIN', money(Number(selected.free_margin), selected.currency)],
+            ].map(([label, value]) => <div key={label} className="macro-panel p-4"><span className="macro-kpi-label">{label}</span><strong className="mt-2 block break-all font-mono text-lg text-slate-100">{value}</strong></div>)}
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <div className="macro-panel p-4"><span className="macro-kpi-label">OPEN POSITIONS</span><strong className="mt-2 block font-mono text-xl text-slate-100">{selected.positions.length}</strong></div>
+            <div className="macro-panel p-4"><span className="macro-kpi-label">CLOSED DEALS IN WINDOW</span><strong className="mt-2 block font-mono text-xl text-slate-100">{analytics.count}</strong></div>
+            <div className="macro-panel p-4"><span className="macro-kpi-label">WIN RATE · DEALS</span><strong className="mt-2 block font-mono text-xl text-slate-100">{analytics.winRate === null ? '—' : analytics.winRate.toFixed(1) + '%'}</strong></div>
+            <div className="macro-panel p-4"><span className="macro-kpi-label">PROFIT FACTOR · DEALS</span><strong className="mt-2 block font-mono text-xl text-slate-100">{analytics.profitFactor === null ? '—' : analytics.profitFactor.toFixed(2)}</strong></div>
+          </div>
+          <p className="mt-3 text-[10px] text-slate-500">Account login {selected.account_login} · observed {dateTime(selected.observed_at)} WAT · received {dateTime(selected.received_at)} WAT. Performance is calculated from synchronized deal records only; no assumed starting balance or synthetic history.</p>
+        </section>
+
+        <section className="macro-section">
+          <div className="macro-section-heading"><div><span className="eyebrow">LIVE ACCOUNT EXPOSURE</span><h2>Open positions</h2></div><span className="macro-section-note mono">BROKER-REPORTED</span></div>
+          <div className="macro-panel overflow-x-auto">
+            {selected.positions.length ? <table className="w-full min-w-[720px] text-xs">
+              <thead className="text-left text-[10px] text-slate-500"><tr><th className="p-3">SYMBOL</th><th className="p-3">SIDE</th><th className="p-3">VOLUME</th><th className="p-3">OPEN</th><th className="p-3">CURRENT</th><th className="p-3">FLOATING P/L</th><th className="p-3">OPENED · UTC</th></tr></thead>
+              <tbody>{selected.positions.map((position) => <tr key={position.ticket} className="border-t border-white/[0.06]">
+                <td className="p-3 font-mono text-slate-100">{position.symbol}</td><td className="p-3">{position.side}</td><td className="p-3 font-mono">{position.volume}</td><td className="p-3 font-mono">{position.openPrice}</td><td className="p-3 font-mono">{position.currentPrice}</td><td className={'p-3 font-mono ' + (position.profit >= 0 ? 'text-emerald-300' : 'text-amber-300')}>{money(position.profit + position.swap, selected.currency)}</td><td className="p-3 text-slate-400">{position.openedAtUtc}</td>
+              </tr>)}</tbody>
+            </table> : <p className="p-5 text-xs text-slate-500">No open positions reported by the latest account snapshot.</p>}
+          </div>
+        </section>
+
+        <section className="macro-section">
+          <div className="macro-section-heading"><div><span className="eyebrow">EXECUTION RECORD</span><h2>Recent closed deals</h2></div><span className="macro-section-note mono">LATEST SYNCHRONIZED HISTORY</span></div>
+          <div className="macro-panel overflow-x-auto">
+            {selectedDeals.length ? <table className="w-full min-w-[760px] text-xs">
+              <thead className="text-left text-[10px] text-slate-500"><tr><th className="p-3">TIME · UTC</th><th className="p-3">SYMBOL</th><th className="p-3">SIDE</th><th className="p-3">VOLUME</th><th className="p-3">NET P/L · {selected.currency}</th><th className="p-3">MAGIC / EA</th><th className="p-3">TICKET</th></tr></thead>
+              <tbody>{selectedDeals.slice(0,100).map((deal) => <tr key={deal.deal_ticket} className="border-t border-white/[0.06]">
+                <td className="p-3 text-slate-400">{deal.deal_time_utc}</td><td className="p-3 font-mono text-slate-100">{deal.symbol}</td><td className="p-3">{deal.side}</td><td className="p-3 font-mono">{deal.volume}</td><td className={'p-3 font-mono ' + (netDeal(deal) >= 0 ? 'text-emerald-300' : 'text-amber-300')}>{money(netDeal(deal), selected.currency)}</td><td className="p-3 font-mono">{deal.magic || '—'}</td><td className="p-3 font-mono">{deal.deal_ticket}</td>
+              </tr>)}</tbody>
+            </table> : <p className="p-5 text-xs text-slate-500">No closed-deal history has arrived yet.</p>}
+          </div>
+        </section>
+      </> : <section className="macro-section">
+        <div className="macro-panel p-6">
+          <span className="eyebrow">AWAITING MT5 PUBLISHER</span>
+          <h2 className="mt-2 text-lg font-semibold text-slate-100">Your broker account is not connected yet.</h2>
+          <p className="mt-2 text-sm leading-relaxed text-slate-400">Set the two private Vercel environment tokens, install the read-only publisher in MT5, allow the MacroLync domain in MT5 WebRequest settings and start the publisher. The dashboard will populate after its first successful sync.</p>
+          <a href="/MacroLyncAccountPublisher.mq5" download className="mt-4 inline-flex rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-xs font-semibold text-emerald-300">DOWNLOAD MT5 ACCOUNT PUBLISHER</a>
+          <p className="mt-4 text-[11px] leading-relaxed text-slate-500">This connector transmits account metadata, positions and deal history only. It cannot open, modify or close orders. It never reads or transmits your broker password.</p>
+        </div>
+      </section>}
+
+      {lastRefresh && <p className="mt-6 text-right text-[10px] text-slate-500">Dashboard refresh {dateTime(lastRefresh)} WAT · auto-refresh every 30 seconds while connected</p>}
+    </div>
+  );
+}
