@@ -331,6 +331,8 @@ test('intraday signal engine blocks stale quotes, weak macro bias and missing sh
   const engine = read('../lib/quant/intradaySignalEngine.ts');
   const route = read('../app/api/v1/intraday-signals/route.ts');
   assert.match(desk, /intradaySignals\.map/);
+  assert.match(route, /buildIntradaySignal/);
+  assert.match(route, /evaluateMarketRiskShield/);
   assert.match(engine, /input\.macroScore !== null && input\.macroScore >= \(isGold \? 20 : 25\)/);
   assert.match(engine, /LIVE_BBO_UNAVAILABLE_OR_STALE/);
   assert.match(engine, /INTRADAY_CANDLES_STALE/);

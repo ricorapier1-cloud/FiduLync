@@ -615,7 +615,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
                   {formatContracts(position.netContracts)}
                 </span>
                 <span className={`mono ${position.weeklyChange >= 0 ? 'macro-positive' : 'macro-negative'}`}>
-                  {position.weeklyChange > 0 ? '+' : ''}{formatContracts(position.weeklyChange)}
+                  {formatContracts(position.weeklyChange)}
                 </span>
                 <div className="macro-extreme">
                   <div className="macro-extreme-track"><span style={{ width: `${position.percentile}%` }} /></div>
