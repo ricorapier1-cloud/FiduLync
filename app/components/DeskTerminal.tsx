@@ -294,7 +294,10 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   };
   const recordTrade = () => {
     const pnl = Number(pnlInput);
-    if (!pnlInput.trim() || !Number.isFinite(pnl) || locked) return;
+    if (!pnlInput.trim() || !Number.isFinite(pnl) || locked
+      || (resultInput === 'WIN' && pnl <= 0)
+      || (resultInput === 'LOSS' && pnl >= 0)
+      || (resultInput === 'FLAT' && pnl !== 0)) return;
     const timeUtc = new Date().toISOString();
     const captured = entryContext?.symbol === journalSymbol && entryContext.direction === direction ? entryContext : null;
     const macroBiasScore = captured ? captured.macroBiasScore ?? null : (journalSymbol === 'XAUUSD' ? goldScore : dossier.biasScore);
@@ -373,7 +376,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
         'time_utc,date_wat,symbol,result,pnl_usd',
         ...journal.entries.map((entry) => [entry.timeUtc, journal.dateWAT, entry.symbol, entry.result, entry.pnl]
           .map((value) => '"' + String(value).replace(/"/g, '""') + '"').join(',')),
-      ].join('\\n');
+      ].join('\n');
     const blob = new Blob([content], { type: format === 'json' ? 'application/json' : 'text/csv' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
@@ -398,9 +401,6 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         {intradaySignals.map((signal) => {
           const active = signal.signalState === 'ACTIVE_SETUP';
-          const rr = signal.slPips && signal.entryPrice !== null && signal.takeProfit1 !== null
-            ? Math.abs(signal.takeProfit1 - signal.entryPrice) / (signal.slPips * (signal.atrUnit === 'USD' ? 1 : signal.symbol.endsWith('JPY') ? 0.01 : 0.0001))
-            : 0;
           const statusClass = active ? 'desk-good' : signal.signalState === 'SHIELD_BLOCKED' ? 'desk-warning' : 'text-slate-400';
           const canLoad = active && signal.entryPrice !== null && signal.slPips !== null && signal.slPips > 0;
           return <div className="rounded border border-white/10 bg-[#0b1017] p-3 min-w-0" key={signal.symbol}>
@@ -463,7 +463,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
       <article className="desk-panel"><header><div><span className="desk-kicker">D / DAILY RISK CONTROL</span><h3>WAT Daily Circuit Breaker</h3></div><small>{currentDateWAT}</small></header>
         <div className="desk-journal-stats"><div><span>TRADES</span><b>{journal.trades}/2</b></div><div><span>WINS</span><b>{journal.wins}</b></div><div><span>LOSSES</span><b>{journal.losses}/2</b></div><div><span>NET P&amp;L</span><b className={journal.netPnl >= 0 ? 'desk-good' : 'desk-warning'}>${journal.netPnl.toFixed(2)}</b></div></div>
         <div className="desk-form-grid desk-journal-form"><label>Result<select value={resultInput} onChange={(e) => setResultInput(e.target.value as 'WIN' | 'LOSS' | 'FLAT')}><option>WIN</option><option>LOSS</option><option>FLAT</option></select></label><label>Realized P&amp;L USD<input inputMode="decimal" value={pnlInput} onChange={(e) => setPnlInput(e.target.value)} placeholder="Closed trade P&L" /></label><label>Instrument<select value={journalSymbol} onChange={(e) => setJournalSymbol(e.target.value as SymbolCode)}>{displaySymbols.map((s) => <option key={s}>{s}</option>)}</select></label></div>
-        <button className="desk-record-button" type="button" onClick={captureEntryContext}>CAPTURE ENTRY CONTEXT</button><small className="block mt-2 text-[10px] text-slate-500">{entryContext?.entryContextCapturedAtUtc ? `ENTRY CONTEXT CAPTURED ${entryContext.entryContextCapturedAtUtc}` : "Capture the current macro, VIX, session and risk state when opening a position."}</small><button className="desk-record-button" type="button" disabled={!pnlInput.trim() || !Number.isFinite(Number(pnlInput)) || locked} onClick={recordTrade}>RECORD CLOSED TRADE</button>
+        <button className="desk-record-button" type="button" onClick={captureEntryContext}>CAPTURE ENTRY CONTEXT</button><small className="block mt-2 text-[10px] text-slate-500">{entryContext?.entryContextCapturedAtUtc ? `ENTRY CONTEXT CAPTURED ${entryContext.entryContextCapturedAtUtc}` : "Capture the current macro, VIX, session and risk state when opening a position."}</small><button className="desk-record-button" type="button" disabled={!pnlInput.trim() || !Number.isFinite(Number(pnlInput)) || locked || (resultInput === 'WIN' && Number(pnlInput) <= 0) || (resultInput === 'LOSS' && Number(pnlInput) >= 0) || (resultInput === 'FLAT' && Number(pnlInput) !== 0)} onClick={recordTrade}>RECORD CLOSED TRADE</button>
         <div className="flex flex-wrap gap-2 mt-3"><button className="desk-record-button" type="button" onClick={() => exportJournal('json')}>EXPORT JSON</button><button className="desk-record-button" type="button" onClick={() => exportJournal('csv')}>EXPORT CSV</button></div>
         <div className="desk-journal-list">{journal.entries.slice(0, 5).map((entry) => <div key={entry.id}><span>{entry.symbol} · {entry.result}</span><b className={entry.pnl >= 0 ? 'desk-good' : 'desk-warning'}>{entry.pnl >= 0 ? '+' : ''}${entry.pnl.toFixed(2)}</b><small>{entry.timeUtc}</small></div>)}</div>
         <p className="desk-footnote">Journal persists in this browser only. Browser storage clearing or switching devices resets it. MT5 must independently enforce the same hard limits.</p>
