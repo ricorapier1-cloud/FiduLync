@@ -70,16 +70,19 @@ export default function TradeJournalPage() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    try {
-      const main = JSON.parse(localStorage.getItem(KEY) ?? '[]') as unknown;
-      const desk = JSON.parse(localStorage.getItem(DESK_KEY) ?? '{"entries":[]}') as { entries?: Record<string, unknown>[] };
-      const imported = Array.isArray(main) ? main as Record<string, unknown>[] : [];
-      const fromDesk = Array.isArray(desk.entries) ? desk.entries : [];
-      const merged = new Map<string, JournalTrade>();
-      [...imported, ...fromDesk].forEach(raw => { const item = normalize(raw); if (item) merged.set(item.id, item); });
-      setTrades([...merged.values()].sort((a,b) => b.timeUtc.localeCompare(a.timeUtc)));
-    } catch { setTrades([]); }
-    setReady(true);
+    const timer = window.setTimeout(() => {
+      try {
+        const main = JSON.parse(localStorage.getItem(KEY) ?? '[]') as unknown;
+        const desk = JSON.parse(localStorage.getItem(DESK_KEY) ?? '{"entries":[]}') as { entries?: Record<string, unknown>[] };
+        const imported = Array.isArray(main) ? main as Record<string, unknown>[] : [];
+        const fromDesk = Array.isArray(desk.entries) ? desk.entries : [];
+        const merged = new Map<string, JournalTrade>();
+        [...imported, ...fromDesk].forEach(raw => { const item = normalize(raw); if (item) merged.set(item.id, item); });
+        setTrades([...merged.values()].sort((a,b) => b.timeUtc.localeCompare(a.timeUtc)));
+      } catch { setTrades([]); }
+      setReady(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
   useEffect(() => { if (ready) localStorage.setItem(KEY, JSON.stringify(trades)); }, [trades, ready]);
 
@@ -129,7 +132,7 @@ export default function TradeJournalPage() {
   };
   return <div className="macro-page pb-36 sm:pb-12">
     <div className="macro-statusline mono"><span><span className="macro-pulse macro-pulse-live" /> QUANT TRADE JOURNAL / LOCAL PRIVATE LEDGER</span><span className="text-[10px] text-slate-500">UTC RECORDS · WAT OPERATING CONTEXT</span></div>
-    <section className="macro-intro"><div><span className="eyebrow">PERFORMANCE GOVERNANCE</span><h1>Quant Trade Journal.<br/><span>Measure the edge.</span></h1><p>Closed-trade ledger, risk-normalized outcomes and attribution analytics. Desk records are synchronized through this browser's local storage; no trade data is transmitted to a server.</p></div><div className="macro-intro-meta mono"><span>LEDGER / {trades.length} RECORDS</span><span className="macro-provenance">P&amp;L is user-recorded. Missing macro or regime observations remain null rather than being fabricated.</span></div></section>
+    <section className="macro-intro"><div><span className="eyebrow">PERFORMANCE GOVERNANCE</span><h1>Quant Trade Journal.<br/><span>Measure the edge.</span></h1><p>Closed-trade ledger, risk-normalized outcomes and attribution analytics. Desk records are synchronized through this browser&apos;s local storage; no trade data is transmitted to a server.</p></div><div className="macro-intro-meta mono"><span>LEDGER / {trades.length} RECORDS</span><span className="macro-provenance">P&amp;L is user-recorded. Missing macro or regime observations remain null rather than being fabricated.</span></div></section>
     <section className="mt-6"><div className="flex flex-wrap items-end justify-between gap-3 mb-3"><div><span className="eyebrow">01 / PERFORMANCE SUMMARY</span><h2 className="text-lg font-semibold text-slate-100">Institutional KPIs</h2></div><label className="text-[10px] text-slate-500">STARTING EQUITY USD<input className="ml-2 w-28 rounded border border-white/10 bg-[#0c1016] p-2 text-slate-200" value={capital} onChange={e=>setCapital(e.target.value)} inputMode="decimal"/></label></div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3"><Metric label="NET P&amp;L" value={money(stats.net)} hint={Number(capital)>0?(stats.net/Number(capital)*100).toFixed(2)+'% of starting equity':'Set starting equity'}/><Metric label="TOTAL R GAINED" value={stats.totalR.toFixed(2)+'R'}/><Metric label="WIN RATE" value={stats.winRate.toFixed(1)+'%'} hint={stats.wins+' wins / '+stats.losses+' losses'}/><Metric label="PROFIT FACTOR" value={stats.pf===null?'—':stats.pf.toFixed(2)}/><Metric label="EXPECTANCY" value={money(stats.expectancy)+' / trade'} hint={stats.expectancyR.toFixed(2)+'R per trade'}/><Metric label="MAX DRAWDOWN" value={stats.maxDd.toFixed(2)+'%'} hint="Peak-to-trough equity drawdown"/><Metric label="CURRENT STREAK" value={stats.streak?stats.streak+' '+stats.streakType:'—'} hint="Most recent consecutive outcomes"/><Metric label="GROSS PROFIT / LOSS" value={money(stats.grossProfit)+' / '+money(-stats.grossLoss)}/></div>
     </section>
