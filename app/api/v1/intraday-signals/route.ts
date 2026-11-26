@@ -65,7 +65,7 @@ export async function GET(request: Request) {
       const isGold = symbol === 'XAUUSD';
       const dossier = isGold ? null : generatePairDossier(snapshot, symbol);
       const macroScore = isGold ? gold.goldBiasScore : dossier?.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier?.biasScore ?? null;
-      return buildIntradaySignal({
+      const signal = buildIntradaySignal({
         symbol, macroScore,
         intradayBars: candles?.intradayBars ?? [],
         dailyBars: candles?.dailyBars ?? [],
@@ -79,6 +79,12 @@ export async function GET(request: Request) {
         session,
         nowUtc: now.toISOString(),
       });
+      return {
+        ...signal,
+        spreadBaselineStatus: baseline.status,
+        spreadBaselineObservations: baseline.observations,
+        spreadMultipleOfBaseline: baseline.multiple,
+      };
     }));
     return NextResponse.json({
       generatedAtUtc: now.toISOString(),
