@@ -281,7 +281,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
     const context: Partial<JournalEntry> = {
       symbol: journalSymbol, direction,
       macroBiasScore: Number.isFinite(score) ? score : null,
-      hurstRegime: goldContext?.liquidityRegime ?? snapshot.regime ?? null,
+      hurstRegime: null,
       vixLevel: Number.isFinite(vixValue) ? vixValue : null,
       session: activeSession === 'NEW YORK' ? 'NY' : activeSession,
       riskPct: Number.isFinite(risk) ? risk : null,
@@ -307,7 +307,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
       id: `${Date.now()}-${journalSymbol}-${Math.random().toString(36).slice(2, 8)}`,
       timeUtc, symbol: journalSymbol, result: resultInput, pnl, pnlUsd: pnl, direction,
       macroBiasScore: Number.isFinite(macroBiasScore) ? macroBiasScore : null,
-      hurstRegime: captured ? captured.hurstRegime ?? null : goldContext?.liquidityRegime ?? snapshot.regime ?? null,
+      hurstRegime: captured ? captured.hurstRegime ?? null : null,
       vixLevel: captured ? captured.vixLevel ?? null : (Number.isFinite(vixValue) ? vixValue : null),
       session: captured?.session ?? (activeSession === 'NEW YORK' ? 'NY' : activeSession),
       riskPct: captured ? captured.riskPct ?? null : (Number.isFinite(risk) ? risk : null),
