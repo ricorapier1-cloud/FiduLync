@@ -240,7 +240,7 @@ export default function DeskTerminal({ initialSnapshot, onSnapshotChange, onGold
             </div>
             <p className="mt-2 text-[10px] leading-relaxed text-slate-400">{signal.triggerRationale}</p>
             {signal.blockers.length > 0 && <p className="mt-2 text-[10px] text-amber-300">{signal.blockers.join(' · ')}</p>}
-            <p className="mt-1 text-[9px] text-slate-500">Spread baseline: {signal.spreadBaselineStatus ?? 'UNAVAILABLE'} · {signal.spreadBaselineObservations ?? 0}/20 samples</p>
+            <p className="mt-1 text-[9px] text-slate-500">Spread guard: {signal.spreadBaselineStatus === 'CONFIGURED_REFERENCE' ? 'CONFIGURED REFERENCE' : signal.spreadBaselineStatus ?? 'UNAVAILABLE'} · {signal.spreadBaselineObservations ?? 0} observed samples</p>
             <p className="mt-3 text-[10px] text-slate-500">Research context only. Your MT5 EA independently validates technical structure and execution.</p>
             {signal.dataAsOfUtc && <small className="mt-2 block text-[9px] text-slate-500">OHLCV {signal.dataAsOfUtc} · {signal.session}</small>}
           </div>;
