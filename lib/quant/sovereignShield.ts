@@ -35,7 +35,7 @@ export function evaluateMarketRiskShield(input: MarketRiskShieldInput): MarketRi
   const volatilityLock = (vixAvailable && vix >= 32)
     || (typeof input.intradayRangeAtrMultiple === 'number'
       && Number.isFinite(input.intradayRangeAtrMultiple) && input.intradayRangeAtrMultiple > 2.5);
-  const elevated = !volatilityLock && vixAvailable && vix >= 22;
+  const elevated = !volatilityLock && vixAvailable && vix >= 25;
   const status: SovereignShieldStatus = volatilityLock ? 'BLACK_SWAN_LOCKOUT'
     : !vixAvailable ? 'DATA_UNAVAILABLE'
       : elevated ? 'ELEVATED_VOLATILITY_HALF_RISK' : 'NORMAL';
