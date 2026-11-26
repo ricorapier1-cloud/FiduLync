@@ -90,6 +90,11 @@ test('trade journal provides private local ledger, performance analytics and por
   assert.match(notebookPage, /Export CSV|exportCsv/);
   assert.match(notebookPage, /Import JSON \/ CSV/);
   assert.match(notebookPage, /localStorage/);
+  assert.match(notebookPage, /sanitizeDeskRecord/);
+  assert.match(notebookPage, /capturedAtEntry/);
+  assert.match(notebookPage, /rMultiple: null/);
+  assert.match(notebookPage, /\[\.\.\.fromDesk, \.\.\.imported\]/);
+  assert.match(notebookPage, /maxDd:validStartingEquity\?maxDd:null/);
 });
 
 test('public MT5 bridge is read-only macro context with no licensing, heartbeat or synthetic tester path', () => {
