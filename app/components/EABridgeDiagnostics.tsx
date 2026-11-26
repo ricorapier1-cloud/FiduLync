@@ -50,7 +50,7 @@ export default function EABridgeDiagnostics() {
           <b className="font-mono text-emerald-300">MQL5 CONNECTION GUIDE</b>
           <ol className="mt-2 list-decimal space-y-1 pl-5">
             <li>Add <code>https://fidulync.vercel.app</code> to the MT5 terminal WebRequest allow-list.</li>
-            <li>Send GET requests with the private <code>MACRO_API_TOKEN</code> in the <code>x-macro-key</code> header or Bearer authorization. Do not put secrets in URLs, logs, or shared source files.</li>
+            <li>Send the private <code>MACRO_API_TOKEN</code> as a Bearer token for both endpoints. The macro-context endpoint also accepts <code>x-macro-key</code>; the dedicated XAUUSD endpoint accepts Bearer authorization only. Never put secrets in URLs, logs, or shared source files.</li>
             <li>Fail closed on HTTP errors, stale data, <code>newsLockoutActive=true</code>, or missing directional evidence.</li>
             <li>Use <code>allowedToTrade</code> as the macro gate only. The EA must independently enforce technical confirmation, broker-native lot sizing, spread, account risk, and its WAT daily circuit breaker.</li>
           </ol>
