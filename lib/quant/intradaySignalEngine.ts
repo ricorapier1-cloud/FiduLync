@@ -115,7 +115,7 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
   else if (input.spreadMultipleOfBaseline > 2) blockers.push('SPREAD_BLOWOUT_BLOCK');
   if (!finite(input.quoteMid) || !input.quoteTimestampUtc || !Number.isFinite(quoteAge) || quoteAge < -30_000 || quoteAge > 60_000) blockers.push('LIVE_BBO_UNAVAILABLE_OR_STALE');
   if (!Number.isFinite(candleAge) || candleAge < -60_000 || candleAge > 15 * 60_000) blockers.push('INTRADAY_CANDLES_STALE');
-  if (direction === 'NONE') blockers.push('MACRO_SCORE_BELOW_25_THRESHOLD');
+  if (direction === 'NONE') blockers.push(`MACRO_SCORE_BELOW_${isGold ? 20 : 25}_THRESHOLD`);
   if (bars.length < 60 || daily.length < 15 || !finite(ker) || !finite(atr)) blockers.push('OHLCV_HISTORY_INSUFFICIENT');
   if (finite(ker) && ker < 0.30) blockers.push('KER_BELOW_0_30');
 
@@ -131,11 +131,15 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
   }
   if (blockers.length) return empty('WAIT_NO_SETUP', 'Macro, OHLCV history or trend-quality confirmation is insufficient.');
 
-  const latestWatDate = latest ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(latest.timestampUtc)) : '';
+  const sessionTimeZone = session === 'LONDON' ? 'Africa/Lagos' : 'America/New_York';
+  const latestSessionDate = latest
+    ? new Intl.DateTimeFormat('en-CA', { timeZone: sessionTimeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(latest.timestampUtc))
+    : '';
   const sessionReference = bars.filter((bar) => {
-    const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(bar.timestampUtc));
-    const hour = watHour(bar.timestampUtc);
-    return date === latestWatDate && (session === 'LONDON' ? hour < 8 : hour >= 8 && hour < 12);
+    const timestamp = new Date(bar.timestampUtc);
+    const date = new Intl.DateTimeFormat('en-CA', { timeZone: sessionTimeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(timestamp);
+    const hour = hourInZone(timestamp, sessionTimeZone);
+    return date === latestSessionDate && hour < 8;
   });
   const prior = sessionReference.length ? sessionReference : bars.slice(-13, -1);
   const priorHigh = Math.max(...prior.map((bar) => bar.high));

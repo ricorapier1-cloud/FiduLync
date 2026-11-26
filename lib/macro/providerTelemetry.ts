@@ -60,7 +60,8 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
   const bisEuroPolicyRateHealthy = eur?.policyRateProvider === 'BIS'
     && Number.isFinite(eur.policyRate)
     && isFresh(eur.policyRateObservationDate, 180);
-  const ecbPolicyRateHealthy = Boolean(eur?.policyRateObservationDate && Number.isFinite(eur.policyRate)
+  const ecbPolicyRateHealthy = Boolean(eur?.policyRateProvider === 'ECB'
+    && eur.policyRateObservationDate && Number.isFinite(eur.policyRate)
     && isFresh(eur.policyRateObservationDate, 180));
   const ecb = ecbDirect.status === 'HEALTHY' ? ecbDirect
     : ecbPolicyRateHealthy || bisEuroPolicyRateHealthy

@@ -195,9 +195,14 @@ export default function DeskTerminal({ initialSnapshot, onSnapshotChange, onGold
         refreshFx(),
       ]);
       if (quoteResult.status === 'rejected') setQuoteStatus('DEGRADED');
-      if (goldResult.status === 'fulfilled') {
-        const freshGold = await goldResult.value.json() as GoldMacroContext;
-        onGoldContextChange(freshGold);
+      if (goldResult.status === 'fulfilled' && goldResult.value.ok) {
+        const freshGold: unknown = await goldResult.value.json();
+        if (freshGold && typeof freshGold === 'object'
+          && 'overallState' in freshGold && 'drivers' in freshGold) {
+          onGoldContextChange(freshGold as GoldMacroContext);
+        } else {
+          onGoldContextChange(null);
+        }
       } else {
         onGoldContextChange(null);
       }
@@ -247,7 +252,7 @@ export default function DeskTerminal({ initialSnapshot, onSnapshotChange, onGold
         })}
         {intradaySignals.length === 0 && <p className="macro-empty col-span-full">Signal service unavailable. No executable levels are published without verified inputs.</p>}
       </div>
-      <div className="desk-syncline"><span>Signal refresh {signalSyncUtc ?? 'NOT AVAILABLE'}</span><span>Macro score ≥ +25 BUY / ≤ −25 SELL</span><span>Signals are research-only; MT5 must independently validate spread and execution</span><button type="button" onClick={() => void refreshIntradaySignals()}>REFRESH SIGNALS</button></div>
+      <div className="desk-syncline"><span>Signal refresh {signalSyncUtc ?? 'NOT AVAILABLE'}</span><span>FX ±25 · XAUUSD ±20 directional threshold</span><span>Signals are research-only; MT5 must independently validate spread and execution</span><button type="button" onClick={() => void refreshIntradaySignals()}>REFRESH SIGNALS</button></div>
     </article>
     <div className="desk-grid">
       <article className="desk-panel"><header><div><span className="desk-kicker">A / UNIFIED CURRENCY MATRIX</span><h3>Spot Momentum vs Fundamental Rate Strength</h3></div><small>20-DAY REFERENCE · LIVE MACRO</small></header>
