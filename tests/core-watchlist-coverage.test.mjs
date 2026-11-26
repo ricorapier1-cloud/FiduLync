@@ -12,6 +12,7 @@ test('primary user watchlist has EURUSD, GBPUSD, XAUUSD and USDJPY across quotes
     assert.match(signals, new RegExp(symbol));
     assert.match(quotes, new RegExp(symbol));
   }
-  assert.match(desk, /const symbols: string\[\] = \['EURUSD', 'GBPUSD', 'XAUUSD', 'USDJPY'\]/);
+  assert.match(desk, /const symbols: string\[\] = \['EURUSD', 'XAUUSD', 'USDJPY'\]/);
+  assert.match(desk, /const activeSatelliteSymbol = satelliteSymbol \?\? 'GBPUSD'/);
   assert.match(signals, /const symbols = \['EURUSD', 'GBPUSD', 'XAUUSD', 'USDJPY'/);
 });
