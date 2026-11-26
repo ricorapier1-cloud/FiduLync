@@ -16,6 +16,13 @@ function safeEqual(candidate: string, expected: string): boolean {
     && timingSafeEqual(candidateBuffer, expectedBuffer);
 }
 
+function isFreshCotReport(date: string | undefined, maxAgeDays = 14): boolean {
+  if (!date) return false;
+  const timestamp = Date.parse(date);
+  const ageMs = Date.now() - timestamp;
+  return Number.isFinite(timestamp) && ageMs >= -5 * 60_000 && ageMs <= maxAgeDays * 86_400_000;
+}
+
 function isAuthorized(request: Request): boolean {
   const configuredTokens = [
     process.env.MACRO_API_TOKEN?.trim() ?? '',
@@ -28,8 +35,7 @@ function isAuthorized(request: Request): boolean {
   const bearerToken = authorization.startsWith('Bearer ')
     ? authorization.slice('Bearer '.length).trim()
     : '';
-  const queryToken = new URL(request.url).searchParams.get('token')?.trim() ?? '';
-  const candidate = bearerToken || queryToken;
+  const candidate = bearerToken;
   if (!candidate) return false;
 
   return configuredTokens.some((expected) => safeEqual(candidate, expected));
@@ -53,16 +59,22 @@ export async function GET(request: Request): Promise<NextResponse> {
   try {
     const snapshot = await getMacroSnapshot();
     const context = await buildGoldMacroContext(snapshot);
-    const nearestEvent = snapshot.catalysts.filter((event) => event.impact === 'High')
+    const highImpactEvents = snapshot.catalysts.filter((event) => event.impact === 'High')
       .map((event) => ({ event, minutes: (Date.parse(event.scheduledAt) - Date.now()) / 60_000 }))
-      .filter((item) => Number.isFinite(item.minutes))
+      .filter((item) => Number.isFinite(item.minutes));
+    const nearestEvent = [...highImpactEvents].sort((a, b) => Math.abs(a.minutes) - Math.abs(b.minutes))[0];
+    const nearestRateDecision = highImpactEvents
+      .filter((item) => /rate decision|interest rate|monetary policy decision|policy rate/i.test(item.event.title))
       .sort((a, b) => Math.abs(a.minutes) - Math.abs(b.minutes))[0];
-    const rateDecision = Boolean(nearestEvent && /rate decision|interest rate|monetary policy decision|policy rate/i.test(nearestEvent.event.title));
+    const rateDecision = Boolean(nearestRateDecision && Math.abs(nearestRateDecision.minutes) <= 60);
+    const eventMinutesAway = rateDecision ? nearestRateDecision!.minutes : nearestEvent?.minutes ?? null;
     const shield = evaluateSovereignShield({
       vix: context.drivers.VIXCLS.value,
-      eventMinutesAway: nearestEvent?.minutes ?? null,
+      eventMinutesAway,
       isCentralBankRateDecision: rateDecision,
-      cotPercentiles: snapshot.cot.map((position) => ({ symbol: position.market, percentile: position.percentile })),
+      cotPercentiles: snapshot.cot
+        .filter((position) => isFreshCotReport(position.reportDate) && Number.isFinite(position.percentile))
+        .map((position) => ({ symbol: position.market, percentile: position.percentile })),
       governance: { tradesToday: null, lossesToday: null, rollingSevenDayDrawdownPct: null, ledgerVerified: false },
     });
     const status = context.overallState === 'AVAILABLE' ? 200 : 503;
