@@ -12,7 +12,7 @@ const navigationLinks = [
   { href: '/#bias', label: 'Pair Bias', icon: 'gauge' },
   { href: '/#catalysts', label: 'Catalysts', icon: 'calendar' },
   { href: '/#regimes', label: 'Cross-Asset', icon: 'radio' },
-  { href: '/notebook', label: 'Research Notebook', icon: 'activity' },
+  { href: '/notebook', label: 'Trade Journal', icon: 'activity' },
   { href: '/workbench', label: 'Validation Workbench', icon: 'trend' },
   { href: '/faq', label: 'FAQ', icon: 'shield-alert' },
 ] as const satisfies readonly { href: string; label: string; icon: BrandGlyphName }[];
@@ -51,7 +51,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
 
           <div className="topbar-actions">
             <Link className="secure-pill" href="/notebook">
-              <span className="secure-dot" /> Research Notebook
+              <span className="secure-dot" /> Trade Journal
             </Link>
             <button
               type="button"
@@ -110,7 +110,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
               <Link href="/" className="breadcrumb-root">Terminal</Link>
               <span className="breadcrumb-separator">/</span>
               <span className="breadcrumb-current">
-                {pathname === '/notebook' ? 'Research Notebook' :
+                {pathname === '/notebook' ? 'Trade Journal' :
                  pathname === '/workbench' ? 'Validation Workbench' :
                  pathname === '/faq' ? 'FAQ & Methodology' :
                  pathname === '/privacy' ? 'Privacy Policy' :
