@@ -159,3 +159,14 @@ test('architecture: one evidence-gated macro opportunity board is integrated int
   assert.ok(route.includes('NO_QUALIFIED_CANDIDATES'));
   assert.doesNotMatch(route, /divergence_pair: pair/);
 });
+
+
+test('service worker never serves cached API data and removes obsolete application caches', () => {
+  const worker = read('../public/sw.js');
+  assert.match(worker, /caches\.keys\(\)/);
+  assert.match(worker, /caches\.delete\(name\)/);
+  assert.match(worker, /url\.pathname\.startsWith\('\/api\/'\)/);
+  assert.match(worker, /event\.request\.method !== 'GET'/);
+  assert.match(worker, /caches\.match\('\/'\)/);
+  assert.doesNotMatch(worker, /caches\.match\(event\.request\)\.then\(\(response\) => response \|\| fetch\(event\.request\)\)/);
+});
