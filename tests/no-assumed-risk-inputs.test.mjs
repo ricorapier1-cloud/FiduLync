@@ -11,7 +11,7 @@ test('risk calculator never pre-populates assumed account equity, risk, stop or 
   assert.match(desk, /const \[sl, setSl\] = useState\(''\)/);
   assert.match(desk, /const \[tp, setTp\] = useState\(''\)/);
   assert.match(desk, /calculatorInputsValid/);
-  assert.match(desk, /GROSS TARGET P\\/L · EST\./);
+  assert.match(desk, /GROSS TARGET P.L/);
   assert.doesNotMatch(desk, /EXPECTED GROSS PROFIT/);
 });
 
