@@ -126,6 +126,7 @@ export default function AccountsPage() {
     window.sessionStorage.removeItem('macrolinc-account-read-token');
     setToken('');
     setPayload(null);
+    setSelectedAccountKey('');
     setStatus('DISCONNECTED');
     setMessage('Private account view disconnected in this browser tab.');
   };
