@@ -49,7 +49,7 @@ export default function PlatformFooter() {
               </li>
               <li>
                 <Link href="/notebook" className="transition hover:text-emerald-300">
-                  Macro Research Notebook
+                  Trade Journal
                 </Link>
               </li>
               <li>
