@@ -77,6 +77,9 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
     .filter((catalyst) => now === null || Date.parse(catalyst.scheduledAt) >= now)
     .sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt));
   const currencies = snapshot.currencies;
+  const eiaFresh = Boolean(snapshot.energyMarkets
+    && isFreshObservation(snapshot.energyMarkets.wti.observationDate, 10)
+    && isFreshObservation(snapshot.energyMarkets.brent.observationDate, 10));
   const divergenceRanked = useMemo(() => {
     return currencies
       .map((c) => {
@@ -489,11 +492,11 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
             { label: 'US 10Y benchmark', value: snapshot.usTreasury?.nominal10YPct ?? null, unit: '%', source: 'U.S. Treasury', observationDate: snapshot.usTreasury?.observationDate ?? null, stale: snapshot.usTreasury?.freshness === 'STALE' },
-            { label: 'US 2s10s curve', value: snapshot.usTreasury?.twoYearTenYearSpreadBps ?? null, unit: 'bps', source: 'U.S. Treasury', observationDate: snapshot.usTreasury?.observationDate ?? null },
-            { label: '10Y TIPS real yield', value: snapshot.usTreasury?.real10YPct ?? null, unit: '%', source: 'U.S. Treasury', observationDate: snapshot.usTreasury?.observationDate ?? null },
+            { label: 'US 2s10s curve', value: snapshot.usTreasury?.twoYearTenYearSpreadBps ?? null, unit: 'bps', source: 'U.S. Treasury', observationDate: snapshot.usTreasury?.observationDate ?? null, stale: snapshot.usTreasury?.freshness === 'STALE' },
+            { label: '10Y TIPS real yield', value: snapshot.usTreasury?.real10YPct ?? null, unit: '%', source: 'U.S. Treasury', observationDate: snapshot.usTreasury?.observationDate ?? null, stale: snapshot.usTreasury?.freshness === 'STALE' },
             { label: 'CBOE VIX', value: snapshot.vix?.freshness === 'LATEST PUBLISHED' ? snapshot.vix.value : null, unit: '', source: 'CBOE daily close', observationDate: snapshot.vix?.observationDate ?? null, stale: snapshot.vix?.freshness === 'STALE' },
-            { label: 'WTI crude oil', value: snapshot.energyMarkets?.wti.valueUsdPerBarrel ?? null, unit: 'USD/bbl', source: 'EIA', observationDate: snapshot.energyMarkets?.wti.observationDate ?? null, stale: false },
-            { label: 'Brent crude oil', value: snapshot.energyMarkets?.brent.valueUsdPerBarrel ?? null, unit: 'USD/bbl', source: 'EIA', observationDate: snapshot.energyMarkets?.brent.observationDate ?? null, stale: false },
+            { label: 'WTI crude oil', value: eiaFresh ? snapshot.energyMarkets?.wti.valueUsdPerBarrel ?? null : null, unit: 'USD/bbl', source: 'EIA', observationDate: snapshot.energyMarkets?.wti.observationDate ?? null, stale: Boolean(snapshot.energyMarkets && !eiaFresh) },
+            { label: 'Brent crude oil', value: eiaFresh ? snapshot.energyMarkets?.brent.valueUsdPerBarrel ?? null : null, unit: 'USD/bbl', source: 'EIA', observationDate: snapshot.energyMarkets?.brent.observationDate ?? null, stale: Boolean(snapshot.energyMarkets && !eiaFresh) },
           ].map(({ label, value, unit, source, observationDate, stale }) => (
             <div className="macro-panel p-3" key={label}>
               <span className="text-[10px] font-mono text-slate-400 block">{label.toUpperCase()}</span>
@@ -508,7 +511,173 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
         </div>
         {snapshot.energyMarkets && (
           <p className="text-[10px] text-slate-500 font-mono mt-2">
-            EIA Brent–WTI spot spread: ${snapshot.energyMarkets.brentWtiSpreadUsd.toFixed(2)}/barrel · Retrieved {snapshot.energyMarkets.wti.retrievedAtUtc} · Daily published spot observations, not intraday futures or live ticks.
+            EIA Brent–WTI spot spread: {eiaFresh ? '
+        {snapshot.usTreasury && (
+          <p className="text-[10px] text-slate-500 font-mono mt-2">
+            U.S. Treasury nominal and TIPS curves: observation {snapshot.usTreasury.observationDate} · {snapshot.usTreasury.freshness} · Retrieved {snapshot.usTreasury.retrievedAtUtc} · Daily published closing-market estimates, not intraday streaming yields.
+          </p>
+        )}
+        {snapshot.vix && (
+          <p className="text-[10px] text-slate-500 font-mono mt-2">
+            Cboe VIX: daily closing index observation {snapshot.vix.observationDate} · {snapshot.vix.freshness} · Retrieved {snapshot.vix.retrievedAtUtc} · Not an intraday volatility quote.
+          </p>
+        )}
+      </section>
+
+      {/* Dedicated gold macro engine: not scored through the generic FX dossier */}
+      <section id="gold-research" className="macro-section" aria-labelledby="gold-research-title">
+        <div className="macro-section-heading">
+          <div>
+            <span className="eyebrow">07 / XAUUSD DEDICATED RESEARCH</span>
+            <h2 id="gold-research-title">Gold Macro &amp; Liquidity Intelligence</h2>
+          </div>
+          <span className="macro-section-note mono">{goldContext?.overallState ?? 'UNAVAILABLE'}</span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="macro-panel p-3 min-w-0 break-words">
+            <span className="text-[10px] font-mono text-slate-400">GOLD BIAS SCORE</span>
+            <strong className="block text-sm sm:text-lg font-mono mt-1 min-w-0 break-words">{goldContext?.goldBiasScore ?? '—'}</strong>
+            <small className="text-[10px] text-slate-500">{goldContext?.evidenceCoveragePct ?? 0}% evidence coverage · not a probability</small>
+          </div>
+          <div className="macro-panel p-3 min-w-0 break-words">
+            <span className="text-[10px] font-mono text-slate-400">DIRECTIONAL VERDICT</span>
+            <strong className="block text-sm sm:text-lg font-mono mt-2 min-w-0 break-words">{goldContext?.directionalVerdict ?? 'UNAVAILABLE'}</strong>
+            <small className="text-[10px] text-slate-500">Research context, not an entry signal</small>
+          </div>
+          <div className="macro-panel p-3 min-w-0 break-words">
+            <span className="text-[10px] font-mono text-slate-400">LIQUIDITY REGIME</span>
+            <strong className="block text-sm sm:text-lg font-mono mt-2 min-w-0 break-words">{goldContext?.liquidityRegime ?? 'INSUFFICIENT_EVIDENCE'}</strong>
+            <small className="text-[10px] text-slate-500">Cross-asset stress / carry context</small>
+          </div>
+          <div className="macro-panel p-3 min-w-0 break-words">
+            <span className="text-[10px] font-mono text-slate-400">SPOT OBSERVATION</span>
+            <strong className="block text-sm sm:text-lg font-mono mt-2 min-w-0 break-words">{goldContext?.quote.mid === null || goldContext?.quote.mid === undefined ? '—' : goldContext.quote.mid.toFixed(2)}</strong>
+            <small className="text-[10px] text-slate-500">{goldContext?.quote.state ?? 'UNAVAILABLE'} · {goldContext?.quote.quoteTimestampUtc ?? 'NO VERIFIED TIME'}</small>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-3">
+          <div className="macro-panel p-4">
+            <h3 className="text-xs font-mono text-slate-300 mb-3">SUPPORTING EVIDENCE</h3>
+            {goldContext?.supportingEvidence.length
+              ? <ul className="macro-brief-list">{initialGoldContext.supportingEvidence.map((item, index) => <li key={index}>{item}</li>)}</ul>
+              : <p className="macro-empty">No verified supporting evidence is currently available.</p>}
+          </div>
+          <div className="macro-panel p-4">
+            <h3 className="text-xs font-mono text-slate-300 mb-3">CONTRADICTING EVIDENCE / INVALIDATION</h3>
+            {goldContext?.contradictingEvidence.length
+              ? <ul className="macro-brief-list">{initialGoldContext.contradictingEvidence.map((item, index) => <li key={index}>{item}</li>)}</ul>
+              : <p className="macro-empty">No verified contradicting evidence is currently available.</p>}
+            {goldContext?.invalidationTriggers.length
+              ? <ul className="macro-brief-list mt-3">{initialGoldContext.invalidationTriggers.map((item, index) => <li key={index}>{item}</li>)}</ul>
+              : null}
+          </div>
+        </div>
+        <div className="macro-panel p-3 mt-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div><span className="block text-[10px] font-mono text-slate-500">DFII10 · REAL YIELD</span><strong className="block text-sm font-mono mt-1">{goldContext?.drivers.DFII10.value ?? '—'}</strong><small className="text-[10px] text-slate-500">{goldContext?.drivers.DFII10.state ?? 'UNAVAILABLE'} · {goldContext?.drivers.DFII10.observationDate ?? '—'}</small></div>
+            <div><span className="block text-[10px] font-mono text-slate-500">T10YIE · BREAKEVEN</span><strong className="block text-sm font-mono mt-1">{goldContext?.drivers.T10YIE.value ?? '—'}</strong><small className="text-[10px] text-slate-500">{goldContext?.drivers.T10YIE.state ?? 'UNAVAILABLE'} · {goldContext?.drivers.T10YIE.observationDate ?? '—'}</small></div>
+            <div><span className="block text-[10px] font-mono text-slate-500">DGS2 · 2Y TREASURY</span><strong className="block text-sm font-mono mt-1">{goldContext?.drivers.DGS2.value ?? '—'}</strong><small className="text-[10px] text-slate-500">{goldContext?.drivers.DGS2.state ?? 'UNAVAILABLE'} · {goldContext?.drivers.DGS2.observationDate ?? '—'}</small></div>
+            <div><span className="block text-[10px] font-mono text-slate-500">3M CMT · TREASURY PROXY</span><strong className="block text-sm font-mono mt-1">{goldContext?.drivers.DTB3.value ?? '—'}</strong><small className="text-[10px] text-slate-500">{goldContext?.drivers.DTB3.state ?? 'UNAVAILABLE'} · {goldContext?.drivers.DTB3.observationDate ?? '—'}</small></div>
+            <div><span className="block text-[10px] font-mono text-slate-500">HY OAS · CREDIT</span><strong className="block text-sm font-mono mt-1">{goldContext?.drivers.BAMLH0A0HYM2.value ?? '—'}</strong><small className="text-[10px] text-slate-500">{goldContext?.drivers.BAMLH0A0HYM2.state ?? 'UNAVAILABLE'} · {goldContext?.drivers.BAMLH0A0HYM2.observationDate ?? '—'}</small></div>
+            <div><span className="block text-[10px] font-mono text-slate-500">VIX · VOLATILITY</span><strong className="block text-sm font-mono mt-1">{goldContext?.drivers.VIXCLS.value ?? '—'}</strong><small className="text-[10px] text-slate-500">{goldContext?.drivers.VIXCLS.state ?? 'UNAVAILABLE'} · {goldContext?.drivers.VIXCLS.observationDate ?? '—'}</small></div>
+          </div>
+          <p className="text-[10px] text-slate-500 font-mono mt-3">CFTC gold positioning report: {goldContext?.cot.reportDate ?? 'UNAVAILABLE'} · Retrieved {goldContext?.generatedAtUtc ?? '—'} · FRED daily-published series and CFTC weekly positioning are not intraday streaming feeds.</p>
+        </div>
+      </section>
+
+      <section id="positioning" className="macro-section" aria-labelledby="cot-title">
+        <div className="macro-section-heading">
+          <div>
+            <span className="eyebrow">08 / POSITIONING &amp; CROWDING</span>
+            <h2 id="cot-title">CFTC Commitments of Traders (COT)</h2>
+          </div>
+          <a className="macro-inline-link" href="https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm" target="_blank" rel="noreferrer">
+            Official Socrata Portal <BrandGlyph name="external-link" size={13} />
+          </a>
+        </div>
+        <div className="macro-cot-layout">
+          <div className="macro-panel macro-cot-panel">
+            <div className="macro-cot-head">
+              <span>MARKET</span>
+              <span>NET NON-COMMERCIAL</span>
+              <span>W/W CHANGE</span>
+              <span>EXTREME CROWDING</span>
+            </div>
+            {snapshot.cot.length === 0 && (
+              <p className="macro-empty">CFTC positioning is temporarily unavailable; monetary policy inputs remain active.</p>
+            )}
+            {snapshot.cot.map((position) => (
+              <div className="macro-cot-row" key={position.market}>
+                <strong className="mono">{position.market}</strong>
+                <span className={`mono ${position.netContracts >= 0 ? 'macro-positive' : 'macro-negative'}`}>
+                  {formatContracts(position.netContracts)}
+                </span>
+                <span className={`mono ${position.weeklyChange >= 0 ? 'macro-positive' : 'macro-negative'}`}>
+                  {position.weeklyChange > 0 ? '+' : ''}{formatContracts(position.weeklyChange)}
+                </span>
+                <div className="macro-extreme">
+                  <div className="macro-extreme-track"><span style={{ width: `${position.percentile}%` }} /></div>
+                  <span className="mono">{position.percentile}%ile</span>
+                  {(position.percentile >= 90 || position.percentile <= 10) && <span className="macro-crowded">CROWDED</span>}
+                </div>
+              </div>
+            ))}
+            <div className="macro-panel-foot">
+              <span>CFTC observations are published weekly; verify report date and vintage for each record.</span>
+              <span className="mono">POSITIONING ≠ EXECUTION TRIGGER</span>
+            </div>
+          </div>
+          <aside className="macro-cot-callout">
+            <div className="macro-callout-icon"><BrandGlyph name="trend" size={18} /></div>
+            <span className="eyebrow">CROWDING INTELLIGENCE</span>
+            <h3>Extreme positioning amplifies reversals.</h3>
+            <p>
+              When speculative non-commercial positioning breaches the 90th or 10th percentile, markets become vulnerable to violent unwinds upon unexpected macroeconomic prints.
+            </p>
+            <div className="macro-callout-stat">
+              <span>MOST CROWDED CONTRACT</span>
+              <strong className="mono">
+                {snapshot.cot.length > 0
+                  ? `${snapshot.cot.reduce((highest, current) => current.percentile > highest.percentile ? current : highest, snapshot.cot[0]).market} ${Math.max(...snapshot.cot.map((position) => position.percentile))}%ile`
+                  : 'Unavailable'}
+              </strong>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <EABridgeDiagnostics />
+
+      {/* Provider Health & Telemetry Diagnostics */}
+      <section id="health" className="macro-section" aria-labelledby="health-title">
+        <div className="macro-section-heading">
+          <div><span className="eyebrow">09 / TELEMETRY</span><h2 id="health-title">Data Ingestion Health &amp; Freshness</h2></div>
+          <span className="macro-section-note mono">OBSERVED STATUS ONLY</span>
+        </div>
+        <div className="macro-panel p-4">
+          {snapshot.providerStatus?.length ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {snapshot.providerStatus.map((provider) => (
+                <div key={provider.name} className="p-3 rounded border border-white/[0.08] bg-[#0c1016]">
+                  <div className="flex items-center justify-between gap-2 text-xs font-mono">
+                    <span className="text-slate-300">{provider.name}</span>
+                    <span className={provider.status === 'HEALTHY' ? 'text-emerald-400' : provider.status === 'STANDBY' ? 'text-slate-400' : provider.status === 'UNCONFIGURED' || provider.status === 'OFFLINE' ? 'text-rose-400' : 'text-amber-300'}>{provider.status === 'STANDBY' ? 'STANDBY • BIS ACTIVE' : provider.status}</span>
+                  </div>
+                  <div className="text-[11px] text-slate-500 font-mono mt-1">{provider.freshness} · {provider.latencyMs === null ? 'Latency unmeasured' : `${provider.latencyMs} ms`}</div>
+                  <div className="text-[10px] text-slate-600 font-mono mt-1">{provider.latestObservationDate ? `Latest observation ${provider.latestObservationDate}` : 'Observation date not recorded'}{provider.lastSuccessfulSyncUtc ? ` · Retrieved ${provider.lastSuccessfulSyncUtc}` : ''}</div>
+                  {provider.detail && <p className="text-[10px] text-slate-400 mt-2 leading-relaxed">{provider.detail}</p>}
+                  {provider.nextAction && <p className="text-[10px] text-amber-300 mt-2 leading-relaxed">ACTION: {provider.nextAction}</p>}
+                </div>
+              ))}
+            </div>
+          ) : <p className="macro-empty">Provider health telemetry is unavailable. Credential presence is not treated as a successful health check.</p>}
+        </div>
+      </section>
+
+    </div>
+  );
+}
+ + snapshot.energyMarkets.brentWtiSpreadUsd.toFixed(2) + '/barrel' : 'UNAVAILABLE · STALE'} · WTI obs {snapshot.energyMarkets.wti.observationDate} / Brent obs {snapshot.energyMarkets.brent.observationDate} · Retrieved {snapshot.energyMarkets.wti.retrievedAtUtc} · Daily published spot observations, not intraday futures or live ticks.
           </p>
         )}
         {snapshot.usTreasury && (
