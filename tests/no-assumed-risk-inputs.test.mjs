@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const desk = read('../app/components/DeskTerminal.tsx');
@@ -10,4 +10,16 @@ test('standalone risk calculator and manual trade journal are retired from the m
   assert.doesNotMatch(desk, /calculatorInputsValid|desk-position-sizing|LIVE RISK CALCULATOR|Position Sizing|WAT Daily Circuit Breaker/);
   assert.doesNotMatch(desk, /fidulync-desk-journal-v1|fidulync-quant-trade-journal-v1|RECORD CLOSED TRADE/);
   assert.match(notebook, /redirect\('\/accounts'\)/);
+});
+
+
+test('retired unused synthetic and manual risk modules are absent from the personal macro terminal', () => {
+  for (const path of [
+    '../lib/quantRisk.ts',
+    '../lib/tradeLedger.ts',
+    '../lib/roroEngine.ts',
+    '../lib/institutionalGuards.ts',
+  ]) {
+    assert.equal(existsSync(new URL(path, import.meta.url)), false, path + ' must remain retired');
+  }
 });
