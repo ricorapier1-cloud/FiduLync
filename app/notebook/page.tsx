@@ -76,8 +76,17 @@ export default function TradeJournalPage() {
         const desk = JSON.parse(localStorage.getItem(DESK_KEY) ?? '{"entries":[]}') as { entries?: Record<string, unknown>[] };
         const imported = Array.isArray(main) ? main as Record<string, unknown>[] : [];
         const fromDesk = Array.isArray(desk.entries) ? desk.entries : [];
+        const sanitizeDeskRecord = (raw: Record<string, unknown>) => {
+          const deskRecord = typeof raw.result === 'string' || Object.prototype.hasOwnProperty.call(raw, 'pnl');
+          if (!deskRecord) return raw;
+          const capturedAtEntry = typeof raw.entryContextCapturedAtUtc === 'string' && Number.isFinite(Date.parse(raw.entryContextCapturedAtUtc));
+          const capturedRisk = num(raw.riskAmountUsdAtEntry);
+          if (!capturedAtEntry) return { ...raw, rMultiple: null, riskPct: null, macroBiasScore: null, hurstRegime: null, vixLevel: null, session: 'UNKNOWN', macroAlignment: 'UNKNOWN' };
+          if (capturedRisk === null || capturedRisk <= 0) return { ...raw, rMultiple: null };
+          return raw;
+        };
         const merged = new Map<string, JournalTrade>();
-        [...imported, ...fromDesk].forEach(raw => { const item = normalize(raw); if (item) merged.set(item.id, item); });
+        [...fromDesk, ...imported].forEach(raw => { const item = normalize(sanitizeDeskRecord(raw)); if (item) merged.set(item.id, item); });
         setTrades([...merged.values()].sort((a,b) => b.timeUtc.localeCompare(a.timeUtc)));
       } catch { setTrades([]); }
       setReady(true);
