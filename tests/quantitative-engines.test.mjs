@@ -300,7 +300,7 @@ test('intraday signal engine blocks stale quotes, weak macro bias and missing sh
   const desk = read('../app/components/DeskTerminal.tsx');
   const engine = read('../lib/quant/intradaySignalEngine.ts');
   assert.match(desk, /intradaySignals\.map/);
-  assert.match(engine, /input\.macroScore !== null && input\.macroScore >= 25/);
+  assert.match(engine, /input\.macroScore !== null && input\.macroScore >= \(isGold \? 20 : 25\)/);
   assert.match(engine, /LIVE_BBO_UNAVAILABLE_OR_STALE/);
   assert.match(engine, /INTRADAY_CANDLES_STALE/);
   assert.match(engine, /VIX_UNAVAILABLE/);
@@ -557,13 +557,13 @@ test('Force Sync refreshes the macro snapshot, gold context, BBO and spot refere
 
 test('intraday signal engine enforces macro threshold, trend quality, live sessions, shield gates and ATR-calibrated levels', () => {
   const engine = read('../lib/quant/intradaySignalEngine.ts');
-  assert.match(engine, /input\.macroScore >= 25/);
-  assert.match(engine, /input\.macroScore <= -25/);
+  assert.match(engine, /isGold \? 20 : 25/);
+  assert.match(engine, /isGold \? -20 : -25/);
   assert.match(engine, /calculateKaufmanEfficiencyRatio\(closes, 14\)/);
   assert.match(engine, /const hurst: number \| null = null/);
   assert.doesNotMatch(engine, /estimateHurstExponent|HURST_NOT_TREND_PERSISTENT/);
   assert.match(engine, /ker < 0\.30/);
-  assert.match(engine, /atr! \* 1\.35/);
+  assert.match(engine, /const stopAtrMultiple = finite\(input\.vix\) && input\.vix >= 25 \? 1\.5 : 1\.35/);
   assert.match(engine, /riskDistance \* 2/);
   assert.match(engine, /riskDistance \* 3/);
   assert.match(engine, /VIX_BLACK_SWAN_LOCKOUT/);
@@ -583,6 +583,7 @@ test('Sovereign Shield fails closed when VIX evidence is missing or invalid', ()
   assert.match(shield, /!vixAvailable \? 'DATA_UNAVAILABLE'/);
   assert.match(shield, /status === 'DATA_UNAVAILABLE'/);
   assert.match(shield, /!vixAvailable\) reasons\.push\('VIX_UNAVAILABLE'\)/);
+  assert.match(shield, /vix >= 32/);
   assert.match(deskTypes, /'DATA_UNAVAILABLE'/);
   const macroContext = read('../app/api/v1/macro-context/route.ts');
   const xauContext = read('../app/api/v1/xauusd-context/route.ts');
@@ -668,15 +669,22 @@ test('provider health includes real EIA and Treasury observation dates and BIS-b
 });
 
 
-test('spread blowout protection uses a measured same-session Redis median and waits for warm-up', () => {
+test('spread blowout protection uses a disclosed configured reference until a measured same-session Redis median is available', () => {
   const baseline = read('../lib/quant/spreadBaseline.ts');
   const route = read('../app/api/v1/intraday-signals/route.ts');
   const desk = read('../app/components/DeskTerminal.tsx');
   assert.match(baseline, /redis\.lpush/);
   assert.match(baseline, /redis\.lrange/);
-  assert.match(baseline, /values\.length < 20/);
+  assert.match(baseline, /values\.length >= 20/);
+  assert.match(baseline, /EURUSD: 0\.00018/);
+  assert.match(baseline, /GBPUSD: 0\.00022/);
+  assert.match(baseline, /USDJPY: 0\.020/);
+  assert.match(baseline, /XAUUSD: 0\.85/);
+  assert.match(baseline, /GBPJPY: 0\.030/);
+  assert.match(baseline, /CONFIGURED_REFERENCE/);
   assert.match(baseline, /spread \/ medianSpread/);
   assert.match(route, /recordAndEvaluateSpreadBaseline/);
   assert.match(route, /spreadMultipleOfBaseline: baseline\.multiple/);
-  assert.match(desk, /Spread baseline:/);
+  assert.match(desk, /Spread guard:/);
+  assert.match(desk, /activeSatelliteSymbol/);
 });
