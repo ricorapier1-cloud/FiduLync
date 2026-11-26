@@ -82,10 +82,14 @@ test('architecture: macro context API is read-only and contains no order executi
   assert.match(macroContextRoute, /Retry-After/);
 });
 
-test('research notebook starts empty and defaults to insufficient evidence', () => {
-  assert.match(notebookPage, /useState<ResearchHypothesis\[]>\(\[\]\)/);
-  assert.doesNotMatch(notebookPage, /INITIAL_DEMO_HYPOTHESIS|hyp-sample-01/);
-  assert.match(notebookPage, /INSUFFICIENT_EVIDENCE/);
+test('trade journal provides private local ledger, performance analytics and portable import/export', () => {
+  assert.match(notebookPage, /fidulync-quant-trade-journal-v1/);
+  assert.match(notebookPage, /Profit Factor|PROFIT FACTOR/);
+  assert.match(notebookPage, /MAX DRAWDOWN/);
+  assert.match(notebookPage, /macroAlignment/);
+  assert.match(notebookPage, /Export CSV|exportCsv/);
+  assert.match(notebookPage, /Import JSON \/ CSV/);
+  assert.match(notebookPage, /localStorage/);
 });
 
 test('public MT5 bridge is read-only macro context with no licensing, heartbeat or synthetic tester path', () => {
