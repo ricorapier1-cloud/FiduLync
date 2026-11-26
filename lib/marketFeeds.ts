@@ -62,7 +62,7 @@ async function getFrankfurterQuotes(): Promise<MarketQuote[]> {
   const payload: unknown = await response.json();
   if (!isRecord(payload) || !isRecord(payload.rates)) throw new Error('Frankfurter rates payload is invalid.');
   const rates = payload.rates;
-  const timestamp = typeof payload.date === 'string' ? `${payload.date}T16:00:00.000Z` : new Date().toISOString();
+  const timestamp = typeof payload.date === 'string' ? `${payload.date}T00:00:00.000Z` : new Date().toISOString();
 
   let prevRates: Record<string, unknown> | null = null;
   if (typeof payload.date === 'string') {

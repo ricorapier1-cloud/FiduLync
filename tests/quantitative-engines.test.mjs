@@ -204,6 +204,12 @@ test('market quote feeds include G8 currency pairs for Finnhub and Frankfurter',
   }
 });
 
+test('Frankfurter date-only reference rates retain their observation date without a fabricated future intraday timestamp', () => {
+  const feeds = read('../lib/marketFeeds.ts');
+  assert.match(feeds, /payload\.date\}T00:00:00\.000Z/);
+  assert.doesNotMatch(feeds, /payload\.date\}T16:00:00\.000Z/);
+});
+
 test('provider quotes reject stale, future, crossed and malformed MT5 observations before macro use', () => {
   const feeds = read('../lib/marketFeeds.ts');
   const macroContext = read('../app/api/v1/macro-context/route.ts');
