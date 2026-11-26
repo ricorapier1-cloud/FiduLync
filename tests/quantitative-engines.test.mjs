@@ -547,8 +547,19 @@ test('intraday signal engine enforces macro threshold, trend quality, live sessi
   assert.match(engine, /SPREAD_BASELINE_UNAVAILABLE/);
   assert.match(engine, /TIER_ONE_EVENT_LOCKOUT/);
   assert.match(engine, /RATE_DECISION_LOCKOUT/);
-  assert.match(engine, /hour >= 13 && hour < 17/);
+  assert.match(engine, /America\\/New_York/);
+  assert.match(engine, /newYorkHour >= 8 && newYorkHour < 12/);
+  assert.doesNotMatch(engine, /hour >= 13 && hour < 17/);
   assert.match(engine, /INTRADAY_CANDLES_STALE/);
+});
+
+test('Sovereign Shield fails closed when VIX evidence is missing or invalid', () => {
+  const shield = read('../lib/quant/sovereignShield.ts');
+  const deskTypes = read('../types/desk.ts');
+  assert.match(shield, /!vixAvailable \? 'DATA_UNAVAILABLE'/);
+  assert.match(shield, /status === 'DATA_UNAVAILABLE'/);
+  assert.match(shield, /!vixAvailable\) reasons\.push\('VIX_UNAVAILABLE'\)/);
+  assert.match(deskTypes, /'DATA_UNAVAILABLE'/);
 });
 
 test('intraday candle adapter exposes real OHLCV with explicit freshness and no synthetic fallback', () => {
