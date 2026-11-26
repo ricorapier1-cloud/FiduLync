@@ -10,7 +10,7 @@ import {
   getNorgesBankPolicyRate,
 } from '@/lib/internationalMacro';
 import { getCachedData } from '@/lib/redisCache';
-import { persistMacroObservations } from '@/lib/macro/observationPersistence';
+import { persistMacroObservations, purgeFREDObservations } from '@/lib/macro/observationPersistence';
 import { getTreasuryYieldData } from '@/lib/treasuryData';
 import { getCboeVixHistory } from '@/lib/cboeVix';
 
@@ -25,7 +25,7 @@ export const EMPTY_SNAPSHOT: MacroSnapshot = {
 };
 
 export function sanitizeMacroSnapshotPermissions(snapshot: MacroSnapshot): MacroSnapshot {
-  if (process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED !== 'false') return snapshot;
+  if (process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED?.trim().toLowerCase() !== 'false') return snapshot;
   let removed = false;
   const currencies = snapshot.currencies.map((currency) => {
     const next = { ...currency };
@@ -728,7 +728,7 @@ async function getCftcCot(): Promise<CotPosition[]> {
 }
 
 async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallbackSnapshot()): Promise<MacroSnapshot | null> {
-  const fredApiKey = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED !== 'false' ? process.env.FRED_API_KEY?.trim() : undefined;
+  const fredApiKey = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED?.trim().toLowerCase() !== 'false' ? process.env.FRED_API_KEY?.trim() : undefined;
   const finnhubApiKey = process.env.FINNHUB_PERSONAL_PLAN_ACTIVE === 'true' ? process.env.FINNHUB_API_KEY?.trim() : undefined;
   const alphaVantageKey = process.env.ALPHA_VANTAGE_COMMERCIAL_USE_APPROVED === 'true' ? process.env.ALPHA_VANTAGE_API_KEY?.trim() : undefined;
   const fmpKey = process.env.FMP_COMMERCIAL_USE_APPROVED === 'true' ? process.env.FMP_API_KEY?.trim() : undefined;
@@ -1168,22 +1168,30 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
 
 async function persistMacroSnapshot(snapshot: MacroSnapshot): Promise<void> {
   if (!(process.env.SUPABASE_SECRET_KEY?.trim() || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim())) return;
-  const refreshedAt = snapshot.asOf && Number.isFinite(Date.parse(snapshot.asOf))
-    ? snapshot.asOf
+  const safeSnapshot = sanitizeMacroSnapshotPermissions(snapshot);
+  const refreshedAt = safeSnapshot.asOf && Number.isFinite(Date.parse(safeSnapshot.asOf))
+    ? safeSnapshot.asOf
     : new Date().toISOString();
   try {
     const { error } = await getSupabaseAdmin().from('macro_snapshot_payloads').upsert({
       snapshot_key: 'global',
-      payload: snapshot,
+      payload: safeSnapshot,
       refreshed_at: refreshedAt,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'snapshot_key' });
     if (error) throw error;
-    await persistMacroObservations(snapshot);
+    await persistMacroObservations(safeSnapshot);
   } catch (error) {
     // Persistence failure must not turn a valid live provider response into a failed refresh.
     console.error('Macro snapshot persistence failed:', error);
   }
+}
+
+export async function purgeFREDStorageArtifacts(snapshot: MacroSnapshot): Promise<void> {
+  if (process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED?.trim().toLowerCase() !== 'false') return;
+  const safeSnapshot = sanitizeMacroSnapshotPermissions(snapshot);
+  await persistMacroSnapshot(safeSnapshot);
+  await purgeFREDObservations();
 }
 
 export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
