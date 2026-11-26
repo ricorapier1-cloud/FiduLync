@@ -37,6 +37,6 @@ test('MT5 publisher is read-only and account dashboard uses session-scoped read 
   assert.doesNotMatch(publisher, /OrderSend|OrderModify|OrderDelete|CTrade/i);
   assert.match(page, /sessionStorage/);
   assert.match(page, /MT5_ACCOUNT_READ_TOKEN/);
-  assert.match(page, /No broker master or investor password/);
-  assert.match(page, /Recent closed deals/);
+  assert.match(page, /Never paste your IC Markets master or investor password/);
+  assert.match(page, /Recent closed trades/);
 });
