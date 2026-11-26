@@ -21,8 +21,11 @@ function watDate(date: Date): string {
 
 function freshCot(snapshot: Awaited<ReturnType<typeof getMacroSnapshot>>, currency: string): number | null {
   const item = snapshot.cot.find((row) => row.market === currency || (currency === 'XAU' && row.market === 'GOLD'));
-  if (!item?.reportDate || Date.now() - Date.parse(item.reportDate) > 14 * 86_400_000) return null;
-  return item.percentile;
+  if (!item?.reportDate) return null;
+  const reportTimestamp = Date.parse(item.reportDate);
+  const ageMs = Date.now() - reportTimestamp;
+  if (!Number.isFinite(reportTimestamp) || ageMs < -5 * 60_000 || ageMs > 14 * 86_400_000) return null;
+  return Number.isFinite(item.percentile) && item.percentile >= 0 && item.percentile <= 100 ? item.percentile : null;
 }
 
 export async function GET(request: Request) {
