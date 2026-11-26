@@ -3,6 +3,7 @@ import {
   calculateKaufmanEfficiencyRatio,
   type OhlcvBar,
 } from '@/lib/quant/technicalConfluence';
+import type { MarketRiskShieldResult } from '@/lib/quant/sovereignShield';
 
 export type IntradaySignalState = 'ACTIVE_SETUP' | 'FORMING_PULLBACK' | 'WAIT_NO_SETUP' | 'SHIELD_BLOCKED';
 export type SignalDirection = 'BUY' | 'SELL' | 'NONE';
@@ -28,6 +29,9 @@ export type IntradaySignal = {
   spreadBaselineStatus?: 'CONFIGURED_REFERENCE' | 'AVAILABLE' | 'UNAVAILABLE';
   spreadBaselineObservations?: number;
   spreadMultipleOfBaseline?: number | null;
+  sovereignShieldStatus?: MarketRiskShieldResult['status'] | null;
+  maxAllowedRiskPct?: number;
+  shieldBlockReasons?: string[];
 };
 export type IntradaySignalInput = {
   symbol: string;
@@ -43,6 +47,7 @@ export type IntradaySignalInput = {
   spreadMultipleOfBaseline: number | null;
   session: 'LONDON' | 'NEW_YORK' | 'CLOSED';
   nowUtc?: string;
+  marketShield?: MarketRiskShieldResult;
 };
 
 const round = (value: number, digits: number) => Number(value.toFixed(digits));
