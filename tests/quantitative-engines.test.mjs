@@ -551,7 +551,8 @@ test('Force Sync refreshes the macro snapshot, gold context, BBO and spot refere
   assert.match(desk, /api\/macro\/snapshot\?force=true/);
   assert.match(desk, /api\/macro\/gold-context/);
   assert.match(desk, /onSnapshotChange\(freshSnapshot\)/);
-  assert.match(desk, /onGoldContextChange\(freshGold\)/);
+  assert.match(desk, /goldResult\.value\.ok/);
+  assert.match(desk, /onGoldContextChange\(freshGold as GoldMacroContext\)/);
 });
 
 
@@ -567,7 +568,7 @@ test('intraday signal engine enforces macro threshold, trend quality, live sessi
   assert.match(engine, /riskDistance \* 2/);
   assert.match(engine, /riskDistance \* 3/);
   assert.match(engine, /VIX_BLACK_SWAN_LOCKOUT/);
-  assert.match(engine, /MACRO_SCORE_BELOW_\\$\\{isGold \\? 20 : 25\\}_THRESHOLD/);
+  assert.match(engine, /MACRO_SCORE_BELOW_\$\{isGold \? 20 : 25\}_THRESHOLD/);
   assert.match(engine, /sessionTimeZone = session === 'LONDON'/);
   assert.match(engine, /SPREAD_BLOWOUT_BLOCK/);
   assert.match(engine, /SPREAD_BASELINE_UNAVAILABLE/);
@@ -662,7 +663,7 @@ test('provider health includes real EIA and Treasury observation dates and BIS-b
   assert.match(telemetry, /snapshot\.usTreasury\?\.observationDate/);
   assert.match(telemetry, /bis\.status === 'HEALTHY'/);
   assert.match(telemetry, /status: 'STANDBY'/);
-  assert.match(telemetry, /eur\\?\\.policyRateProvider === 'ECB'/);
+  assert.match(telemetry, /eur\?\.policyRateProvider === 'ECB'/);
   assert.match(types, /'STANDBY'/);
   assert.match(dashboard, /STANDBY • BIS ACTIVE/);
   assert.match(dashboard, /const eiaFresh = Boolean\(snapshot\.energyMarkets/);
@@ -690,7 +691,7 @@ test('spread blowout protection uses a disclosed configured reference until a me
   assert.match(route, /spreadMultipleOfBaseline: baseline\.multiple/);
   assert.match(desk, /Spread guard:/);
   assert.match(desk, /XAUUSD ±20 directional threshold/);
-  assert.match(desk, /goldResult\\.value\\.ok/);
+  assert.match(desk, /goldResult\.value\.ok/);
   assert.match(desk, /activeSatelliteSymbol/);
 });
 
