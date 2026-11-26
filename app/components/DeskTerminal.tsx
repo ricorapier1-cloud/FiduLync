@@ -15,7 +15,7 @@ type Quote = {
 };
 type QuoteResponse = { generatedAtUtc: string; latencyMs: number; status: string; quotes: Quote[] };
 type FxRow = { date: string; rates: Record<string, number> };
-type JournalEntry = { id: string; timeUtc: string; symbol: string; result: 'WIN' | 'LOSS' | 'FLAT'; pnl: number; pnlUsd: number; direction: Direction; macroBiasScore: number | null; hurstRegime: string | null; vixLevel: number | null; session: 'LONDON' | 'NY' | 'OFF-SESSION'; riskPct: number | null; rMultiple: number | null; macroAlignment: 'ALIGNED' | 'COUNTER' | 'UNKNOWN' };
+type JournalEntry = { id: string; timeUtc: string; symbol: string; result: 'WIN' | 'LOSS' | 'FLAT'; pnl: number; pnlUsd: number; direction: Direction; macroBiasScore: number | null; hurstRegime: string | null; vixLevel: number | null; session: 'LONDON' | 'NY' | 'OFF-SESSION'; riskPct: number | null; rMultiple: number | null; macroAlignment: 'ALIGNED' | 'COUNTER' | 'UNKNOWN'; entryContextCapturedAtUtc?: string; riskAmountUsdAtEntry?: number | null };
 type Journal = { dateWAT: string; trades: number; wins: number; losses: number; netPnl: number; entries: JournalEntry[] };
 type SymbolCode = string;
 type Direction = 'BUY' | 'SELL';
@@ -23,6 +23,7 @@ const symbols: SymbolCode[] = ['EURUSD', 'XAUUSD', 'USDJPY'];
 const currencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CHF', 'CAD'] as const;
 const JOURNAL_KEY = 'fidulync-desk-journal-v1';
 const TRADE_JOURNAL_KEY = 'fidulync-quant-trade-journal-v1';
+const ENTRY_CONTEXT_KEY = 'fidulync-pending-entry-context-v1';
 const FX_KEY = 'fidulync-desk-fx-v1';
 const blankJournal = (dateWAT: string): Journal => ({ dateWAT, trades: 0, wins: 0, losses: 0, netPnl: 0, entries: [] });
 const watDate = (date = new Date()) => { const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date); const part = (type: string) => parts.find((item) => item.type === type)?.value ?? '00'; return part('year') + '-' + part('month') + '-' + part('day'); };
@@ -59,6 +60,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const [pnlInput, setPnlInput] = useState('');
   const [resultInput, setResultInput] = useState<'WIN' | 'LOSS' | 'FLAT'>('WIN');
   const [journalSymbol, setJournalSymbol] = useState<SymbolCode>('EURUSD');
+  const [entryContext, setEntryContext] = useState<Partial<JournalEntry> | null>(null);
   const [ready, setReady] = useState(false);
   const [forceSyncing, setForceSyncing] = useState(false);
   const [intradaySignals, setIntradaySignals] = useState<IntradaySignal[]>([]);
@@ -195,6 +197,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
+      setEntryContext(readStorage<Partial<JournalEntry>>(ENTRY_CONTEXT_KEY));
       const cached = readStorage<Journal>(JOURNAL_KEY);
       if (cached?.dateWAT === watDate()) setJournal(cached);
       else setJournal(blankJournal(watDate()));
@@ -271,26 +274,47 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const matrixCurrencies = Array.from(new Set([...strength.map((item) => item.currency), ...macroStrength.map((item) => item.currency)])).sort();
 
 
-  const recordTrade = () => {
-    const pnl = Number(pnlInput);
-    if (!pnlInput.trim() || !Number.isFinite(pnl) || locked) return;
-    const timeUtc = new Date().toISOString();
-    const macroBiasScore = journalSymbol === 'XAUUSD' ? goldScore : dossier.biasScore;
-    const macroAlignment = macroBiasScore === null || macroBiasScore === undefined || macroBiasScore === 0
-      ? 'UNKNOWN' as const
-      : ((macroBiasScore > 0 && direction === 'BUY') || (macroBiasScore < 0 && direction === 'SELL'))
-        ? 'ALIGNED' as const : 'COUNTER' as const;
-    const riskAmountAtEntry = account > 0 && risk > 0 ? account * risk / 100 : null;
-    const entry: JournalEntry = {
-      id: `${Date.now()}-${journalSymbol}-${Math.random().toString(36).slice(2, 8)}`,
-      timeUtc, symbol: journalSymbol, result: resultInput, pnl, pnlUsd: pnl, direction,
-      macroBiasScore: Number.isFinite(macroBiasScore) ? macroBiasScore : null,
+  const captureEntryContext = () => {
+    const score = journalSymbol === 'XAUUSD' ? goldScore : dossier.biasScore;
+    const alignment = score === null || score === undefined || score === 0 ? 'UNKNOWN'
+      : ((score > 0 && direction === 'BUY') || (score < 0 && direction === 'SELL')) ? 'ALIGNED' : 'COUNTER';
+    const context: Partial<JournalEntry> = {
+      symbol: journalSymbol, direction,
+      macroBiasScore: Number.isFinite(score) ? score : null,
       hurstRegime: goldContext?.liquidityRegime ?? snapshot.regime ?? null,
       vixLevel: Number.isFinite(vixValue) ? vixValue : null,
       session: activeSession === 'NEW YORK' ? 'NY' : activeSession,
       riskPct: Number.isFinite(risk) ? risk : null,
+      riskAmountUsdAtEntry: account > 0 && risk > 0 ? account * risk / 100 : null,
+      macroAlignment: alignment,
+      entryContextCapturedAtUtc: new Date().toISOString(),
+    };
+    setEntryContext(context);
+    try { window.localStorage.setItem(ENTRY_CONTEXT_KEY, JSON.stringify(context)); } catch { /* local capture remains in component state */ }
+  };
+  const recordTrade = () => {
+    const pnl = Number(pnlInput);
+    if (!pnlInput.trim() || !Number.isFinite(pnl) || locked) return;
+    const timeUtc = new Date().toISOString();
+    const captured = entryContext?.symbol === journalSymbol && entryContext.direction === direction ? entryContext : null;
+    const macroBiasScore = captured?.macroBiasScore ?? (journalSymbol === 'XAUUSD' ? goldScore : dossier.biasScore);
+    const macroAlignment = captured?.macroAlignment ?? (macroBiasScore === null || macroBiasScore === undefined || macroBiasScore === 0
+      ? 'UNKNOWN' as const
+      : ((macroBiasScore > 0 && direction === 'BUY') || (macroBiasScore < 0 && direction === 'SELL'))
+        ? 'ALIGNED' as const : 'COUNTER' as const);
+    const riskAmountAtEntry = captured?.riskAmountUsdAtEntry ?? (account > 0 && risk > 0 ? account * risk / 100 : null);
+    const entry: JournalEntry = {
+      id: `${Date.now()}-${journalSymbol}-${Math.random().toString(36).slice(2, 8)}`,
+      timeUtc, symbol: journalSymbol, result: resultInput, pnl, pnlUsd: pnl, direction,
+      macroBiasScore: Number.isFinite(macroBiasScore) ? macroBiasScore : null,
+      hurstRegime: captured?.hurstRegime ?? goldContext?.liquidityRegime ?? snapshot.regime ?? null,
+      vixLevel: captured?.vixLevel ?? (Number.isFinite(vixValue) ? vixValue : null),
+      session: captured?.session ?? (activeSession === 'NEW YORK' ? 'NY' : activeSession),
+      riskPct: captured?.riskPct ?? (Number.isFinite(risk) ? risk : null),
       rMultiple: riskAmountAtEntry && riskAmountAtEntry > 0 ? Number((pnl / riskAmountAtEntry).toFixed(4)) : null,
       macroAlignment,
+      ...(captured?.entryContextCapturedAtUtc ? { entryContextCapturedAtUtc: captured.entryContextCapturedAtUtc } : {}),
+      riskAmountUsdAtEntry: riskAmountAtEntry,
     };
     try {
       const prior = readStorage<JournalEntry[]>(TRADE_JOURNAL_KEY) ?? [];
@@ -306,6 +330,8 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
       entries: [entry, ...previous.entries].slice(0, 20),
     }));
     setPnlInput('');
+    setEntryContext(null);
+    try { window.localStorage.removeItem(ENTRY_CONTEXT_KEY); } catch { /* no-op */ }
   };
   const forceSync = async () => {
     setForceSyncing(true);
@@ -437,7 +463,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
       <article className="desk-panel"><header><div><span className="desk-kicker">D / DAILY RISK CONTROL</span><h3>WAT Daily Circuit Breaker</h3></div><small>{currentDateWAT}</small></header>
         <div className="desk-journal-stats"><div><span>TRADES</span><b>{journal.trades}/2</b></div><div><span>WINS</span><b>{journal.wins}</b></div><div><span>LOSSES</span><b>{journal.losses}/2</b></div><div><span>NET P&amp;L</span><b className={journal.netPnl >= 0 ? 'desk-good' : 'desk-warning'}>${journal.netPnl.toFixed(2)}</b></div></div>
         <div className="desk-form-grid desk-journal-form"><label>Result<select value={resultInput} onChange={(e) => setResultInput(e.target.value as 'WIN' | 'LOSS' | 'FLAT')}><option>WIN</option><option>LOSS</option><option>FLAT</option></select></label><label>Realized P&amp;L USD<input inputMode="decimal" value={pnlInput} onChange={(e) => setPnlInput(e.target.value)} placeholder="Closed trade P&L" /></label><label>Instrument<select value={journalSymbol} onChange={(e) => setJournalSymbol(e.target.value as SymbolCode)}>{displaySymbols.map((s) => <option key={s}>{s}</option>)}</select></label></div>
-        <button className="desk-record-button" type="button" disabled={!pnlInput.trim() || !Number.isFinite(Number(pnlInput)) || locked} onClick={recordTrade}>RECORD CLOSED TRADE</button>
+        <button className="desk-record-button" type="button" onClick={captureEntryContext}>CAPTURE ENTRY CONTEXT</button><small className="block mt-2 text-[10px] text-slate-500">{entryContext?.entryContextCapturedAtUtc ? `ENTRY CONTEXT CAPTURED ${entryContext.entryContextCapturedAtUtc}` : "Capture the current macro, VIX, session and risk state when opening a position."}</small><button className="desk-record-button" type="button" disabled={!pnlInput.trim() || !Number.isFinite(Number(pnlInput)) || locked} onClick={recordTrade}>RECORD CLOSED TRADE</button>
         <div className="flex flex-wrap gap-2 mt-3"><button className="desk-record-button" type="button" onClick={() => exportJournal('json')}>EXPORT JSON</button><button className="desk-record-button" type="button" onClick={() => exportJournal('csv')}>EXPORT CSV</button></div>
         <div className="desk-journal-list">{journal.entries.slice(0, 5).map((entry) => <div key={entry.id}><span>{entry.symbol} · {entry.result}</span><b className={entry.pnl >= 0 ? 'desk-good' : 'desk-warning'}>{entry.pnl >= 0 ? '+' : ''}${entry.pnl.toFixed(2)}</b><small>{entry.timeUtc}</small></div>)}</div>
         <p className="desk-footnote">Journal persists in this browser only. Browser storage clearing or switching devices resets it. MT5 must independently enforce the same hard limits.</p>
