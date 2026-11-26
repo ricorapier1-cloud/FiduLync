@@ -275,7 +275,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
 
 
   const captureEntryContext = () => {
-    const score = journalSymbol === 'XAUUSD' ? goldScore : dossier.biasScore;
+    const score = journalSymbol === 'XAUUSD' ? goldScore : generatePairDossier(snapshot, journalSymbol).biasScore;
     const alignment = score === null || score === undefined || score === 0 ? 'UNKNOWN'
       : ((score > 0 && direction === 'BUY') || (score < 0 && direction === 'SELL')) ? 'ALIGNED' : 'COUNTER';
     const context: Partial<JournalEntry> = {
@@ -300,7 +300,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
       || (resultInput === 'FLAT' && pnl !== 0)) return;
     const timeUtc = new Date().toISOString();
     const captured = entryContext?.symbol === journalSymbol && entryContext.direction === direction ? entryContext : null;
-    const macroBiasScore = captured ? captured.macroBiasScore ?? null : (journalSymbol === 'XAUUSD' ? goldScore : dossier.biasScore);
+    const macroBiasScore = captured ? captured.macroBiasScore ?? null : (journalSymbol === 'XAUUSD' ? goldScore : generatePairDossier(snapshot, journalSymbol).biasScore);
     const macroAlignment = captured?.macroAlignment ?? (macroBiasScore === null || macroBiasScore === undefined || macroBiasScore === 0
       ? 'UNKNOWN' as const
       : ((macroBiasScore > 0 && direction === 'BUY') || (macroBiasScore < 0 && direction === 'SELL'))
