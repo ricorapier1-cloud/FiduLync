@@ -1,7 +1,6 @@
 import {
   calculateAtr,
   calculateKaufmanEfficiencyRatio,
-  estimateHurstExponent,
   type OhlcvBar,
 } from '@/lib/quant/technicalConfluence';
 
@@ -97,7 +96,8 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
   const bars = input.intradayBars;
   const daily = input.dailyBars;
   const closes = bars.map((bar) => bar.close);
-  const hurst = estimateHurstExponent(closes);
+  // Hurst remains unavailable to the execution desk until its estimator is independently validated.
+  const hurst: number | null = null;
   const ker = calculateKaufmanEfficiencyRatio(closes, 14);
   const atr = calculateAtr(daily, 14);
   const latest = bars.at(-1);
@@ -116,8 +116,7 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
   if (!finite(input.quoteMid) || !input.quoteTimestampUtc || !Number.isFinite(quoteAge) || quoteAge < -30_000 || quoteAge > 60_000) blockers.push('LIVE_BBO_UNAVAILABLE_OR_STALE');
   if (!Number.isFinite(candleAge) || candleAge < -60_000 || candleAge > 15 * 60_000) blockers.push('INTRADAY_CANDLES_STALE');
   if (direction === 'NONE') blockers.push('MACRO_SCORE_BELOW_25_THRESHOLD');
-  if (bars.length < 60 || daily.length < 15 || !finite(hurst) || !finite(ker) || !finite(atr)) blockers.push('OHLCV_HISTORY_INSUFFICIENT');
-  if (finite(hurst) && hurst <= 0.55) blockers.push('HURST_NOT_TREND_PERSISTENT');
+  if (bars.length < 60 || daily.length < 15 || !finite(ker) || !finite(atr)) blockers.push('OHLCV_HISTORY_INSUFFICIENT');
   if (finite(ker) && ker < 0.30) blockers.push('KER_BELOW_0_30');
 
   const empty = (state: IntradaySignalState, rationale: string): IntradaySignal => ({
@@ -157,8 +156,8 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
   const stopLoss = direction === 'BUY' ? price! - riskDistance : price! + riskDistance;
   const takeProfit1 = direction === 'BUY' ? price! + riskDistance * 2 : price! - riskDistance * 2;
   const takeProfit2 = direction === 'BUY' ? price! + riskDistance * 3 : price! - riskDistance * 3;
-  const score = Math.min(100, Math.round(25 + (Math.abs(input.macroScore ?? 0) / 100) * 20 + (ker! * 25) + (hurst! > 0.55 ? 15 : 0) + (alignedTrigger ? 15 : 0)));
-  const rationale = `${direction} Macro (${input.macroScore}) + ${sweptLow ? 'prior-session low sweep' : sweptHigh ? 'prior-session high sweep' : valueZone ? 'EMA20/VWAP value-zone pullback' : 'trend aligned'} + Hurst ${hurst!.toFixed(2)} / KER ${ker!.toFixed(2)} + 1.35x daily ATR stop`;
+  const score = Math.min(100, Math.round(25 + (Math.abs(input.macroScore ?? 0) / 100) * 20 + (ker! * 25) + (alignedTrigger ? 15 : 0)));
+  const rationale = `${direction} Macro (${input.macroScore}) + ${sweptLow ? 'prior-session low sweep' : sweptHigh ? 'prior-session high sweep' : valueZone ? 'EMA20/VWAP value-zone pullback' : 'trend aligned'} + KER ${ker!.toFixed(2)} + 1.35x daily ATR stop · Hurst unavailable pending validation`;
   return {
     symbol, signalState: alignedTrigger ? 'ACTIVE_SETUP' : 'FORMING_PULLBACK', direction,
     entryPrice: round(price!, digits), stopLoss: round(stopLoss, digits),
