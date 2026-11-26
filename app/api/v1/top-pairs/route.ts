@@ -92,8 +92,8 @@ export async function GET() {
       });
 
     const goldEventLockout = snapshot.catalysts.some((event) => event.impact === 'High'
-      && event.region === 'US' && Math.abs(Date.parse(event.scheduledAt) - Date.now()) <= 30 * 60 * 1000);
-    const nextGoldEvent = snapshot.catalysts.filter((event) => event.region === 'US' && Date.parse(event.scheduledAt) >= Date.now())
+      && Math.abs(Date.parse(event.scheduledAt) - Date.now()) <= 30 * 60 * 1000);
+    const nextGoldEvent = snapshot.catalysts.filter((event) => event.impact === 'High' && Date.parse(event.scheduledAt) >= Date.now())
       .sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt))[0];
     const goldCandidate: Omit<Candidate, 'rank'> | null = gold && gold.overallState === 'AVAILABLE'
       && gold.goldBiasScore !== null && Math.abs(gold.goldBiasScore) >= 20
