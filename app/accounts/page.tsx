@@ -20,9 +20,17 @@ type Account = {
 };
 type Payload = { status: string; generatedAtUtc: string; accounts: Account[]; deals: Deal[] };
 
-const money = (value: number, currency: string) => new Intl.NumberFormat(undefined, {
-  style: 'currency', currency, maximumFractionDigits: 2,
-}).format(value);
+const money = (value: number, currency: string) => {
+  const normalizedCurrency = currency.toUpperCase();
+  if (/^[A-Z]{3}$/.test(normalizedCurrency)) {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency', currency: normalizedCurrency, maximumFractionDigits: 2,
+    }).format(value);
+  }
+  return normalizedCurrency + ' ' + new Intl.NumberFormat(undefined, {
+    maximumFractionDigits: 2,
+  }).format(value);
+};
 const dateTime = (value: string) => new Intl.DateTimeFormat(undefined, {
   dateStyle: 'medium', timeStyle: 'medium', timeZone: 'Africa/Lagos',
 }).format(new Date(value));

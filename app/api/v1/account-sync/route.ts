@@ -69,7 +69,8 @@ export async function POST(request: Request) {
 
     const login = str(String(account.login ?? ''), 32);
     const server = str(account.server, 120);
-    const currency = str(account.currency, 12);
+    const currencyValue = str(account.currency, 12)?.toUpperCase() ?? null;
+    const currency = currencyValue && /^[A-Z]{3}$/.test(currencyValue) ? currencyValue : null;
     const observedAt = iso(account.observedAtUtc);
     const leverage = num(account.leverage, null);
     const balance = num(account.balance, null);
