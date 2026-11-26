@@ -144,7 +144,7 @@ export async function GET(request: Request) {
       .filter((position) => isFreshCotReport(position.reportDate) && Number.isFinite(position.percentile))
       .map((position) => ({ symbol: position.market, percentile: position.percentile }));
     const sovereignShield = evaluateSovereignShield({
-      vix: goldContext.drivers.VIXCLS.value,
+      vix: goldContext.drivers.VIXCLS.state === 'HEALTHY' ? goldContext.drivers.VIXCLS.value : null,
       eventMinutesAway: shieldEventMinutesAway,
       isCentralBankRateDecision: isRateDecision,
       cotPercentiles: crowdedPositions,
