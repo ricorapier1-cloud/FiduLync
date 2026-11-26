@@ -48,7 +48,7 @@ function safeJson(value: unknown): unknown[] {
     const profit = num(p.profit, null);
     if (!symbol || !side || !ticket || !openedAtServer || volume === null || openPrice === null || currentPrice === null || profit === null) return [];
     return [{
-      ticket, symbol, side: side === 'BUY' ? 'BUY' : 'SELL', volume, openPrice, currentPrice, profit,
+      ticket, positionId: str(String(p.positionId ?? ''), 64), symbol, side: side === 'BUY' ? 'BUY' : 'SELL', volume, openPrice, currentPrice, profit,
       swap: num(p.swap), stopLoss: num(p.stopLoss, null), takeProfit: num(p.takeProfit, null),
       openedAtServer, magic: str(String(p.magic ?? ''), 64), comment: str(p.comment ?? '', 120),
     }];
