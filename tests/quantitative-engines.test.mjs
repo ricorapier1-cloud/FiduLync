@@ -372,6 +372,10 @@ test('cached FRED observations are excluded when storage permission is not appro
   assert.match(persistence, /provider === 'FRED' && !fredStorageAllowed\(\)/);
   assert.match(persistence, /delete\(\)\.eq\('provider', 'FRED'\)/);
   assert.match(cache, /export async function deleteCachedData/);
+  assert.match(macroData, /twoYearYieldProvider === 'FRED' \|\| !next\.twoYearYieldProvider/);
+  assert.match(macroData, /CUSTOM MACRO PROVIDER/);
+  assert.match(persistence, /currency\.twoYearYieldProvider \?\?/);
+  assert.match(read('../types/macro.ts'), /twoYearYieldProvider\?: string/);
   assert.match(engine, /xau:fred:\$\{seriesId\}:v1/);
 });
 
