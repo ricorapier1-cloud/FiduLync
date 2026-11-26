@@ -163,7 +163,7 @@ export type PairDossier = {
 export type ProviderStatus = {
   name: string;
   endpoint: string;
-  status: 'HEALTHY' | 'DEGRADED' | 'OFFLINE' | 'UNCONFIGURED' | 'PERMISSION_REQUIRED';
+  status: 'HEALTHY' | 'DEGRADED' | 'OFFLINE' | 'UNCONFIGURED' | 'PERMISSION_REQUIRED' | 'STANDBY';
   detail?: string;
   nextAction?: string;
   latestObservationDate?: string | null;
