@@ -5,6 +5,8 @@ import { G8_PAIRS, generatePairDossier } from '@/lib/macro/dossierEngine';
 import { buildIntradaySignal, classifyWATSession, type IntradaySignal } from '@/lib/quant/intradaySignalEngine';
 import type { OhlcvBar } from '@/lib/quant/technicalConfluence';
 import { recordAndEvaluateSpreadBaseline } from '@/lib/quant/spreadBaseline';
+import { calculateAtr } from '@/lib/quant/technicalConfluence';
+import { evaluateMarketRiskShield } from '@/lib/quant/sovereignShield';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -71,17 +73,42 @@ export async function GET(request: Request) {
       const isGold = symbol === 'XAUUSD';
       const dossier = isGold ? null : generatePairDossier(snapshot, symbol);
       const macroScore = isGold ? gold.goldBiasScore : dossier?.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier?.biasScore ?? null;
+      const dailyBars = candles?.dailyBars ?? [];
+      const dailyAtr = calculateAtr(dailyBars, 14);
+      const recentBars = (candles?.intradayBars ?? []).filter((bar) =>
+        Date.parse(bar.timestampUtc) >= now.getTime() - 24 * 60 * 60_000);
+      const recentRange = recentBars.length >= 12
+        ? Math.max(...recentBars.map((bar) => bar.high)) - Math.min(...recentBars.map((bar) => bar.low))
+        : null;
+      const intradayRangeAtrMultiple = dailyAtr !== null && recentRange !== null && dailyAtr > 0
+        ? recentRange / dailyAtr : null;
+      const cotPercentiles = isGold
+        ? [{ symbol: 'GOLD', percentile: freshCot(snapshot, 'XAU') }]
+        : [
+          { symbol: dossier!.base, percentile: freshCot(snapshot, dossier!.base) },
+          { symbol: dossier!.quote, percentile: freshCot(snapshot, dossier!.quote) },
+        ];
+      const vix = gold.drivers.VIXCLS.state === 'HEALTHY' ? gold.drivers.VIXCLS.value : null;
+      const marketShield = evaluateMarketRiskShield({
+        vix,
+        intradayRangeAtrMultiple,
+        spreadMultipleOfSessionBaseline: baseline.multiple,
+        eventMinutesAway,
+        isCentralBankRateDecision: rateDecision,
+        cotPercentiles,
+      });
       const signal = buildIntradaySignal({
         symbol, macroScore,
         intradayBars: candles?.intradayBars ?? [],
-        dailyBars: candles?.dailyBars ?? [],
+        dailyBars,
         quoteMid: quote?.freshness === 'LIVE' ? quote.mid : null,
         quoteTimestampUtc: quote?.freshness === 'LIVE' ? quote.quoteTimeUtc : null,
-        vix: snapshot.vix?.freshness === 'LATEST PUBLISHED' ? snapshot.vix.value : null,
+        vix,
         calendarVerified,
         eventMinutesAway,
         rateDecision,
         spreadMultipleOfBaseline: baseline.multiple,
+        marketShield,
         session,
         nowUtc: now.toISOString(),
       });

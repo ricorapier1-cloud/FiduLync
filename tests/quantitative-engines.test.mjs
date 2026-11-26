@@ -719,6 +719,11 @@ test('spread blowout protection uses a disclosed configured reference until a me
   assert.match(baseline, /CONFIGURED_REFERENCE/);
   assert.match(baseline, /spread \/ medianSpread/);
   assert.match(route, /recordAndEvaluateSpreadBaseline/);
+  assert.match(route, /evaluateMarketRiskShield/);
+  assert.match(route, /intradayRangeAtrMultiple/);
+  assert.match(route, /cotPercentiles/);
+  assert.match(engine, /input\.marketShield && !input\.marketShield\.allowedToTrade/);
+  assert.match(engine, /maxAllowedRiskPct/);
   assert.match(route, /spreadMultipleOfBaseline: baseline\.multiple/);
   assert.match(desk, /Spread guard:/);
   assert.match(desk, /XAUUSD ±20 directional threshold/);

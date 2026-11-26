@@ -28,3 +28,12 @@ test('Sovereign Shield fails closed when account governance cannot be verified',
   assert.match(source, /rollingSevenDayDrawdownPct! <= -4/);
   assert.match(source, /if \(hardBlock\) maxAllowedRiskPct = 0/);
 });
+
+
+test('market-risk shield is independently enforced by intraday signals without inventing account-ledger verification', () => {
+  assert.match(source, /export function evaluateMarketRiskShield/);
+  assert.match(source, /intradayRangeAtrMultiple > 2\.5/);
+  assert.match(source, /maxAllowedRiskPct = Math\.min\(maxAllowedRiskPct, 0\.5\)/);
+  assert.match(source, /spreadBlowoutBlock \|\| eventWindow/);
+  assert.match(source, /evaluateMarketRiskShield\(input\)/);
+});
