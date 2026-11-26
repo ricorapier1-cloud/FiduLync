@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   if (!authorized(request)) return NextResponse.json({ error: 'A valid private account-read token is required.' }, { status: 401, headers });
   try {
     const supabase = getSupabaseAdmin();
-    const { data: accounts, error: accountError } = await supabase.from('mt5_account_snapshots')
+    const { data: accounts, error: accountError } = await supabase.from('macrolinc_account_snapshots')
       .select('account_key,account_login,broker,server,currency,leverage,account_mode,balance,equity,margin,free_margin,margin_level,positions,observed_at,received_at')
       .order('received_at', { ascending: false }).limit(10);
     if (accountError) throw accountError;
