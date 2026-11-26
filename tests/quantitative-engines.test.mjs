@@ -547,7 +547,7 @@ test('intraday signal engine enforces macro threshold, trend quality, live sessi
   assert.match(engine, /SPREAD_BASELINE_UNAVAILABLE/);
   assert.match(engine, /TIER_ONE_EVENT_LOCKOUT/);
   assert.match(engine, /RATE_DECISION_LOCKOUT/);
-  assert.match(engine, /America\\/New_York/);
+  assert.match(engine, /America\/New_York/);
   assert.match(engine, /newYorkHour >= 8 && newYorkHour < 12/);
   assert.doesNotMatch(engine, /hour >= 13 && hour < 17/);
   assert.match(engine, /INTRADAY_CANDLES_STALE/);
