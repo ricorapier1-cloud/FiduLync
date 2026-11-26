@@ -1,3 +1,4 @@
+import type { IntradaySignal } from '@/lib/quant/intradaySignalEngine';
 export type DeskQuoteContext = {
   symbol: string;
   mid: number | null;
@@ -27,6 +28,7 @@ export type MacroContextPayload = {
   macroRiskRegime: string;
   symbols: Record<string, MacroSymbolBias>;
   decisionScope: 'MACRO_GATE_ONLY';
+  signals: IntradaySignal[];
   symbol: string;
   base: string;
   quote: string;
