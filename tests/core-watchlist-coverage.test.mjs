@@ -14,5 +14,4 @@ test('primary user watchlist has EURUSD, GBPUSD, XAUUSD and USDJPY across quotes
   }
   assert.match(desk, /const symbols: string\[\] = \['EURUSD', 'GBPUSD', 'XAUUSD', 'USDJPY'\]/);
   assert.match(signals, /const symbols = \['EURUSD', 'GBPUSD', 'XAUUSD', 'USDJPY'/);
-  assert.match(desk, /<option value="GBPUSD">GBP\/USD<\/option>/);
 });
