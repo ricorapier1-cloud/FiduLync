@@ -46,11 +46,11 @@ function safeJson(value: unknown): unknown[] {
     const openPrice = num(p.openPrice, null);
     const currentPrice = num(p.currentPrice, null);
     const profit = num(p.profit, null);
-    if (!symbol || !side || !ticket || !openedAtUtc || volume === null || openPrice === null || currentPrice === null || profit === null) return [];
+    if (!symbol || !side || !ticket || !openedAtServer || volume === null || openPrice === null || currentPrice === null || profit === null) return [];
     return [{
       ticket, symbol, side: side === 'BUY' ? 'BUY' : 'SELL', volume, openPrice, currentPrice, profit,
       swap: num(p.swap), stopLoss: num(p.stopLoss, null), takeProfit: num(p.takeProfit, null),
-      openedAtUtc, magic: str(String(p.magic ?? ''), 64), comment: str(p.comment ?? '', 120),
+      openedAtServer, magic: str(String(p.magic ?? ''), 64), comment: str(p.comment ?? '', 120),
     }];
   }) : [];
 }
@@ -113,13 +113,13 @@ export async function POST(request: Request) {
       if (!deal) return [];
       const ticket = str(String(deal.ticket ?? ''), 64);
       const symbol = str(deal.symbol, 32);
-      const dealTime = iso(deal.timeUtc);
+      const dealTimeServer = str(deal.timeServer, 40);
       const volume = num(deal.volume);
       const price = num(deal.price);
       const profit = num(deal.profit);
       const sideRaw = str(deal.side, 16) ?? 'OTHER';
       const entryRaw = str(deal.entry, 16) ?? 'OTHER';
-      if (!ticket || !symbol || !dealTime || volume === null || price === null || profit === null) return [];
+      if (!ticket || !symbol || !dealTimeServer || volume === null || price === null || profit === null) return [];
       return [{
         account_key: accountKey,
         deal_ticket: ticket,
@@ -132,7 +132,7 @@ export async function POST(request: Request) {
         commission: num(deal.commission),
         swap: num(deal.swap),
         fee: num(deal.fee),
-        deal_time_utc: dealTime,
+        deal_time_server: dealTimeServer,
         magic: str(String(deal.magic ?? ''), 64),
         comment: str(deal.comment ?? '', 120),
       }];
