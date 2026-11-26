@@ -26,6 +26,9 @@ export type IntradaySignal = {
   session: 'LONDON' | 'NEW_YORK' | 'CLOSED';
   dataAsOfUtc: string | null;
   blockers: string[];
+  spreadBaselineStatus?: 'WARMING_UP' | 'AVAILABLE' | 'UNAVAILABLE';
+  spreadBaselineObservations?: number;
+  spreadMultipleOfBaseline?: number | null;
 };
 export type IntradaySignalInput = {
   symbol: string;
