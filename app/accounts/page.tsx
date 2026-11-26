@@ -180,7 +180,7 @@ export default function AccountsPage() {
             </button>
           </form>
           {message && <p role="status" className="mt-3 text-xs text-amber-300">{message}</p>}
-          <p className="mt-3 text-[11px] leading-relaxed text-slate-500">The read token is kept in this browser tab's session storage only. It is not a broker password. Never paste your IC Markets master or investor password here.</p>
+          <p className="mt-3 text-[11px] leading-relaxed text-slate-500">The read token is kept in this browser tab&apos;s session storage only. It is not a broker password. Never paste your IC Markets master or investor password here.</p>
         </div>
       </section>
 
