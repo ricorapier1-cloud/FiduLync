@@ -41,7 +41,7 @@ function safeJson(value: unknown): unknown[] {
     const symbol = str(p.symbol, 32);
     const side = str(p.side, 12);
     const ticket = str(p.ticket, 64);
-    const openedAtUtc = iso(p.openedAtUtc);
+    const openedAtServer = str(p.openedAtServer, 40);
     const volume = num(p.volume, null);
     const openPrice = num(p.openPrice, null);
     const currentPrice = num(p.currentPrice, null);
