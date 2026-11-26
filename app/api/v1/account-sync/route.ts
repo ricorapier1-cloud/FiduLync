@@ -139,7 +139,7 @@ export async function POST(request: Request) {
     });
 
     if (deals.length) {
-      const { error: dealsError } = await supabase.from('mt5_account_deals')
+      const { error: dealsError } = await supabase.from('macrolinc_account_deals')
         .upsert(deals, { onConflict: 'account_key,deal_ticket', ignoreDuplicates: true });
       if (dealsError) throw dealsError;
     }
