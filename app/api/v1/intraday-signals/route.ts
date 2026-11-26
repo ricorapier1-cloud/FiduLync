@@ -1,4 +1,3 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { getMacroSnapshot } from '@/lib/macroEngine';
 import { buildGoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
@@ -9,15 +8,6 @@ import type { OhlcvBar } from '@/lib/quant/technicalConfluence';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-function authorized(request: Request): boolean {
-  const auth = request.headers.get('authorization') ?? '';
-  const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
-  const supplied = (request.headers.get('x-macro-key') ?? bearer).trim();
-  const expected = (process.env.MACRO_API_TOKEN ?? process.env.MACROLYNC_API_SECRET ?? process.env.ALGO_PRIVATE_API_KEY ?? '').trim();
-  if (!supplied || expected.length < 32) return false;
-  const left = Buffer.from(supplied), right = Buffer.from(expected);
-  return left.length === right.length && timingSafeEqual(left, right);
-}
 
 type CandlePayload = { status: string; intradayBars: OhlcvBar[]; dailyBars: OhlcvBar[]; latestBarUtc: string | null };
 type QuotePayload = { quotes?: Array<{ symbol: string; bid: number | null; ask: number | null; mid: number | null; spread: number | null; quoteTimeUtc: string | null; freshness: string }> };
@@ -29,7 +19,6 @@ function freshCot(snapshot: Awaited<ReturnType<typeof getMacroSnapshot>>, curren
 }
 
 export async function GET(request: Request) {
-  if (!authorized(request)) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
   try {
     const snapshot = await getMacroSnapshot();
     const gold = await buildGoldMacroContext(snapshot);
