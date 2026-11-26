@@ -27,8 +27,8 @@ const faqs = [
     a: 'Economic indicators (GDP, CPI, employment) are frequently revised. A valid historical test must use the exact vintage and publication timestamp available at each decision point. MacroLync stores release timestamps and vintages only when the source actually supplies them; unknown values remain null and retrieval time is never substituted. Historical performance remains NOT VALIDATED until point-in-time macro vintages, synchronized FX returns and reproducible out-of-sample calculations exist.',
   },
   {
-    q: 'How is research stored in the Trade Journal?',
-    a: 'The Trade Journal is a zero-login, browser-based research workspace. Closed trades, P&amp;L, risk multiples and captured market context are persisted strictly inside your browser&apos;s local storage. No proprietary research data is transmitted to external servers.',
+    q: 'How does Portfolio & Accounts connect to MT5?',
+    a: 'The optional Portfolio & Accounts workspace uses a read-only publisher running inside your MT5 terminal. It sends account snapshots, open positions and deal history through a private ingestion token. A separate read token protects the dashboard. Broker master/investor passwords are never requested or transmitted; the connector has no order execution functions.',
   },
   {
     q: 'Does MacroLync execute trades or provide financial advice?',
