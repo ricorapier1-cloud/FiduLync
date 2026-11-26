@@ -5,12 +5,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 type Deal = {
   account_key: string; deal_ticket: string; symbol: string; side: string; entry_type: string;
   volume: number; price: number; profit: number; commission: number; swap: number; fee: number;
-  deal_time_utc: string; magic: string | null; comment: string | null;
+  deal_time_server: string; magic: string | null; comment: string | null;
 };
 type Position = {
   ticket: string; symbol: string; side: string; volume: number; openPrice: number;
   currentPrice: number; profit: number; swap: number; stopLoss: number | null;
-  takeProfit: number | null; openedAtUtc: string; magic: string | null; comment: string | null;
+  takeProfit: number | null; openedAtServer: string; magic: string | null; comment: string | null;
 };
 type Account = {
   account_key: string; account_login: string; broker: string | null; server: string;
@@ -172,7 +172,7 @@ export default function AccountsPage() {
           <div className="macro-section-heading"><div><span className="eyebrow">LIVE ACCOUNT EXPOSURE</span><h2>Open positions</h2></div><span className="macro-section-note mono">BROKER-REPORTED</span></div>
           <div className="macro-panel overflow-x-auto">
             {selected.positions.length ? <table className="w-full min-w-[720px] text-xs">
-              <thead className="text-left text-[10px] text-slate-500"><tr><th className="p-3">SYMBOL</th><th className="p-3">SIDE</th><th className="p-3">VOLUME</th><th className="p-3">OPEN</th><th className="p-3">CURRENT</th><th className="p-3">FLOATING P/L</th><th className="p-3">OPENED · UTC</th></tr></thead>
+              <thead className="text-left text-[10px] text-slate-500"><tr><th className="p-3">SYMBOL</th><th className="p-3">SIDE</th><th className="p-3">VOLUME</th><th className="p-3">OPEN</th><th className="p-3">CURRENT</th><th className="p-3">FLOATING P/L</th><th className="p-3">OPENED · BROKER SERVER</th></tr></thead>
               <tbody>{selected.positions.map((position) => <tr key={position.ticket} className="border-t border-white/[0.06]">
                 <td className="p-3 font-mono text-slate-100">{position.symbol}</td><td className="p-3">{position.side}</td><td className="p-3 font-mono">{position.volume}</td><td className="p-3 font-mono">{position.openPrice}</td><td className="p-3 font-mono">{position.currentPrice}</td><td className={'p-3 font-mono ' + (position.profit >= 0 ? 'text-emerald-300' : 'text-amber-300')}>{money(position.profit + position.swap, selected.currency)}</td><td className="p-3 text-slate-400">{position.openedAtUtc}</td>
               </tr>)}</tbody>
@@ -184,7 +184,7 @@ export default function AccountsPage() {
           <div className="macro-section-heading"><div><span className="eyebrow">EXECUTION RECORD</span><h2>Recent closed deals</h2></div><span className="macro-section-note mono">LATEST SYNCHRONIZED HISTORY</span></div>
           <div className="macro-panel overflow-x-auto">
             {selectedDeals.length ? <table className="w-full min-w-[760px] text-xs">
-              <thead className="text-left text-[10px] text-slate-500"><tr><th className="p-3">TIME · UTC</th><th className="p-3">SYMBOL</th><th className="p-3">SIDE</th><th className="p-3">VOLUME</th><th className="p-3">NET P/L · {selected.currency}</th><th className="p-3">MAGIC / EA</th><th className="p-3">TICKET</th></tr></thead>
+              <thead className="text-left text-[10px] text-slate-500"><tr><th className="p-3">TIME · BROKER SERVER</th><th className="p-3">SYMBOL</th><th className="p-3">SIDE</th><th className="p-3">VOLUME</th><th className="p-3">NET P/L · {selected.currency}</th><th className="p-3">MAGIC / EA</th><th className="p-3">TICKET</th></tr></thead>
               <tbody>{selectedDeals.slice(0,100).map((deal) => <tr key={deal.deal_ticket} className="border-t border-white/[0.06]">
                 <td className="p-3 text-slate-400">{deal.deal_time_utc}</td><td className="p-3 font-mono text-slate-100">{deal.symbol}</td><td className="p-3">{deal.side}</td><td className="p-3 font-mono">{deal.volume}</td><td className={'p-3 font-mono ' + (netDeal(deal) >= 0 ? 'text-emerald-300' : 'text-amber-300')}>{money(netDeal(deal), selected.currency)}</td><td className="p-3 font-mono">{deal.magic || '—'}</td><td className="p-3 font-mono">{deal.deal_ticket}</td>
               </tr>)}</tbody>
