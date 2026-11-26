@@ -570,6 +570,14 @@ test('intraday candle adapter rejects malformed OHLC ranges and invalid timestam
   assert.match(route, /bars\.sort\(\(left, right\)/);
 });
 
+test('desk journal does not infer entry-time R or macro context when no entry snapshot exists', () => {
+  const desk = read('../app/components/DeskTerminal.tsx');
+  assert.match(desk, /riskAmountAtEntry = captured \? captured\.riskAmountUsdAtEntry \?\? null : null/);
+  assert.match(desk, /macroBiasScore = captured \? captured\.macroBiasScore \?\? null : null/);
+  assert.match(desk, /session: captured\?\.session \?\? 'UNKNOWN'/);
+  assert.match(desk, /rMultiple: riskAmountAtEntry && riskAmountAtEntry > 0/);
+});
+
 test('desk journal macro attribution is computed for the recorded instrument, not the calculator selection', () => {
   const desk = read('../app/components/DeskTerminal.tsx');
   assert.match(desk, /generatePairDossier\(snapshot, journalSymbol\)\.biasScore/);
