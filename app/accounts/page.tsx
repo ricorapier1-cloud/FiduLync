@@ -86,6 +86,7 @@ export default function AccountsPage() {
       if (openIds.has(positionId) || !items.some(closesPosition)) return [];
       const entry = items.find((deal) => deal.entry_type === 'IN' && (deal.side === 'BUY' || deal.side === 'SELL')) ?? items[0];
       const exit = items.filter(closesPosition).sort((left, right) => right.deal_time_server.localeCompare(left.deal_time_server))[0];
+      if (!exit) return [];
       return [{
         positionId,
         symbol: entry.symbol,
@@ -214,6 +215,7 @@ export default function AccountsPage() {
                 <td className="p-3 text-slate-400">{trade.closedAt}</td><td className="p-3 font-mono text-slate-100">{trade.symbol}</td><td className="p-3">{trade.side}</td><td className="p-3 font-mono">{trade.volume}</td><td className={'p-3 font-mono ' + (trade.net >= 0 ? 'text-emerald-300' : 'text-amber-300')}>{money(trade.net, selected.currency)}</td><td className="p-3 font-mono">{trade.magic || '—'}</td><td className="p-3 font-mono">{trade.positionId}</td>
               </tr>)}</tbody>
             </table> : <p className="p-5 text-xs text-slate-500">No fully reconciled closed-position history has arrived yet.</p>}
+            {selectedDeals.length >= 500 && <p className="p-3 text-[10px] text-amber-300">History sync reached the 500-deal batch cap. This view represents the latest synchronized records only; older history requires additional batches and is not assumed complete.</p>}
           </div>
         </section>
       </> : <section className="macro-section">
