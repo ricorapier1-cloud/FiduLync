@@ -27,7 +27,7 @@ const dateTime = (value: string) => new Intl.DateTimeFormat(undefined, {
   dateStyle: 'medium', timeStyle: 'medium', timeZone: 'Africa/Lagos',
 }).format(new Date(value));
 const netDeal = (deal: Deal) => Number(deal.profit) + Number(deal.commission) + Number(deal.swap) + Number(deal.fee);
-const closed = (deal: Deal) => ['OUT','OUT_BY','INOUT'].includes(deal.entry_type);
+const closesPosition = (deal: Deal) => ['OUT','OUT_BY','INOUT'].includes(deal.entry_type);
 
 export default function AccountsPage() {
   const [token, setToken] = useState('');
@@ -84,7 +84,7 @@ export default function AccountsPage() {
       winRate: values.length ? wins.length / values.length * 100 : null,
       profitFactor: grossLoss > 0 ? grossWin / grossLoss : null,
     };
-  }, [selectedDeals]);
+  }, [closedTrades]);
 
   const connect = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -161,11 +161,11 @@ export default function AccountsPage() {
           </div>
           <div className="mt-3 grid grid-cols-2 gap-3 xl:grid-cols-4">
             <div className="macro-panel p-4"><span className="macro-kpi-label">OPEN POSITIONS</span><strong className="mt-2 block font-mono text-xl text-slate-100">{selected.positions.length}</strong></div>
-            <div className="macro-panel p-4"><span className="macro-kpi-label">CLOSED DEALS IN WINDOW</span><strong className="mt-2 block font-mono text-xl text-slate-100">{analytics.count}</strong></div>
+            <div className="macro-panel p-4"><span className="macro-kpi-label">CLOSED POSITIONS SYNCED</span><strong className="mt-2 block font-mono text-xl text-slate-100">{analytics.count}</strong></div>
             <div className="macro-panel p-4"><span className="macro-kpi-label">WIN RATE · DEALS</span><strong className="mt-2 block font-mono text-xl text-slate-100">{analytics.winRate === null ? '—' : analytics.winRate.toFixed(1) + '%'}</strong></div>
             <div className="macro-panel p-4"><span className="macro-kpi-label">PROFIT FACTOR · DEALS</span><strong className="mt-2 block font-mono text-xl text-slate-100">{analytics.profitFactor === null ? '—' : analytics.profitFactor.toFixed(2)}</strong></div>
           </div>
-          <p className="mt-3 text-[10px] text-slate-500">Account login {selected.account_login} · observed {dateTime(selected.observed_at)} WAT · received {dateTime(selected.received_at)} WAT. Performance is calculated from synchronized deal records only; no assumed starting balance or synthetic history.</p>
+          <p className="mt-3 text-[10px] text-slate-500">Account login {selected.account_login} · observed {dateTime(selected.observed_at)} WAT · received {dateTime(selected.received_at)} WAT. Trade-level P&L aggregates entry and exit deal costs by position identifier; no assumed starting balance or synthetic history.</p>
         </section>
 
         <section className="macro-section">
@@ -181,14 +181,14 @@ export default function AccountsPage() {
         </section>
 
         <section className="macro-section">
-          <div className="macro-section-heading"><div><span className="eyebrow">EXECUTION RECORD</span><h2>Recent closed deals</h2></div><span className="macro-section-note mono">LATEST SYNCHRONIZED HISTORY</span></div>
+          <div className="macro-section-heading"><div><span className="eyebrow">EXECUTION RECORD</span><h2>Recent closed trades</h2></div><span className="macro-section-note mono">RECONCILED BY POSITION IDENTIFIER</span></div>
           <div className="macro-panel overflow-x-auto">
-            {selectedDeals.length ? <table className="w-full min-w-[760px] text-xs">
-              <thead className="text-left text-[10px] text-slate-500"><tr><th className="p-3">TIME · BROKER SERVER</th><th className="p-3">SYMBOL</th><th className="p-3">SIDE</th><th className="p-3">VOLUME</th><th className="p-3">NET P/L · {selected.currency}</th><th className="p-3">MAGIC / EA</th><th className="p-3">TICKET</th></tr></thead>
+            {closedTrades.length ? <table className="w-full min-w-[760px] text-xs">
+              <thead className="text-left text-[10px] text-slate-500"><tr><th className="p-3">CLOSED · BROKER SERVER</th><th className="p-3">SYMBOL</th><th className="p-3">SIDE</th><th className="p-3">VOLUME</th><th className="p-3">NET TRADE P/L · {selected.currency}</th><th className="p-3">MAGIC / EA</th><th className="p-3">POSITION ID</th></tr></thead>
               <tbody>{selectedDeals.slice(0,100).map((deal) => <tr key={deal.deal_ticket} className="border-t border-white/[0.06]">
                 <td className="p-3 text-slate-400">{deal.deal_time_utc}</td><td className="p-3 font-mono text-slate-100">{deal.symbol}</td><td className="p-3">{deal.side}</td><td className="p-3 font-mono">{deal.volume}</td><td className={'p-3 font-mono ' + (netDeal(deal) >= 0 ? 'text-emerald-300' : 'text-amber-300')}>{money(netDeal(deal), selected.currency)}</td><td className="p-3 font-mono">{deal.magic || '—'}</td><td className="p-3 font-mono">{deal.deal_ticket}</td>
               </tr>)}</tbody>
-            </table> : <p className="p-5 text-xs text-slate-500">No closed-deal history has arrived yet.</p>}
+            </table> : <p className="p-5 text-xs text-slate-500">No fully reconciled closed-position history has arrived yet.</p>}
           </div>
         </section>
       </> : <section className="macro-section">
