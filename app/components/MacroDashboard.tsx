@@ -660,7 +660,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
                 <div key={provider.name} className="p-3 rounded border border-white/[0.08] bg-[#0c1016]">
                   <div className="flex items-center justify-between gap-2 text-xs font-mono">
                     <span className="text-slate-300">{provider.name}</span>
-                    <span className={provider.status === 'HEALTHY' ? 'text-emerald-400' : provider.status === 'UNCONFIGURED' || provider.status === 'OFFLINE' ? 'text-rose-400' : 'text-amber-300'}>{provider.status}</span>
+                    <span className={provider.status === 'HEALTHY' ? 'text-emerald-400' : provider.status === 'STANDBY' ? 'text-slate-400' : provider.status === 'UNCONFIGURED' || provider.status === 'OFFLINE' ? 'text-rose-400' : 'text-amber-300'}>{provider.status === 'STANDBY' ? 'STANDBY • BIS ACTIVE' : provider.status}</span>
                   </div>
                   <div className="text-[11px] text-slate-500 font-mono mt-1">{provider.freshness} · {provider.latencyMs === null ? 'Latency unmeasured' : `${provider.latencyMs} ms`}</div>
                   <div className="text-[10px] text-slate-600 font-mono mt-1">{provider.latestObservationDate ? `Latest observation ${provider.latestObservationDate}` : 'Observation date not recorded'}{provider.lastSuccessfulSyncUtc ? ` · Retrieved ${provider.lastSuccessfulSyncUtc}` : ''}</div>

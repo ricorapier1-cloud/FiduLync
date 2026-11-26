@@ -40,6 +40,9 @@ struct MacroLyncMacroContext
    string cot_source;
    string as_of_utc;
    string disclaimer;
+   string intraday_signal_state;
+   string intraday_signal_direction;
+   double recommended_sl;
 };
 
 // Compatibility structure for existing EAs. The bridge deliberately never
@@ -65,6 +68,9 @@ struct MacroLyncSignal
    string decision_status;
    string confidence;
    bool   calendar_verified;
+   string intraday_signal_state;
+   string intraday_signal_direction;
+   double recommended_sl;
 };
 
 string ML_JsonString(const string json, const string key)
@@ -164,6 +170,9 @@ bool ML_FetchMacroContext(const string symbol, const string endpoint, const stri
    context.cot_source = "unavailable";
    context.as_of_utc = "";
    context.disclaimer = "Read-only macroeconomic intelligence. No technical analysis or broker order execution.";
+   context.intraday_signal_state = "WAIT_NO_SETUP";
+   context.intraday_signal_direction = "NONE";
+   context.recommended_sl = 0.0;
 
    string root = ML_BaseUrl(endpoint);
    if(StringFind(root, "/api/v1/macro-context") < 0) root += "/api/v1/macro-context";
@@ -260,6 +269,24 @@ bool ML_FetchMacroContext(const string symbol, const string endpoint, const stri
    context.cot_source = cot_source;
    context.as_of_utc = as_of;
    context.disclaimer = ML_JsonString(response, "disclaimer");
+   // Locate the selected symbol only inside the structured signals array.
+   int signals_position = StringFind(response, "\"signals\"");
+   if(signals_position >= 0)
+   {
+      string signals_json = StringSubstr(response, signals_position);
+      string signal_symbol_needle = "\"symbol\":\"" + normalized_symbol + "\"";
+      int selected_signal_position = StringFind(signals_json, signal_symbol_needle);
+      if(selected_signal_position >= 0)
+      {
+         string selected_signal_json = StringSubstr(signals_json, selected_signal_position);
+         context.intraday_signal_state = ML_JsonString(selected_signal_json, "signalState");
+         context.intraday_signal_direction = ML_JsonString(selected_signal_json, "direction");
+         string selected_sl = ML_JsonScalar(selected_signal_json, "stopLoss");
+         context.recommended_sl = selected_sl == "" || selected_sl == "null" ? 0.0 : StringToDouble(selected_sl);
+      }
+   }
+   if(context.intraday_signal_state == "") context.intraday_signal_state = "WAIT_NO_SETUP";
+   if(context.intraday_signal_direction == "") context.intraday_signal_direction = "NONE";
    return true;
 }
 
@@ -286,6 +313,9 @@ bool MacroLyncGetSignal(const string symbol, const string endpoint, const string
       signal.news_lockout = true;
       signal.macro_allowed_to_trade = false;
       signal.safe_to_trade = false;
+      signal.intraday_signal_state = "WAIT_NO_SETUP";
+      signal.intraday_signal_direction = "NONE";
+      signal.recommended_sl = 0.0;
       return false;
    }
    signal.symbol = context.symbol;
@@ -307,7 +337,26 @@ bool MacroLyncGetSignal(const string symbol, const string endpoint, const string
    signal.decision_status = context.decision_status;
    signal.confidence = context.confidence;
    signal.calendar_verified = context.calendar_verified;
+   signal.intraday_signal_state = context.intraday_signal_state;
+   signal.intraday_signal_direction = context.intraday_signal_direction;
+   signal.recommended_sl = context.recommended_sl;
    return true;
+}
+
+
+string GetSignalState(const MacroLyncSignal &signal)
+{
+   return signal.intraday_signal_state;
+}
+
+string GetSignalDirection(const MacroLyncSignal &signal)
+{
+   return signal.intraday_signal_direction;
+}
+
+double GetRecommendedSL(const MacroLyncSignal &signal)
+{
+   return signal.recommended_sl;
 }
 
 bool CheckRolloverWindow()
