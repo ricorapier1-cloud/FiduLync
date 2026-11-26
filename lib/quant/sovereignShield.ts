@@ -24,6 +24,7 @@ export type MarketRiskShieldResult = {
   blockReasons: string[];
 };
 export type SovereignShieldResult = MarketRiskShieldResult & {
+  allowedToTrade: boolean;
   governanceVerified: boolean;
 };
 
