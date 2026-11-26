@@ -25,8 +25,11 @@ export async function recordAndEvaluateSpreadBaseline(
   try {
     const redis = Redis.fromEnv();
     const key = 'intraday:spread-baseline:v1:' + symbol + ':' + dateWAT + ':' + session;
-    await redis.lpush(key, String(spread));
-    await redis.ltrim(key, 0, 119);
+    const sampleLock = await redis.set(key + ':sample-lock', '1', { nx: true, ex: 15 });
+    if (sampleLock === 'OK') {
+      await redis.lpush(key, String(spread));
+      await redis.ltrim(key, 0, 119);
+    }
     await redis.expire(key, 36 * 60 * 60);
     const raw = await redis.lrange<string>(key, 0, 119);
     const values = raw.map(Number).filter((value) => Number.isFinite(value) && value > 0).sort((a, b) => a - b);
