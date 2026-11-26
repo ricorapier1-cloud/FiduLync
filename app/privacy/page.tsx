@@ -46,13 +46,13 @@ export default function PrivacyPage() {
 
           <section className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-6">
             <h2 className="text-base font-semibold text-cyan-300">
-              2. Private Browser Research Notebook Storage
+              2. Private Browser Trade Journal Storage
             </h2>
             <p className="mt-3">
-              The Macro Research Notebook functions entirely within your browser client. All recorded research hypotheses, scenario probabilities, invalidation triggers, and qualitative notes are stored strictly in your browser&apos;s local storage (<code>localStorage</code>).
+              The Quant Trade Journal stores closed-trade records, P&amp;L, risk multiples and context snapshots strictly in your browser&apos;s local storage (<code>localStorage</code>).
             </p>
             <p className="mt-2 text-slate-400">
-              No proprietary research data or hypotheses are uploaded, transmitted, or synchronized to remote cloud servers.
+              Trade journal records are not uploaded, transmitted, or synchronized to remote cloud servers.
             </p>
           </section>
 
