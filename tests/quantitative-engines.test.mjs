@@ -626,6 +626,10 @@ test('provider health includes real EIA and Treasury observation dates and BIS-b
   assert.match(telemetry, /status: 'STANDBY'/);
   assert.match(types, /'STANDBY'/);
   assert.match(dashboard, /STANDBY • BIS ACTIVE/);
+  assert.match(dashboard, /const eiaFresh = Boolean\(snapshot\.energyMarkets/);
+  assert.match(dashboard, /eiaFresh \? snapshot\.energyMarkets\?\.wti\.valueUsdPerBarrel/);
+  assert.match(dashboard, /stale: Boolean\(snapshot\.energyMarkets && !eiaFresh\)/);
+  assert.match(dashboard, /snapshot\.usTreasury\?\.freshness === 'STALE'/);
 });
 
 
