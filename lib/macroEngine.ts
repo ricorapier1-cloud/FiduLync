@@ -61,8 +61,10 @@ export function getFundamentalSignal(snapshot: MacroSnapshot, pair: string): Fun
     && isFreshMacroObservation(currency.policyRateObservationDate, 180)
     && isFreshMacroObservation(currency.inflationObservationDate, currency.code === 'AUD' ? 180 : 120);
   if (!verified(base) || !verified(quote)) return null;
-  const baseCot = snapshot.cot.find((position) => position.market === baseCode);
-  const quoteCot = snapshot.cot.find((position) => position.market === quoteCode);
+  const baseCotRaw = snapshot.cot.find((position) => position.market === baseCode);
+  const quoteCotRaw = snapshot.cot.find((position) => position.market === quoteCode);
+  const baseCot = baseCotRaw && isFreshMacroObservation(baseCotRaw.reportDate, 14) ? baseCotRaw : undefined;
+  const quoteCot = quoteCotRaw && isFreshMacroObservation(quoteCotRaw.reportDate, 14) ? quoteCotRaw : undefined;
   const policyDiffBps = base
     ? Math.round((base.policyRate - quote.policyRate) * 100)
     : Math.round(-quote.policyRate * 100);
