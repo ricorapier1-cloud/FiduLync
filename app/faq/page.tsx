@@ -20,11 +20,11 @@ const faqs = [
   },
   {
     q: 'What data sources power MacroLync?',
-    a: 'MacroLync ingests official statistical releases from the Federal Reserve Economic Data (FRED), European Central Bank (ECB Data Portal), Bank of Canada Valet API, Bank of England, and the US Commodity Futures Trading Commission (CFTC Commitments of Traders). Live currency pricing is sourced via institutional market data gateways.',
+    a: 'MacroLync prioritizes official sources: ECB, Bank of England, Bank of Canada, BIS, Sveriges Riksbank, Norges Bank, US BLS, US BEA, CFTC, US Treasury and Cboe. FRED is optional and subject to its data-use/storage permission gate; EIA supplies daily WTI/Brent observations; FairEconomy supplies the public high-impact event calendar. Live bid/ask quotes use the public Swissquote BBO feed; intraday OHLCV bars use Yahoo Finance; Frankfurter daily exchange rates are indicative references, not executable broker prices. Provider health is based on actual observations, not merely configured API keys.',
   },
   {
     q: 'What is point-in-time vintage integrity?',
-    a: 'Economic indicators (GDP, CPI, employment) are frequently revised months after initial release. Backtesting models against revised data introduces fatal look-ahead bias. MacroLync tracks publication timestamps and release vintages to ensure historical research reflects only what market participants knew at the release timestamp.',
+    a: 'Economic indicators (GDP, CPI, employment) are frequently revised. A valid historical test must use the exact vintage and publication timestamp available at each decision point. MacroLync stores release timestamps and vintages only when the source actually supplies them; unknown values remain null and retrieval time is never substituted. Historical performance remains NOT VALIDATED until point-in-time macro vintages, synchronized FX returns and reproducible out-of-sample calculations exist.',
   },
   {
     q: 'How is research stored in the Trade Journal?',
