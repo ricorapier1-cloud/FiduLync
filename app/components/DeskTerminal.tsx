@@ -15,7 +15,7 @@ type Quote = {
 };
 type QuoteResponse = { generatedAtUtc: string; latencyMs: number; status: string; quotes: Quote[] };
 type FxRow = { date: string; rates: Record<string, number> };
-type JournalEntry = { id: string; timeUtc: string; symbol: string; result: 'WIN' | 'LOSS' | 'FLAT'; pnl: number; pnlUsd: number; direction: Direction; macroBiasScore: number | null; hurstRegime: string | null; vixLevel: number | null; session: 'LONDON' | 'NY' | 'OFF-SESSION'; riskPct: number | null; rMultiple: number | null; macroAlignment: 'ALIGNED' | 'COUNTER' | 'UNKNOWN'; entryContextCapturedAtUtc?: string; riskAmountUsdAtEntry?: number | null };
+type JournalEntry = { id: string; timeUtc: string; symbol: string; result: 'WIN' | 'LOSS' | 'FLAT'; pnl: number; pnlUsd: number; direction: Direction; macroBiasScore: number | null; hurstRegime: string | null; vixLevel: number | null; session: 'LONDON' | 'NY' | 'OFF-SESSION' | 'UNKNOWN'; riskPct: number | null; rMultiple: number | null; macroAlignment: 'ALIGNED' | 'COUNTER' | 'UNKNOWN'; entryContextCapturedAtUtc?: string; riskAmountUsdAtEntry?: number | null };
 type Journal = { dateWAT: string; trades: number; wins: number; losses: number; netPnl: number; entries: JournalEntry[] };
 type SymbolCode = string;
 type Direction = 'BUY' | 'SELL';
@@ -300,20 +300,17 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
       || (resultInput === 'FLAT' && pnl !== 0)) return;
     const timeUtc = new Date().toISOString();
     const captured = entryContext?.symbol === journalSymbol && entryContext.direction === direction ? entryContext : null;
-    const macroBiasScore = captured ? captured.macroBiasScore ?? null : (journalSymbol === 'XAUUSD' ? goldScore : generatePairDossier(snapshot, journalSymbol).biasScore);
-    const macroAlignment = captured?.macroAlignment ?? (macroBiasScore === null || macroBiasScore === undefined || macroBiasScore === 0
-      ? 'UNKNOWN' as const
-      : ((macroBiasScore > 0 && direction === 'BUY') || (macroBiasScore < 0 && direction === 'SELL'))
-        ? 'ALIGNED' as const : 'COUNTER' as const);
-    const riskAmountAtEntry = captured ? captured.riskAmountUsdAtEntry ?? null : (account > 0 && risk > 0 ? account * risk / 100 : null);
+    const macroBiasScore = captured ? captured.macroBiasScore ?? null : null;
+    const macroAlignment = captured ? captured.macroAlignment ?? 'UNKNOWN' : 'UNKNOWN';
+    const riskAmountAtEntry = captured ? captured.riskAmountUsdAtEntry ?? null : null;
     const entry: JournalEntry = {
       id: `${Date.now()}-${journalSymbol}-${Math.random().toString(36).slice(2, 8)}`,
       timeUtc, symbol: journalSymbol, result: resultInput, pnl, pnlUsd: pnl, direction,
       macroBiasScore: Number.isFinite(macroBiasScore) ? macroBiasScore : null,
       hurstRegime: captured ? captured.hurstRegime ?? null : null,
-      vixLevel: captured ? captured.vixLevel ?? null : (Number.isFinite(vixValue) ? vixValue : null),
-      session: captured?.session ?? (activeSession === 'NEW YORK' ? 'NY' : activeSession),
-      riskPct: captured ? captured.riskPct ?? null : (Number.isFinite(risk) ? risk : null),
+      vixLevel: captured ? captured.vixLevel ?? null : null,
+      session: captured?.session ?? 'UNKNOWN',
+      riskPct: captured ? captured.riskPct ?? null : null,
       rMultiple: riskAmountAtEntry && riskAmountAtEntry > 0 ? Number((pnl / riskAmountAtEntry).toFixed(4)) : null,
       macroAlignment,
       ...(captured?.entryContextCapturedAtUtc ? { entryContextCapturedAtUtc: captured.entryContextCapturedAtUtc } : {}),
