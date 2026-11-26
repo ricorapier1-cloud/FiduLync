@@ -37,8 +37,8 @@ export function sanitizeMacroSnapshotPermissions(snapshot: MacroSnapshot): Macro
       next.inflation = 0; next.inflationLabel = 'CPI'; next.inflationSource = 'reference';
       delete next.inflationProvider; delete next.inflationObservationDate; delete next.corePce; delete next.cpi; removed = true;
     }
-    if (next.code === 'USD' && next.twoYearYieldSource === 'provider') {
-      next.twoYearYield = undefined; next.twoYearYieldSource = 'reference'; delete next.twoYearYieldObservationDate; removed = true;
+    if (next.code === 'USD' && next.twoYearYieldSource === 'provider' && (next.twoYearYieldProvider === 'FRED' || !next.twoYearYieldProvider)) {
+      next.twoYearYield = undefined; next.twoYearYieldSource = 'reference'; delete next.twoYearYieldObservationDate; delete next.twoYearYieldProvider; removed = true;
     }
     return next;
   });
@@ -119,6 +119,7 @@ function isCurrency(value: unknown): value is MacroCurrency {
     && (value.cpi === undefined || isFiniteNumber(value.cpi))
     && (value.twoYearYield === undefined || isFiniteNumber(value.twoYearYield))
     && (value.twoYearYieldSource === undefined || value.twoYearYieldSource === 'provider' || value.twoYearYieldSource === 'reference')
+    && (value.twoYearYieldProvider === undefined || typeof value.twoYearYieldProvider === 'string')
     && (value.policyRateSource === undefined || value.policyRateSource === 'provider' || value.policyRateSource === 'reference')
     && (value.inflationSource === undefined || value.inflationSource === 'provider' || value.inflationSource === 'reference')
     && (value.policyRateObservationDate === undefined || typeof value.policyRateObservationDate === 'string')
@@ -822,6 +823,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
       if (isFiniteNumber(fredResult.value.twoYearYield)) {
         usd.twoYearYield = fredResult.value.twoYearYield;
         usd.twoYearYieldSource = 'provider';
+        usd.twoYearYieldProvider = 'FRED';
         usd.twoYearYieldObservationDate = typeof fredResult.value.twoYearYieldObservationDate === 'string' ? fredResult.value.twoYearYieldObservationDate : undefined;
         hasMacroData = true;
         hasAnyProviderData = true;
@@ -894,6 +896,7 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
       if (isFiniteNumber(ecbResult.value.twoYearYield)) {
         eur.twoYearYield = ecbResult.value.twoYearYield;
         eur.twoYearYieldSource = 'provider';
+        eur.twoYearYieldProvider = 'ECB';
         eur.twoYearYieldObservationDate = ecbResult.value.twoYearYieldObservationDate;
         hasMacroData = true;
         hasAnyProviderData = true;
@@ -1229,6 +1232,9 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
             ...currency,
             policyRateSource: 'provider' as const,
             inflationSource: 'provider' as const,
+            ...(currency.twoYearYieldSource === 'provider' && currency.twoYearYield !== undefined
+              ? { twoYearYieldProvider: currency.twoYearYieldProvider ?? 'CUSTOM MACRO PROVIDER' }
+              : {}),
           })),
         ],
         cot: parsed.cot.length > 0 ? parsed.cot : baseline.cot,
