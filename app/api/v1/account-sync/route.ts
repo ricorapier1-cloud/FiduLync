@@ -25,7 +25,7 @@ function str(value: unknown, max = 160): string | null {
   const result = value.trim();
   return result.length > 0 && result.length <= max ? result : null;
 }
-function num(value: unknown, fallback = 0): number | null {
+function num(value: unknown, fallback: number | null = 0): number | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
   return Math.abs(value) <= 1e15 ? value : null;
 }
