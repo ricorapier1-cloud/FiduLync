@@ -1,5 +1,5 @@
 -- Private, read-only MT5 account intelligence. No broker credentials are stored.
-create table if not exists public.mt5_account_snapshots (
+create table if not exists public.macrolinc_account_snapshots (
   account_key text primary key check (length(account_key) = 64),
   account_login text not null,
   broker text,
@@ -17,11 +17,11 @@ create table if not exists public.mt5_account_snapshots (
   received_at timestamptz not null default now()
 );
 
-create index if not exists mt5_account_snapshots_received_idx
-  on public.mt5_account_snapshots (received_at desc);
+create index if not exists macrolinc_account_snapshots_received_idx
+  on public.macrolinc_account_snapshots (received_at desc);
 
 create table if not exists public.mt5_account_deals (
-  account_key text not null references public.mt5_account_snapshots(account_key) on delete cascade,
+  account_key text not null references public.macrolinc_account_snapshots(account_key) on delete cascade,
   deal_ticket text not null,
   order_ticket text,
   position_id text,
@@ -44,9 +44,9 @@ create table if not exists public.mt5_account_deals (
 create index if not exists mt5_account_deals_history_idx
   on public.mt5_account_deals (account_key, deal_time_server desc);
 
-alter table public.mt5_account_snapshots enable row level security;
+alter table public.macrolinc_account_snapshots enable row level security;
 alter table public.mt5_account_deals enable row level security;
-revoke all on public.mt5_account_snapshots from anon, authenticated;
+revoke all on public.macrolinc_account_snapshots from anon, authenticated;
 revoke all on public.mt5_account_deals from anon, authenticated;
-grant all on public.mt5_account_snapshots to service_role;
+grant all on public.macrolinc_account_snapshots to service_role;
 grant all on public.mt5_account_deals to service_role;
