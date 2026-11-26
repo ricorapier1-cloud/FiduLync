@@ -585,7 +585,7 @@ test('manual journal and calculator workflows are retired while the macro curren
 test('Force Sync refreshes the macro snapshot, gold context, BBO and spot reference inputs', () => {
   const snapshotRoute = read('../app/api/macro/snapshot/route.ts');
   const desk = read('../app/components/DeskTerminal.tsx');
-  assert.match(snapshotRoute, /searchParams\.get\('force'\) === 'true'/);
+  assert.match(snapshotRoute, /new URL\(request\.url\)\.searchParams\.get\('force'\) === 'true'/);
   assert.match(snapshotRoute, /getMacroSnapshot\(forceRefresh\)/);
   assert.match(desk, /api\/macro\/snapshot\?force=true/);
   assert.match(desk, /api\/macro\/gold-context/);
