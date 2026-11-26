@@ -478,7 +478,7 @@ function classifyRegime(
 
 export async function buildGoldMacroContext(snapshot?: MacroSnapshot): Promise<GoldMacroContext> {
   const totalStarted = performance.now();
-  const fredApiKey = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED !== 'false' ? process.env.FRED_API_KEY?.trim() ?? '' : '';
+  const fredApiKey = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED?.trim().toLowerCase() !== 'false' ? process.env.FRED_API_KEY?.trim() ?? '' : '';
 
   const quotePromise = fetchGoldQuote();
   const treasuryStarted = performance.now();
