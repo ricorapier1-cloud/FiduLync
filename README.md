@@ -70,6 +70,19 @@ The scheduled `/api/cron/sync-macro` route requires the server-side `CRON_SECRET
 
 Use the dedicated MACRO_API_TOKEN service secret (or the legacy ALGO_PRIVATE_API_KEY alias) through the x-macro-key header or Bearer authorization. The public MT5 include uses this read-only context contract; it does not issue licenses, log closed trades, send heartbeats or place orders. Never reuse CRON_SECRET as the EA token. Do not send broker master/investor passwords or provider API keys to FiduLync or embed them in an EA.
 
+## Read-only MT5 account intelligence
+
+The optional Portfolio & Accounts workspace accepts a read-only snapshot publisher running inside the user's MT5 terminal. It stores broker-reported account metrics, open positions and deal history for private analysis. It does not accept broker passwords, place orders, modify positions or close trades.
+
+- Apply `supabase/migrations/20261126174500_mt5_account_intelligence.sql` before enabling the connector.
+- Configure separate server-side `MT5_ACCOUNT_INGEST_TOKEN` and `MT5_ACCOUNT_READ_TOKEN` values in Vercel. Each must be a unique random secret of at least 32 characters. Never commit either value or embed the read token in the MT5 publisher.
+- Install `public/MacroLyncAccountPublisher.mq5` in MT5, set its `InpAccountIngestToken` to the ingest token, and allow `https://fidulync.vercel.app` under MT5 Expert Advisors → WebRequest.
+- Open `/accounts` and enter the read token to view synchronized data. The browser keeps it in session storage for that tab only.
+- The publisher sends current account/position snapshots and up to 500 recent deal records from its configured history window every 60 seconds. Deal timestamps are retained as broker-server time because broker historical UTC offsets cannot be safely inferred. The account observation timestamp is UTC.
+- Repeated deal tickets are deduplicated. Numeric P&L is shown in the account's reported deposit currency; no currency conversion is invented.
+
+The database tables are RLS-enabled and inaccessible to anon/authenticated roles; server routes use the Supabase service role after validating endpoint-specific tokens. Revoke either token in Vercel to disable its corresponding access path. Do not paste broker master or investor passwords into MacroLync.
+
 ## Environment variables
 
 Configure secrets only in the Vercel project environment settings, never in this repository or in ChatGPT messages.
