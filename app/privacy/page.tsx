@@ -46,13 +46,13 @@ export default function PrivacyPage() {
 
           <section className="rounded-xl border border-white/[0.08] bg-[#0c1016] p-6">
             <h2 className="text-base font-semibold text-cyan-300">
-              2. Private Browser Trade Journal Storage
+              2. Private Read-Only MT5 Account Data
             </h2>
             <p className="mt-3">
-              The Quant Trade Journal stores closed-trade records, P&amp;L, risk multiples and context snapshots strictly in your browser&apos;s local storage (<code>localStorage</code>).
+              The optional Portfolio &amp; Accounts connector stores broker-reported account snapshots, open-position data and synchronized deal history in private Supabase tables protected by row-level security and server-side access tokens.
             </p>
             <p className="mt-2 text-slate-400">
-              Trade journal records are not uploaded, transmitted, or synchronized to remote cloud servers.
+              Only the data required for account analytics is transmitted from the user's MT5 terminal. Broker master/investor passwords, withdrawal credentials and order-control permissions are never collected. The publisher cannot place, modify or close trades. The browser read token is held in session storage for the current tab.
             </p>
           </section>
 
