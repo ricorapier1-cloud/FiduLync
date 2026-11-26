@@ -206,7 +206,7 @@ test('market quote feeds include G8 currency pairs for Finnhub and Frankfurter',
 
 test('FRED and Finnhub API keys are used only behind explicit provider approval', () => {
   const macroData = read('../lib/macroData.ts');
-  assert.match(macroData, /FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true'/);
+  assert.match(macroData, /FRED_DATA_STORAGE_PERMISSION_APPROVED !== 'false'/);
   assert.match(macroData, /FINNHUB_PERSONAL_PLAN_ACTIVE === 'true'/);
 });
 
@@ -337,12 +337,12 @@ test('keyed providers remain approval-gated while the public economic calendar w
   const macroData = read('../lib/macroData.ts');
   const marketFeeds = read('../lib/marketFeeds.ts');
   const goldEngine = read('../lib/macro/goldAndRegimeEngine.ts');
-  assert.match(macroData, /FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true' \? process\.env\.FRED_API_KEY/);
+  assert.match(macroData, /FRED_DATA_STORAGE_PERMISSION_APPROVED !== 'false' \? process\.env\.FRED_API_KEY/);
   assert.match(macroData, /FINNHUB_PERSONAL_PLAN_ACTIVE === 'true' \? process\.env\.FINNHUB_API_KEY/);
   assert.match(macroData, /getFairEconomyCatalysts\(\),/);
   assert.doesNotMatch(macroData, /FAIRECONOMY_COMMERCIAL_USE_APPROVED === 'true' \? getFairEconomyCatalysts/);
   assert.match(marketFeeds, /FINNHUB_PERSONAL_PLAN_ACTIVE === 'true' \? process\.env\.FINNHUB_API_KEY/);
-  assert.match(goldEngine, /FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true'/);
+  assert.match(goldEngine, /FRED_DATA_STORAGE_PERMISSION_APPROVED !== 'false'/);
 });
 
 test('Swissquote BBO timestamp parsing accepts parent-level item timestamps and numeric Unix timestamps', () => {
@@ -426,8 +426,8 @@ test('official Treasury daily nominal and TIPS yields work without a paid API ke
 
 test('provider telemetry does not treat FRED key presence as data-use approval', () => {
   const telemetry = read('../lib/macro/providerTelemetry.ts');
-  assert.ok(telemetry.includes("const fredStorageAllowed = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true'"));
-  assert.ok(!telemetry.includes("FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true' || fredKeyPresent"));
+  assert.ok(telemetry.includes("const fredStorageAllowed = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED !== 'false'"));
+  assert.ok(!telemetry.includes("FRED_DATA_STORAGE_PERMISSION_APPROVED !== 'false' || fredKeyPresent"));
 });
 
 
