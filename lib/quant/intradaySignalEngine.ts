@@ -93,6 +93,7 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
   const atr = calculateAtr(daily, 14);
   const latest = bars.at(-1);
   const quoteAge = input.quoteTimestampUtc ? Date.parse(now) - Date.parse(input.quoteTimestampUtc) : Number.POSITIVE_INFINITY;
+  const candleAge = latest ? Date.parse(now) - Date.parse(latest.timestampUtc) : Number.POSITIVE_INFINITY;
   const price = finite(input.quoteMid) && input.quoteMid > 0 ? input.quoteMid : latest?.close ?? null;
   const session = input.session;
 
@@ -104,6 +105,7 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
   if (input.spreadMultipleOfBaseline === null) blockers.push('SPREAD_BASELINE_UNAVAILABLE');
   else if (input.spreadMultipleOfBaseline > 2) blockers.push('SPREAD_BLOWOUT_BLOCK');
   if (!finite(input.quoteMid) || !input.quoteTimestampUtc || !Number.isFinite(quoteAge) || quoteAge < -30_000 || quoteAge > 60_000) blockers.push('LIVE_BBO_UNAVAILABLE_OR_STALE');
+  if (!Number.isFinite(candleAge) || candleAge < -60_000 || candleAge > 15 * 60_000) blockers.push('INTRADAY_CANDLES_STALE');
   if (direction === 'NONE') blockers.push('MACRO_SCORE_BELOW_25_THRESHOLD');
   if (bars.length < 60 || daily.length < 15 || !finite(hurst) || !finite(ker) || !finite(atr)) blockers.push('OHLCV_HISTORY_INSUFFICIENT');
   if (finite(hurst) && hurst <= 0.55) blockers.push('HURST_NOT_TREND_PERSISTENT');
@@ -116,7 +118,7 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
     hurst, ker, atr14: atr, atrUnit: isGold ? 'USD' : 'PIPS', session,
     dataAsOfUtc: latest?.timestampUtc ?? null, blockers,
   });
-  if (blockers.some((item) => ['VIX_UNAVAILABLE', 'VIX_BLACK_SWAN_LOCKOUT', 'CALENDAR_UNVERIFIED', 'RATE_DECISION_LOCKOUT', 'TIER_ONE_EVENT_LOCKOUT', 'OUTSIDE_LONDON_NEW_YORK_WAT_WINDOWS', 'SPREAD_BASELINE_UNAVAILABLE', 'SPREAD_BLOWOUT_BLOCK', 'LIVE_BBO_UNAVAILABLE_OR_STALE'].includes(item))) {
+  if (blockers.some((item) => ['VIX_UNAVAILABLE', 'VIX_BLACK_SWAN_LOCKOUT', 'CALENDAR_UNVERIFIED', 'RATE_DECISION_LOCKOUT', 'TIER_ONE_EVENT_LOCKOUT', 'OUTSIDE_LONDON_NEW_YORK_WAT_WINDOWS', 'SPREAD_BASELINE_UNAVAILABLE', 'SPREAD_BLOWOUT_BLOCK', 'LIVE_BBO_UNAVAILABLE_OR_STALE', 'INTRADAY_CANDLES_STALE'].includes(item))) {
     return empty('SHIELD_BLOCKED', 'Sovereign Shield or live market-data gate is not clear.');
   }
   if (blockers.length) return empty('WAIT_NO_SETUP', 'Macro, OHLCV history or trend-quality confirmation is insufficient.');
