@@ -313,6 +313,9 @@ bool MacroLyncGetSignal(const string symbol, const string endpoint, const string
       signal.news_lockout = true;
       signal.macro_allowed_to_trade = false;
       signal.safe_to_trade = false;
+      signal.intraday_signal_state = "WAIT_NO_SETUP";
+      signal.intraday_signal_direction = "NONE";
+      signal.recommended_sl = 0.0;
       return false;
    }
    signal.symbol = context.symbol;
