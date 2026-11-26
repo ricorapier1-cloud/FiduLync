@@ -1,6 +1,7 @@
 'use client';
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { ChangeEvent, FormEvent } from 'react';
 
 type Session = 'LONDON' | 'NY' | 'OFF-SESSION';
 type JournalTrade = {
@@ -12,7 +13,7 @@ type JournalTrade = {
 const KEY = 'fidulync-quant-trade-journal-v1';
 const DESK_KEY = 'fidulync-desk-journal-v1';
 const money = (v: number) => (v < 0 ? '-$' : '$') + Math.abs(v).toFixed(2);
-const num = (v: unknown): number | null => typeof v === 'number' && Number.isFinite(v) ? v : null;
+const num = (v: unknown): number | null => { const parsed = typeof v === 'number' ? v : typeof v === 'string' && v.trim() ? Number(v) : NaN; return Number.isFinite(parsed) ? parsed : null; };
 const csvCell = (v: unknown) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
 function download(name: string, body: string, type: string) {
   const url = URL.createObjectURL(new Blob([body], { type }));
