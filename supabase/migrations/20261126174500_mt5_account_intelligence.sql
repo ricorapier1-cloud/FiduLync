@@ -34,7 +34,7 @@ create table if not exists public.mt5_account_deals (
   commission numeric(24,8) not null default 0,
   swap numeric(24,8) not null default 0,
   fee numeric(24,8) not null default 0,
-  deal_time_utc timestamptz not null,
+  deal_time_server text not null,
   magic text,
   comment text,
   received_at timestamptz not null default now(),
@@ -42,7 +42,7 @@ create table if not exists public.mt5_account_deals (
 );
 
 create index if not exists mt5_account_deals_history_idx
-  on public.mt5_account_deals (account_key, deal_time_utc desc);
+  on public.mt5_account_deals (account_key, deal_time_server desc);
 
 alter table public.mt5_account_snapshots enable row level security;
 alter table public.mt5_account_deals enable row level security;
