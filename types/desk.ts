@@ -45,7 +45,7 @@ export type MacroContextPayload = {
   cross_asset_confirmation: string;
   live_quotes: DeskQuoteContext[];
   sovereignShield: {
-    status: 'NORMAL' | 'ELEVATED_VOLATILITY' | 'BLACK_SWAN_LOCKOUT' | 'DATA_UNAVAILABLE';
+    status: 'NORMAL' | 'ELEVATED_VOLATILITY_HALF_RISK' | 'BLACK_SWAN_LOCKOUT' | 'DATA_UNAVAILABLE';
     maxAllowedRiskPct: number;
     blockReasons: string[];
     crowdedUnwindRisk: string[];
