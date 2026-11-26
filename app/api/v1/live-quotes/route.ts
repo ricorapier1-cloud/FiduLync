@@ -53,7 +53,7 @@ async function fetchQuote(instrument: { symbol: string; path: string }) {
         const quoteTimeUtc = isoTime(raw.ts ?? item.ts);
         const quoteTimestamp = quoteTimeUtc ? Date.parse(quoteTimeUtc) : Number.NaN;
         if (bid !== null && ask !== null && bid > 0 && ask >= bid
-          && Number.isFinite(quoteTimestamp) && quoteTimestamp <= Date.now() + 5 * 60_000) {
+          && Number.isFinite(quoteTimestamp) && quoteTimestamp <= Date.now() + 30_000) {
           observations.push({ bid, ask, quoteTimeUtc: quoteTimeUtc! });
         }
       }

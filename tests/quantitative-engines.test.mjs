@@ -388,6 +388,13 @@ test('keyed providers remain approval-gated while the public economic calendar w
   assert.match(goldEngine, /FRED_DATA_STORAGE_PERMISSION_APPROVED\?\.trim\(\)\.toLowerCase\(\) !== 'false'/);
 });
 
+test('Swissquote BBO future timestamps are bounded by the same 30-second clock-skew tolerance as intraday signals', () => {
+  const quotes = read('../app/api/v1/live-quotes/route.ts');
+  const engine = read('../lib/quant/intradaySignalEngine.ts');
+  assert.match(quotes, /quoteTimestamp <= Date\.now\(\) \+ 30_000/);
+  assert.match(engine, /quoteAge < -30_000/);
+});
+
 test('Swissquote BBO timestamp parsing accepts parent-level item timestamps and numeric Unix timestamps', () => {
   const quotes = read('../app/api/v1/live-quotes/route.ts');
   assert.ok(quotes.includes('raw.ts ?? item.ts'));
