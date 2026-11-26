@@ -48,8 +48,8 @@ export default function PlatformFooter() {
                 </Link>
               </li>
               <li>
-                <Link href="/notebook" className="transition hover:text-emerald-300">
-                  Trade Journal
+                <Link href="/accounts" className="transition hover:text-emerald-300">
+                  Portfolio &amp; Account Intelligence
                 </Link>
               </li>
               <li>
