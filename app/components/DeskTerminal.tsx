@@ -15,7 +15,7 @@ type Quote = {
 };
 type QuoteResponse = { generatedAtUtc: string; latencyMs: number; status: string; quotes: Quote[] };
 type FxRow = { date: string; rates: Record<string, number> };
-type JournalEntry = { id: string; timeUtc: string; symbol: string; result: 'WIN' | 'LOSS' | 'FLAT'; pnl: number };
+type JournalEntry = { id: string; timeUtc: string; symbol: string; result: 'WIN' | 'LOSS' | 'FLAT'; pnl: number; pnlUsd: number; direction: Direction; macroBiasScore: number | null; hurstRegime: string | null; vixLevel: number | null; session: 'LONDON' | 'NY' | 'OFF-SESSION'; riskPct: number | null; rMultiple: number | null; macroAlignment: 'ALIGNED' | 'COUNTER' | 'UNKNOWN' };
 type Journal = { dateWAT: string; trades: number; wins: number; losses: number; netPnl: number; entries: JournalEntry[] };
 type SymbolCode = string;
 type Direction = 'BUY' | 'SELL';
@@ -273,12 +273,30 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const recordTrade = () => {
     const pnl = Number(pnlInput);
     if (!pnlInput.trim() || !Number.isFinite(pnl) || locked) return;
+    const timeUtc = new Date().toISOString();
+    const macroBiasScore = journalSymbol === 'XAUUSD' ? goldScore : dossier.biasScore;
+    const macroAlignment = macroBiasScore === null || macroBiasScore === undefined || macroBiasScore === 0
+      ? 'UNKNOWN' as const
+      : ((macroBiasScore > 0 && direction === 'BUY') || (macroBiasScore < 0 && direction === 'SELL'))
+        ? 'ALIGNED' as const : 'COUNTER' as const;
+    const riskAmountAtEntry = account > 0 && risk > 0 ? account * risk / 100 : null;
+    const entry: JournalEntry = {
+      id: `${Date.now()}-${journalSymbol}-${Math.random().toString(36).slice(2, 8)}`,
+      timeUtc, symbol: journalSymbol, result: resultInput, pnl, pnlUsd: pnl, direction,
+      macroBiasScore: Number.isFinite(macroBiasScore) ? macroBiasScore : null,
+      hurstRegime: goldContext?.liquidityRegime ?? snapshot.regime ?? null,
+      vixLevel: Number.isFinite(vixValue) ? vixValue : null,
+      session: activeSession === 'NEW YORK' ? 'NY' : activeSession,
+      riskPct: Number.isFinite(risk) ? risk : null,
+      rMultiple: riskAmountAtEntry && riskAmountAtEntry > 0 ? Number((pnl / riskAmountAtEntry).toFixed(4)) : null,
+      macroAlignment,
+    };
     setJournal((previous) => ({
       ...previous, trades: previous.trades + 1,
       wins: previous.wins + (resultInput === 'WIN' ? 1 : 0),
       losses: previous.losses + (resultInput === 'LOSS' ? 1 : 0),
       netPnl: Number((previous.netPnl + pnl).toFixed(2)),
-      entries: [{ id: `${Date.now()}-${previous.entries.length}`, timeUtc: new Date().toISOString(), symbol: journalSymbol, result: resultInput, pnl }, ...previous.entries].slice(0, 20),
+      entries: [entry, ...previous.entries].slice(0, 20),
     }));
     setPnlInput('');
   };
