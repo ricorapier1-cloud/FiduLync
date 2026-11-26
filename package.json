@@ -7,7 +7,7 @@
     "build": "npm run lint && tsc --noEmit && npm test && next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --experimental-strip-types --test tests/*.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
@@ -28,6 +28,6 @@
     "typescript": "^5"
   },
   "engines": {
-    "node": ">=22.0.0 <23.0.0"
+    "node": ">=22.6.0 <23.0.0"
   }
 }
