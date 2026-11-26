@@ -67,7 +67,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const rateDecision = Boolean(nearestRateDecision && Math.abs(nearestRateDecision.minutes) <= 60);
     const eventMinutesAway = rateDecision ? nearestRateDecision!.minutes : nearestEvent?.minutes ?? null;
     const shield = evaluateSovereignShield({
-      vix: context.drivers.VIXCLS.value,
+      vix: context.drivers.VIXCLS.state === 'HEALTHY' ? context.drivers.VIXCLS.value : null,
       eventMinutesAway,
       isCentralBankRateDecision: rateDecision,
       cotPercentiles: snapshot.cot
