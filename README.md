@@ -74,7 +74,7 @@ Use the dedicated MACRO_API_TOKEN service secret (or the legacy ALGO_PRIVATE_API
 
 The optional Portfolio & Accounts workspace accepts a read-only snapshot publisher running inside the user's MT5 terminal. It stores broker-reported account metrics, open positions and deal history for private analysis. It does not accept broker passwords, place orders, modify positions or close trades.
 
-- Apply `supabase/migrations/20261126174500_mt5_account_intelligence.sql` before enabling the connector.
+- Apply `supabase/migrations/20261126165443_mt5_account_intelligence.sql` before enabling the connector.
 - Configure separate server-side `MT5_ACCOUNT_INGEST_TOKEN` and `MT5_ACCOUNT_READ_TOKEN` values in Vercel. Each must be a unique random secret of at least 32 characters. Never commit either value or embed the read token in the MT5 publisher.
 - Install `public/MacroLyncAccountPublisher.mq5` in MT5, set its `InpAccountIngestToken` to the ingest token, and allow `https://fidulync.vercel.app` under MT5 Expert Advisors → WebRequest.
 - Open `/accounts` and enter the read token to view synchronized data. The browser keeps it in session storage for that tab only.
