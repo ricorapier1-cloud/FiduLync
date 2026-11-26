@@ -511,7 +511,9 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
         </div>
         {snapshot.energyMarkets && (
           <p className="text-[10px] text-slate-500 font-mono mt-2">
-            EIA Brent–WTI spot spread: {eiaFresh ? '
+            EIA Brent–WTI spot spread: {eiaFresh ? 'USD ' + snapshot.energyMarkets.brentWtiSpreadUsd.toFixed(2) + '/barrel' : 'UNAVAILABLE · STALE'} · WTI obs {snapshot.energyMarkets.wti.observationDate} / Brent obs {snapshot.energyMarkets.brent.observationDate} · Retrieved {snapshot.energyMarkets.wti.retrievedAtUtc} · Daily published spot observations, not intraday futures or live ticks.
+          </p>
+        )}
         {snapshot.usTreasury && (
           <p className="text-[10px] text-slate-500 font-mono mt-2">
             U.S. Treasury nominal and TIPS curves: observation {snapshot.usTreasury.observationDate} · {snapshot.usTreasury.freshness} · Retrieved {snapshot.usTreasury.retrievedAtUtc} · Daily published closing-market estimates, not intraday streaming yields.
