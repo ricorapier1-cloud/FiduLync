@@ -18,7 +18,6 @@ export async function recordAndEvaluateSpreadBaseline(
   spread: number | null,
   session: 'LONDON' | 'NEW_YORK' | 'CLOSED',
   dateWAT: string,
-  nowMs = Date.now(),
 ): Promise<SpreadBaselineResult> {
   if (spread === null || !Number.isFinite(spread) || spread <= 0 || session === 'CLOSED') {
     return { multiple: null, medianSpread: null, observations: 0, status: 'UNAVAILABLE' };
@@ -29,7 +28,7 @@ export async function recordAndEvaluateSpreadBaseline(
     await redis.lpush(key, String(spread));
     await redis.ltrim(key, 0, 119);
     await redis.expire(key, 36 * 60 * 60);
-    const raw = await redis.lrange<string[]>(key, 0, 119);
+    const raw = await redis.lrange<string>(key, 0, 119);
     const values = raw.map(Number).filter((value) => Number.isFinite(value) && value > 0).sort((a, b) => a - b);
     if (values.length < 20) {
       return { multiple: null, medianSpread: null, observations: values.length, status: 'WARMING_UP' };
