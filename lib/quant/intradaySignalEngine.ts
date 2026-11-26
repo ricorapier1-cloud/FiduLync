@@ -25,7 +25,7 @@ export type IntradaySignal = {
   session: 'LONDON' | 'NEW_YORK' | 'CLOSED';
   dataAsOfUtc: string | null;
   blockers: string[];
-  spreadBaselineStatus?: 'WARMING_UP' | 'AVAILABLE' | 'UNAVAILABLE';
+  spreadBaselineStatus?: 'CONFIGURED_REFERENCE' | 'AVAILABLE' | 'UNAVAILABLE';
   spreadBaselineObservations?: number;
   spreadMultipleOfBaseline?: number | null;
 };
@@ -91,8 +91,8 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
   const pipSize = isGold ? 1 : symbol.endsWith('JPY') ? 0.01 : 0.0001;
   const now = input.nowUtc ?? new Date().toISOString();
   const blockers: string[] = [];
-  const direction: SignalDirection = input.macroScore !== null && input.macroScore >= 25 ? 'BUY'
-    : input.macroScore !== null && input.macroScore <= -25 ? 'SELL' : 'NONE';
+  const direction: SignalDirection = input.macroScore !== null && input.macroScore >= (isGold ? 20 : 25) ? 'BUY'
+    : input.macroScore !== null && input.macroScore <= (isGold ? -20 : -25) ? 'SELL' : 'NONE';
   const bars = input.intradayBars;
   const daily = input.dailyBars;
   const closes = bars.map((bar) => bar.close);
@@ -107,7 +107,7 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
   const session = input.session;
 
   if (input.vix === null) blockers.push('VIX_UNAVAILABLE');
-  else if (input.vix >= 28) blockers.push('VIX_BLACK_SWAN_LOCKOUT');
+  else if (input.vix >= 32) blockers.push('VIX_BLACK_SWAN_LOCKOUT');
   if (!input.calendarVerified) blockers.push('CALENDAR_UNVERIFIED');
   if (input.eventMinutesAway !== null && Math.abs(input.eventMinutesAway) <= (input.rateDecision ? 60 : 30)) blockers.push(input.rateDecision ? 'RATE_DECISION_LOCKOUT' : 'TIER_ONE_EVENT_LOCKOUT');
   if (session === 'CLOSED') blockers.push('OUTSIDE_LONDON_NEW_YORK_WAT_WINDOWS');
@@ -151,13 +151,14 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
     : (sweptHigh || (valueZone && latest!.close < latest!.open));
   const swing = direction === 'BUY' ? Math.min(...bars.slice(-12).map((bar) => bar.low))
     : Math.max(...bars.slice(-12).map((bar) => bar.high));
-  const riskDistance = Math.max(atr! * 1.35, direction === 'BUY' ? price! - swing : swing - price!);
+  const stopAtrMultiple = finite(input.vix) && input.vix >= 25 ? 1.5 : 1.35;
+  const riskDistance = Math.max(atr! * stopAtrMultiple, direction === 'BUY' ? price! - swing : swing - price!);
   if (!Number.isFinite(riskDistance) || riskDistance <= 0) return empty('WAIT_NO_SETUP', 'No valid swing invalidation distance.');
   const stopLoss = direction === 'BUY' ? price! - riskDistance : price! + riskDistance;
   const takeProfit1 = direction === 'BUY' ? price! + riskDistance * 2 : price! - riskDistance * 2;
   const takeProfit2 = direction === 'BUY' ? price! + riskDistance * 3 : price! - riskDistance * 3;
   const score = Math.min(100, Math.round(25 + (Math.abs(input.macroScore ?? 0) / 100) * 20 + (ker! * 25) + (alignedTrigger ? 15 : 0)));
-  const rationale = `${direction} Macro (${input.macroScore}) + ${sweptLow ? 'prior-session low sweep' : sweptHigh ? 'prior-session high sweep' : valueZone ? 'EMA20/VWAP value-zone pullback' : 'trend aligned'} + KER ${ker!.toFixed(2)} + 1.35x daily ATR stop · Hurst unavailable pending validation`;
+  const rationale = `${direction} Macro (${input.macroScore}) + ${sweptLow ? 'prior-session low sweep' : sweptHigh ? 'prior-session high sweep' : valueZone ? 'EMA20/VWAP value-zone pullback' : 'trend aligned'} + KER ${ker!.toFixed(2)} + ${stopAtrMultiple.toFixed(2)}x daily ATR stop · Hurst unavailable pending validation`;
   return {
     symbol, signalState: alignedTrigger ? 'ACTIVE_SETUP' : 'FORMING_PULLBACK', direction,
     entryPrice: round(price!, digits), stopLoss: round(stopLoss, digits),
