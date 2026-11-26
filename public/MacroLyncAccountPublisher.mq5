@@ -82,7 +82,7 @@ string BuildPositions()
 
       json += "{";
       json += "\"ticket\":\"" + (string)ticket + "\",";
-      json += "\\\"positionId\\\":\\\"" + (string)PositionGetInteger(POSITION_IDENTIFIER) + "\\\",";
+      json += "\"positionId\":\"" + (string)PositionGetInteger(POSITION_IDENTIFIER) + "\",";
       json += "\"symbol\":\"" + JsonEscape(symbol) + "\",";
       json += "\"side\":\"" + (type == POSITION_TYPE_BUY ? "BUY" : "SELL") + "\",";
       json += "\"volume\":" + DoubleToString(PositionGetDouble(POSITION_VOLUME), 8) + ",";
