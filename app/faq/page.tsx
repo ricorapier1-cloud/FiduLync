@@ -28,7 +28,7 @@ const faqs = [
   },
   {
     q: 'How is research stored in the Trade Journal?',
-    a: 'The Trade Journal is a zero-login, browser-based research workspace. All hypotheses, scenario probabilities, supporting evidence, and invalidation triggers are persisted strictly inside your browser\'s local storage. No proprietary research data is transmitted to external servers.',
+    a: 'The Trade Journal is a zero-login, browser-based research workspace. Closed trades, P&amp;L, risk multiples and captured market context are persisted strictly inside your browser&apos;s local storage. No proprietary research data is transmitted to external servers.',
   },
   {
     q: 'Does MacroLync execute trades or provide financial advice?',
