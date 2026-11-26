@@ -361,9 +361,17 @@ test('GDP quarter parsing uses a real digit matcher', () => {
 test('cached FRED observations are excluded when storage permission is not approved', () => {
   const macroData = read('../lib/macroData.ts');
   const engine = read('../lib/macroEngine.ts');
+  const persistence = read('../lib/macro/observationPersistence.ts');
+  const cache = read('../lib/redisCache.ts');
   assert.match(macroData, /sanitizeMacroSnapshotPermissions/);
   assert.match(macroData, /policyRateProvider === 'FRED'/);
-  assert.ok(engine.includes('sanitizeMacroSnapshotPermissions(await getCachedData'));
+  assert.match(macroData, /purgeFREDStorageArtifacts/);
+  assert.match(engine, /macro:snapshot:v4:no-fred/);
+  assert.match(engine, /sanitizeMacroSnapshotPermissions\(await loadMacroSnapshot\(\)\)/);
+  assert.match(engine, /deleteCachedData\('macro:snapshot:v3'\)/);
+  assert.match(persistence, /provider === 'FRED' && !fredStorageAllowed\(\)/);
+  assert.match(persistence, /delete\(\)\.eq\('provider', 'FRED'\)/);
+  assert.match(cache, /export async function deleteCachedData/);
 });
 
 test('gold quote parser uses parent-level Swissquote timestamps and Treasury daily history when FRED storage is disabled', () => {
