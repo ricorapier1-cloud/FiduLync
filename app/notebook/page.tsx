@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 
-type Session = 'LONDON' | 'NY' | 'OFF-SESSION';
+type Session = 'LONDON' | 'NY' | 'OFF-SESSION' | 'UNKNOWN';
 type JournalTrade = {
   id: string; timeUtc: string; symbol: string; direction: 'BUY' | 'SELL';
   macroBiasScore: number | null; hurstRegime: string | null; vixLevel: number | null;
@@ -42,7 +42,7 @@ function normalize(raw: Record<string, unknown>): JournalTrade | null {
   return {
     id: String(raw.id ?? crypto.randomUUID()), timeUtc: String(raw.timeUtc ?? new Date().toISOString()),
     symbol, direction, macroBiasScore: num(raw.macroBiasScore), hurstRegime: typeof raw.hurstRegime === 'string' ? raw.hurstRegime : null,
-    vixLevel: num(raw.vixLevel), session: sessionRaw === 'LONDON' ? 'LONDON' : sessionRaw === 'NY' || sessionRaw === 'NEW YORK' ? 'NY' : 'OFF-SESSION',
+    vixLevel: num(raw.vixLevel), session: sessionRaw === 'LONDON' ? 'LONDON' : sessionRaw === 'NY' || sessionRaw === 'NEW YORK' ? 'NY' : sessionRaw === 'OFF-SESSION' ? 'OFF-SESSION' : 'UNKNOWN',
     riskPct: num(raw.riskPct), rMultiple: num(raw.rMultiple), pnlUsd,
     macroAlignment: alignmentRaw === 'ALIGNED' ? 'ALIGNED' : alignmentRaw === 'COUNTER' || alignmentRaw === 'COUNTER-MACRO' ? 'COUNTER' : 'UNKNOWN',
   };
@@ -144,7 +144,7 @@ export default function TradeJournalPage() {
           <label className="text-slate-400">Realized P&amp;L USD<input required className="w-full mt-1 p-2 bg-[#0c1016] border border-white/10 rounded" value={pnl} onChange={e=>setPnl(e.target.value)} type="number" step="any"/></label>
           <label className="text-slate-400">R-multiple<input className="w-full mt-1 p-2 bg-[#0c1016] border border-white/10 rounded" value={rMultiple} onChange={e=>setRMultiple(e.target.value)} type="number" step="any" placeholder="Optional"/></label>
           <label className="text-slate-400">Risk %<input className="w-full mt-1 p-2 bg-[#0c1016] border border-white/10 rounded" value={riskPct} onChange={e=>setRiskPct(e.target.value)} type="number" step="any"/></label>
-          <label className="text-slate-400">Session<select className="w-full mt-1 p-2 bg-[#0c1016] border border-white/10 rounded" value={session} onChange={e=>setSession(e.target.value as Session)}><option value="LONDON">London</option><option value="NY">New York</option><option value="OFF-SESSION">Off-session</option></select></label>
+          <label className="text-slate-400">Session<select className="w-full mt-1 p-2 bg-[#0c1016] border border-white/10 rounded" value={session} onChange={e=>setSession(e.target.value as Session)}><option value="LONDON">London</option><option value="NY">New York</option><option value="OFF-SESSION">Off-session</option><option value="UNKNOWN">Unknown (not captured)</option></select></label>
           <label className="text-slate-400">Macro bias score<input className="w-full mt-1 p-2 bg-[#0c1016] border border-white/10 rounded" value={biasScore} onChange={e=>setBiasScore(e.target.value)} type="number" step="any" placeholder="Unknown"/></label>
           <label className="text-slate-400">Hurst / regime<input className="w-full mt-1 p-2 bg-[#0c1016] border border-white/10 rounded" value={hurst} onChange={e=>setHurst(e.target.value)} placeholder="Unknown"/></label>
           <label className="text-slate-400">VIX level<input className="w-full mt-1 p-2 bg-[#0c1016] border border-white/10 rounded" value={vix} onChange={e=>setVix(e.target.value)} type="number" step="any" placeholder="Unknown"/></label>
