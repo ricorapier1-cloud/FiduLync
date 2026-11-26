@@ -35,6 +35,7 @@ export default function AccountsPage() {
   const [status, setStatus] = useState<'DISCONNECTED'|'CONNECTING'|'CONNECTED'|'ERROR'>('DISCONNECTED');
   const [message, setMessage] = useState('');
   const [lastRefresh, setLastRefresh] = useState<string | null>(null);
+  const [selectedAccountKey, setSelectedAccountKey] = useState('');
 
   const refresh = useCallback(async (credential: string) => {
     setStatus('CONNECTING');
@@ -45,6 +46,7 @@ export default function AccountsPage() {
       const data = await response.json() as Payload & { error?: string };
       if (!response.ok) throw new Error(data.error ?? 'Account service unavailable.');
       setPayload(data);
+      setSelectedAccountKey((current) => current || data.accounts[0]?.account_key || '');
       setLastRefresh(new Date().toISOString());
       setStatus('CONNECTED');
       setMessage(data.status === 'AWAITING_FIRST_SYNC' ? 'Access verified. Waiting for the first MT5 publisher sync.' : '');
@@ -68,7 +70,7 @@ export default function AccountsPage() {
     return () => window.clearInterval(timer);
   }, [status, token, payload?.accounts.length, refresh]);
 
-  const selected = payload?.accounts[0] ?? null;
+  const selected = payload?.accounts.find((account) => account.account_key === selectedAccountKey) ?? payload?.accounts[0] ?? null;
   const selectedDeals = useMemo(() => selected
     ? (payload?.deals ?? []).filter((deal) => deal.account_key === selected.account_key)
     : [], [payload?.deals, selected]);
@@ -177,19 +179,26 @@ export default function AccountsPage() {
             <div><span className="eyebrow">BROKER ACCOUNT SNAPSHOT</span><h2>{selected.broker || 'MT5'} · {selected.server}</h2></div>
             <span className="macro-section-note mono">{selected.account_mode} · {selected.currency} · 1:{selected.leverage}</span>
           </div>
+          {(payload?.accounts.length ?? 0) > 1 && <label className="mb-3 block text-xs text-slate-400">Connected MT5 account
+            <select value={selected.account_key} onChange={(event) => setSelectedAccountKey(event.target.value)} className="mt-2 block w-full rounded-lg border border-white/10 bg-[#080c12] px-3 py-2 text-slate-100">
+              {payload?.accounts.map((account) => <option key={account.account_key} value={account.account_key}>{account.broker || 'MT5'} · {account.server} · {account.account_login} · {account.account_mode}</option>)}
+            </select>
+          </label>}
           <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
             {[
               ['BALANCE', money(Number(selected.balance), selected.currency)],
               ['EQUITY', money(Number(selected.equity), selected.currency)],
-              ['FLOATING P/L', money(Number(selected.equity) - Number(selected.balance), selected.currency)],
+              ['FLOATING P/L', money(selected.positions.reduce((sum, position) => sum + Number(position.profit) + Number(position.swap), 0), selected.currency)],
               ['FREE MARGIN', money(Number(selected.free_margin), selected.currency)],
+              ['MARGIN USED', money(Number(selected.margin), selected.currency)],
+              ['MARGIN LEVEL', selected.margin_level === null ? '—' : Number(selected.margin_level).toFixed(1) + '%'],
             ].map(([label, value]) => <div key={label} className="macro-panel p-4"><span className="macro-kpi-label">{label}</span><strong className="mt-2 block break-all font-mono text-lg text-slate-100">{value}</strong></div>)}
           </div>
           <div className="mt-3 grid grid-cols-2 gap-3 xl:grid-cols-4">
             <div className="macro-panel p-4"><span className="macro-kpi-label">OPEN POSITIONS</span><strong className="mt-2 block font-mono text-xl text-slate-100">{selected.positions.length}</strong></div>
             <div className="macro-panel p-4"><span className="macro-kpi-label">CLOSED POSITIONS SYNCED</span><strong className="mt-2 block font-mono text-xl text-slate-100">{analytics.count}</strong></div>
-            <div className="macro-panel p-4"><span className="macro-kpi-label">WIN RATE · DEALS</span><strong className="mt-2 block font-mono text-xl text-slate-100">{analytics.winRate === null ? '—' : analytics.winRate.toFixed(1) + '%'}</strong></div>
-            <div className="macro-panel p-4"><span className="macro-kpi-label">PROFIT FACTOR · DEALS</span><strong className="mt-2 block font-mono text-xl text-slate-100">{analytics.profitFactor === null ? '—' : analytics.profitFactor.toFixed(2)}</strong></div>
+            <div className="macro-panel p-4"><span className="macro-kpi-label">WIN RATE · CLOSED POSITIONS</span><strong className="mt-2 block font-mono text-xl text-slate-100">{analytics.winRate === null ? '—' : analytics.winRate.toFixed(1) + '%'}</strong></div>
+            <div className="macro-panel p-4"><span className="macro-kpi-label">PROFIT FACTOR · CLOSED POSITIONS</span><strong className="mt-2 block font-mono text-xl text-slate-100">{analytics.profitFactor === null ? '—' : analytics.profitFactor.toFixed(2)}</strong></div>
           </div>
           <p className="mt-3 text-[10px] text-slate-500">Account login {selected.account_login} · observed {dateTime(selected.observed_at)} WAT · received {dateTime(selected.received_at)} WAT. Trade-level P&L aggregates entry and exit deal costs by position identifier; no assumed starting balance or synthetic history.</p>
         </section>
