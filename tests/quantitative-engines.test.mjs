@@ -273,7 +273,7 @@ test('XAUUSD macro context engine requires verified spot, official macro series,
   assert.match(engine, /latencyMs/);
   assert.match(engine, /goldBiasScore: number \| null/);
   assert.match(route, /MACRO_API_TOKEN/);
-  assert.match(route, /CRON_SECRET/);
+  assert.doesNotMatch(route, /CRON_SECRET/);
   assert.match(route, /status: 401/);
   assert.match(route, /timingSafeEqual/);
 });
