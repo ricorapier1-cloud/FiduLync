@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 const source = readFileSync(new URL('../lib/quant/sovereignShield.ts', import.meta.url), 'utf8');
 
 test('Sovereign Shield implements VIX and intraday range tail-risk thresholds', () => {
-  assert.match(source, /vix >= 28/);
+  assert.match(source, /vix >= 32/);
   assert.match(source, /vix >= 22/);
   assert.match(source, /intradayRangeAtrMultiple > 2\.5/);
   assert.match(source, /status === 'BLACK_SWAN_LOCKOUT' \|\| status === 'DATA_UNAVAILABLE' \? 0 : status === 'ELEVATED_VOLATILITY' \? 0\.5 : 1/);
