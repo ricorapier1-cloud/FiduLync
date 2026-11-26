@@ -104,7 +104,7 @@ export async function POST(request: Request) {
     };
 
     const supabase = getSupabaseAdmin();
-    const { error: snapshotError } = await supabase.from('mt5_account_snapshots').upsert(snapshot, { onConflict: 'account_key' });
+    const { error: snapshotError } = await supabase.from('macrolinc_account_snapshots').upsert(snapshot, { onConflict: 'account_key' });
     if (snapshotError) throw snapshotError;
 
     const incomingDeals = Array.isArray(payload.deals) ? payload.deals.slice(0, 500) : [];
