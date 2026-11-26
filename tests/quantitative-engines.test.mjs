@@ -590,7 +590,8 @@ test('Force Sync refreshes the macro snapshot, gold context, BBO and spot refere
 
 test('intraday signal engine enforces macro threshold, trend quality, live sessions, shield gates and ATR-calibrated levels', () => {
   const engine = read('../lib/quant/intradaySignalEngine.ts');
-  assert.match(engine, /isGold \? 20 : 25/);
+  const route = read('../app/api/v1/intraday-signals/route.ts');
+  assert.match(engine, /isGold ? 20 : 25/);
   assert.match(engine, /isGold \? -20 : -25/);
   assert.match(engine, /calculateKaufmanEfficiencyRatio\(closes, 14\)/);
   assert.match(engine, /const hurst: number \| null = null/);
