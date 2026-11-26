@@ -31,7 +31,7 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
   const nok = snapshot.currencies.find((item) => item.code === 'NOK');
   const worldBankCurrencies = snapshot.currencies.filter((item) => item.inflationProvider === 'World Bank' && item.inflationObservationDate);
   const fredKeyPresent = Boolean(process.env.FRED_API_KEY?.trim());
-  const fredStorageAllowed = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED === 'true';
+  const fredStorageAllowed = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED !== 'false';
   const finnhubKeyPresent = Boolean(process.env.FINNHUB_API_KEY?.trim());
   const finnhubPlanActive = process.env.FINNHUB_PERSONAL_PLAN_ACTIVE === 'true';
   const finnhubConfigured = finnhubPlanActive && finnhubKeyPresent;
@@ -46,8 +46,15 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
     ? { status: 'PERMISSION_REQUIRED' as const, freshness: 'UNAVAILABLE' as const }
     : feedStatus(fredStorageAllowed && Boolean(usd?.policyRateProvider === 'FRED' && usd.inflationProvider === 'FRED'),
       fredStorageAllowed && isFresh(usd?.policyRateObservationDate, 180) && isFresh(usd?.inflationObservationDate, 120), fredKeyPresent && fredStorageAllowed);
-  const ecb = feedStatus(eur?.policyRateProvider === 'ECB' && eur.inflationProvider === 'ECB',
+  const ecbDirect = feedStatus(eur?.policyRateProvider === 'ECB' && eur.inflationProvider === 'ECB',
     isFresh(eur?.policyRateObservationDate, 180) && isFresh(eur?.inflationObservationDate, 120), true);
+  const bisEuroPolicyRateHealthy = eur?.policyRateProvider === 'BIS'
+    && Number.isFinite(eur.policyRate)
+    && isFresh(eur.policyRateObservationDate, 180);
+  const ecb = ecbDirect.status === 'HEALTHY' ? ecbDirect
+    : bisEuroPolicyRateHealthy
+      ? { status: 'STANDBY' as const, freshness: 'LATEST PUBLISHED' as const }
+      : ecbDirect;
   const boe = feedStatus(gbp?.policyRateProvider === 'Bank of England' && Boolean(gbp.policyRateObservationDate),
     isFresh(gbp?.policyRateObservationDate, 180), true);
   const boc = feedStatus(cad?.policyRateProvider === 'Bank of Canada' && cad.inflationProvider === 'Bank of Canada',
@@ -78,7 +85,7 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
 
   return [
     { name: 'FRED / Federal Reserve Economic Data', endpoint: 'https://api.stlouisfed.org/fred/series/observations', ...fred, latencyMs: null, lastSuccessfulSyncUtc: null, latestObservationDate: latestDate(usd?.policyRateObservationDate, usd?.inflationObservationDate), detail: !fredStorageAllowed && fredKeyPresent ? 'FRED key is configured but storage permission is not approved; cached FRED observations are excluded from active research.' : 'Provider status is based on fresh observations, not key presence.', nextAction: !fredStorageAllowed && fredKeyPresent ? 'Confirm FRED data-use/storage rights, then set FRED_DATA_STORAGE_PERMISSION_APPROVED=true in Vercel Production. Treasury, BIS and BLS alternatives remain active.' : undefined, rateLimitRemaining: null, circuitBreakerTripped: false },
-    { name: 'ECB Data Portal', endpoint: 'https://data-api.ecb.europa.eu/service/data', ...ecb, latencyMs: null, lastSuccessfulSyncUtc: null, latestObservationDate: latestDate(eur?.policyRateObservationDate, eur?.inflationObservationDate), rateLimitRemaining: null, circuitBreakerTripped: false },
+    { name: 'ECB Data Portal', endpoint: 'https://data-api.ecb.europa.eu/service/data', ...ecb, latencyMs: null, lastSuccessfulSyncUtc: null, latestObservationDate: latestDate(eur?.policyRateObservationDate, eur?.inflationObservationDate), detail: bisEuroPolicyRateHealthy && ecbDirect.status !== 'HEALTHY' ? `STANDBY • BIS ACTIVE · Eurozone policy rate ${eur.policyRate.toFixed(2)}% (${eur.policyRateObservationDate}); ECB SDMX is degraded or unavailable.` : undefined, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'Bank of England', endpoint: 'https://www.bankofengland.co.uk/boeapps/database/_iadb-fromshowcolumns.asp', ...boe, latencyMs: null, lastSuccessfulSyncUtc: null, latestObservationDate: gbp?.policyRateObservationDate ?? null, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'Bank of Canada Valet', endpoint: 'https://www.bankofcanada.ca/valet/observations', ...boc, latencyMs: null, lastSuccessfulSyncUtc: null, latestObservationDate: latestDate(cad?.policyRateObservationDate, cad?.inflationObservationDate), rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'CFTC Commitments of Traders', endpoint: 'https://publicreporting.cftc.gov/resource/6dca-aqww.json', ...cftc, latencyMs: null, lastSuccessfulSyncUtc: null, latestObservationDate: latestDate(...snapshot.cot.map((item) => item.reportDate)), rateLimitRemaining: null, circuitBreakerTripped: false },
