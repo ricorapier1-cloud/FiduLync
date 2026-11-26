@@ -297,20 +297,20 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
     if (!pnlInput.trim() || !Number.isFinite(pnl) || locked) return;
     const timeUtc = new Date().toISOString();
     const captured = entryContext?.symbol === journalSymbol && entryContext.direction === direction ? entryContext : null;
-    const macroBiasScore = captured?.macroBiasScore ?? (journalSymbol === 'XAUUSD' ? goldScore : dossier.biasScore);
+    const macroBiasScore = captured ? captured.macroBiasScore ?? null : (journalSymbol === 'XAUUSD' ? goldScore : dossier.biasScore);
     const macroAlignment = captured?.macroAlignment ?? (macroBiasScore === null || macroBiasScore === undefined || macroBiasScore === 0
       ? 'UNKNOWN' as const
       : ((macroBiasScore > 0 && direction === 'BUY') || (macroBiasScore < 0 && direction === 'SELL'))
         ? 'ALIGNED' as const : 'COUNTER' as const);
-    const riskAmountAtEntry = captured?.riskAmountUsdAtEntry ?? (account > 0 && risk > 0 ? account * risk / 100 : null);
+    const riskAmountAtEntry = captured ? captured.riskAmountUsdAtEntry ?? null : (account > 0 && risk > 0 ? account * risk / 100 : null);
     const entry: JournalEntry = {
       id: `${Date.now()}-${journalSymbol}-${Math.random().toString(36).slice(2, 8)}`,
       timeUtc, symbol: journalSymbol, result: resultInput, pnl, pnlUsd: pnl, direction,
       macroBiasScore: Number.isFinite(macroBiasScore) ? macroBiasScore : null,
-      hurstRegime: captured?.hurstRegime ?? goldContext?.liquidityRegime ?? snapshot.regime ?? null,
-      vixLevel: captured?.vixLevel ?? (Number.isFinite(vixValue) ? vixValue : null),
+      hurstRegime: captured ? captured.hurstRegime ?? null : goldContext?.liquidityRegime ?? snapshot.regime ?? null,
+      vixLevel: captured ? captured.vixLevel ?? null : (Number.isFinite(vixValue) ? vixValue : null),
       session: captured?.session ?? (activeSession === 'NEW YORK' ? 'NY' : activeSession),
-      riskPct: captured?.riskPct ?? (Number.isFinite(risk) ? risk : null),
+      riskPct: captured ? captured.riskPct ?? null : (Number.isFinite(risk) ? risk : null),
       rMultiple: riskAmountAtEntry && riskAmountAtEntry > 0 ? Number((pnl / riskAmountAtEntry).toFixed(4)) : null,
       macroAlignment,
       ...(captured?.entryContextCapturedAtUtc ? { entryContextCapturedAtUtc: captured.entryContextCapturedAtUtc } : {}),
