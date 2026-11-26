@@ -28,7 +28,7 @@ export function evaluateSovereignShield(input: SovereignShieldInput): SovereignS
   const reasons: string[] = [];
   const vix = input.vix;
   const vixAvailable = typeof vix === 'number' && Number.isFinite(vix);
-  const volatilityLock = (vixAvailable && vix >= 28)
+  const volatilityLock = (vixAvailable && vix >= 32)
     || (typeof input.intradayRangeAtrMultiple === 'number' && Number.isFinite(input.intradayRangeAtrMultiple) && input.intradayRangeAtrMultiple > 2.5);
   const elevated = !volatilityLock && vixAvailable && vix >= 22;
   const status: SovereignShieldStatus = volatilityLock ? 'BLACK_SWAN_LOCKOUT'
