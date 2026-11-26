@@ -594,3 +594,17 @@ test('provider health includes real EIA and Treasury observation dates and BIS-b
   assert.match(types, /'STANDBY'/);
   assert.match(dashboard, /STANDBY • BIS ACTIVE/);
 });
+
+
+test('spread blowout protection uses a measured same-session Redis median and waits for warm-up', () => {
+  const baseline = read('../lib/quant/spreadBaseline.ts');
+  const route = read('../app/api/v1/intraday-signals/route.ts');
+  const desk = read('../app/components/DeskTerminal.tsx');
+  assert.match(baseline, /redis\.lpush/);
+  assert.match(baseline, /redis\.lrange/);
+  assert.match(baseline, /values\.length < 20/);
+  assert.match(baseline, /spread \/ medianSpread/);
+  assert.match(route, /recordAndEvaluateSpreadBaseline/);
+  assert.match(route, /spreadMultipleOfBaseline: baseline\.multiple/);
+  assert.match(desk, /Spread baseline:/);
+});
