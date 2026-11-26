@@ -1,7 +1,7 @@
 import 'server-only';
 
-import { getFallbackSnapshot, loadMacroSnapshot, sanitizeMacroSnapshotPermissions } from '@/lib/macroData';
-import { getCachedData } from '@/lib/redisCache';
+import { getFallbackSnapshot, loadMacroSnapshot, purgeFREDStorageArtifacts, sanitizeMacroSnapshotPermissions } from '@/lib/macroData';
+import { deleteCachedData, getCachedData } from '@/lib/redisCache';
 import type { MacroSnapshot } from '@/types/macro';
 import { getCrossAssetTelemetry, classifyMacroRegime } from '@/lib/macro/crossAssetEngine';
 import { getCountryProfiles } from '@/lib/macro/countryProfiles';
@@ -16,10 +16,26 @@ export type FundamentalSignal = {
   roroScore: number;
 };
 
+let fredPermissionCleanup: Promise<void> | null = null;
+
 export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnapshot> {
   let snapshot: MacroSnapshot;
+  const fredStorageAllowed = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED?.trim().toLowerCase() !== 'false';
+  const cacheKey = fredStorageAllowed ? 'macro:snapshot:v4:fred' : 'macro:snapshot:v4:no-fred';
   try {
-    snapshot = sanitizeMacroSnapshotPermissions(await getCachedData('macro:snapshot:v3', loadMacroSnapshot, 900, forceRefresh));
+    snapshot = await getCachedData(cacheKey, async () => sanitizeMacroSnapshotPermissions(await loadMacroSnapshot()), 900, forceRefresh);
+    if (!fredStorageAllowed) {
+      if (!fredPermissionCleanup) {
+        fredPermissionCleanup = Promise.all([
+          deleteCachedData('macro:snapshot:v3'),
+          deleteCachedData('macro:snapshot:v4:fred'),
+          purgeFREDStorageArtifacts(snapshot),
+        ]).then(() => undefined).catch((error) => {
+          console.error('FRED storage permission cleanup could not be completed:', error);
+        });
+      }
+      await fredPermissionCleanup;
+    }
   } catch (error) {
     console.warn('Macro providers and cached snapshots are unavailable; serving reference macro levels.', error);
     snapshot = getFallbackSnapshot();
