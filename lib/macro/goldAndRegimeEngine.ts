@@ -549,7 +549,7 @@ export async function buildGoldMacroContext(snapshot?: MacroSnapshot): Promise<G
     DTB3: newestFirst(treasuryHistory.map((item) => ({ date: item.date, value: item.nominal3MPct }))),
   };
   if (treasuryHistory.length > 0) for (const [seriesId, observations] of Object.entries(treasurySeries)) {
-    if (!fredBySeries.get(seriesId) && observations.length > 0) {
+    if (observations.length > 0 && (seriesId === 'DFII10' || !fredBySeries.get(seriesId))) {
       fredBySeries.set(seriesId, {
         value: observations,
         latencyMs: treasuryObservedLatencyMs ?? 0,
