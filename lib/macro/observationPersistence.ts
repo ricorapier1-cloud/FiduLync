@@ -126,7 +126,7 @@ export async function persistMacroObservations(snapshot: MacroSnapshot): Promise
       'UNEMPLOYMENT_RATE', currency.code, currency.unemploymentObservationDate, currency.unemploymentRate);
     add(currency.wageGrowthSource === 'provider' ? currency.wageGrowthProvider ?? 'BLS' : undefined,
       'WAGE_GROWTH_YOY', currency.code, currency.wageGrowthObservationDate, currency.wageGrowthYoY);
-    const yieldProvider = currency.code === 'EUR' ? 'ECB' : currency.code === 'USD' ? 'FRED' : undefined;
+    const yieldProvider = currency.twoYearYieldProvider ?? (currency.code === 'EUR' ? 'ECB' : currency.code === 'USD' ? 'FRED' : undefined);
     add(currency.twoYearYieldSource === 'provider' ? yieldProvider : undefined,
       'SOVEREIGN_2Y_YIELD', currency.code, currency.twoYearYieldObservationDate, currency.twoYearYield);
   }
