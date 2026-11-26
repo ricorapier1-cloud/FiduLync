@@ -49,11 +49,11 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const [fxStatus, setFxStatus] = useState('NOT SYNCED');
   const [fxSync, setFxSync] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.parse(initialSnapshot.asOf) || 0);
-  const [balance, setBalance] = useState('1000');
-  const [riskPct, setRiskPct] = useState('1');
+  const [balance, setBalance] = useState('');
+  const [riskPct, setRiskPct] = useState('');
   const [selected, setSelected] = useState<SymbolCode>('EURUSD');
-  const [sl, setSl] = useState('20');
-  const [tp, setTp] = useState('40');
+  const [sl, setSl] = useState('');
+  const [tp, setTp] = useState('');
   const [direction, setDirection] = useState<Direction>('BUY');
   const [technicalConfirmed, setTechnicalConfirmed] = useState(false);
   const [journal, setJournal] = useState<Journal>(() => blankJournal(''));
@@ -117,6 +117,8 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const lots = pipValue && stop > 0 ? Math.floor((riskAmount / (stop * pipValue)) * 100) / 100 : 0;
   const rr = stop > 0 && target > 0 ? target / stop : 0;
   const gross = riskAmount * rr;
+  const calculatorInputsValid = Number.isFinite(account) && account > 0 && Number.isFinite(risk) && risk > 0
+    && Number.isFinite(stop) && stop > 0 && Number.isFinite(target) && target > 0 && pipValue !== null;
   const spreadUnits = quote?.spread === null || quote?.spread === undefined ? null : selected === 'XAUUSD' ? quote.spread : quote.spread / (selected.slice(3) === 'JPY' ? 0.01 : 0.0001);
   const spreadPct = spreadUnits !== null && stop > 0 ? spreadUnits / stop * 100 : null;
   const currentDateWAT = watDate(new Date(now));
@@ -439,14 +441,80 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
       </article>
       <article id="desk-position-sizing" className="desk-panel scroll-mt-24"><header><div><span className="desk-kicker">B / LIVE RISK CALCULATOR</span><h3>Position Sizing</h3></div><small>USD ACCOUNT · STANDARD LOT ESTIMATE</small></header>
         <div className="desk-form-grid">
-          <label>Account balance USD<input inputMode="decimal" value={balance} onChange={(e) => setBalance(e.target.value)} /></label>
-          <label>Risk %<input inputMode="decimal" value={riskPct} onChange={(e) => setRiskPct(e.target.value)} /></label>
+          <label>Account balance USD<input inputMode="decimal" placeholder="Enter live equity" value={balance} onChange={(e) => setBalance(e.target.value)} /></label>
+          <label>Risk %<input inputMode="decimal" placeholder="Set risk per trade" value={riskPct} onChange={(e) => setRiskPct(e.target.value)} /></label>
           <label>Instrument<select value={selected} onChange={(e) => { setSelected(e.target.value as SymbolCode); setJournalSymbol(e.target.value as SymbolCode); }}><option value="EURUSD">EUR/USD</option><option value="XAUUSD">XAU/USD</option><option value="USDJPY">USD/JPY</option>{satelliteSymbol && <option value={satelliteSymbol}>SATELLITE #1 · {satelliteSymbol}</option>}</select></label>
-          <label>{selected === 'XAUUSD' ? 'Stop distance ($)' : 'Stop loss (pips)'}<input inputMode="decimal" value={sl} onChange={(e) => setSl(e.target.value)} /></label>
-          <label>{selected === 'XAUUSD' ? 'Target distance ($)' : 'Take profit (pips)'}<input inputMode="decimal" value={tp} onChange={(e) => setTp(e.target.value)} /></label>
+          <label>{selected === 'XAUUSD' ? 'Stop distance ($)' : 'Stop loss (pips)'}<input inputMode="decimal" placeholder="Enter planned stop" value={sl} onChange={(e) => setSl(e.target.value)} /></label>
+          <label>{selected === 'XAUUSD' ? 'Target distance ($)' : 'Take profit (pips)'}<input inputMode="decimal" placeholder="Enter planned target" value={tp} onChange={(e) => setTp(e.target.value)} /></label>
           <label>Direction<select value={direction} onChange={(e) => setDirection(e.target.value as Direction)}><option value="BUY">BUY</option><option value="SELL">SELL</option></select></label>
         </div>
-        <div className="desk-calc-results"><div><span>RISK AMOUNT</span><strong>${riskAmount.toFixed(2)}</strong></div><div><span>LOT SIZE · ROUNDED DOWN</span><strong>{lots.toFixed(2)}</strong><small className="block mt-1 text-[10px] text-slate-400">{pipValue === null ? '$/PIP/LOT UNAVAILABLE' : '$' + pipValue.toFixed(2) + ' / PIP / LOT'}</small></div><div><span>REWARD / RISK</span><strong className={rr >= 2 ? 'desk-good' : 'desk-warning'}>{rr.toFixed(2)}R</strong></div><div><span>EXPECTED GROSS PROFIT</span><strong>${gross.toFixed(2)}</strong></div></div>
+        <div className="desk-calc-results"><div><span>RISK AMOUNT</span><strong>{calculatorInputsValid ? '</div><div><span>LOT SIZE · ROUNDED DOWN</span><strong>{calculatorInputsValid ? lots.toFixed(2) : '—'}</strong><small className="block mt-1 text-[10px] text-slate-400">{pipValue === null ? '$/PIP/LOT UNAVAILABLE' : '$' + pipValue.toFixed(2) + ' / PIP / LOT'}</small></div><div><span>REWARD / RISK</span><strong className={rr >= 2 ? 'desk-good' : 'desk-warning'}>{calculatorInputsValid ? rr.toFixed(2) + 'R' : '—'}</strong></div><div><span>GROSS TARGET P/L · EST.</span><strong>{calculatorInputsValid ? '</div></div>
+        <p className="desk-footnote">{selected === 'USDJPY' ? `USDJPY pip value: 1,000 / live ${display(usdJpy, 3)} = ${pipValue?.toFixed(4) ?? 'unavailable'} USD per pip per lot.` : selected === 'XAUUSD' ? 'Gold assumption: 100 oz per standard lot; $100 P/L per $1.00 price move per lot.' : 'FX assumption: $10 USD pip value per standard lot for EUR/USD and GBP/USD.'} Excludes commissions, slippage, swaps and broker contract variations. Planning estimate only: verify the broker&apos;s MT5 symbol specification and account currency; the EA&apos;s broker-native sizing is authoritative.</p>
+        {risk > 1 && <p className="desk-warning-text">Risk exceeds the 1.0% governance ceiling.</p>}{lots > 0 && lots < 0.01 && <p className="desk-warning-text">Below 0.01 lot: skip, never round size up.</p>}{rr < 2 && <p className="desk-warning-text">R:R is below the required 1:2.0.</p>}
+      </article>
+    </div>
+    <div className="desk-grid">
+      <article className="desk-panel"><header><div><span className="desk-kicker">C / GOVERNANCE</span><h3>Mandatory 6/6 Pre-Trade Gate</h3></div><small>{gates.filter((gate) => gate.pass).length}/6 PASSED</small></header>
+        <div className="desk-gate-list">{gates.map((gate, index) => <div className="desk-gate-row" key={gate.name}><span className={gate.pass ? 'desk-gate-pass' : 'desk-gate-fail'}>{gate.pass ? 'PASS' : 'BLOCK'}</span><div><b>{index + 1}. {gate.name}</b><small>{gate.detail}</small></div>{index === 3 && <label className="desk-check"><input type="checkbox" checked={technicalConfirmed} onChange={(e) => setTechnicalConfirmed(e.target.checked)} /> MT5 confirmed</label>}</div>)}</div>
+        <div className={locked ? 'desk-lockout' : gatePassed ? 'desk-clear' : 'desk-blocked'}>{locked ? 'DAILY CIRCUIT BREAKER ACTIVE · LOCKED UNTIL 00:00 WAT' : gatePassed ? '6/6 CHECKS PASSED · MT5 EXECUTION REMAINS MANUAL' : 'GATE CLOSED · ALL SIX CONDITIONS MUST PASS'}</div>
+        <p className="desk-footnote">Calendar must be verified before the event gate can pass. This checklist does not submit orders or control MT5. Local state is not a broker-enforced lockout.</p>
+      </article>
+      <article className="desk-panel"><header><div><span className="desk-kicker">D / DAILY RISK CONTROL</span><h3>WAT Daily Circuit Breaker</h3></div><small>{currentDateWAT}</small></header>
+        <div className="desk-journal-stats"><div><span>TRADES</span><b>{journal.trades}/2</b></div><div><span>WINS</span><b>{journal.wins}</b></div><div><span>LOSSES</span><b>{journal.losses}/2</b></div><div><span>NET P&amp;L</span><b className={journal.netPnl >= 0 ? 'desk-good' : 'desk-warning'}>${journal.netPnl.toFixed(2)}</b></div></div>
+        <div className="desk-form-grid desk-journal-form"><label>Result<select value={resultInput} onChange={(e) => setResultInput(e.target.value as 'WIN' | 'LOSS' | 'FLAT')}><option>WIN</option><option>LOSS</option><option>FLAT</option></select></label><label>Realized P&amp;L USD<input inputMode="decimal" value={pnlInput} onChange={(e) => setPnlInput(e.target.value)} placeholder="Closed trade P&L" /></label><label>Instrument<select value={journalSymbol} onChange={(e) => setJournalSymbol(e.target.value as SymbolCode)}>{displaySymbols.map((s) => <option key={s}>{s}</option>)}</select></label></div>
+        <button className="desk-record-button" type="button" onClick={captureEntryContext}>CAPTURE ENTRY CONTEXT</button><small className="block mt-2 text-[10px] text-slate-500">{entryContext?.entryContextCapturedAtUtc ? `ENTRY CONTEXT CAPTURED ${entryContext.entryContextCapturedAtUtc}` : "Capture the current macro, VIX, session and risk state when opening a position."}</small><button className="desk-record-button" type="button" disabled={!pnlInput.trim() || !Number.isFinite(Number(pnlInput)) || locked || (resultInput === 'WIN' && Number(pnlInput) <= 0) || (resultInput === 'LOSS' && Number(pnlInput) >= 0) || (resultInput === 'FLAT' && Number(pnlInput) !== 0)} onClick={recordTrade}>RECORD CLOSED TRADE</button>
+        <div className="flex flex-wrap gap-2 mt-3"><button className="desk-record-button" type="button" onClick={() => exportJournal('json')}>EXPORT JSON</button><button className="desk-record-button" type="button" onClick={() => exportJournal('csv')}>EXPORT CSV</button></div>
+        <div className="desk-journal-list">{journal.entries.slice(0, 5).map((entry) => <div key={entry.id}><span>{entry.symbol} · {entry.result}</span><b className={entry.pnl >= 0 ? 'desk-good' : 'desk-warning'}>{entry.pnl >= 0 ? '+' : ''}${entry.pnl.toFixed(2)}</b><small>{entry.timeUtc}</small></div>)}</div>
+        <p className="desk-footnote">Journal persists in this browser only. Browser storage clearing or switching devices resets it. MT5 must independently enforce the same hard limits.</p>
+      </article>
+    </div>
+  </section>;
+}
+ + riskAmount.toFixed(2) : '—'}</strong></div><div><span>LOT SIZE · ROUNDED DOWN</span><strong>{lots.toFixed(2)}</strong><small className="block mt-1 text-[10px] text-slate-400">{pipValue === null ? '$/PIP/LOT UNAVAILABLE' : '$' + pipValue.toFixed(2) + ' / PIP / LOT'}</small></div><div><span>REWARD / RISK</span><strong className={rr >= 2 ? 'desk-good' : 'desk-warning'}>{rr.toFixed(2)}R</strong></div><div><span>EXPECTED GROSS PROFIT</span><strong>${gross.toFixed(2)}</strong></div></div>
+        <p className="desk-footnote">{selected === 'USDJPY' ? `USDJPY pip value: 1,000 / live ${display(usdJpy, 3)} = ${pipValue?.toFixed(4) ?? 'unavailable'} USD per pip per lot.` : selected === 'XAUUSD' ? 'Gold assumption: 100 oz per standard lot; $100 P/L per $1.00 price move per lot.' : 'FX assumption: $10 USD pip value per standard lot for EUR/USD and GBP/USD.'} Excludes commissions, slippage, swaps and broker contract variations. Planning estimate only: verify the broker&apos;s MT5 symbol specification and account currency; the EA&apos;s broker-native sizing is authoritative.</p>
+        {risk > 1 && <p className="desk-warning-text">Risk exceeds the 1.0% governance ceiling.</p>}{lots > 0 && lots < 0.01 && <p className="desk-warning-text">Below 0.01 lot: skip, never round size up.</p>}{rr < 2 && <p className="desk-warning-text">R:R is below the required 1:2.0.</p>}
+      </article>
+    </div>
+    <div className="desk-grid">
+      <article className="desk-panel"><header><div><span className="desk-kicker">C / GOVERNANCE</span><h3>Mandatory 6/6 Pre-Trade Gate</h3></div><small>{gates.filter((gate) => gate.pass).length}/6 PASSED</small></header>
+        <div className="desk-gate-list">{gates.map((gate, index) => <div className="desk-gate-row" key={gate.name}><span className={gate.pass ? 'desk-gate-pass' : 'desk-gate-fail'}>{gate.pass ? 'PASS' : 'BLOCK'}</span><div><b>{index + 1}. {gate.name}</b><small>{gate.detail}</small></div>{index === 3 && <label className="desk-check"><input type="checkbox" checked={technicalConfirmed} onChange={(e) => setTechnicalConfirmed(e.target.checked)} /> MT5 confirmed</label>}</div>)}</div>
+        <div className={locked ? 'desk-lockout' : gatePassed ? 'desk-clear' : 'desk-blocked'}>{locked ? 'DAILY CIRCUIT BREAKER ACTIVE · LOCKED UNTIL 00:00 WAT' : gatePassed ? '6/6 CHECKS PASSED · MT5 EXECUTION REMAINS MANUAL' : 'GATE CLOSED · ALL SIX CONDITIONS MUST PASS'}</div>
+        <p className="desk-footnote">Calendar must be verified before the event gate can pass. This checklist does not submit orders or control MT5. Local state is not a broker-enforced lockout.</p>
+      </article>
+      <article className="desk-panel"><header><div><span className="desk-kicker">D / DAILY RISK CONTROL</span><h3>WAT Daily Circuit Breaker</h3></div><small>{currentDateWAT}</small></header>
+        <div className="desk-journal-stats"><div><span>TRADES</span><b>{journal.trades}/2</b></div><div><span>WINS</span><b>{journal.wins}</b></div><div><span>LOSSES</span><b>{journal.losses}/2</b></div><div><span>NET P&amp;L</span><b className={journal.netPnl >= 0 ? 'desk-good' : 'desk-warning'}>${journal.netPnl.toFixed(2)}</b></div></div>
+        <div className="desk-form-grid desk-journal-form"><label>Result<select value={resultInput} onChange={(e) => setResultInput(e.target.value as 'WIN' | 'LOSS' | 'FLAT')}><option>WIN</option><option>LOSS</option><option>FLAT</option></select></label><label>Realized P&amp;L USD<input inputMode="decimal" value={pnlInput} onChange={(e) => setPnlInput(e.target.value)} placeholder="Closed trade P&L" /></label><label>Instrument<select value={journalSymbol} onChange={(e) => setJournalSymbol(e.target.value as SymbolCode)}>{displaySymbols.map((s) => <option key={s}>{s}</option>)}</select></label></div>
+        <button className="desk-record-button" type="button" onClick={captureEntryContext}>CAPTURE ENTRY CONTEXT</button><small className="block mt-2 text-[10px] text-slate-500">{entryContext?.entryContextCapturedAtUtc ? `ENTRY CONTEXT CAPTURED ${entryContext.entryContextCapturedAtUtc}` : "Capture the current macro, VIX, session and risk state when opening a position."}</small><button className="desk-record-button" type="button" disabled={!pnlInput.trim() || !Number.isFinite(Number(pnlInput)) || locked || (resultInput === 'WIN' && Number(pnlInput) <= 0) || (resultInput === 'LOSS' && Number(pnlInput) >= 0) || (resultInput === 'FLAT' && Number(pnlInput) !== 0)} onClick={recordTrade}>RECORD CLOSED TRADE</button>
+        <div className="flex flex-wrap gap-2 mt-3"><button className="desk-record-button" type="button" onClick={() => exportJournal('json')}>EXPORT JSON</button><button className="desk-record-button" type="button" onClick={() => exportJournal('csv')}>EXPORT CSV</button></div>
+        <div className="desk-journal-list">{journal.entries.slice(0, 5).map((entry) => <div key={entry.id}><span>{entry.symbol} · {entry.result}</span><b className={entry.pnl >= 0 ? 'desk-good' : 'desk-warning'}>{entry.pnl >= 0 ? '+' : ''}${entry.pnl.toFixed(2)}</b><small>{entry.timeUtc}</small></div>)}</div>
+        <p className="desk-footnote">Journal persists in this browser only. Browser storage clearing or switching devices resets it. MT5 must independently enforce the same hard limits.</p>
+      </article>
+    </div>
+  </section>;
+}
+ + gross.toFixed(2) : '—'}</strong></div></div>
+        <p className="desk-footnote">{selected === 'USDJPY' ? `USDJPY pip value: 1,000 / live ${display(usdJpy, 3)} = ${pipValue?.toFixed(4) ?? 'unavailable'} USD per pip per lot.` : selected === 'XAUUSD' ? 'Gold assumption: 100 oz per standard lot; $100 P/L per $1.00 price move per lot.' : 'FX assumption: $10 USD pip value per standard lot for EUR/USD and GBP/USD.'} Excludes commissions, slippage, swaps and broker contract variations. Planning estimate only: verify the broker&apos;s MT5 symbol specification and account currency; the EA&apos;s broker-native sizing is authoritative.</p>
+        {risk > 1 && <p className="desk-warning-text">Risk exceeds the 1.0% governance ceiling.</p>}{lots > 0 && lots < 0.01 && <p className="desk-warning-text">Below 0.01 lot: skip, never round size up.</p>}{rr < 2 && <p className="desk-warning-text">R:R is below the required 1:2.0.</p>}
+      </article>
+    </div>
+    <div className="desk-grid">
+      <article className="desk-panel"><header><div><span className="desk-kicker">C / GOVERNANCE</span><h3>Mandatory 6/6 Pre-Trade Gate</h3></div><small>{gates.filter((gate) => gate.pass).length}/6 PASSED</small></header>
+        <div className="desk-gate-list">{gates.map((gate, index) => <div className="desk-gate-row" key={gate.name}><span className={gate.pass ? 'desk-gate-pass' : 'desk-gate-fail'}>{gate.pass ? 'PASS' : 'BLOCK'}</span><div><b>{index + 1}. {gate.name}</b><small>{gate.detail}</small></div>{index === 3 && <label className="desk-check"><input type="checkbox" checked={technicalConfirmed} onChange={(e) => setTechnicalConfirmed(e.target.checked)} /> MT5 confirmed</label>}</div>)}</div>
+        <div className={locked ? 'desk-lockout' : gatePassed ? 'desk-clear' : 'desk-blocked'}>{locked ? 'DAILY CIRCUIT BREAKER ACTIVE · LOCKED UNTIL 00:00 WAT' : gatePassed ? '6/6 CHECKS PASSED · MT5 EXECUTION REMAINS MANUAL' : 'GATE CLOSED · ALL SIX CONDITIONS MUST PASS'}</div>
+        <p className="desk-footnote">Calendar must be verified before the event gate can pass. This checklist does not submit orders or control MT5. Local state is not a broker-enforced lockout.</p>
+      </article>
+      <article className="desk-panel"><header><div><span className="desk-kicker">D / DAILY RISK CONTROL</span><h3>WAT Daily Circuit Breaker</h3></div><small>{currentDateWAT}</small></header>
+        <div className="desk-journal-stats"><div><span>TRADES</span><b>{journal.trades}/2</b></div><div><span>WINS</span><b>{journal.wins}</b></div><div><span>LOSSES</span><b>{journal.losses}/2</b></div><div><span>NET P&amp;L</span><b className={journal.netPnl >= 0 ? 'desk-good' : 'desk-warning'}>${journal.netPnl.toFixed(2)}</b></div></div>
+        <div className="desk-form-grid desk-journal-form"><label>Result<select value={resultInput} onChange={(e) => setResultInput(e.target.value as 'WIN' | 'LOSS' | 'FLAT')}><option>WIN</option><option>LOSS</option><option>FLAT</option></select></label><label>Realized P&amp;L USD<input inputMode="decimal" value={pnlInput} onChange={(e) => setPnlInput(e.target.value)} placeholder="Closed trade P&L" /></label><label>Instrument<select value={journalSymbol} onChange={(e) => setJournalSymbol(e.target.value as SymbolCode)}>{displaySymbols.map((s) => <option key={s}>{s}</option>)}</select></label></div>
+        <button className="desk-record-button" type="button" onClick={captureEntryContext}>CAPTURE ENTRY CONTEXT</button><small className="block mt-2 text-[10px] text-slate-500">{entryContext?.entryContextCapturedAtUtc ? `ENTRY CONTEXT CAPTURED ${entryContext.entryContextCapturedAtUtc}` : "Capture the current macro, VIX, session and risk state when opening a position."}</small><button className="desk-record-button" type="button" disabled={!pnlInput.trim() || !Number.isFinite(Number(pnlInput)) || locked || (resultInput === 'WIN' && Number(pnlInput) <= 0) || (resultInput === 'LOSS' && Number(pnlInput) >= 0) || (resultInput === 'FLAT' && Number(pnlInput) !== 0)} onClick={recordTrade}>RECORD CLOSED TRADE</button>
+        <div className="flex flex-wrap gap-2 mt-3"><button className="desk-record-button" type="button" onClick={() => exportJournal('json')}>EXPORT JSON</button><button className="desk-record-button" type="button" onClick={() => exportJournal('csv')}>EXPORT CSV</button></div>
+        <div className="desk-journal-list">{journal.entries.slice(0, 5).map((entry) => <div key={entry.id}><span>{entry.symbol} · {entry.result}</span><b className={entry.pnl >= 0 ? 'desk-good' : 'desk-warning'}>{entry.pnl >= 0 ? '+' : ''}${entry.pnl.toFixed(2)}</b><small>{entry.timeUtc}</small></div>)}</div>
+        <p className="desk-footnote">Journal persists in this browser only. Browser storage clearing or switching devices resets it. MT5 must independently enforce the same hard limits.</p>
+      </article>
+    </div>
+  </section>;
+}
+ + riskAmount.toFixed(2) : '—'}</strong></div><div><span>LOT SIZE · ROUNDED DOWN</span><strong>{lots.toFixed(2)}</strong><small className="block mt-1 text-[10px] text-slate-400">{pipValue === null ? '$/PIP/LOT UNAVAILABLE' : '$' + pipValue.toFixed(2) + ' / PIP / LOT'}</small></div><div><span>REWARD / RISK</span><strong className={rr >= 2 ? 'desk-good' : 'desk-warning'}>{rr.toFixed(2)}R</strong></div><div><span>EXPECTED GROSS PROFIT</span><strong>${gross.toFixed(2)}</strong></div></div>
         <p className="desk-footnote">{selected === 'USDJPY' ? `USDJPY pip value: 1,000 / live ${display(usdJpy, 3)} = ${pipValue?.toFixed(4) ?? 'unavailable'} USD per pip per lot.` : selected === 'XAUUSD' ? 'Gold assumption: 100 oz per standard lot; $100 P/L per $1.00 price move per lot.' : 'FX assumption: $10 USD pip value per standard lot for EUR/USD and GBP/USD.'} Excludes commissions, slippage, swaps and broker contract variations. Planning estimate only: verify the broker&apos;s MT5 symbol specification and account currency; the EA&apos;s broker-native sizing is authoritative.</p>
         {risk > 1 && <p className="desk-warning-text">Risk exceeds the 1.0% governance ceiling.</p>}{lots > 0 && lots < 0.01 && <p className="desk-warning-text">Below 0.01 lot: skip, never round size up.</p>}{rr < 2 && <p className="desk-warning-text">R:R is below the required 1:2.0.</p>}
       </article>
