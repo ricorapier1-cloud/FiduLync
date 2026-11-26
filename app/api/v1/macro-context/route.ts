@@ -229,16 +229,19 @@ export async function GET(request: Request) {
         ? null : dossier.cotPercentileDiff,
       cross_asset_confirmation: symbol === 'XAUUSD' ? (goldContext?.liquidityRegime ?? 'INSUFFICIENT_EVIDENCE') : dossier.crossAssetConfirmation,
       live_quotes: quotes.map((quote) => {
-        const ageMs = Math.max(0, Date.now() - Date.parse(quote.timestamp));
+        const timestampMs = Date.parse(quote.timestamp);
+        const rawAgeMs = Date.now() - timestampMs;
+        const timestampValid = Number.isFinite(timestampMs) && rawAgeMs >= -5 * 60_000;
+        const ageMs = timestampValid ? Math.max(0, rawAgeMs) : null;
         const providerQuote = quote.source === 'finnhub' || quote.source === 'mt5';
-        const freshness = providerQuote
-          ? ageMs <= 120_000 ? 'FRESH' as const : 'STALE' as const
+        const freshness = !timestampValid ? 'STALE' as const : providerQuote
+          ? ageMs !== null && ageMs <= 120_000 ? 'FRESH' as const : 'STALE' as const
           : 'REFERENCE' as const;
         return {
           symbol: quote.symbol,
           mid: freshness === 'STALE' ? null : quote.price,
           observation_time_utc: quote.timestamp,
-          age_ms: Number.isFinite(ageMs) ? ageMs : null,
+          age_ms: ageMs,
           freshness,
           source: quote.source,
           quote_type: providerQuote ? 'PROVIDER_QUOTE' as const : 'REFERENCE_RATE' as const,

@@ -204,6 +204,17 @@ test('market quote feeds include G8 currency pairs for Finnhub and Frankfurter',
   }
 });
 
+test('provider quotes reject stale, future, crossed and malformed MT5 observations before macro use', () => {
+  const feeds = read('../lib/marketFeeds.ts');
+  const macroContext = read('../app/api/v1/macro-context/route.ts');
+  assert.match(feeds, /quoteAgeMs < -5 \* 60_000 \|\| quoteAgeMs > 120_000/);
+  assert.match(feeds, /ageMs < -5 \* 60_000 \|\| ageMs > 120_000/);
+  assert.match(feeds, /ask < bid/);
+  assert.match(macroContext, /rawAgeMs >= -5 \* 60_000/);
+  assert.match(macroContext, /timestampValid \? Math\.max\(0, rawAgeMs\) : null/);
+  assert.match(macroContext, /mid: freshness === 'STALE' \? null : quote\.price/);
+});
+
 test('FRED and Finnhub API keys are used only behind explicit provider approval', () => {
   const macroData = read('../lib/macroData.ts');
   assert.match(macroData, /FRED_DATA_STORAGE_PERMISSION_APPROVED\?\.trim\(\)\.toLowerCase\(\) !== 'false'/);

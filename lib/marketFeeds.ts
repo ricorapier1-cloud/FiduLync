@@ -29,14 +29,19 @@ async function getFinnhubQuotes(apiKey: string): Promise<MarketQuote[]> {
     if (!response.ok) throw new Error(`Finnhub quote returned ${response.status} for ${symbol}.`);
     const payload: unknown = await response.json();
     if (!isRecord(payload) || typeof payload.c !== 'number' || !Number.isFinite(payload.c)
-      || payload.c <= 0 || typeof payload.t !== 'number' || payload.t <= 0) {
+      || payload.c <= 0 || typeof payload.t !== 'number' || !Number.isFinite(payload.t) || payload.t <= 0) {
       throw new Error(`Finnhub returned an invalid quote for ${symbol}.`);
+    }
+    const quoteTimestampMs = payload.t * 1000;
+    const quoteAgeMs = Date.now() - quoteTimestampMs;
+    if (quoteAgeMs < -5 * 60_000 || quoteAgeMs > 120_000) {
+      throw new Error(`Finnhub quote is outside the permitted freshness window for ${symbol}.`);
     }
     return {
       symbol,
       price: payload.c,
       changePercent: typeof payload.dp === 'number' && Number.isFinite(payload.dp) ? payload.dp : null,
-      timestamp: new Date(payload.t * 1000).toISOString(),
+      timestamp: new Date(quoteTimestampMs).toISOString(),
       source: 'finnhub' as const,
     };
   }));
@@ -196,16 +201,28 @@ async function getMt5Quotes(): Promise<MarketQuote[]> {
   const latestBySymbol = new Map<string, StoredMt5Quote>();
   for (const row of rows) {
     if (!['EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD'].includes(row.symbol)) continue;
-    if (Date.now() - Date.parse(row.quote_time) > 120_000) continue;
+    const quoteTimeMs = Date.parse(row.quote_time);
+    const ageMs = Date.now() - quoteTimeMs;
+    const bid = Number(row.bid);
+    const ask = Number(row.ask);
+    if (!Number.isFinite(quoteTimeMs) || ageMs < -5 * 60_000 || ageMs > 120_000) continue;
+    if (!Number.isFinite(bid) || !Number.isFinite(ask) || bid <= 0 || ask < bid) continue;
     if (!latestBySymbol.has(row.symbol)) latestBySymbol.set(row.symbol, row);
   }
-  return [...latestBySymbol.values()].map((row) => ({
-    symbol: row.symbol as MarketQuote['symbol'],
-    price: (Number(row.bid) + Number(row.ask)) / 2,
-    changePercent: null,
-    timestamp: new Date(row.quote_time).toISOString(),
-    source: 'mt5' as const,
-  }));
+  return [...latestBySymbol.values()].flatMap((row) => {
+    const bid = Number(row.bid);
+    const ask = Number(row.ask);
+    const mid = (bid + ask) / 2;
+    const timestampMs = Date.parse(row.quote_time);
+    if (!Number.isFinite(mid) || mid <= 0 || !Number.isFinite(timestampMs)) return [];
+    return [{
+      symbol: row.symbol as MarketQuote['symbol'],
+      price: mid,
+      changePercent: null,
+      timestamp: new Date(timestampMs).toISOString(),
+      source: 'mt5' as const,
+    }];
+  });
 }
 
 async function fetchMarketQuotes(): Promise<MarketQuote[]> {
