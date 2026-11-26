@@ -57,6 +57,13 @@ function hourInZone(date: Date, timeZone: string): number {
   return hour + minute / 60;
 }
 
+function isFreshCotReport(date: string | undefined, maxAgeDays = 14): boolean {
+  if (!date) return false;
+  const timestamp = Date.parse(date);
+  const ageMs = Date.now() - timestamp;
+  return Number.isFinite(timestamp) && ageMs >= -5 * 60_000 && ageMs <= maxAgeDays * 86_400_000;
+}
+
 function activeMarketSession(date = new Date()): 'LONDON' | 'NY' | 'CLOSED' {
   const watHour = hourInZone(date, 'Africa/Lagos');
   if (watHour >= 8 && watHour < 12) return 'LONDON';
@@ -124,16 +131,21 @@ export async function GET(request: Request) {
     const highImpactWindow = snapshot.catalysts.some((event) => event.impact === 'High'
       && Math.abs(Date.parse(event.scheduledAt) - Date.now()) <= 30 * 60_000);
     const newsLockoutActive = snapshot.calendarSource !== 'provider' || !snapshot.calendarProvider || highImpactWindow || dossier.eventRiskLockout;
-    const nearestHighImpact = snapshot.catalysts
-      .filter((event) => event.impact === 'High')
+    const highImpactEvents = snapshot.catalysts.filter((event) => event.impact === 'High')
       .map((event) => ({ event, minutes: (Date.parse(event.scheduledAt) - Date.now()) / 60_000 }))
-      .filter((item) => Number.isFinite(item.minutes))
+      .filter((item) => Number.isFinite(item.minutes));
+    const nearestHighImpact = [...highImpactEvents].sort((a, b) => Math.abs(a.minutes) - Math.abs(b.minutes))[0];
+    const nearestRateDecision = highImpactEvents
+      .filter((item) => /rate decision|interest rate|monetary policy decision|policy rate/i.test(item.event.title))
       .sort((a, b) => Math.abs(a.minutes) - Math.abs(b.minutes))[0];
-    const isRateDecision = Boolean(nearestHighImpact && /rate decision|interest rate|monetary policy decision|policy rate/i.test(nearestHighImpact.event.title));
-    const crowdedPositions = snapshot.cot.map((position) => ({ symbol: position.market, percentile: position.percentile }));
+    const isRateDecision = Boolean(nearestRateDecision && Math.abs(nearestRateDecision.minutes) <= 60);
+    const shieldEventMinutesAway = isRateDecision ? nearestRateDecision!.minutes : nearestHighImpact?.minutes ?? null;
+    const crowdedPositions = snapshot.cot
+      .filter((position) => isFreshCotReport(position.reportDate) && Number.isFinite(position.percentile))
+      .map((position) => ({ symbol: position.market, percentile: position.percentile }));
     const sovereignShield = evaluateSovereignShield({
       vix: goldContext.drivers.VIXCLS.value,
-      eventMinutesAway: nearestHighImpact?.minutes ?? null,
+      eventMinutesAway: shieldEventMinutesAway,
       isCentralBankRateDecision: isRateDecision,
       cotPercentiles: crowdedPositions,
       // No authenticated MT5 trade ledger is currently connected. Fail closed rather than
@@ -162,9 +174,7 @@ export async function GET(request: Request) {
         confidence: item.confidence,
       }];
     }));
-    const apiToken = (process.env.MACRO_API_TOKEN?.trim() || process.env.MACROLYNC_API_SECRET?.trim() || process.env.ALGO_PRIVATE_API_KEY?.trim() || '');
     const signalResponse = await fetch(new URL('/api/v1/intraday-signals', request.url), {
-      headers: { 'x-macro-key': apiToken },
       cache: 'no-store',
       signal: AbortSignal.timeout(25_000),
     }).catch((error) => {
@@ -175,6 +185,8 @@ export async function GET(request: Request) {
       ? await signalResponse.json() as { signals?: MacroContextPayload['signals'] }
       : null;
     const intradaySignals = signalPayload?.signals ?? [];
+    const hasFreshBaseCot = snapshot.cotSource === 'provider' && snapshot.cot.some((position) => position.market === dossier.base && isFreshCotReport(position.reportDate));
+    const hasFreshQuoteCot = snapshot.cotSource === 'provider' && snapshot.cot.some((position) => position.market === dossier.quote && isFreshCotReport(position.reportDate));
     const selectedBias = symbolBiases[symbol];
     const allowedToTrade = Boolean(sovereignShield.allowedToTrade && selectedBias?.biasScore !== null
       && selectedBias?.directionalVerdict !== 'INSUFFICIENT_EVIDENCE'
@@ -213,10 +225,8 @@ export async function GET(request: Request) {
       real_policy_rate_diff_bps: symbol === 'XAUUSD' ? null : dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier.realPolicyRateDiffBps,
       real_yield_diff_bps: null,
       two_year_yield_diff_bps: symbol === 'XAUUSD' ? null : dossier.twoYearYieldDiffBps,
-      cot_percentile_diff: symbol === 'XAUUSD' ? null : snapshot.cotSource === 'provider'
-        && snapshot.cot.some((position) => position.market === dossier.base)
-        && snapshot.cot.some((position) => position.market === dossier.quote)
-          ? dossier.cotPercentileDiff : null,
+      cot_percentile_diff: symbol === 'XAUUSD' || !hasFreshBaseCot || !hasFreshQuoteCot
+        ? null : dossier.cotPercentileDiff,
       cross_asset_confirmation: symbol === 'XAUUSD' ? (goldContext?.liquidityRegime ?? 'INSUFFICIENT_EVIDENCE') : dossier.crossAssetConfirmation,
       live_quotes: quotes.map((quote) => {
         const ageMs = Math.max(0, Date.now() - Date.parse(quote.timestamp));
