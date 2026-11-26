@@ -20,9 +20,9 @@ test('MT5 ingestion and account-read routes use separate private bearer credenti
 test('MT5 account storage is private and service-role-only', () => {
   const migration = read('../supabase/migrations/20261126174500_mt5_account_intelligence.sql');
   assert.match(migration, /enable row level security/gi);
-  assert.match(migration, /revoke all on public\.mt5_account_snapshots from anon, authenticated/i);
+  assert.match(migration, /revoke all on public\.macrolinc_account_snapshots from anon, authenticated/i);
   assert.match(migration, /revoke all on public\.mt5_account_deals from anon, authenticated/i);
-  assert.match(migration, /grant all on public\.mt5_account_snapshots to service_role/i);
+  assert.match(migration, /grant all on public\.macrolinc_account_snapshots to service_role/i);
   assert.match(migration, /grant all on public\.mt5_account_deals to service_role/i);
   assert.match(migration, /deal_time_server text not null/);
 });
