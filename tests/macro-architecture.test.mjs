@@ -166,7 +166,7 @@ test('service worker never serves cached API data and removes obsolete applicati
   assert.match(worker, /caches\.keys\(\)/);
   assert.match(worker, /caches\.delete\(name\)/);
   assert.match(worker, /url\.pathname\.startsWith\('\/api\/'\)/);
-  assert.match(worker, /event\.request\.method !== 'GET'/);
+  assert.match(worker, /request\.method !== 'GET'/);
   assert.match(worker, /caches\.match\('\/'\)/);
   assert.doesNotMatch(worker, /caches\.match\(event\.request\)\.then\(\(response\) => response \|\| fetch\(event\.request\)\)/);
 });
