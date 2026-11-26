@@ -55,7 +55,7 @@ The service API also accepts MACROLYNC_API_SECRET or the legacy ALGO_PRIVATE_API
 
 ## Private MT5 account connector
 
-1. Apply migration `20261126174500_mt5_account_intelligence.sql` to the connected Supabase project.
+1. Apply migration `20261126165443_mt5_account_intelligence.sql` to the connected Supabase project.
 2. Set separate random `MT5_ACCOUNT_INGEST_TOKEN` and `MT5_ACCOUNT_READ_TOKEN` values in Vercel Production (32+ characters each). Redeploy after setting them.
 3. In MT5, allow `https://fidulync.vercel.app` in Tools → Options → Expert Advisors → Allow WebRequest.
 4. Install `public/MacroLyncAccountPublisher.mq5` under MQL5/Experts, compile in MetaEditor, attach it to a chart, and set `InpAccountIngestToken` to the ingest token.
