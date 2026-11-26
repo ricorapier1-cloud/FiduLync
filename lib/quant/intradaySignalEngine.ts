@@ -30,8 +30,8 @@ export type IntradaySignal = {
   spreadBaselineObservations?: number;
   spreadMultipleOfBaseline?: number | null;
   sovereignShieldStatus?: MarketRiskShieldResult['status'] | null;
-  maxAllowedRiskPct?: number;
-  shieldBlockReasons?: string[];
+  marketRiskCeilingPct?: number;
+  marketShieldFlags?: string[];
 };
 export type IntradaySignalInput = {
   symbol: string;
@@ -112,7 +112,7 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
   const session = input.session;
 
   if (input.vix === null) blockers.push('VIX_UNAVAILABLE');
-  if (input.marketShield && !input.marketShield.allowedToTrade) blockers.push(...input.marketShield.blockReasons);
+  if (input.marketShield && !input.marketShield.marketConditionsClear) blockers.push(...input.marketShield.blockReasons);
   else if (input.vix >= 32) blockers.push('VIX_BLACK_SWAN_LOCKOUT');
   if (!input.calendarVerified) blockers.push('CALENDAR_UNVERIFIED');
   if (input.eventMinutesAway !== null && Math.abs(input.eventMinutesAway) <= (input.rateDecision ? 60 : 30)) blockers.push(input.rateDecision ? 'RATE_DECISION_LOCKOUT' : 'TIER_ONE_EVENT_LOCKOUT');
@@ -132,10 +132,10 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
     hurst, ker, atr14: atr, atrUnit: isGold ? 'USD' : 'PIPS', session,
     dataAsOfUtc: latest?.timestampUtc ?? null, blockers,
     sovereignShieldStatus: input.marketShield?.status ?? null,
-    maxAllowedRiskPct: input.marketShield?.maxAllowedRiskPct ?? 0,
-    shieldBlockReasons: input.marketShield?.blockReasons ?? [],
+    marketRiskCeilingPct: input.marketShield?.maxAllowedRiskPct ?? 0,
+    marketShieldFlags: input.marketShield?.blockReasons ?? [],
   });
-  if (input.marketShield && !input.marketShield.allowedToTrade) return empty('SHIELD_BLOCKED', 'Sovereign market-risk shield is blocking this setup.');
+  if (input.marketShield && !input.marketShield.marketConditionsClear) return empty('SHIELD_BLOCKED', 'Sovereign market-risk shield is blocking this setup.');
   if (blockers.some((item) => ['VIX_UNAVAILABLE', 'VIX_BLACK_SWAN_LOCKOUT', 'CALENDAR_UNVERIFIED', 'RATE_DECISION_LOCKOUT', 'TIER_ONE_EVENT_LOCKOUT', 'OUTSIDE_LONDON_NEW_YORK_WAT_WINDOWS', 'SPREAD_BASELINE_UNAVAILABLE', 'SPREAD_BLOWOUT_BLOCK', 'LIVE_BBO_UNAVAILABLE_OR_STALE', 'INTRADAY_CANDLES_STALE'].includes(item))) {
     return empty('SHIELD_BLOCKED', 'Sovereign Shield or live market-data gate is not clear.');
   }
@@ -183,7 +183,7 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
     atr14: round(atr! / pipSize, isGold ? 2 : 1), atrUnit: isGold ? 'USD' : 'PIPS',
     session, dataAsOfUtc: latest?.timestampUtc ?? null, blockers: [],
     sovereignShieldStatus: input.marketShield?.status ?? null,
-    maxAllowedRiskPct: shieldCap,
+    marketRiskCeilingPct: shieldCap,
     shieldBlockReasons: input.marketShield?.blockReasons ?? [],
   };
 }

@@ -35,5 +35,5 @@ test('market-risk shield is independently enforced by intraday signals without i
   assert.match(source, /intradayRangeAtrMultiple > 2\.5/);
   assert.match(source, /maxAllowedRiskPct = Math\.min\(maxAllowedRiskPct, 0\.5\)/);
   assert.match(source, /spreadBlowoutBlock \|\| eventWindow/);
-  assert.match(source, /evaluateMarketRiskShield\(input\)/);
+  assert.match(source, /marketConditionsClear: !hardBlock/);
 });

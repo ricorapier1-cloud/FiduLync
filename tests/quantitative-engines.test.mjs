@@ -678,7 +678,7 @@ test('authenticated EA macro context includes intraday signals and MQL5 read-onl
 test('desk exposes macro-aligned intraday signals as research context without calculator or order execution', () => {
   const desk = read('../app/components/DeskTerminal.tsx');
   const signals = read('../app/api/v1/intraday-signals/route.ts');
-  assert.match(desk, /LIVE EXECUTION SIGNALS/);
+  assert.match(desk, /LIVE INTRADAY RESEARCH/);
   assert.match(desk, /intradaySignals\.map/);
   assert.match(desk, /Research context only/);
   assert.match(desk, /REFRESH SIGNALS/);
@@ -722,8 +722,8 @@ test('spread blowout protection uses a disclosed configured reference until a me
   assert.match(route, /evaluateMarketRiskShield/);
   assert.match(route, /intradayRangeAtrMultiple/);
   assert.match(route, /cotPercentiles/);
-  assert.match(engine, /input\.marketShield && !input\.marketShield\.allowedToTrade/);
-  assert.match(engine, /maxAllowedRiskPct/);
+  assert.match(engine, /input\.marketShield && !input\.marketShield\.marketConditionsClear/);
+  assert.match(engine, /marketRiskCeilingPct/);
   assert.match(route, /spreadMultipleOfBaseline: baseline\.multiple/);
   assert.match(desk, /Spread guard:/);
   assert.match(desk, /XAUUSD ±20 directional threshold/);

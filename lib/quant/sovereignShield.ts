@@ -18,7 +18,7 @@ export type MarketRiskShieldInput = Omit<SovereignShieldInput, 'governance'>;
 export type MarketRiskShieldResult = {
   status: SovereignShieldStatus;
   maxAllowedRiskPct: number;
-  allowedToTrade: boolean;
+  marketConditionsClear: boolean;
   spreadBlowoutBlock: boolean;
   crowdedUnwindRisk: string[];
   blockReasons: string[];
@@ -71,7 +71,7 @@ export function evaluateMarketRiskShield(input: MarketRiskShieldInput): MarketRi
   return {
     status,
     maxAllowedRiskPct,
-    allowedToTrade: !hardBlock,
+    marketConditionsClear: !hardBlock,
     spreadBlowoutBlock,
     crowdedUnwindRisk,
     blockReasons: reasons,
@@ -97,7 +97,7 @@ export function evaluateSovereignShield(input: SovereignShieldInput): SovereignS
     || reasons.includes('MAX_TRADES_PER_DAY')
     || reasons.includes('MAX_LOSSES_PER_DAY')
     || reasons.includes('ROLLING_7D_DRAWDOWN_LIMIT');
-  const hardBlock = !market.allowedToTrade || governanceBlock;
+  const hardBlock = !market.marketConditionsClear || governanceBlock;
 
   return {
     ...market,
