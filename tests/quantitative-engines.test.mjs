@@ -562,6 +562,19 @@ test('Sovereign Shield fails closed when VIX evidence is missing or invalid', ()
   assert.match(deskTypes, /'DATA_UNAVAILABLE'/);
 });
 
+test('intraday candle adapter rejects malformed OHLC ranges and invalid timestamps', () => {
+  const route = read('../app/api/v1/intraday-candles/route.ts');
+  assert.match(route, /high! < Math\.max\(open!, close!\)/);
+  assert.match(route, /low! > Math\.min\(open!, close!\)/);
+  assert.match(route, /Number\.isFinite\(epochSeconds\)/);
+  assert.match(route, /bars\.sort\(\(left, right\)/);
+});
+
+test('desk journal macro attribution is computed for the recorded instrument, not the calculator selection', () => {
+  const desk = read('../app/components/DeskTerminal.tsx');
+  assert.match(desk, /generatePairDossier\(snapshot, journalSymbol\)\.biasScore/);
+});
+
 test('intraday candle adapter exposes real OHLCV with explicit freshness and no synthetic fallback', () => {
   const route = read('../app/api/v1/intraday-candles/route.ts');
   assert.match(route, /query1\.finance\.yahoo\.com\/v8\/finance\/chart/);
