@@ -149,3 +149,15 @@ export function getCachedData<T>(
     if (inFlight.get(key) === request) inFlight.delete(key);
   });
 }
+
+export async function deleteCachedData(key: string): Promise<void> {
+  memoryCache.delete(key);
+  staleMemoryCache.delete(key);
+  const redis = getRedisClient();
+  if (!redis) return;
+  try {
+    await redis.del(key, `${key}:stale`, `${key}:refresh-lock`);
+  } catch (error) {
+    warnOnce(`delete-failure:${key}`, `Upstash cache cleanup failed for ${key}.`, error);
+  }
+}
