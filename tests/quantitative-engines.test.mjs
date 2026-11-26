@@ -584,6 +584,10 @@ test('Sovereign Shield fails closed when VIX evidence is missing or invalid', ()
   assert.match(shield, /status === 'DATA_UNAVAILABLE'/);
   assert.match(shield, /!vixAvailable\) reasons\.push\('VIX_UNAVAILABLE'\)/);
   assert.match(deskTypes, /'DATA_UNAVAILABLE'/);
+  const macroContext = read('../app/api/v1/macro-context/route.ts');
+  const xauContext = read('../app/api/v1/xauusd-context/route.ts');
+  assert.match(macroContext, /drivers\.VIXCLS\.state === 'HEALTHY' \? goldContext\.drivers\.VIXCLS\.value : null/);
+  assert.match(xauContext, /drivers\.VIXCLS\.state === 'HEALTHY' \? context\.drivers\.VIXCLS\.value : null/);
 });
 
 test('intraday candle adapter rejects malformed OHLC ranges and invalid timestamps', () => {
