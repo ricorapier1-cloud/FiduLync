@@ -6,9 +6,13 @@ This document is an engineering control, not legal advice. FiduLync is currently
 
 All third-party data integrations must be server-side, credential-protected, HTTPS-only, timestamped, source-labelled and bounded by provider rate limits. Caching, storage, derived-data use, display and redistribution must be permitted by the provider and any underlying exchange for the intended personal research scope.
 
-The following flags default to `false`. They must not be enabled merely because a key is present:
+The following provider-entitlement flags default to `false` and must not be enabled merely because a key is present:
 
-- `FRED_DATA_STORAGE_PERMISSION_APPROVED`
+- `FINNHUB_PERSONAL_PLAN_ACTIVE`
+- `ALPHA_VANTAGE_COMMERCIAL_USE_APPROVED`
+- `FMP_COMMERCIAL_USE_APPROVED`
+
+For this private personal research deployment, FRED storage is enabled by default and can be explicitly disabled with `FRED_DATA_STORAGE_PERMISSION_APPROVED=false`. This application-level default does not override FRED's applicable attribution, redistribution, and usage terms.
 - `FINNHUB_PERSONAL_PLAN_ACTIVE`
 - `ALPHA_VANTAGE_COMMERCIAL_USE_APPROVED`
 - `FMP_COMMERCIAL_USE_APPROVED`
