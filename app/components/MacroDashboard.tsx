@@ -289,7 +289,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
                       {currency.twoYearYield === undefined || currency.twoYearYieldSource !== 'provider' || !isFreshObservation(currency.twoYearYieldObservationDate, 60) ? '—' : (
                         <>
                           {formatRate(currency.twoYearYield)}
-                          <small>PROVIDER · OBS {currency.twoYearYieldObservationDate}</small>
+                          <small>PROVIDER {currency.twoYearYieldProvider ?? 'UNSPECIFIED'} · OBS {currency.twoYearYieldObservationDate}</small>
                         </>
                       )}
                     </td>
