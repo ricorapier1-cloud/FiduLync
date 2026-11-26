@@ -162,6 +162,19 @@ export async function GET(request: Request) {
         confidence: item.confidence,
       }];
     }));
+    const apiToken = (process.env.MACRO_API_TOKEN?.trim() || process.env.MACROLYNC_API_SECRET?.trim() || process.env.ALGO_PRIVATE_API_KEY?.trim() || '');
+    const signalResponse = await fetch(new URL('/api/v1/intraday-signals', request.url), {
+      headers: { 'x-macro-key': apiToken },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(25_000),
+    }).catch((error) => {
+      console.warn('Intraday signals are unavailable:', error);
+      return null;
+    });
+    const signalPayload = signalResponse?.ok
+      ? await signalResponse.json() as { signals?: MacroContextPayload['signals'] }
+      : null;
+    const intradaySignals = signalPayload?.signals ?? [];
     const selectedBias = symbolBiases[symbol];
     const allowedToTrade = Boolean(sovereignShield.allowedToTrade && selectedBias?.biasScore !== null
       && selectedBias?.directionalVerdict !== 'INSUFFICIENT_EVIDENCE'
@@ -179,6 +192,7 @@ export async function GET(request: Request) {
       macroRiskRegime: selectedBias?.macroRiskRegime ?? 'INSUFFICIENT_EVIDENCE',
       symbols: symbolBiases,
       decisionScope: 'MACRO_GATE_ONLY',
+      signals: intradaySignals,
       sovereignShield: {
         status: sovereignShield.status,
         maxAllowedRiskPct: sovereignShield.maxAllowedRiskPct,
