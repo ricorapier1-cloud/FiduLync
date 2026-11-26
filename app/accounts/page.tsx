@@ -65,7 +65,7 @@ export default function AccountsPage() {
   }, [refresh]);
 
   useEffect(() => {
-    if (status !== 'CONNECTED' || !token || !payload?.accounts.length) return;
+    if (status !== 'CONNECTED' || !token) return;
     const timer = window.setInterval(() => void refresh(token), 30_000);
     return () => window.clearInterval(timer);
   }, [status, token, payload?.accounts.length, refresh]);
