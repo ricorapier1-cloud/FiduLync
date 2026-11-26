@@ -69,7 +69,7 @@ export async function GET(request: Request) {
       }).catch(() => null);
       const candles = candleResponse?.ok ? await candleResponse.json() as CandlePayload : null;
       const quote = quotes.find((item) => item.symbol === symbol);
-      const baseline = await recordAndEvaluateSpreadBaseline(symbol, quote?.spread ?? null, session, watDate(now));
+      const baseline = await recordAndEvaluateSpreadBaseline(symbol, quote?.freshness === 'LIVE' ? quote.spread : null, session, watDate(now));
       const isGold = symbol === 'XAUUSD';
       const dossier = isGold ? null : generatePairDossier(snapshot, symbol);
       const macroScore = isGold ? gold.goldBiasScore : dossier?.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier?.biasScore ?? null;

@@ -725,6 +725,7 @@ test('spread blowout protection uses a disclosed configured reference until a me
   assert.match(baseline, /CONFIGURED_REFERENCE/);
   assert.match(baseline, /spread \/ medianSpread/);
   assert.match(route, /recordAndEvaluateSpreadBaseline/);
+  assert.match(route, /quote\?\.freshness === 'LIVE' \? quote\.spread : null/);
   assert.match(route, /evaluateMarketRiskShield/);
   assert.match(route, /intradayRangeAtrMultiple/);
   assert.match(route, /cotPercentiles/);
