@@ -336,7 +336,6 @@ button { color: inherit; }
 .inquiry-copy { padding-top: 10px; }
 .inquiry-copy h2 { max-width: 360px; margin: 14px 0 0; font-size: 27px; font-weight: 550; line-height: 1.28; letter-spacing: 0; }
 .inquiry-copy > p { max-width: 365px; margin: 13px 0 0; color: #95a3a8; font-size: 11px; line-height: 1.8; }
-.whatsapp-link { display: inline-flex; min-height: 48px; align-items: center; gap: 10px; margin-top: 19px; padding: 0 13px; border: 1px solid rgba(16, 185, 129, .34); border-radius: 7px; background: rgba(16, 185, 129, .09); color: #7be2b8; font-size: 10px; font-weight: 600; }
 .inquiry-note { display: block; margin-top: 14px; color: #718087; font-size: 8px; }
 .inquiry-form { min-width: 0; padding: 17px; border: 1px solid rgba(167, 187, 194, .12); border-radius: 8px; background: rgba(7, 11, 15, .55); }
 .form-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; color: #8d9ba0; font-size: 8px; }
@@ -503,7 +502,6 @@ button { color: inherit; }
   }
   .tab-link { display: flex; min-width: 0; height: 51px; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border-radius: 11px; color: #78868f; font-size: 9px; font-weight: 500; }
   .tab-link-active { background: rgba(81, 228, 194, 0.08); color: var(--teal); }
-  .whatsapp-float { right: 14px; bottom: calc(86px + env(safe-area-inset-bottom)); padding: 11px; }
 }
 
 @keyframes drawer-in { from { transform: translateX(-16px); opacity: 0.5; } to { transform: translateX(0); opacity: 1; } }
