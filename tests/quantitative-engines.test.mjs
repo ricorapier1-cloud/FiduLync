@@ -114,7 +114,7 @@ test('normalized macro observations retain source, period, provenance and honest
   assert.match(persistence, /source_hash/);
   assert.match(persistence, /released_at: null/);
   assert.match(persistence, /observation_period/);
-  assert.match(macroData, /persistMacroObservations\(snapshot\)/);
+  assert.match(macroData, /persistMacroObservations\(safeSnapshot\)/);
 });
 
 test('G10 Nordic policy rates use official no-key central-bank sources', () => {
@@ -206,7 +206,7 @@ test('market quote feeds include G8 currency pairs for Finnhub and Frankfurter',
 
 test('FRED and Finnhub API keys are used only behind explicit provider approval', () => {
   const macroData = read('../lib/macroData.ts');
-  assert.match(macroData, /FRED_DATA_STORAGE_PERMISSION_APPROVED !== 'false'/);
+  assert.match(macroData, /FRED_DATA_STORAGE_PERMISSION_APPROVED\?\.trim\(\)\.toLowerCase\(\) !== 'false'/);
   assert.match(macroData, /FINNHUB_PERSONAL_PLAN_ACTIVE === 'true'/);
 });
 
@@ -337,7 +337,7 @@ test('keyed providers remain approval-gated while the public economic calendar w
   const macroData = read('../lib/macroData.ts');
   const marketFeeds = read('../lib/marketFeeds.ts');
   const goldEngine = read('../lib/macro/goldAndRegimeEngine.ts');
-  assert.match(macroData, /FRED_DATA_STORAGE_PERMISSION_APPROVED !== 'false' \? process\.env\.FRED_API_KEY/);
+  assert.match(macroData, /FRED_DATA_STORAGE_PERMISSION_APPROVED\?\.trim\(\)\.toLowerCase\(\) !== 'false' \? process\.env\.FRED_API_KEY/);
   assert.match(macroData, /FINNHUB_PERSONAL_PLAN_ACTIVE === 'true' \? process\.env\.FINNHUB_API_KEY/);
   assert.match(macroData, /getFairEconomyCatalysts\(\),/);
   assert.doesNotMatch(macroData, /FAIRECONOMY_COMMERCIAL_USE_APPROVED === 'true' \? getFairEconomyCatalysts/);
@@ -372,6 +372,7 @@ test('cached FRED observations are excluded when storage permission is not appro
   assert.match(persistence, /provider === 'FRED' && !fredStorageAllowed\(\)/);
   assert.match(persistence, /delete\(\)\.eq\('provider', 'FRED'\)/);
   assert.match(cache, /export async function deleteCachedData/);
+  assert.match(engine, /xau:fred:\$\{seriesId\}:v1/);
 });
 
 test('gold quote parser uses parent-level Swissquote timestamps and Treasury daily history when FRED storage is disabled', () => {
@@ -434,7 +435,7 @@ test('official Treasury daily nominal and TIPS yields work without a paid API ke
 
 test('provider telemetry does not treat FRED key presence as data-use approval', () => {
   const telemetry = read('../lib/macro/providerTelemetry.ts');
-  assert.ok(telemetry.includes("const fredStorageAllowed = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED !== 'false'"));
+  assert.ok(telemetry.includes("const fredStorageAllowed = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED?.trim().toLowerCase() !== 'false'"));
   assert.ok(!telemetry.includes("FRED_DATA_STORAGE_PERMISSION_APPROVED !== 'false' || fredKeyPresent"));
 });
 
