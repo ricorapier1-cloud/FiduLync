@@ -82,6 +82,21 @@ function makeRow(
   };
 }
 
+function fredStorageAllowed(): boolean {
+  return process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED?.trim().toLowerCase() !== 'false';
+}
+
+export async function purgeFREDObservations(): Promise<void> {
+  if (fredStorageAllowed()) return;
+  if (!(process.env.SUPABASE_SECRET_KEY?.trim() || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim())) return;
+  try {
+    const { error } = await getSupabaseAdmin().from('macro_observations').delete().eq('provider', 'FRED');
+    if (error) throw error;
+  } catch (error) {
+    console.error('FRED observation purge failed after storage permission was disabled:', error);
+  }
+}
+
 export async function persistMacroObservations(snapshot: MacroSnapshot): Promise<number> {
   if (!(process.env.SUPABASE_SECRET_KEY?.trim() || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim())) return 0;
 
@@ -95,7 +110,7 @@ export async function persistMacroObservations(snapshot: MacroSnapshot): Promise
     value: number | undefined,
     unit = 'percent',
   ) => {
-    if (!provider) return;
+    if (!provider || (provider === 'FRED' && !fredStorageAllowed())) return;
     const row = makeRow(provider, series, code, date, value, unit, retrievedAt);
     if (row) rows.push(row);
   };
