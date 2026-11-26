@@ -29,6 +29,7 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
         fredPermissionCleanup = Promise.all([
           deleteCachedData('macro:snapshot:v3'),
           deleteCachedData('macro:snapshot:v4:fred'),
+          ...['DFII10', 'T10YIE', 'DGS2', 'DTB3', 'BAMLH0A0HYM2', 'VIXCLS'].map((seriesId) => deleteCachedData(`xau:fred:${seriesId}:v1`)),
           purgeFREDStorageArtifacts(snapshot),
         ]).then(() => undefined).catch((error) => {
           console.error('FRED storage permission cleanup could not be completed:', error);
