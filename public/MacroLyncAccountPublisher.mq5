@@ -10,8 +10,6 @@ input int    InpHistoryDays = 90;
 input int    InpMaxDealsPerSync = 500;
 input int    InpRequestTimeoutMs = 10000;
 
-datetime g_last_sync = 0;
-
 string JsonEscape(string value)
 {
    StringReplace(value, "\\", "\\\\");
@@ -110,7 +108,8 @@ string BuildDeals()
    if(!HistorySelect(from_time, to_time)) return json + "]";
 
    int total = HistoryDealsTotal();
-   int start = MathMax(0, total - MathMax(1, InpMaxDealsPerSync));
+   int max_deals = (int)MathMin(500, MathMax(1, InpMaxDealsPerSync));
+   int start = (int)MathMax(0, total - max_deals);
    for(int i = start; i < total; i++)
    {
       ulong ticket = HistoryDealGetTicket(i);
@@ -192,7 +191,6 @@ bool PublishAccount()
       return false;
    }
 
-   g_last_sync = TimeCurrent();
    Print("MacroLync account snapshot and deal history synchronized. No trading action was performed.");
    return true;
 }
