@@ -15,7 +15,7 @@ export default function FundamentalWorkbenchPage() {
         <span><span className="macro-pulse" /> MACRO REGIME WORKBENCH / VALIDATION GOVERNANCE</span>
         <span className="macro-status-right">
           <Link href="/" className="macro-refresh">← RETURN TO TERMINAL</Link>
-          <Link href="/notebook" className="macro-refresh">OPEN TRADE JOURNAL →</Link>
+          <Link href="/accounts" className="macro-refresh">PORTFOLIO &amp; ACCOUNTS →</Link>
         </span>
       </div>
       <section className="macro-intro" aria-labelledby="workbench-title">
