@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     if (keys.length) {
       const { data, error } = await supabase.from('macrolinc_account_deals')
         .select('account_key,deal_ticket,order_ticket,position_id,symbol,side,entry_type,volume,price,profit,commission,swap,fee,deal_time_server,magic,comment')
-        .in('account_key', keys).order('deal_time_utc', { ascending: false }).limit(500);
+        .in('account_key', keys).order('deal_time_server', { ascending: false }).limit(500);
       if (error) throw error;
       deals = (data ?? []) as Record<string, unknown>[];
     }
