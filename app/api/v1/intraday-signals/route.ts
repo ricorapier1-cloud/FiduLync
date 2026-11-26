@@ -4,6 +4,7 @@ import { buildGoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
 import { G8_PAIRS, generatePairDossier } from '@/lib/macro/dossierEngine';
 import { buildIntradaySignal, classifyWATSession, type IntradaySignal } from '@/lib/quant/intradaySignalEngine';
 import type { OhlcvBar } from '@/lib/quant/technicalConfluence';
+import { recordAndEvaluateSpreadBaseline } from '@/lib/quant/spreadBaseline';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -11,6 +12,12 @@ export const dynamic = 'force-dynamic';
 
 type CandlePayload = { status: string; intradayBars: OhlcvBar[]; dailyBars: OhlcvBar[]; latestBarUtc: string | null };
 type QuotePayload = { quotes?: Array<{ symbol: string; bid: number | null; ask: number | null; mid: number | null; spread: number | null; quoteTimeUtc: string | null; freshness: string }> };
+
+function watDate(date: Date): string {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date);
+  const part = (type: string) => parts.find((item) => item.type === type)?.value ?? '00';
+  return part('year') + '-' + part('month') + '-' + part('day');
+}
 
 function freshCot(snapshot: Awaited<ReturnType<typeof getMacroSnapshot>>, currency: string): number | null {
   const item = snapshot.cot.find((row) => row.market === currency || (currency === 'XAU' && row.market === 'GOLD'));
@@ -54,6 +61,7 @@ export async function GET(request: Request) {
       }).catch(() => null);
       const candles = candleResponse?.ok ? await candleResponse.json() as CandlePayload : null;
       const quote = quotes.find((item) => item.symbol === symbol);
+      const baseline = await recordAndEvaluateSpreadBaseline(symbol, quote?.spread ?? null, session, watDate(now));
       const isGold = symbol === 'XAUUSD';
       const dossier = isGold ? null : generatePairDossier(snapshot, symbol);
       const macroScore = isGold ? gold.goldBiasScore : dossier?.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier?.biasScore ?? null;
@@ -67,9 +75,7 @@ export async function GET(request: Request) {
         calendarVerified,
         eventMinutesAway: nearest?.minutes ?? null,
         rateDecision,
-        // Swissquote exposes current BBO only. No measured session spread distribution exists yet.
-        // Missing baseline is a hard block; a fabricated normal spread is never substituted.
-        spreadMultipleOfBaseline: null,
+        spreadMultipleOfBaseline: baseline.multiple,
         session,
         nowUtc: now.toISOString(),
       });
