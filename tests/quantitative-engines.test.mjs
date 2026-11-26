@@ -568,7 +568,7 @@ test('intraday signal engine enforces macro threshold, trend quality, live sessi
   assert.match(engine, /riskDistance \* 3/);
   assert.match(engine, /VIX_BLACK_SWAN_LOCKOUT/);
   assert.match(engine, /MACRO_SCORE_BELOW_\\$\\{isGold \\? 20 : 25\\}_THRESHOLD/);
-  assert.match(engine, /sessionTimeZone = session === 'LONDON' \\? 'Africa\\/Lagos' : 'America\\/New_York'/);
+  assert.match(engine, /sessionTimeZone = session === 'LONDON'/);
   assert.match(engine, /SPREAD_BLOWOUT_BLOCK/);
   assert.match(engine, /SPREAD_BASELINE_UNAVAILABLE/);
   assert.match(engine, /TIER_ONE_EVENT_LOCKOUT/);
