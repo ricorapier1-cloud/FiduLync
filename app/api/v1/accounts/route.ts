@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     const keys = (accounts ?? []).map((item) => item.account_key);
     let deals: Record<string, unknown>[] = [];
     if (keys.length) {
-      const { data, error } = await supabase.from('mt5_account_deals')
+      const { data, error } = await supabase.from('macrolinc_account_deals')
         .select('account_key,deal_ticket,order_ticket,position_id,symbol,side,entry_type,volume,price,profit,commission,swap,fee,deal_time_server,magic,comment')
         .in('account_key', keys).order('deal_time_utc', { ascending: false }).limit(500);
       if (error) throw error;
