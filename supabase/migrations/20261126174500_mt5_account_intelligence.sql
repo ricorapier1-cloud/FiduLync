@@ -20,7 +20,7 @@ create table if not exists public.macrolinc_account_snapshots (
 create index if not exists macrolinc_account_snapshots_received_idx
   on public.macrolinc_account_snapshots (received_at desc);
 
-create table if not exists public.mt5_account_deals (
+create table if not exists public.macrolinc_account_deals (
   account_key text not null references public.macrolinc_account_snapshots(account_key) on delete cascade,
   deal_ticket text not null,
   order_ticket text,
@@ -41,12 +41,12 @@ create table if not exists public.mt5_account_deals (
   primary key (account_key, deal_ticket)
 );
 
-create index if not exists mt5_account_deals_history_idx
-  on public.mt5_account_deals (account_key, deal_time_server desc);
+create index if not exists macrolinc_account_deals_history_idx
+  on public.macrolinc_account_deals (account_key, deal_time_server desc);
 
 alter table public.macrolinc_account_snapshots enable row level security;
-alter table public.mt5_account_deals enable row level security;
+alter table public.macrolinc_account_deals enable row level security;
 revoke all on public.macrolinc_account_snapshots from anon, authenticated;
-revoke all on public.mt5_account_deals from anon, authenticated;
+revoke all on public.macrolinc_account_deals from anon, authenticated;
 grant all on public.macrolinc_account_snapshots to service_role;
-grant all on public.mt5_account_deals to service_role;
+grant all on public.macrolinc_account_deals to service_role;
