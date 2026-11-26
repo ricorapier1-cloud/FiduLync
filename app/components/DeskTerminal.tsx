@@ -5,6 +5,7 @@ import type { MacroSnapshot } from '@/types/macro';
 import type { GoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
 import { getCurrencyStrengthIndex } from '@/lib/currencyStrength';
 import { generatePairDossier } from '@/lib/macro/dossierEngine';
+import type { IntradaySignal } from '@/lib/quant/intradaySignalEngine';
 
 type Quote = {
   symbol: string; bid: number | null; ask: number | null; mid: number | null;
@@ -59,8 +60,41 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const [journalSymbol, setJournalSymbol] = useState<SymbolCode>('EURUSD');
   const [ready, setReady] = useState(false);
   const [forceSyncing, setForceSyncing] = useState(false);
+  const [intradaySignals, setIntradaySignals] = useState<IntradaySignal[]>([]);
+  const [signalSyncUtc, setSignalSyncUtc] = useState<string | null>(null);
 
   const quoteFor = useCallback((symbol: string) => quotes.find((q) => q.symbol === symbol) ?? null, [quotes]);
+  const refreshIntradaySignals = useCallback(async () => {
+    try {
+      const response = await fetch('/api/v1/intraday-signals', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Intraday signal feed unavailable');
+      const payload = await response.json() as { signals?: IntradaySignal[]; generatedAtUtc?: string };
+      setIntradaySignals(Array.isArray(payload.signals) ? payload.signals : []);
+      setSignalSyncUtc(payload.generatedAtUtc ?? new Date().toISOString());
+    } catch {
+      setIntradaySignals([]);
+      setSignalSyncUtc(null);
+    }
+  }, []);
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const response = await fetch('/api/v1/intraday-signals', { cache: 'no-store' });
+        if (!response.ok) throw new Error('Intraday signal feed unavailable');
+        const payload = await response.json() as { signals?: IntradaySignal[]; generatedAtUtc?: string };
+        if (active) {
+          setIntradaySignals(Array.isArray(payload.signals) ? payload.signals : []);
+          setSignalSyncUtc(payload.generatedAtUtc ?? new Date().toISOString());
+        }
+      } catch {
+        if (active) { setIntradaySignals([]); setSignalSyncUtc(null); }
+      }
+    };
+    void load();
+    const timer = window.setInterval(() => void load(), 60_000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, []);
   const quote = quoteFor(selected);
   const usdJpy = quoteFor('USDJPY')?.mid ?? null;
   const risk = Number(riskPct);
@@ -308,6 +342,39 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
       return <article className="desk-quote-card" key={symbol}><span>{symbol === satelliteSymbol ? 'SATELLITE #1 · ' + symbol : symbol === 'EURUSD' ? 'CORE #1 · EURUSD' : symbol === 'XAUUSD' ? 'CORE #2 · XAUUSD' : 'CORE #3 · USDJPY'}</span><strong>{display(item?.mid, digits)}</strong><small>{item?.freshness ?? 'PENDING'} · {item?.latencyMs ?? '—'} ms · {activeSession}</small><div><span>BID {display(item?.bid, digits)}</span><span>ASK {display(item?.ask, digits)}</span></div><small>SPREAD {display(item?.spread, symbol === 'XAUUSD' ? 2 : 6)} · {item?.quoteTimeUtc ?? 'NO QUOTE'}</small></article>;
     })}</div>
     <div className="desk-syncline"><span>Swissquote public BBO · {latency ?? '—'} ms</span><span>Retrieved {quoteSync ?? '—'}</span><span>Frankfurter {fxStatus} · {fxSync ?? '—'}</span></div>
+    <article className="desk-panel mt-3" aria-label="Live execution signals">
+      <header><div><span className="desk-kicker">LIVE EXECUTION SIGNALS</span><h3>Macro-Aligned Intraday Setups</h3></div><small>5M PRICE ACTION · 1D ATR · AUTO REFRESH 60S</small></header>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+        {intradaySignals.map((signal) => {
+          const active = signal.signalState === 'ACTIVE_SETUP';
+          const rr = signal.slPips && signal.entryPrice !== null && signal.takeProfit1 !== null
+            ? Math.abs(signal.takeProfit1 - signal.entryPrice) / (signal.slPips * (signal.atrUnit === 'USD' ? 1 : signal.symbol.endsWith('JPY') ? 0.01 : 0.0001))
+            : 0;
+          const statusClass = active ? 'desk-good' : signal.signalState === 'SHIELD_BLOCKED' ? 'desk-warning' : 'text-slate-400';
+          const canLoad = active && signal.entryPrice !== null && signal.slPips !== null && signal.slPips > 0;
+          return <div className="rounded border border-white/10 bg-[#0b1017] p-3 min-w-0" key={signal.symbol}>
+            <div className="flex items-center justify-between gap-2"><strong className="font-mono text-xs">{signal.symbol}</strong><span className={statusClass + ' text-[10px] font-mono'}>{signal.signalState.replaceAll('_', ' ')}</span></div>
+            <div className="mt-3 flex items-baseline justify-between"><b className="text-lg font-mono">{signal.direction}</b><span className="text-xs font-mono">{signal.confluenceScore}% confluence</span></div>
+            <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] font-mono text-slate-400">
+              <span>ENTRY <b className="block text-slate-100">{display(signal.entryPrice, signal.symbol === 'XAUUSD' ? 2 : signal.symbol.endsWith('JPY') ? 3 : 5)}</b></span>
+              <span>STOP <b className="block text-slate-100">{display(signal.stopLoss, signal.symbol === 'XAUUSD' ? 2 : signal.symbol.endsWith('JPY') ? 3 : 5)}</b></span>
+              <span>TP1 <b className="block text-slate-100">{display(signal.takeProfit1, signal.symbol === 'XAUUSD' ? 2 : signal.symbol.endsWith('JPY') ? 3 : 5)}</b></span>
+              <span>TP2 <b className="block text-slate-100">{display(signal.takeProfit2, signal.symbol === 'XAUUSD' ? 2 : signal.symbol.endsWith('JPY') ? 3 : 5)}</b></span>
+            </div>
+            <p className="mt-2 text-[10px] leading-relaxed text-slate-400">{signal.triggerRationale}</p>
+            {signal.blockers.length > 0 && <p className="mt-2 text-[10px] text-amber-300">{signal.blockers.join(' · ')}</p>}
+            <button type="button" className="desk-record-button mt-3 w-full" disabled={!canLoad} onClick={() => {
+              setSelected(signal.symbol); setJournalSymbol(signal.symbol); setDirection(signal.direction as Direction);
+              setSl(String(signal.slPips)); setTp(String(signal.slPips! * 2));
+              document.getElementById('desk-position-sizing')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }}>LOAD INTO CALCULATOR</button>
+            {signal.dataAsOfUtc && <small className="mt-2 block text-[9px] text-slate-500">OHLCV {signal.dataAsOfUtc} · {signal.session}</small>}
+          </div>;
+        })}
+        {intradaySignals.length === 0 && <p className="macro-empty col-span-full">Signal service unavailable. No executable levels are published without verified inputs.</p>}
+      </div>
+      <div className="desk-syncline"><span>Signal refresh {signalSyncUtc ?? 'NOT AVAILABLE'}</span><span>Macro score ≥ +25 BUY / ≤ −25 SELL</span><span>Signals are research-only; MT5 must independently validate spread and execution</span><button type="button" onClick={() => void refreshIntradaySignals()}>REFRESH SIGNALS</button></div>
+    </article>
     <div className="desk-workflow"><strong>DESK WORKFLOW</strong><span>1 Macro Bias</span><b>→</b><span>2 Position Sizing</span><b>→</b><span>3 6/6 Gate</span><b>→</b><span>4 MT5 Execution</span><b>→</b><span>5 Trade Journal</span></div>
     <div className="desk-grid">
       <article className="desk-panel"><header><div><span className="desk-kicker">A / UNIFIED CURRENCY MATRIX</span><h3>Spot Momentum vs Fundamental Rate Strength</h3></div><small>20-DAY REFERENCE · LIVE MACRO</small></header>
@@ -321,7 +388,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
         </tbody></table></div>
         <p className="desk-footnote">Spot momentum is calculated from the latest 20 available Frankfurter business-day reference observations, not executable intraday quotes. Fundamental strength uses fresh provider policy and inflation observations. Divergence flags a disagreement between price trend and rate fundamentals; neither is an entry signal.</p>
       </article>
-      <article className="desk-panel"><header><div><span className="desk-kicker">B / LIVE RISK CALCULATOR</span><h3>Position Sizing</h3></div><small>USD ACCOUNT · STANDARD LOT ESTIMATE</small></header>
+      <article id="desk-position-sizing" className="desk-panel scroll-mt-24"><header><div><span className="desk-kicker">B / LIVE RISK CALCULATOR</span><h3>Position Sizing</h3></div><small>USD ACCOUNT · STANDARD LOT ESTIMATE</small></header>
         <div className="desk-form-grid">
           <label>Account balance USD<input inputMode="decimal" value={balance} onChange={(e) => setBalance(e.target.value)} /></label>
           <label>Risk %<input inputMode="decimal" value={riskPct} onChange={(e) => setRiskPct(e.target.value)} /></label>
