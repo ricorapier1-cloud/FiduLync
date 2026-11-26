@@ -1,4 +1,4 @@
-export type SovereignShieldStatus = 'NORMAL' | 'ELEVATED_VOLATILITY' | 'BLACK_SWAN_LOCKOUT' | 'DATA_UNAVAILABLE';
+export type SovereignShieldStatus = 'NORMAL' | 'ELEVATED_VOLATILITY_HALF_RISK' | 'BLACK_SWAN_LOCKOUT' | 'DATA_UNAVAILABLE';
 export type GovernanceState = {
   tradesToday: number | null;
   lossesToday: number | null;
@@ -33,8 +33,8 @@ export function evaluateSovereignShield(input: SovereignShieldInput): SovereignS
   const elevated = !volatilityLock && vixAvailable && vix >= 22;
   const status: SovereignShieldStatus = volatilityLock ? 'BLACK_SWAN_LOCKOUT'
     : !vixAvailable ? 'DATA_UNAVAILABLE'
-      : elevated ? 'ELEVATED_VOLATILITY' : 'NORMAL';
-  let maxAllowedRiskPct = status === 'BLACK_SWAN_LOCKOUT' || status === 'DATA_UNAVAILABLE' ? 0 : status === 'ELEVATED_VOLATILITY' ? 0.5 : 1;
+      : elevated ? 'ELEVATED_VOLATILITY_HALF_RISK' : 'NORMAL';
+  let maxAllowedRiskPct = status === 'BLACK_SWAN_LOCKOUT' || status === 'DATA_UNAVAILABLE' ? 0 : status === 'ELEVATED_VOLATILITY_HALF_RISK' ? 0.5 : 1;
 
   if (!vixAvailable) reasons.push('VIX_UNAVAILABLE');
   if (volatilityLock) reasons.push('BLACK_SWAN_VOLATILITY_LOCKOUT');
