@@ -342,7 +342,7 @@ test('keyed providers remain approval-gated while the public economic calendar w
   assert.match(macroData, /getFairEconomyCatalysts\(\),/);
   assert.doesNotMatch(macroData, /FAIRECONOMY_COMMERCIAL_USE_APPROVED === 'true' \? getFairEconomyCatalysts/);
   assert.match(marketFeeds, /FINNHUB_PERSONAL_PLAN_ACTIVE === 'true' \? process\.env\.FINNHUB_API_KEY/);
-  assert.match(goldEngine, /FRED_DATA_STORAGE_PERMISSION_APPROVED !== 'false'/);
+  assert.match(goldEngine, /FRED_DATA_STORAGE_PERMISSION_APPROVED\?\.trim\(\)\.toLowerCase\(\) !== 'false'/);
 });
 
 test('Swissquote BBO timestamp parsing accepts parent-level item timestamps and numeric Unix timestamps', () => {
