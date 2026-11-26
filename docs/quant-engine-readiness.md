@@ -2,7 +2,7 @@
 
 ## Product boundary
 
-FiduLync is a sourced macro-fundamental research terminal and read-only context service. It does not execute trades, manage broker accounts, ingest MT5 candles, provide chart indicators, or replace an EA's risk controls.
+FiduLync is a sourced macro-fundamental research terminal with an optional private, read-only portfolio telemetry module. It does not execute trades, manage broker accounts, ingest MT5 candles, provide chart indicators, or replace an EA's risk controls. The portfolio module receives account snapshots, open positions and broker deal history solely for account analytics.
 
 The connected MT5 EA remains responsible for:
 - Broker-native bid/ask and executable prices.
@@ -11,7 +11,7 @@ The connected MT5 EA remains responsible for:
 - Position sizing, exposure, margin, stop-loss, take-profit and order management.
 - Daily loss limits, equity protection, drawdown controls and emergency shutdown.
 
-FiduLync supplies macro context only. An EA must never treat a macro bias as an entry instruction.
+FiduLync supplies macro context and read-only account telemetry only. Account analytics never authorize an order. An EA must never treat a macro bias as an entry instruction.
 
 ## Read-only MT5 bridge
 
@@ -24,7 +24,7 @@ FiduLync supplies macro context only. An EA must never treat a macro bias as an 
 
 No browser login, owner console, customer account, licensing, or publisher registration is required.
 
-## Research and validation principles
+## Private portfolio telemetry boundary\n\n- MT5 account data is pushed by a separate read-only publisher to `POST /api/v1/account-sync` using `MT5_ACCOUNT_INGEST_TOKEN`.\n- The dashboard reads `GET /api/v1/accounts` using a different `MT5_ACCOUNT_READ_TOKEN`; both credentials are server-side secrets and are never sent in URLs.\n- Account and deal tables are RLS-enabled, have no browser-role policies or grants, and are accessed only by server routes using the Supabase service role after token validation.\n- The publisher does not collect broker passwords and contains no trade execution functions. Deal timestamps remain broker-server time unless a verified historical UTC offset is available.\n- The initial publisher synchronizes at most 500 recent deal records per cycle. Partial history must be disclosed; incomplete position groups are excluded from trade-level performance metrics.\n\n## Research and validation principles
 
 - No simulated or fabricated market observations.
 - Display source, observation timestamp, retrieval timestamp, freshness and latency.
