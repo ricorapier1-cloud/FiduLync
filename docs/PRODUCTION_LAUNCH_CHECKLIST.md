@@ -6,7 +6,7 @@ This runbook describes the private MacroLync research terminal. It is not a stor
 
 - MacroLync researches macroeconomic releases, policy rates, inflation, growth, labour, yields, CFTC positioning, approved economic events and cross-asset regimes.
 - Connected MT5 EAs own technical analysis, entry/exit logic, broker orders, position sizing, stops, targets and account-level risk enforcement.
-- The web application does not execute orders, issue licenses, provision customer accounts, collect payments, send EA heartbeats or ingest closed-trade telemetry.
+- The web application does not execute orders, issue licenses, provision customer accounts, collect payments or send EA heartbeats. Its optional private Portfolio & Accounts module ingests read-only account snapshots and deal history only.
 - No owner console, login portal, customer store, subscription or billing flow is part of the product.
 - No data may be labelled live unless provider observation and freshness checks pass. Official macro releases are published at their own cadence; they are not intraday streams.
 
@@ -20,7 +20,7 @@ Configure these in Vercel → Project → Settings → Environment Variables. Ne
 | SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY | Server-only database persistence and rate limiting |
 | CRON_SECRET | Authenticates /api/cron/sync-macro |
 | NEXT_PUBLIC_APP_URL | Canonical app origin, https://fidulync.vercel.app |
-| MACRO_API_TOKEN | Dedicated read-only EA context credential; unique random value of at least 32 characters |
+| MACRO_API_TOKEN | Dedicated read-only EA macro-context credential; 32+ characters |\n| MT5_ACCOUNT_INGEST_TOKEN | Private MT5 publisher write-only ingestion credential; 32+ characters |\n| MT5_ACCOUNT_READ_TOKEN | Private Portfolio & Accounts read credential; separate 32+ character secret |
 | EIA_API_KEY | EIA daily WTI/Brent observations |
 | BEA_API_KEY | Optional BEA macro series |
 | BLS_API_KEY | Optional BLS API v2 registration key; public v1 fallback is supported |
@@ -52,6 +52,17 @@ The service API also accepts MACROLYNC_API_SECRET or the legacy ALGO_PRIVATE_API
 5. Call MacroLyncGetMacroContext(symbol, context) and treat INSUFFICIENT_EVIDENCE, unverified calendar and news_lockout=true as abstain conditions.
 6. Keep technical analysis, entries/exits, broker orders, stops, sizing and risk controls inside the EA. The compatibility MacroLyncGetSignal wrapper always sets safe_to_trade=false; it never authorizes a trade.
 7. Compile in MetaEditor, resolve every compiler warning/error and validate the authenticated HTTP 200 response on a demo account before connecting a live EA.
+
+## Private MT5 account connector
+
+1. Apply migration `20261126174500_mt5_account_intelligence.sql` to the connected Supabase project.
+2. Set separate random `MT5_ACCOUNT_INGEST_TOKEN` and `MT5_ACCOUNT_READ_TOKEN` values in Vercel Production (32+ characters each). Redeploy after setting them.
+3. In MT5, allow `https://fidulync.vercel.app` in Tools → Options → Expert Advisors → Allow WebRequest.
+4. Install `public/MacroLyncAccountPublisher.mq5` under MQL5/Experts, compile in MetaEditor, attach it to a chart, and set `InpAccountIngestToken` to the ingest token.
+5. Open `/accounts`, enter the read token, and verify that account observation time, positions and deal history update.
+6. Verify the account mode, deposit currency, broker server and P&L against the MT5 terminal before relying on analytics.
+
+The publisher is read-only and has no order execution functions. It sends the most recent configured history window, capped at 500 deal records per synchronization. Deal times are explicitly broker-server times; only the observation timestamp is UTC. Revoke the relevant Vercel token to disable ingestion or dashboard reads.
 
 ## Release gates
 
