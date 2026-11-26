@@ -85,8 +85,9 @@ export default function AccountsPage() {
       groups.set(deal.position_id, current);
     });
     return [...groups.entries()].flatMap(([positionId, items]) => {
-      if (openIds.has(positionId) || !items.some(closesPosition)) return [];
-      const entry = items.find((deal) => deal.entry_type === 'IN' && (deal.side === 'BUY' || deal.side === 'SELL')) ?? items[0];
+      if (openIds.has(positionId) || !items.some((deal) => deal.entry_type === 'IN') || !items.some(closesPosition)) return [];
+      const entry = items.find((deal) => deal.entry_type === 'IN' && (deal.side === 'BUY' || deal.side === 'SELL'));
+      if (!entry) return [];
       const exit = items.filter(closesPosition).sort((left, right) => right.deal_time_server.localeCompare(left.deal_time_server))[0];
       if (!exit) return [];
       return [{
@@ -142,7 +143,7 @@ export default function AccountsPage() {
         <div>
           <span className="eyebrow">ACCOUNT &amp; PERFORMANCE INTELLIGENCE</span>
           <h1 id="accounts-title">Portfolio &amp; Accounts.<br /><span>Broker evidence, not manual entries.</span></h1>
-          <p>Connect an MT5 terminal publisher to review account equity, open exposure and verified closed-deal history alongside your macro research.</p>
+          <p>Connect an MT5 terminal publisher to review account equity, open exposure and broker-reported closed-trade history alongside your macro research.</p>
         </div>
         <div className="macro-intro-meta mono">
           <span>CONNECTION STATUS</span>
