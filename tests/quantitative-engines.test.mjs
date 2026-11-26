@@ -693,3 +693,13 @@ test('spread blowout protection uses a disclosed configured reference until a me
   assert.match(desk, /goldResult\\.value\\.ok/);
   assert.match(desk, /activeSatelliteSymbol/);
 });
+
+
+test('all distributable MacroLync MT5 bridge copies share one authenticated read-only contract', () => {
+  const canonicalBridge = read('../public/MacroLyncBridge.mqh');
+  assert.equal(read('../mql5/MacroLyncBridge.mqh'), canonicalBridge);
+  assert.equal(read('../public/mql5/MacroLyncBridge.mqh'), canonicalBridge);
+  assert.match(canonicalBridge, /x-macro-key/);
+  assert.match(canonicalBridge, /safe_to_trade = false/);
+  assert.doesNotMatch(canonicalBridge, /OrderSend|PositionModify|PositionClose/);
+});

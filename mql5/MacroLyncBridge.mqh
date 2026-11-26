@@ -22,6 +22,14 @@ struct MacroLyncMacroContext
    string confidence;
    int    bias_score;
    bool   has_bias_score;
+   string directional_verdict;
+   bool   allowed_to_trade;
+   bool   news_lockout_active;
+   string active_session;
+   string macro_risk_regime;
+   string sovereign_shield_status;
+   double sovereign_max_risk_pct;
+   bool   sovereign_shield_blocked;
    bool   calendar_verified;
    string event_risk_status;
    bool   news_lockout;
@@ -32,6 +40,9 @@ struct MacroLyncMacroContext
    string cot_source;
    string as_of_utc;
    string disclaimer;
+   string intraday_signal_state;
+   string intraday_signal_direction;
+   double recommended_sl;
 };
 
 // Compatibility structure for existing EAs. The bridge deliberately never
@@ -51,11 +62,15 @@ struct MacroLyncSignal
    double atr_sl_pips;
    double atr_tp_pips;
    bool   news_lockout;
+   bool   macro_allowed_to_trade;
    bool   safe_to_trade;
    string timestamp_utc;
    string decision_status;
    string confidence;
    bool   calendar_verified;
+   string intraday_signal_state;
+   string intraday_signal_direction;
+   double recommended_sl;
 };
 
 string ML_JsonString(const string json, const string key)
@@ -137,6 +152,14 @@ bool ML_FetchMacroContext(const string symbol, const string endpoint, const stri
    context.confidence = "INSUFFICIENT_EVIDENCE";
    context.bias_score = 0;
    context.has_bias_score = false;
+   context.directional_verdict = "INSUFFICIENT_EVIDENCE";
+   context.allowed_to_trade = false;
+   context.news_lockout_active = true;
+   context.active_session = "CLOSED";
+   context.macro_risk_regime = "INSUFFICIENT_EVIDENCE";
+   context.sovereign_shield_status = "UNVERIFIED";
+   context.sovereign_max_risk_pct = 0.0;
+   context.sovereign_shield_blocked = true;
    context.calendar_verified = false;
    context.event_risk_status = "UNVERIFIED_CALENDAR";
    context.news_lockout = true;
@@ -147,6 +170,9 @@ bool ML_FetchMacroContext(const string symbol, const string endpoint, const stri
    context.cot_source = "unavailable";
    context.as_of_utc = "";
    context.disclaimer = "Read-only macroeconomic intelligence. No technical analysis or broker order execution.";
+   context.intraday_signal_state = "WAIT_NO_SETUP";
+   context.intraday_signal_direction = "NONE";
+   context.recommended_sl = 0.0;
 
    string root = ML_BaseUrl(endpoint);
    if(StringFind(root, "/api/v1/macro-context") < 0) root += "/api/v1/macro-context";
@@ -180,7 +206,15 @@ bool ML_FetchMacroContext(const string symbol, const string endpoint, const stri
    string regime = ML_JsonString(response, "macro_regime");
    string decision = ML_JsonString(response, "decision_status");
    string confidence = ML_JsonString(response, "confidence");
-   string score = ML_JsonScalar(response, "bias_score");
+   string score = ML_JsonScalar(response, "biasScore");
+   if(score == "") score = ML_JsonScalar(response, "bias_score");
+   string directional = ML_JsonString(response, "directionalVerdict");
+   string allowed = ML_JsonScalar(response, "allowedToTrade");
+   string news_active = ML_JsonScalar(response, "newsLockoutActive");
+   string active_session = ML_JsonString(response, "activeSession");
+   string macro_risk_regime = ML_JsonString(response, "macroRiskRegime");
+   string shield_status = ML_JsonString(response, "status");
+   string shield_max_risk = ML_JsonScalar(response, "maxAllowedRiskPct");
    string calendar = ML_JsonScalar(response, "calendar_verified");
    string news = ML_JsonScalar(response, "news_lockout");
    string event_status = ML_JsonString(response, "event_risk_status");
@@ -194,6 +228,11 @@ bool ML_FetchMacroContext(const string symbol, const string endpoint, const stri
       || (confidence != "HIGH" && confidence != "MODERATE" && confidence != "LOW" && confidence != "INSUFFICIENT_EVIDENCE")
       || (calendar != "true" && calendar != "false")
       || (news != "true" && news != "false")
+      || (allowed != "true" && allowed != "false")
+      || (news_active != "true" && news_active != "false")
+      || (active_session != "LONDON" && active_session != "NY" && active_session != "CLOSED")
+      || (directional != "BULLISH" && directional != "BEARISH" && directional != "NEUTRAL" && directional != "INSUFFICIENT_EVIDENCE")
+      || macro_risk_regime == ""
       || (event_status != "PROVIDER_CALENDAR" && event_status != "UNVERIFIED_CALENDAR")
       || (source_mode != "fallback" && source_mode != "provider" && source_mode != "partial")
       || (calendar_source != "unavailable" && calendar_source != "reference" && calendar_source != "provider")
@@ -211,9 +250,18 @@ bool ML_FetchMacroContext(const string symbol, const string endpoint, const stri
    context.has_bias_score = score != "" && score != "null";
    context.bias_score = context.has_bias_score ? (int)StringToInteger(score) : 0;
    if(context.has_bias_score && (context.bias_score < -100 || context.bias_score > 100)) return false;
+   context.directional_verdict = directional;
+   context.news_lockout_active = news_active == "true";
+   context.active_session = active_session;
+   context.macro_risk_regime = macro_risk_regime;
    context.calendar_verified = calendar == "true";
    context.event_risk_status = event_status;
-   context.news_lockout = news == "true" || !context.calendar_verified || decision == "INSUFFICIENT_EVIDENCE";
+   context.news_lockout = context.news_lockout_active || news == "true" || !context.calendar_verified || decision == "INSUFFICIENT_EVIDENCE";
+   context.allowed_to_trade = allowed == "true" && !context.news_lockout;
+   context.sovereign_shield_status = shield_status == "" ? "UNVERIFIED" : shield_status;
+   context.sovereign_max_risk_pct = StringToDouble(shield_max_risk);
+   context.sovereign_shield_blocked = shield_status == "BLACK_SWAN_LOCKOUT" || shield_max_risk == "" || context.sovereign_max_risk_pct <= 0.0;
+   if(context.sovereign_shield_blocked) context.allowed_to_trade = false;
    context.next_catalyst_title = ML_JsonString(response, "title");
    context.next_catalyst_utc = ML_JsonString(response, "scheduled_at_utc");
    context.source_mode = source_mode;
@@ -221,6 +269,24 @@ bool ML_FetchMacroContext(const string symbol, const string endpoint, const stri
    context.cot_source = cot_source;
    context.as_of_utc = as_of;
    context.disclaimer = ML_JsonString(response, "disclaimer");
+   // Locate the selected symbol only inside the structured signals array.
+   int signals_position = StringFind(response, "\"signals\"");
+   if(signals_position >= 0)
+   {
+      string signals_json = StringSubstr(response, signals_position);
+      string signal_symbol_needle = "\"symbol\":\"" + normalized_symbol + "\"";
+      int selected_signal_position = StringFind(signals_json, signal_symbol_needle);
+      if(selected_signal_position >= 0)
+      {
+         string selected_signal_json = StringSubstr(signals_json, selected_signal_position);
+         context.intraday_signal_state = ML_JsonString(selected_signal_json, "signalState");
+         context.intraday_signal_direction = ML_JsonString(selected_signal_json, "direction");
+         string selected_sl = ML_JsonScalar(selected_signal_json, "stopLoss");
+         context.recommended_sl = selected_sl == "" || selected_sl == "null" ? 0.0 : StringToDouble(selected_sl);
+      }
+   }
+   if(context.intraday_signal_state == "") context.intraday_signal_state = "WAIT_NO_SETUP";
+   if(context.intraday_signal_direction == "") context.intraday_signal_direction = "NONE";
    return true;
 }
 
@@ -245,15 +311,19 @@ bool MacroLyncGetSignal(const string symbol, const string endpoint, const string
       signal.atr_sl_pips = 0.0;
       signal.atr_tp_pips = 0.0;
       signal.news_lockout = true;
+      signal.macro_allowed_to_trade = false;
       signal.safe_to_trade = false;
+      signal.intraday_signal_state = "WAIT_NO_SETUP";
+      signal.intraday_signal_direction = "NONE";
+      signal.recommended_sl = 0.0;
       return false;
    }
    signal.symbol = context.symbol;
    signal.bias = context.fundamental_bias;
    signal.regime = context.macro_regime;
-   signal.session = "NOT_PROVIDED";
+   signal.session = context.active_session;
    signal.correlation_group = "NOT_PROVIDED";
-   signal.roro_regime = context.macro_regime;
+   signal.roro_regime = context.macro_risk_regime;
    signal.confluence_score = context.has_bias_score ? context.bias_score : 0;
    signal.csi_spread = 0.0;
    signal.killzone_active = "NOT_PROVIDED";
@@ -261,12 +331,32 @@ bool MacroLyncGetSignal(const string symbol, const string endpoint, const string
    signal.atr_sl_pips = 0.0;
    signal.atr_tp_pips = 0.0;
    signal.news_lockout = context.news_lockout;
+   signal.macro_allowed_to_trade = context.allowed_to_trade;
    signal.safe_to_trade = false;
    signal.timestamp_utc = context.as_of_utc;
    signal.decision_status = context.decision_status;
    signal.confidence = context.confidence;
    signal.calendar_verified = context.calendar_verified;
+   signal.intraday_signal_state = context.intraday_signal_state;
+   signal.intraday_signal_direction = context.intraday_signal_direction;
+   signal.recommended_sl = context.recommended_sl;
    return true;
+}
+
+
+string GetSignalState(const MacroLyncSignal &signal)
+{
+   return signal.intraday_signal_state;
+}
+
+string GetSignalDirection(const MacroLyncSignal &signal)
+{
+   return signal.intraday_signal_direction;
+}
+
+double GetRecommendedSL(const MacroLyncSignal &signal)
+{
+   return signal.recommended_sl;
 }
 
 bool CheckRolloverWindow()
