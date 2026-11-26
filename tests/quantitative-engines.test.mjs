@@ -523,10 +523,9 @@ test('public FairEconomy calendar is represented as healthy telemetry without Fi
   assert.doesNotMatch(telemetry, /const calendar = finnhubKeyPresent && !finnhubPlanActive/);
 });
 
-test('trade journal offers JSON and CSV exports and desk sections use non-colliding letter labels', () => {
+test('manual journal and calculator workflows are retired while the macro currency matrix remains', () => {
   const desk = read('../app/components/DeskTerminal.tsx');
-  assert.match(desk, /exportJournal\('json'\)/);
-  assert.match(desk, /exportJournal\('csv'\)/);
+  assert.doesNotMatch(desk, /exportJournal|calculatorInputsValid|LIVE RISK CALCULATOR|desk-position-sizing/);
   assert.match(desk, /A \/ UNIFIED CURRENCY MATRIX/);
   const diagnostics = read('../app/components/EABridgeDiagnostics.tsx');
   assert.match(diagnostics, /ZONE 4/);
