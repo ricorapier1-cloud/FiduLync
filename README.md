@@ -93,6 +93,8 @@ Configure secrets only in the Vercel project environment settings, never in this
 | `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` | Server-only database persistence |
 | `CRON_SECRET` | Authenticates scheduled macro refresh |
 | `MACRO_API_TOKEN` | Dedicated read-only EA macro-context service token (32+ characters) |
+| `MT5_ACCOUNT_INGEST_TOKEN` | Private MT5 publisher write-only ingestion token (32+ characters) |
+| `MT5_ACCOUNT_READ_TOKEN` | Separate private Portfolio & Accounts read token (32+ characters) |
 | `EIA_API_KEY` | Optional EIA energy data key for WTI/Brent daily observations |
 | `BLS_API_KEY` | Optional BLS API v2 registration key; public v1 fallback works without a key |
 | `BEA_API_KEY` | Optional BEA API key |
