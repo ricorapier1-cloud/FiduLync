@@ -92,7 +92,9 @@ export async function GET(request: Request) {
     ? { symbol: satellite, path: satellite.slice(0, 3) + '/' + satellite.slice(3, 6) }
     : null;
   const requestedInstruments = [...instruments, ...(satelliteInstrument ? [satelliteInstrument] : [])];
-  const cachedQuotes = await getCachedData('macro:swissquote-bbo-v1' + ':' + (satelliteInstrument?.symbol ?? 'core'), () => Promise.all(requestedInstruments.map(fetchQuote)), 5);
+  const cachedQuotes = await Promise.all(requestedInstruments.map((instrument) =>
+    getCachedData('macro:swissquote-bbo-v1:' + instrument.symbol, () => fetchQuote(instrument), 5),
+  ));
   const quotes = cachedQuotes.map((quote) => {
     const ageMs = quote.quoteTimeUtc ? Math.max(0, Date.now() - Date.parse(quote.quoteTimeUtc)) : null;
     const freshness = ageMs === null ? 'UNAVAILABLE' as const : ageMs > 60_000 ? 'STALE' as const : 'LIVE' as const;

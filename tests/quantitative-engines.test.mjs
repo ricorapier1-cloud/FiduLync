@@ -259,6 +259,19 @@ test('public FairEconomy calendar is no-key, Tier-1-only, and records source pro
   assert.match(signals, /const calendarVerified = snapshot\.calendarSource === 'provider' && Boolean\(snapshot\.calendarProvider\)/);
 });
 
+test('Swissquote quote caching is per instrument so satellite selection cannot refetch every core pair', () => {
+  const route = read('../app/api/v1/live-quotes/route.ts');
+  assert.match(route, /macro:swissquote-bbo-v1:' \+ instrument\.symbol/);
+  assert.doesNotMatch(route, /macro:swissquote-bbo-v1' \+ ':' \+ \(satelliteInstrument/);
+});
+
+test('Supabase REST helper is strictly read-only and contains no legacy commerce writes', () => {
+  const adapter = read('../lib/supabaseAdmin.ts');
+  assert.match(adapter, /method: 'GET'/);
+  assert.match(adapter, /export async function supabaseRead/);
+  assert.doesNotMatch(adapter, /persistLicense|recordTransaction|upsertHeartbeat|supabaseInsert|method: 'POST'|method: 'PATCH'|method: 'DELETE'/);
+});
+
 test('live quote API rounds each instrument to its display precision before JSON serialization', () => {
   const route = read('../app/api/v1/live-quotes/route.ts');
   assert.match(route, /quote\.symbol === 'XAUUSD' \? 2 : quote\.symbol === 'USDJPY' \? 3 : 5/);
