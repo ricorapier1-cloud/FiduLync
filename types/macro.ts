@@ -38,6 +38,7 @@ export type MacroCurrency = {
   cpi?: number;
   twoYearYield?: number;
   twoYearYieldSource?: 'provider' | 'reference';
+  twoYearYieldProvider?: string;
   policyRateSource?: 'provider' | 'reference';
   inflationSource?: 'provider' | 'reference';
   policyRateObservationDate?: string;
