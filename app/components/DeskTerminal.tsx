@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { MacroSnapshot } from '@/types/macro';
 import type { GoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
 import { getCurrencyStrengthIndex } from '@/lib/currencyStrength';
-import { generatePairDossier } from '@/lib/macro/dossierEngine';
 import type { IntradaySignal } from '@/lib/quant/intradaySignalEngine';
 
 type Quote = {
@@ -15,18 +14,9 @@ type Quote = {
 };
 type QuoteResponse = { generatedAtUtc: string; latencyMs: number; status: string; quotes: Quote[] };
 type FxRow = { date: string; rates: Record<string, number> };
-type JournalEntry = { id: string; timeUtc: string; symbol: string; result: 'WIN' | 'LOSS' | 'FLAT'; pnl: number; pnlUsd: number; direction: Direction; macroBiasScore: number | null; hurstRegime: string | null; vixLevel: number | null; session: 'LONDON' | 'NY' | 'OFF-SESSION' | 'UNKNOWN'; riskPct: number | null; rMultiple: number | null; macroAlignment: 'ALIGNED' | 'COUNTER' | 'UNKNOWN'; entryContextCapturedAtUtc?: string; riskAmountUsdAtEntry?: number | null };
-type Journal = { dateWAT: string; trades: number; wins: number; losses: number; netPnl: number; entries: JournalEntry[] };
-type SymbolCode = string;
-type Direction = 'BUY' | 'SELL';
 const symbols: SymbolCode[] = ['EURUSD', 'GBPUSD', 'XAUUSD', 'USDJPY'];
 const currencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CHF', 'CAD'] as const;
-const JOURNAL_KEY = 'fidulync-desk-journal-v1';
-const TRADE_JOURNAL_KEY = 'fidulync-quant-trade-journal-v1';
-const ENTRY_CONTEXT_KEY = 'fidulync-pending-entry-context-v1';
 const FX_KEY = 'fidulync-desk-fx-v1';
-const blankJournal = (dateWAT: string): Journal => ({ dateWAT, trades: 0, wins: 0, losses: 0, netPnl: 0, entries: [] });
-const watDate = (date = new Date()) => { const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date); const part = (type: string) => parts.find((item) => item.type === type)?.value ?? '00'; return part('year') + '-' + part('month') + '-' + part('day'); };
 function zonedDecimalHour(date: Date, timeZone: string) {
   const parts = new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date);
   return Number(parts.find((p) => p.type === 'hour')?.value ?? 0) + Number(parts.find((p) => p.type === 'minute')?.value ?? 0) / 60;
@@ -49,18 +39,6 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const [fxStatus, setFxStatus] = useState('NOT SYNCED');
   const [fxSync, setFxSync] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.parse(initialSnapshot.asOf) || 0);
-  const [balance, setBalance] = useState('');
-  const [riskPct, setRiskPct] = useState('');
-  const [selected, setSelected] = useState<SymbolCode>('EURUSD');
-  const [sl, setSl] = useState('');
-  const [tp, setTp] = useState('');
-  const [direction, setDirection] = useState<Direction>('BUY');
-  const [technicalConfirmed, setTechnicalConfirmed] = useState(false);
-  const [journal, setJournal] = useState<Journal>(() => blankJournal(''));
-  const [pnlInput, setPnlInput] = useState('');
-  const [resultInput, setResultInput] = useState<'WIN' | 'LOSS' | 'FLAT'>('WIN');
-  const [journalSymbol, setJournalSymbol] = useState<SymbolCode>('EURUSD');
-  const [entryContext, setEntryContext] = useState<Partial<JournalEntry> | null>(null);
   const [ready, setReady] = useState(false);
   const [forceSyncing, setForceSyncing] = useState(false);
   const [intradaySignals, setIntradaySignals] = useState<IntradaySignal[]>([]);
@@ -98,74 +76,11 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
     const timer = window.setInterval(() => void load(), 60_000);
     return () => { active = false; window.clearInterval(timer); };
   }, []);
-  const quote = quoteFor(selected);
-  const usdJpy = quoteFor('USDJPY')?.mid ?? null;
-  const risk = Number(riskPct);
-  const stop = Number(sl);
-  const target = Number(tp);
-  const account = Number(balance);
-  const pipValue = selected === 'USDJPY' ? (usdJpy && usdJpy > 0 ? 1000 / usdJpy : null)
-    : selected === 'XAUUSD' ? 100
-      : selected.slice(3) === 'USD' ? 10
-        : selected.length === 6 && fxRows.length ? (() => {
-          const quoteCurrency = selected.slice(3, 6);
-          const usdCross = fxRows[fxRows.length - 1].rates[quoteCurrency];
-          if (!usdCross || usdCross <= 0) return null;
-          return quoteCurrency === 'JPY' ? 1000 / usdCross : 10 / usdCross;
-        })() : null;
-  const riskAmount = account > 0 && risk > 0 ? account * risk / 100 : 0;
-  const lots = pipValue && stop > 0 ? Math.floor((riskAmount / (stop * pipValue)) * 100) / 100 : 0;
-  const rr = stop > 0 && target > 0 ? target / stop : 0;
-  const gross = riskAmount * rr;
-  const calculatorInputsValid = Number.isFinite(account) && account > 0 && Number.isFinite(risk) && risk > 0
-    && Number.isFinite(stop) && stop > 0 && Number.isFinite(target) && target > 0 && pipValue !== null;
-  const spreadUnits = quote?.spread === null || quote?.spread === undefined ? null : selected === 'XAUUSD' ? quote.spread : quote.spread / (selected.slice(3) === 'JPY' ? 0.01 : 0.0001);
-  const spreadPct = spreadUnits !== null && stop > 0 ? spreadUnits / stop * 100 : null;
-  const currentDateWAT = watDate(new Date(now));
-  const sessionClock = new Date(now);
-  const hourWAT = zonedDecimalHour(sessionClock, 'Africa/Lagos');
-  const hourNewYork = zonedDecimalHour(sessionClock, 'America/New_York');
+  const hourWAT = zonedDecimalHour(new Date(now), 'Africa/Lagos');
+  const hourNewYork = zonedDecimalHour(new Date(now), 'America/New_York');
   const activeSession = hourWAT >= 8 && hourWAT < 12 ? 'LONDON' : hourNewYork >= 8 && hourNewYork < 12 ? 'NEW YORK' : 'OFF-SESSION';
-  const inSession = activeSession !== 'OFF-SESSION';
   const healthyProviderCount = snapshot.providerStatus?.filter((provider) => provider.status === 'HEALTHY').length ?? 0;
   const totalProviderCount = snapshot.providerStatus?.length ?? 0;
-  const locked = journal.trades >= 2 || journal.losses >= 2;
-  const vixValue = goldContext?.drivers.VIXCLS.value ?? null;
-  const tailRiskStatus = vixValue === null ? 'UNAVAILABLE' : vixValue >= 28 ? 'BLACK_SWAN_LOCKOUT' : vixValue >= 22 ? 'ELEVATED_VOLATILITY' : 'NORMAL';
-  const riskCap = tailRiskStatus === 'UNAVAILABLE' || tailRiskStatus === 'BLACK_SWAN_LOCKOUT' ? 0 : tailRiskStatus === 'ELEVATED_VOLATILITY' ? 0.5 : 1;
-  const selectedLegs = selected === 'XAUUSD' ? ['USD'] : [selected.slice(0, 3), selected.slice(3, 6)];
-  const conflictingTrades = journal.entries.filter((entry) => {
-    const legs = entry.symbol === 'XAUUSD' ? ['USD'] : [entry.symbol.slice(0, 3), entry.symbol.slice(3, 6)];
-    return legs.some((leg) => selectedLegs.includes(leg));
-  });
-  const correlationPass = conflictingTrades.length === 0;
-  const dossier = useMemo(() => generatePairDossier(snapshot, selected), [snapshot, selected]);
-  const fxMacroPass = (dossier.confidence === 'HIGH' || dossier.confidence === 'MODERATE')
-    && ((dossier.biasScore > 0 && direction === 'BUY') || (dossier.biasScore < 0 && direction === 'SELL'));
-  const goldScore = goldContext?.goldBiasScore ?? null;
-  const goldMacroPass = goldContext?.overallState === 'AVAILABLE'
-    && ((goldContext.directionalVerdict === 'BULLISH' && direction === 'BUY')
-      || (goldContext.directionalVerdict === 'BEARISH' && direction === 'SELL'));
-  const macroPass = selected === 'XAUUSD' ? goldMacroPass : fxMacroPass;
-  const verifiedCalendar = snapshot.calendarSource === 'provider' && Boolean(snapshot.calendarProvider);
-  const nearEvent = verifiedCalendar && snapshot.catalysts.some((event) => event.impact === 'High' && Math.abs(Date.parse(event.scheduledAt) - now) <= 30 * 60_000);
-  const eventPass = verifiedCalendar && !nearEvent;
-  const riskPass = Number.isFinite(account) && account > 0
-    && Number.isFinite(stop) && stop > 0 && Number.isFinite(target) && target > 0
-    && risk > 0 && risk <= riskCap && lots >= 0.01
-    && journal.trades < 2 && journal.losses < 2 && !locked
-    && correlationPass && (tailRiskStatus === 'NORMAL' || tailRiskStatus === 'ELEVATED_VOLATILITY');
-  const quoteIsFresh = quote?.freshness === 'LIVE' && quote.ageMs !== null && quote.ageMs <= 60_000;
-  const spreadPass = quoteIsFresh && rr >= 2 && spreadPct !== null && spreadPct < 15;
-  const gates = [
-    { name: 'Macro alignment', pass: macroPass, detail: selected === 'XAUUSD' ? (goldScore === null ? 'Gold engine evidence unavailable' : `${goldScore} gold score · ${goldContext?.directionalVerdict} · ${direction}`) : dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? 'No verified pair bias available' : `${dossier.biasScore} score · ${dossier.confidence} · ${direction}` },
-    { name: 'Lagos session', pass: inSession, detail: 'London 08:00–12:00 WAT / New York 08:00–12:00 ET (DST-aware)' },
-    { name: 'Tier-1 event risk', pass: eventPass, detail: !verifiedCalendar ? 'Calendar unverified; fail-closed' : nearEvent ? 'Event within ±30 minutes' : 'Verified calendar: clear' },
-    { name: 'H4/H1 structure and liquidity', pass: technicalConfirmed, detail: 'Requires manual MT5 chart confirmation' },
-    { name: 'Reward/risk and spread', pass: spreadPass, detail: `${rr.toFixed(2)}R · ${quoteIsFresh ? 'fresh quote' : 'quote stale/unavailable'} · spread ${spreadPct === null ? 'unavailable' : spreadPct.toFixed(1) + '% of SL'}` },
-    { name: 'Daily risk & correlation circuit breaker', pass: riskPass, detail: `${correlationPass ? 'Currency legs clear' : 'BLOCKED: shared leg with ' + conflictingTrades.map((entry) => entry.symbol).join(', ')} · ${risk.toFixed(2)}% / ${riskCap.toFixed(2)}% cap · ${journal.trades}/2 trades · ${journal.losses}/2 losses · ${tailRiskStatus}` },
-  ];
-  const gatePassed = gates.every((gate) => gate.pass) && !locked;
 
   const refreshQuotes = useCallback(async () => {
     if (document.visibilityState === 'hidden') return;
@@ -199,17 +114,12 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setEntryContext(readStorage<Partial<JournalEntry>>(ENTRY_CONTEXT_KEY));
-      const cached = readStorage<Journal>(JOURNAL_KEY);
-      if (cached?.dateWAT === watDate()) setJournal(cached);
-      else setJournal(blankJournal(watDate()));
       const cachedFx = readStorage<{ rows: FxRow[]; retrievedAtUtc: string }>(FX_KEY);
       if (cachedFx?.rows?.length) { setFxRows(cachedFx.rows); setFxSync(cachedFx.retrievedAtUtc); setFxStatus('CACHED'); }
       setReady(true);
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
-  useEffect(() => { if (ready) window.localStorage.setItem(JOURNAL_KEY, JSON.stringify(journal)); }, [journal, ready]);
   const refreshSatellite = useCallback(async () => {
     try {
       const response = await fetch('/api/v1/top-pairs', { cache: 'no-store' });
@@ -270,65 +180,6 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const matrixCurrencies = Array.from(new Set([...strength.map((item) => item.currency), ...macroStrength.map((item) => item.currency)])).sort();
 
 
-  const captureEntryContext = () => {
-    const score = journalSymbol === 'XAUUSD' ? goldScore : generatePairDossier(snapshot, journalSymbol).biasScore;
-    const alignment = score === null || score === undefined || score === 0 ? 'UNKNOWN'
-      : ((score > 0 && direction === 'BUY') || (score < 0 && direction === 'SELL')) ? 'ALIGNED' : 'COUNTER';
-    const context: Partial<JournalEntry> = {
-      symbol: journalSymbol, direction,
-      macroBiasScore: Number.isFinite(score) ? score : null,
-      hurstRegime: null,
-      vixLevel: Number.isFinite(vixValue) ? vixValue : null,
-      session: activeSession === 'NEW YORK' ? 'NY' : activeSession,
-      riskPct: Number.isFinite(risk) ? risk : null,
-      riskAmountUsdAtEntry: account > 0 && risk > 0 ? account * risk / 100 : null,
-      macroAlignment: alignment,
-      entryContextCapturedAtUtc: new Date().toISOString(),
-    };
-    setEntryContext(context);
-    try { window.localStorage.setItem(ENTRY_CONTEXT_KEY, JSON.stringify(context)); } catch { /* local capture remains in component state */ }
-  };
-  const recordTrade = () => {
-    const pnl = Number(pnlInput);
-    if (!pnlInput.trim() || !Number.isFinite(pnl) || locked
-      || (resultInput === 'WIN' && pnl <= 0)
-      || (resultInput === 'LOSS' && pnl >= 0)
-      || (resultInput === 'FLAT' && pnl !== 0)) return;
-    const timeUtc = new Date().toISOString();
-    const captured = entryContext?.symbol === journalSymbol && entryContext.direction === direction ? entryContext : null;
-    const macroBiasScore = captured ? captured.macroBiasScore ?? null : null;
-    const macroAlignment = captured ? captured.macroAlignment ?? 'UNKNOWN' : 'UNKNOWN';
-    const riskAmountAtEntry = captured ? captured.riskAmountUsdAtEntry ?? null : null;
-    const entry: JournalEntry = {
-      id: `${Date.now()}-${journalSymbol}-${Math.random().toString(36).slice(2, 8)}`,
-      timeUtc, symbol: journalSymbol, result: resultInput, pnl, pnlUsd: pnl, direction,
-      macroBiasScore: Number.isFinite(macroBiasScore) ? macroBiasScore : null,
-      hurstRegime: captured ? captured.hurstRegime ?? null : null,
-      vixLevel: captured ? captured.vixLevel ?? null : null,
-      session: captured?.session ?? 'UNKNOWN',
-      riskPct: captured ? captured.riskPct ?? null : null,
-      rMultiple: riskAmountAtEntry && riskAmountAtEntry > 0 ? Number((pnl / riskAmountAtEntry).toFixed(4)) : null,
-      macroAlignment,
-      ...(captured?.entryContextCapturedAtUtc ? { entryContextCapturedAtUtc: captured.entryContextCapturedAtUtc } : {}),
-      riskAmountUsdAtEntry: riskAmountAtEntry,
-    };
-    try {
-      const prior = readStorage<JournalEntry[]>(TRADE_JOURNAL_KEY) ?? [];
-      window.localStorage.setItem(TRADE_JOURNAL_KEY, JSON.stringify([entry, ...prior.filter((item) => item.id !== entry.id)].slice(0, 5000)));
-    } catch (error) {
-      console.warn('Quant trade journal mirror could not be persisted:', error);
-    }
-    setJournal((previous) => ({
-      ...previous, trades: previous.trades + 1,
-      wins: previous.wins + (resultInput === 'WIN' ? 1 : 0),
-      losses: previous.losses + (resultInput === 'LOSS' ? 1 : 0),
-      netPnl: Number((previous.netPnl + pnl).toFixed(2)),
-      entries: [entry, ...previous.entries].slice(0, 20),
-    }));
-    setPnlInput('');
-    setEntryContext(null);
-    try { window.localStorage.removeItem(ENTRY_CONTEXT_KEY); } catch { /* no-op */ }
-  };
   const forceSync = async () => {
     setForceSyncing(true);
     try {
@@ -362,24 +213,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const watClock = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Lagos', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).format(new Date(now));
   const utcClock = new Date(now).toISOString().slice(11, 19);
   const displaySymbols = [...symbols, ...(satelliteSymbol ? [satelliteSymbol] : [])];
-  const exportJournal = (format: 'json' | 'csv') => {
-    const content = format === 'json'
-      ? JSON.stringify({ schemaVersion: '1.0.0', timezone: 'Africa/Lagos', dateWAT: journal.dateWAT, ...journal }, null, 2)
-      : [
-        'time_utc,date_wat,symbol,result,pnl_usd',
-        ...journal.entries.map((entry) => [entry.timeUtc, journal.dateWAT, entry.symbol, entry.result, entry.pnl]
-          .map((value) => '"' + String(value).replace(/"/g, '""') + '"').join(',')),
-      ].join('\n');
-    const blob = new Blob([content], { type: format === 'json' ? 'application/json' : 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = 'macrolinc-trade-journal-' + journal.dateWAT + '.' + format;
-    anchor.click();
-    URL.revokeObjectURL(url);
-  };
-
-  return <section id="desk-terminal" className="desk-terminal scroll-mt-24" aria-label="Quantitative trading desk terminal">
+  return <section id="desk-terminal" className="desk-terminal scroll-mt-24" aria-label="Macro and fundamental research terminal">
     <div className="desk-topbar">
       <div><span className="desk-kicker">MACROLYNC / PRIVATE SYSTEMATIC RESEARCH</span><h2>MacroLync Terminal</h2></div>
       <div className="desk-top-meta"><span className={quoteStatus === 'HEALTHY' && quotes.every((item) => item.freshness === 'LIVE' && item.ageMs !== null && item.ageMs <= 60_000) ? 'desk-live' : 'desk-warning'}><i />{quoteStatus === 'HEALTHY' && quotes.some((item) => item.freshness === 'LIVE' && item.ageMs !== null && item.ageMs <= 60_000) ? 'FRESH BBO · 15s' : quoteStatus === 'HEALTHY' ? 'STALE BBO' : quoteStatus}</span><span>WAT {watClock}</span><span>UTC {utcClock}</span><span className={healthyProviderCount === totalProviderCount && totalProviderCount > 0 ? 'desk-live' : 'desk-warning'}>DATA HEALTH {healthyProviderCount}/{totalProviderCount}</span><button type="button" onClick={() => void forceSync()} disabled={forceSyncing}>{forceSyncing ? 'SYNCING…' : 'FORCE SYNC'}</button></div>
@@ -395,7 +229,6 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
         {intradaySignals.map((signal) => {
           const active = signal.signalState === 'ACTIVE_SETUP';
           const statusClass = active ? 'desk-good' : signal.signalState === 'SHIELD_BLOCKED' ? 'desk-warning' : 'text-slate-400';
-          const canLoad = active && signal.entryPrice !== null && signal.slPips !== null && signal.slPips > 0;
           return <div className="rounded border border-white/10 bg-[#0b1017] p-3 min-w-0" key={signal.symbol}>
             <div className="flex items-center justify-between gap-2"><strong className="font-mono text-xs">{signal.symbol}</strong><span className={statusClass + ' text-[10px] font-mono'}>{signal.signalState.replaceAll('_', ' ')}</span></div>
             <div className="mt-3 flex items-baseline justify-between"><b className="text-lg font-mono">{signal.direction}</b><span className="text-xs font-mono">{signal.confluenceScore}/100 confluence score</span></div>
@@ -428,34 +261,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
         </tbody></table></div>
         <p className="desk-footnote">Spot momentum is calculated from the latest 20 available Frankfurter business-day reference observations, not executable intraday quotes. Fundamental strength uses fresh provider policy and inflation observations. Divergence flags a disagreement between price trend and rate fundamentals; neither is an entry signal.</p>
       </article>
-      <article id="desk-position-sizing" className="desk-panel scroll-mt-24"><header><div><span className="desk-kicker">B / LIVE RISK CALCULATOR</span><h3>Position Sizing</h3></div><small>USD ACCOUNT · STANDARD LOT ESTIMATE</small></header>
-        <div className="desk-form-grid">
-          <label>Account balance USD<input inputMode="decimal" placeholder="Enter live equity" value={balance} onChange={(e) => setBalance(e.target.value)} /></label>
-          <label>Risk %<input inputMode="decimal" placeholder="Set risk per trade" value={riskPct} onChange={(e) => setRiskPct(e.target.value)} /></label>
-          <label>Instrument<select value={selected} onChange={(e) => { setSelected(e.target.value as SymbolCode); setJournalSymbol(e.target.value as SymbolCode); }}><option value="EURUSD">EUR/USD</option><option value="GBPUSD">GBP/USD</option><option value="XAUUSD">XAU/USD</option><option value="USDJPY">USD/JPY</option>{satelliteSymbol && <option value={satelliteSymbol}>SATELLITE #1 · {satelliteSymbol}</option>}</select></label>
-          <label>{selected === 'XAUUSD' ? 'Stop distance ($)' : 'Stop loss (pips)'}<input inputMode="decimal" placeholder="Enter planned stop" value={sl} onChange={(e) => setSl(e.target.value)} /></label>
-          <label>{selected === 'XAUUSD' ? 'Target distance ($)' : 'Take profit (pips)'}<input inputMode="decimal" placeholder="Enter planned target" value={tp} onChange={(e) => setTp(e.target.value)} /></label>
-          <label>Direction<select value={direction} onChange={(e) => setDirection(e.target.value as Direction)}><option value="BUY">BUY</option><option value="SELL">SELL</option></select></label>
-        </div>
-        <div className="desk-calc-results"><div><span>RISK AMOUNT</span><strong>{calculatorInputsValid ? '$' + riskAmount.toFixed(2) : '—'}</strong></div><div><span>LOT SIZE · ROUNDED DOWN</span><strong>{calculatorInputsValid ? lots.toFixed(2) : '—'}</strong><small className="block mt-1 text-[10px] text-slate-400">{pipValue === null ? '$/PIP/LOT UNAVAILABLE' : '$' + pipValue.toFixed(2) + ' / PIP / LOT'}</small></div><div><span>REWARD / RISK</span><strong className={rr >= 2 ? 'desk-good' : 'desk-warning'}>{calculatorInputsValid ? rr.toFixed(2) + 'R' : '—'}</strong></div><div><span>GROSS TARGET P/L · EST.</span><strong>{calculatorInputsValid ? '$' + gross.toFixed(2) : '—'}</strong></div></div>
-        <p className="desk-footnote">{selected === 'USDJPY' ? `USDJPY pip value: 1,000 / live ${display(usdJpy, 3)} = ${pipValue?.toFixed(4) ?? 'unavailable'} USD per pip per lot.` : selected === 'XAUUSD' ? 'Gold assumption: 100 oz per standard lot; $100 P/L per $1.00 price move per lot.' : 'FX assumption: $10 USD pip value per standard lot for EUR/USD and GBP/USD.'} Excludes commissions, slippage, swaps and broker contract variations. Planning estimate only: verify the broker&apos;s MT5 symbol specification and account currency; the EA&apos;s broker-native sizing is authoritative.</p>
-        {risk > 1 && <p className="desk-warning-text">Risk exceeds the 1.0% governance ceiling.</p>}{lots > 0 && lots < 0.01 && <p className="desk-warning-text">Below 0.01 lot: skip, never round size up.</p>}{rr < 2 && <p className="desk-warning-text">R:R is below the required 1:2.0.</p>}
-      </article>
-    </div>
-    <div className="desk-grid">
-      <article className="desk-panel"><header><div><span className="desk-kicker">C / GOVERNANCE</span><h3>Mandatory 6/6 Pre-Trade Gate</h3></div><small>{gates.filter((gate) => gate.pass).length}/6 PASSED</small></header>
-        <div className="desk-gate-list">{gates.map((gate, index) => <div className="desk-gate-row" key={gate.name}><span className={gate.pass ? 'desk-gate-pass' : 'desk-gate-fail'}>{gate.pass ? 'PASS' : 'BLOCK'}</span><div><b>{index + 1}. {gate.name}</b><small>{gate.detail}</small></div>{index === 3 && <label className="desk-check"><input type="checkbox" checked={technicalConfirmed} onChange={(e) => setTechnicalConfirmed(e.target.checked)} /> MT5 confirmed</label>}</div>)}</div>
-        <div className={locked ? 'desk-lockout' : gatePassed ? 'desk-clear' : 'desk-blocked'}>{locked ? 'DAILY CIRCUIT BREAKER ACTIVE · LOCKED UNTIL 00:00 WAT' : gatePassed ? '6/6 CHECKS PASSED · MT5 EXECUTION REMAINS MANUAL' : 'GATE CLOSED · ALL SIX CONDITIONS MUST PASS'}</div>
-        <p className="desk-footnote">Calendar must be verified before the event gate can pass. This checklist does not submit orders or control MT5. Local state is not a broker-enforced lockout.</p>
-      </article>
-      <article className="desk-panel"><header><div><span className="desk-kicker">D / DAILY RISK CONTROL</span><h3>WAT Daily Circuit Breaker</h3></div><small>{currentDateWAT}</small></header>
-        <div className="desk-journal-stats"><div><span>TRADES</span><b>{journal.trades}/2</b></div><div><span>WINS</span><b>{journal.wins}</b></div><div><span>LOSSES</span><b>{journal.losses}/2</b></div><div><span>NET P&amp;L</span><b className={journal.netPnl >= 0 ? 'desk-good' : 'desk-warning'}>${journal.netPnl.toFixed(2)}</b></div></div>
-        <div className="desk-form-grid desk-journal-form"><label>Result<select value={resultInput} onChange={(e) => setResultInput(e.target.value as 'WIN' | 'LOSS' | 'FLAT')}><option>WIN</option><option>LOSS</option><option>FLAT</option></select></label><label>Realized P&amp;L USD<input inputMode="decimal" value={pnlInput} onChange={(e) => setPnlInput(e.target.value)} placeholder="Closed trade P&L" /></label><label>Instrument<select value={journalSymbol} onChange={(e) => setJournalSymbol(e.target.value as SymbolCode)}>{displaySymbols.map((s) => <option key={s}>{s}</option>)}</select></label></div>
-        <button className="desk-record-button" type="button" onClick={captureEntryContext}>CAPTURE ENTRY CONTEXT</button><small className="block mt-2 text-[10px] text-slate-500">{entryContext?.entryContextCapturedAtUtc ? `ENTRY CONTEXT CAPTURED ${entryContext.entryContextCapturedAtUtc}` : "Capture the current macro, VIX, session and risk state when opening a position."}</small><button className="desk-record-button" type="button" disabled={!pnlInput.trim() || !Number.isFinite(Number(pnlInput)) || locked || (resultInput === 'WIN' && Number(pnlInput) <= 0) || (resultInput === 'LOSS' && Number(pnlInput) >= 0) || (resultInput === 'FLAT' && Number(pnlInput) !== 0)} onClick={recordTrade}>RECORD CLOSED TRADE</button>
-        <div className="flex flex-wrap gap-2 mt-3"><button className="desk-record-button" type="button" onClick={() => exportJournal('json')}>EXPORT JSON</button><button className="desk-record-button" type="button" onClick={() => exportJournal('csv')}>EXPORT CSV</button></div>
-        <div className="desk-journal-list">{journal.entries.slice(0, 5).map((entry) => <div key={entry.id}><span>{entry.symbol} · {entry.result}</span><b className={entry.pnl >= 0 ? 'desk-good' : 'desk-warning'}>{entry.pnl >= 0 ? '+' : ''}${entry.pnl.toFixed(2)}</b><small>{entry.timeUtc}</small></div>)}</div>
-        <p className="desk-footnote">Journal persists in this browser only. Browser storage clearing or switching devices resets it. MT5 must independently enforce the same hard limits.</p>
-      </article>
+
     </div>
   </section>;
 }
