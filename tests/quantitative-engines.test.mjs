@@ -530,3 +530,67 @@ test('Force Sync refreshes the macro snapshot, gold context, BBO and spot refere
   assert.match(desk, /onSnapshotChange\(freshSnapshot\)/);
   assert.match(desk, /onGoldContextChange\(freshGold\)/);
 });
+
+
+test('intraday signal engine enforces macro threshold, trend quality, live sessions, shield gates and ATR-calibrated levels', () => {
+  const engine = read('../lib/quant/intradaySignalEngine.ts');
+  assert.match(engine, /input\.macroScore >= 25/);
+  assert.match(engine, /input\.macroScore <= -25/);
+  assert.match(engine, /calculateKaufmanEfficiencyRatio\(closes, 14\)/);
+  assert.match(engine, /hurst <= 0\.55/);
+  assert.match(engine, /ker < 0\.30/);
+  assert.match(engine, /atr! \* 1\.35/);
+  assert.match(engine, /riskDistance \* 2/);
+  assert.match(engine, /riskDistance \* 3/);
+  assert.match(engine, /VIX_BLACK_SWAN_LOCKOUT/);
+  assert.match(engine, /SPREAD_BLOWOUT_BLOCK/);
+  assert.match(engine, /SPREAD_BASELINE_UNAVAILABLE/);
+  assert.match(engine, /TIER_ONE_EVENT_LOCKOUT/);
+  assert.match(engine, /RATE_DECISION_LOCKOUT/);
+  assert.match(engine, /hour >= 13 && hour < 17/);
+  assert.match(engine, /INTRADAY_CANDLES_STALE/);
+});
+
+test('intraday candle adapter exposes real OHLCV with explicit freshness and no synthetic fallback', () => {
+  const route = read('../app/api/v1/intraday-candles/route.ts');
+  assert.match(route, /query1\.finance\.yahoo\.com\/v8\/finance\/chart/);
+  assert.match(route, /interval', '5m'/);
+  assert.match(route, /interval', '1d'/);
+  assert.match(route, /status: fresh && intraday\.length >= 60/);
+  assert.match(route, /intradayBars: \[\], dailyBars: \[\]/);
+  assert.doesNotMatch(route, /Math\.random|synthetic|fallbackBars/);
+});
+
+test('authenticated EA macro context includes intraday signals and MQL5 read-only getters', () => {
+  const route = read('../app/api/v1/macro-context/route.ts');
+  const types = read('../types/desk.ts');
+  const bridge = read('../public/MacroLyncBridge.mqh');
+  assert.match(route, /api\/v1\/intraday-signals/);
+  assert.match(route, /signals: intradaySignals/);
+  assert.match(types, /signals: IntradaySignal\[\]/);
+  assert.match(bridge, /GetSignalState/);
+  assert.match(bridge, /GetSignalDirection/);
+  assert.match(bridge, /GetRecommendedSL/);
+  assert.match(bridge, /safe_to_trade = false/);
+});
+
+test('desk exposes load-to-calculator live signals without auto-executing trades', () => {
+  const desk = read('../app/components/DeskTerminal.tsx');
+  assert.match(desk, /LIVE EXECUTION SIGNALS/);
+  assert.match(desk, /LOAD INTO CALCULATOR/);
+  assert.match(desk, /setSl\(String\(signal\.slPips\)\)/);
+  assert.match(desk, /setTp\(String\(signal\.slPips! \* 2\)\)/);
+  assert.match(desk, /disabled=\{!canLoad\}/);
+});
+
+test('provider health includes real EIA and Treasury observation dates and BIS-backed World Bank standby', () => {
+  const telemetry = read('../lib/macro/providerTelemetry.ts');
+  const types = read('../types/macro.ts');
+  const dashboard = read('../app/components/MacroDashboard.tsx');
+  assert.match(telemetry, /snapshot\.energyMarkets\?\.wti\.observationDate/);
+  assert.match(telemetry, /snapshot\.usTreasury\?\.observationDate/);
+  assert.match(telemetry, /bis\.status === 'HEALTHY'/);
+  assert.match(telemetry, /status: 'STANDBY'/);
+  assert.match(types, /'STANDBY'/);
+  assert.match(dashboard, /STANDBY • BIS ACTIVE/);
+});
