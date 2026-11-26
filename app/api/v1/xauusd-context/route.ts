@@ -24,12 +24,10 @@ function isFreshCotReport(date: string | undefined, maxAgeDays = 14): boolean {
 }
 
 function isAuthorized(request: Request): boolean {
-  const configuredTokens = [
-    process.env.MACRO_API_TOKEN?.trim() ?? '',
-    process.env.CRON_SECRET?.trim() ?? '',
-  ].filter((token) => token.length > 0);
-
-  if (configuredTokens.length === 0) return false;
+  const expected = process.env.MACRO_API_TOKEN?.trim()
+    || process.env.MACROLYNC_API_SECRET?.trim()
+    || process.env.ALGO_PRIVATE_API_KEY?.trim();
+  if (!expected || expected.length < 32) return false;
 
   const authorization = request.headers.get('authorization')?.trim() ?? '';
   const bearerToken = authorization.startsWith('Bearer ')
@@ -38,7 +36,7 @@ function isAuthorized(request: Request): boolean {
   const candidate = bearerToken;
   if (!candidate) return false;
 
-  return configuredTokens.some((expected) => safeEqual(candidate, expected));
+  return safeEqual(candidate, expected);
 }
 
 const responseHeaders = {
@@ -51,7 +49,7 @@ const responseHeaders = {
 export async function GET(request: Request): Promise<NextResponse> {
   if (!isAuthorized(request)) {
     return NextResponse.json(
-      { status: 'UNAUTHORIZED', error: 'A valid bearer token or query token is required.' },
+      { status: 'UNAUTHORIZED', error: 'A valid private bearer token is required.' },
       { status: 401, headers: responseHeaders },
     );
   }
