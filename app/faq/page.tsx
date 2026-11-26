@@ -27,8 +27,8 @@ const faqs = [
     a: 'Economic indicators (GDP, CPI, employment) are frequently revised months after initial release. Backtesting models against revised data introduces fatal look-ahead bias. MacroLync tracks publication timestamps and release vintages to ensure historical research reflects only what market participants knew at the release timestamp.',
   },
   {
-    q: 'How is research stored in the Macro Research Notebook?',
-    a: 'The Macro Research Notebook is a zero-login, browser-based research workspace. All hypotheses, scenario probabilities, supporting evidence, and invalidation triggers are persisted strictly inside your browser\'s local storage. No proprietary research data is transmitted to external servers.',
+    q: 'How is research stored in the Trade Journal?',
+    a: 'The Trade Journal is a zero-login, browser-based research workspace. All hypotheses, scenario probabilities, supporting evidence, and invalidation triggers are persisted strictly inside your browser\'s local storage. No proprietary research data is transmitted to external servers.',
   },
   {
     q: 'Does MacroLync execute trades or provide financial advice?',
