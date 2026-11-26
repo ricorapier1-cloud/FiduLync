@@ -47,11 +47,16 @@ async function loadBars(symbol: string, interval: '5m' | '1d', range: '5d' | '1m
   for (let i = 0; i < result.timestamp.length; i++) {
     const open = quote.open[i], high = quote.high[i], low = quote.low[i], close = quote.close[i];
     if (![open, high, low, close].every((value) => typeof value === 'number' && Number.isFinite(value) && value > 0)) continue;
-    const timestampUtc = new Date(result.timestamp[i] * 1000).toISOString();
+    if (high! < low! || high! < Math.max(open!, close!) || low! > Math.min(open!, close!)) continue;
+    const epochSeconds = result.timestamp[i];
+    if (!Number.isFinite(epochSeconds)) continue;
+    const timestampUtc = new Date(epochSeconds * 1000).toISOString();
     if (Date.parse(timestampUtc) > Date.now() + 60_000) continue;
-    bars.push({ timestampUtc, open: open!, high: high!, low: low!, close: close!, volume: quote.volume?.[i] ?? null });
+    const rawVolume = quote.volume?.[i];
+    const volume = typeof rawVolume === 'number' && Number.isFinite(rawVolume) && rawVolume >= 0 ? rawVolume : null;
+    bars.push({ timestampUtc, open: open!, high: high!, low: low!, close: close!, volume });
   }
-  return bars;
+  return bars.sort((left, right) => Date.parse(left.timestampUtc) - Date.parse(right.timestampUtc));
 }
 
 export async function GET(request: Request) {
