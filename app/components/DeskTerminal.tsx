@@ -14,7 +14,7 @@ type Quote = {
 };
 type QuoteResponse = { generatedAtUtc: string; latencyMs: number; status: string; quotes: Quote[] };
 type FxRow = { date: string; rates: Record<string, number> };
-const symbols: string[] = ['EURUSD', 'GBPUSD', 'XAUUSD', 'USDJPY'];
+const symbols: string[] = ['EURUSD', 'XAUUSD', 'USDJPY'];
 const currencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CHF', 'CAD'] as const;
 const FX_KEY = 'fidulync-desk-fx-v1';
 function zonedDecimalHour(date: Date, timeZone: string) {
