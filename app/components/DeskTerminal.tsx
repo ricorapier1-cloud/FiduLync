@@ -211,7 +211,8 @@ export default function DeskTerminal({ initialSnapshot, onSnapshotChange, onGold
   };
   const watClock = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Lagos', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).format(new Date(now));
   const utcClock = new Date(now).toISOString().slice(11, 19);
-  const displaySymbols = [...symbols, ...(satelliteSymbol ? [satelliteSymbol] : [])];
+  const activeSatelliteSymbol = satelliteSymbol ?? 'GBPUSD';
+  const displaySymbols = [...symbols, activeSatelliteSymbol];
   return <section id="desk-terminal" className="desk-terminal scroll-mt-24" aria-label="Macro and fundamental research terminal">
     <div className="desk-topbar">
       <div><span className="desk-kicker">MACROLYNC / PRIVATE SYSTEMATIC RESEARCH</span><h2>MacroLync Terminal</h2></div>
