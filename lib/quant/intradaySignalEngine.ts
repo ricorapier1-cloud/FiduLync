@@ -72,10 +72,16 @@ function watHour(timestamp: string): number {
     + Number(parts.find((part) => part.type === 'minute')?.value ?? 0) / 60;
 }
 
+function hourInZone(date: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date);
+  return Number(parts.find((part) => part.type === 'hour')?.value ?? -1)
+    + Number(parts.find((part) => part.type === 'minute')?.value ?? 0) / 60;
+}
+
 export function classifyWATSession(now = new Date()): 'LONDON' | 'NEW_YORK' | 'CLOSED' {
-  const hour = watHour(now.toISOString());
-  if (hour >= 8 && hour < 12) return 'LONDON';
-  if (hour >= 13 && hour < 17) return 'NEW_YORK';
+  if (watHour(now.toISOString()) >= 8 && watHour(now.toISOString()) < 12) return 'LONDON';
+  const newYorkHour = hourInZone(now, 'America/New_York');
+  if (newYorkHour >= 8 && newYorkHour < 12) return 'NEW_YORK';
   return 'CLOSED';
 }
 
