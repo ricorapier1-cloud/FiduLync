@@ -35,6 +35,7 @@ export default function AccountsPage() {
   const [status, setStatus] = useState<'DISCONNECTED'|'CONNECTING'|'CONNECTED'|'ERROR'>('DISCONNECTED');
   const [message, setMessage] = useState('');
   const [lastRefresh, setLastRefresh] = useState<string | null>(null);
+  const [now, setNow] = useState(0);
   const [selectedAccountKey, setSelectedAccountKey] = useState('');
 
   const refresh = useCallback(async (credential: string) => {
@@ -57,12 +58,20 @@ export default function AccountsPage() {
   }, []);
 
   useEffect(() => {
-    const saved = window.sessionStorage.getItem('macrolinc-account-read-token');
-    if (saved) {
-      setToken(saved);
-      void refresh(saved);
-    }
+    const timer = window.setTimeout(() => {
+      const saved = window.sessionStorage.getItem('macrolinc-account-read-token');
+      if (saved) {
+        setToken(saved);
+        void refresh(saved);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [refresh]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 15_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (status !== 'CONNECTED' || !token) return;
@@ -131,7 +140,7 @@ export default function AccountsPage() {
     setMessage('Private account view disconnected in this browser tab.');
   };
 
-  const observedAge = selected ? Math.max(0, Date.now() - Date.parse(selected.observed_at)) : null;
+  const observedAge = selected && now > 0 ? Math.max(0, now - Date.parse(selected.observed_at)) : null;
   const freshness = observedAge === null ? 'NO DATA' : observedAge <= 90_000 ? 'FRESH' : observedAge <= 300_000 ? 'DELAYED' : 'STALE';
 
   return (
