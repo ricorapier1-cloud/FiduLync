@@ -173,7 +173,7 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
   const takeProfit2 = direction === 'BUY' ? price! + riskDistance * 3 : price! - riskDistance * 3;
   const score = Math.min(100, Math.round(25 + (Math.abs(input.macroScore ?? 0) / 100) * 20 + (ker! * 25) + (alignedTrigger ? 15 : 0)));
   const shieldCap = input.marketShield?.maxAllowedRiskPct ?? 0;
-  const rationale = `${direction} Macro (${input.macroScore}) + ${sweptLow ? 'prior-session low sweep' : sweptHigh ? 'prior-session high sweep' : valueZone ? 'EMA20/VWAP value-zone pullback' : 'trend aligned'} + KER ${ker!.toFixed(2)} + ${stopAtrMultiple.toFixed(2)}x daily ATR stop · Hurst unavailable pending validation`;
+  const rationale = `${direction} Macro (${input.macroScore}) + ${sweptLow ? 'prior-session low sweep' : sweptHigh ? 'prior-session high sweep' : valueZone ? 'EMA20/VWAP value-zone pullback' : 'trend aligned'} + KER ${ker!.toFixed(2)} + ${stopAtrMultiple.toFixed(2)}x daily ATR stop · market risk ceiling ${shieldCap.toFixed(2)}% · Hurst unavailable pending validation`;
   return {
     symbol, signalState: alignedTrigger ? 'ACTIVE_SETUP' : 'FORMING_PULLBACK', direction,
     entryPrice: round(price!, digits), stopLoss: round(stopLoss, digits),
@@ -184,6 +184,6 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
     session, dataAsOfUtc: latest?.timestampUtc ?? null, blockers: [],
     sovereignShieldStatus: input.marketShield?.status ?? null,
     marketRiskCeilingPct: shieldCap,
-    shieldBlockReasons: input.marketShield?.blockReasons ?? [],
+    marketShieldFlags: input.marketShield?.blockReasons ?? [],
   };
 }
