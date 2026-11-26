@@ -554,8 +554,8 @@ test('intraday signal engine enforces macro threshold, trend quality, live sessi
 test('intraday candle adapter exposes real OHLCV with explicit freshness and no synthetic fallback', () => {
   const route = read('../app/api/v1/intraday-candles/route.ts');
   assert.match(route, /query1\.finance\.yahoo\.com\/v8\/finance\/chart/);
-  assert.match(route, /interval', '5m'/);
-  assert.match(route, /interval', '1d'/);
+  assert.match(route, /loadBars\(symbol, '5m', '5d'\)/);
+  assert.match(route, /loadBars\(symbol, '1d', '1mo'\)/);
   assert.match(route, /status: fresh && intraday\.length >= 60/);
   assert.match(route, /intradayBars: \[\], dailyBars: \[\]/);
   assert.doesNotMatch(route, /Math\.random|synthetic|fallbackBars/);
