@@ -329,6 +329,7 @@ test('authenticated macro bridge accepts the configured MACRO_API_TOKEN through 
 test('intraday signal engine blocks stale quotes, weak macro bias and missing shield evidence while leaving lot sizing to the EA', () => {
   const desk = read('../app/components/DeskTerminal.tsx');
   const engine = read('../lib/quant/intradaySignalEngine.ts');
+  const route = read('../app/api/v1/intraday-signals/route.ts');
   assert.match(desk, /intradaySignals\.map/);
   assert.match(engine, /input\.macroScore !== null && input\.macroScore >= \(isGold \? 20 : 25\)/);
   assert.match(engine, /LIVE_BBO_UNAVAILABLE_OR_STALE/);
@@ -599,6 +600,11 @@ test('intraday signal engine enforces macro threshold, trend quality, live sessi
   assert.match(engine, /riskDistance \* 2/);
   assert.match(engine, /riskDistance \* 3/);
   assert.match(engine, /VIX_BLACK_SWAN_LOCKOUT/);
+  assert.match(engine, /input\.marketShield && !input\.marketShield\.marketConditionsClear/);
+  assert.match(engine, /marketRiskCeilingPct/);
+  assert.match(route, /evaluateMarketRiskShield/);
+  assert.match(route, /intradayRangeAtrMultiple/);
+  assert.match(route, /cotPercentiles/);
   assert.match(engine, /MACRO_SCORE_BELOW_\$\{isGold \? 20 : 25\}_THRESHOLD/);
   assert.match(engine, /sessionTimeZone = session === 'LONDON'/);
   assert.match(engine, /SPREAD_BLOWOUT_BLOCK/);
@@ -722,8 +728,6 @@ test('spread blowout protection uses a disclosed configured reference until a me
   assert.match(route, /evaluateMarketRiskShield/);
   assert.match(route, /intradayRangeAtrMultiple/);
   assert.match(route, /cotPercentiles/);
-  assert.match(engine, /input\.marketShield && !input\.marketShield\.marketConditionsClear/);
-  assert.match(engine, /marketRiskCeilingPct/);
   assert.match(route, /spreadMultipleOfBaseline: baseline\.multiple/);
   assert.match(desk, /Spread guard:/);
   assert.match(desk, /XAUUSD ±20 directional threshold/);
