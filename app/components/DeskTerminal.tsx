@@ -22,6 +22,7 @@ type Direction = 'BUY' | 'SELL';
 const symbols: SymbolCode[] = ['EURUSD', 'XAUUSD', 'USDJPY'];
 const currencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CHF', 'CAD'] as const;
 const JOURNAL_KEY = 'fidulync-desk-journal-v1';
+const TRADE_JOURNAL_KEY = 'fidulync-quant-trade-journal-v1';
 const FX_KEY = 'fidulync-desk-fx-v1';
 const blankJournal = (dateWAT: string): Journal => ({ dateWAT, trades: 0, wins: 0, losses: 0, netPnl: 0, entries: [] });
 const watDate = (date = new Date()) => { const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date); const part = (type: string) => parts.find((item) => item.type === type)?.value ?? '00'; return part('year') + '-' + part('month') + '-' + part('day'); };
@@ -291,6 +292,12 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
       rMultiple: riskAmountAtEntry && riskAmountAtEntry > 0 ? Number((pnl / riskAmountAtEntry).toFixed(4)) : null,
       macroAlignment,
     };
+    try {
+      const prior = readStorage<JournalEntry[]>(TRADE_JOURNAL_KEY) ?? [];
+      window.localStorage.setItem(TRADE_JOURNAL_KEY, JSON.stringify([entry, ...prior.filter((item) => item.id !== entry.id)].slice(0, 5000)));
+    } catch (error) {
+      console.warn('Quant trade journal mirror could not be persisted:', error);
+    }
     setJournal((previous) => ({
       ...previous, trades: previous.trades + 1,
       wins: previous.wins + (resultInput === 'WIN' ? 1 : 0),
