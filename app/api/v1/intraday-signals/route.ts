@@ -34,11 +34,15 @@ export async function GET(request: Request) {
     const gold = await buildGoldMacroContext(snapshot);
     const now = new Date();
     const session = classifyWATSession(now);
-    const nearest = snapshot.catalysts.filter((event) => event.impact === 'High')
+    const highImpactEvents = snapshot.catalysts.filter((event) => event.impact === 'High')
       .map((event) => ({ event, minutes: (Date.parse(event.scheduledAt) - now.getTime()) / 60_000 }))
-      .filter((item) => Number.isFinite(item.minutes))
+      .filter((item) => Number.isFinite(item.minutes));
+    const nearest = [...highImpactEvents].sort((a, b) => Math.abs(a.minutes) - Math.abs(b.minutes))[0];
+    const nearestRateDecision = highImpactEvents
+      .filter((item) => /rate decision|interest rate|monetary policy decision|policy rate/i.test(item.event.title))
       .sort((a, b) => Math.abs(a.minutes) - Math.abs(b.minutes))[0];
-    const rateDecision = Boolean(nearest && /rate decision|interest rate|monetary policy decision|policy rate/i.test(nearest.event.title));
+    const rateDecision = Boolean(nearestRateDecision && Math.abs(nearestRateDecision.minutes) <= 60);
+    const eventMinutesAway = rateDecision ? nearestRateDecision!.minutes : nearest?.minutes ?? null;
     const calendarVerified = snapshot.calendarSource === 'provider' && Boolean(snapshot.calendarProvider);
     const satellite = G8_PAIRS.filter((symbol) => symbol !== 'EURUSD' && symbol !== 'USDJPY' && symbol !== 'GBPUSD' && symbol !== 'XAUUSD')
       .map((symbol) => {
@@ -52,9 +56,8 @@ export async function GET(request: Request) {
       .sort((a, b) => Math.abs(b.score) - Math.abs(a.score))[0]?.symbol ?? null;
     const symbols = ['EURUSD', 'XAUUSD', 'USDJPY', ...(satellite ? [satellite] : [])];
     const origin = new URL(request.url).origin;
-    const token = (process.env.MACRO_API_TOKEN ?? process.env.MACROLYNC_API_SECRET ?? process.env.ALGO_PRIVATE_API_KEY ?? '').trim();
     const quoteResponse = await fetch(new URL('/api/v1/live-quotes' + (satellite ? '?satellite=' + satellite : ''), origin), {
-      headers: { 'x-macro-key': token }, cache: 'no-store', signal: AbortSignal.timeout(9_000),
+      cache: 'no-store', signal: AbortSignal.timeout(9_000),
     }).catch(() => null);
     const quotePayload = quoteResponse?.ok ? await quoteResponse.json() as QuotePayload : {};
     const quotes = quotePayload.quotes ?? [];
@@ -76,7 +79,7 @@ export async function GET(request: Request) {
         quoteTimestampUtc: quote?.freshness === 'LIVE' ? quote.quoteTimeUtc : null,
         vix: snapshot.vix?.freshness === 'LATEST PUBLISHED' ? snapshot.vix.value : null,
         calendarVerified,
-        eventMinutesAway: nearest?.minutes ?? null,
+        eventMinutesAway,
         rateDecision,
         spreadMultipleOfBaseline: baseline.multiple,
         session,
