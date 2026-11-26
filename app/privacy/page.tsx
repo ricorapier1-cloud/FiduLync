@@ -52,7 +52,7 @@ export default function PrivacyPage() {
               The optional Portfolio &amp; Accounts connector stores broker-reported account snapshots, open-position data and synchronized deal history in private Supabase tables protected by row-level security and server-side access tokens.
             </p>
             <p className="mt-2 text-slate-400">
-              Only the data required for account analytics is transmitted from the user's MT5 terminal. Broker master/investor passwords, withdrawal credentials and order-control permissions are never collected. The publisher cannot place, modify or close trades. The browser read token is held in session storage for the current tab.
+              Only the data required for account analytics is transmitted from the user&apos;s MT5 terminal. Broker master/investor passwords, withdrawal credentials and order-control permissions are never collected. The publisher cannot place, modify or close trades. The browser read token is held in session storage for the current tab.
             </p>
           </section>
 
