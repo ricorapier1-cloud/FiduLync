@@ -537,7 +537,8 @@ test('intraday signal engine enforces macro threshold, trend quality, live sessi
   assert.match(engine, /input\.macroScore >= 25/);
   assert.match(engine, /input\.macroScore <= -25/);
   assert.match(engine, /calculateKaufmanEfficiencyRatio\(closes, 14\)/);
-  assert.match(engine, /hurst <= 0\.55/);
+  assert.match(engine, /const hurst: number \| null = null/);
+  assert.doesNotMatch(engine, /estimateHurstExponent|HURST_NOT_TREND_PERSISTENT/);
   assert.match(engine, /ker < 0\.30/);
   assert.match(engine, /atr! \* 1\.35/);
   assert.match(engine, /riskDistance \* 2/);
