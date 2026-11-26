@@ -230,13 +230,16 @@ test('gold refresh route reuses the synchronized macro snapshot and CBOE observa
 test('public FairEconomy calendar is no-key, Tier-1-only, and records source provenance', () => {
   const macroData = read('../lib/macroData.ts');
   const types = read('../types/macro.ts');
-  const desk = read('../app/components/DeskTerminal.tsx');
+  const macroContext = read('../app/api/v1/macro-context/route.ts');
+  const signals = read('../app/api/v1/intraday-signals/route.ts');
   assert.match(macroData, /getFairEconomyCatalysts\(\),/);
   assert.doesNotMatch(macroData, /FAIRECONOMY_COMMERCIAL_USE_APPROVED === 'true' \? getFairEconomyCatalysts/);
   assert.match(macroData, /item\.impact === 'High'/);
   assert.match(macroData, /snapshot\.calendarProvider = calendarResult/);
   assert.match(types, /calendarProvider\?: 'FAIRECONOMY_PUBLIC'/);
-  assert.match(desk, /snapshot\.calendarSource === 'provider' && Boolean\(snapshot\.calendarProvider\)/);
+  assert.match(macroContext, /calendar_verified: snapshot\.calendarSource === 'provider' && Boolean\(snapshot\.calendarProvider\)/);
+  assert.match(macroContext, /const newsLockoutActive = snapshot\.calendarSource !== 'provider'/);
+  assert.match(signals, /const calendarVerified = snapshot\.calendarSource === 'provider' && Boolean\(snapshot\.calendarProvider\)/);
 });
 
 test('live quote API rounds each instrument to its display precision before JSON serialization', () => {
@@ -293,13 +296,17 @@ test('authenticated macro bridge accepts the configured MACRO_API_TOKEN through 
   assert.match(route, /consumePersistentRateLimit/);
 });
 
-test('desk pre-trade gate blocks stale quotes, low-confidence bias and below-minimum lot sizes', () => {
+test('intraday signal engine blocks stale quotes, weak macro bias and missing shield evidence while leaving lot sizing to the EA', () => {
   const desk = read('../app/components/DeskTerminal.tsx');
-  assert.match(desk, /dossier\.confidence === 'HIGH' \|\| dossier\.confidence === 'MODERATE'/);
-  assert.match(desk, /quoteIsFresh = quote\?\.freshness === 'LIVE'/);
-  assert.match(desk, /spreadPass = quoteIsFresh/);
-  assert.match(desk, /lots >= 0\.01/);
-  assert.match(desk, /account > 0/);
+  const engine = read('../lib/quant/intradaySignalEngine.ts');
+  assert.match(desk, /intradaySignals\.map/);
+  assert.match(engine, /input\.macroScore !== null && input\.macroScore >= 25/);
+  assert.match(engine, /LIVE_BBO_UNAVAILABLE_OR_STALE/);
+  assert.match(engine, /INTRADAY_CANDLES_STALE/);
+  assert.match(engine, /VIX_UNAVAILABLE/);
+  assert.match(engine, /CALENDAR_UNVERIFIED/);
+  assert.match(engine, /SHIELD_BLOCKED/);
+  assert.doesNotMatch(desk, /lots >= 0\.01|setSl\(|setTp\(/);
 });
 
 test('dashboard exposes anchored research workspaces and keeps BBO presentation in the desk terminal', () => {
@@ -321,18 +328,22 @@ test('MT5 macro bridge rejects unsupported instruments and withholds stale provi
   assert.match(route, /age_ms: Number\.isFinite\(ageMs\)/);
   assert.match(types, /freshness: 'FRESH' \| 'STALE' \| 'REFERENCE'/);
 });
-test('XAUUSD dashboard, desk gate and MT5 context use the dedicated gold macro engine', () => {
+test('XAUUSD dashboard, intraday signals and MT5 context use the dedicated gold macro engine', () => {
   const page = read('../app/page.tsx');
   const dashboard = read('../app/components/MacroDashboard.tsx');
-  const desk = read('../app/components/DeskTerminal.tsx');
+  const signals = read('../app/api/v1/intraday-signals/route.ts');
   const route = read('../app/api/v1/macro-context/route.ts');
+  const goldRoute = read('../app/api/v1/xauusd-context/route.ts');
   assert.match(page, /buildGoldMacroContext\(initialSnapshot\)/);
   assert.match(dashboard, /Gold Macro &amp; Liquidity Intelligence/);
-  assert.match(desk, /selected === 'XAUUSD' \? goldMacroPass : fxMacroPass/);
+  assert.match(signals, /isGold \? gold\.goldBiasScore/);
   assert.match(route, /const goldContext = await buildGoldMacroContext\(snapshot\)/);
   assert.match(route, /goldAvailable/);
   assert.match(route, /goldContext\?\.invalidationTriggers/);
+  assert.match(goldRoute, /buildGoldMacroContext\(snapshot\)/);
+  assert.match(goldRoute, /evaluateSovereignShield/);
 });
+
 test('keyed providers remain approval-gated while the public economic calendar works without a key', () => {
   const macroData = read('../lib/macroData.ts');
   const marketFeeds = read('../lib/marketFeeds.ts');
@@ -583,17 +594,23 @@ test('intraday candle adapter rejects malformed OHLC ranges and invalid timestam
   assert.match(route, /bars\.sort\(\(left, right\)/);
 });
 
-test('desk journal does not infer entry-time R or macro context when no entry snapshot exists', () => {
-  const desk = read('../app/components/DeskTerminal.tsx');
-  assert.match(desk, /riskAmountAtEntry = captured \? captured\.riskAmountUsdAtEntry \?\? null : null/);
-  assert.match(desk, /macroBiasScore = captured \? captured\.macroBiasScore \?\? null : null/);
-  assert.match(desk, /session: captured\?\.session \?\? 'UNKNOWN'/);
-  assert.match(desk, /rMultiple: riskAmountAtEntry && riskAmountAtEntry > 0/);
+test('broker trade history derives outcomes only from reconciled MT5 deals, without synthetic journal context', () => {
+  const accounts = read('../app/accounts/page.tsx');
+  assert.match(accounts, /const netDeal = \(deal: Deal\) => Number\(deal\.profit\) \+ Number\(deal\.commission\) \+ Number\(deal\.swap\) \+ Number\(deal\.fee\)/);
+  assert.match(accounts, /selectedDeals\.forEach\(\(deal\) =>/);
+  assert.match(accounts, /if \(!deal\.position_id\) return/);
+  assert.match(accounts, /items\.some\(\(deal\) => deal\.entry_type === 'IN'\)/);
+  assert.match(accounts, /items\.some\(closesPosition\)/);
+  assert.match(accounts, /net: items\.reduce\(\(sum, deal\) => sum \+ netDeal\(deal\), 0\)/);
+  assert.doesNotMatch(accounts, /riskPct|rMultiple|macroBiasScore|hurstRegime|vixLevel/);
 });
 
-test('desk journal macro attribution is computed for the recorded instrument, not the calculator selection', () => {
-  const desk = read('../app/components/DeskTerminal.tsx');
-  assert.match(desk, /generatePairDossier\(snapshot, journalSymbol\)\.biasScore/);
+test('account history attribution uses the broker-recorded position instrument and direction', () => {
+  const accounts = read('../app/accounts/page.tsx');
+  assert.match(accounts, /symbol: entry\.symbol/);
+  assert.match(accounts, /side: entry\.side/);
+  assert.match(accounts, /positionId/);
+  assert.doesNotMatch(accounts, /generatePairDossier|journalSymbol|calculator/i);
 });
 
 test('intraday candle adapter exposes real OHLCV with explicit freshness and no synthetic fallback', () => {
@@ -619,13 +636,15 @@ test('authenticated EA macro context includes intraday signals and MQL5 read-onl
   assert.match(bridge, /safe_to_trade = false/);
 });
 
-test('desk exposes load-to-calculator live signals without auto-executing trades', () => {
+test('desk exposes macro-aligned intraday signals as research context without calculator or order execution', () => {
   const desk = read('../app/components/DeskTerminal.tsx');
+  const signals = read('../app/api/v1/intraday-signals/route.ts');
   assert.match(desk, /LIVE EXECUTION SIGNALS/);
-  assert.match(desk, /LOAD INTO CALCULATOR/);
-  assert.match(desk, /setSl\(String\(signal\.slPips\)\)/);
-  assert.match(desk, /setTp\(String\(signal\.slPips! \* 2\)\)/);
-  assert.match(desk, /disabled=\{!canLoad\}/);
+  assert.match(desk, /intradaySignals\.map/);
+  assert.match(desk, /Research context only/);
+  assert.match(desk, /REFRESH SIGNALS/);
+  assert.match(signals, /executionAuthority: 'MANUAL_OR_EA_CONFIRMATION_REQUIRED'/);
+  assert.doesNotMatch(desk, /LOAD INTO CALCULATOR|setSl\(|setTp\(|OrderSend/);
 });
 
 test('provider health includes real EIA and Treasury observation dates and BIS-backed World Bank standby', () => {
