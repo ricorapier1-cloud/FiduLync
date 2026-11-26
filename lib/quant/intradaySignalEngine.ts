@@ -130,7 +130,7 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
     entryPrice: null, stopLoss: null, takeProfit1: null, takeProfit2: null, slPips: null,
     confluenceScore: 0, triggerRationale: rationale, macroScore: input.macroScore,
     hurst, ker, atr14: atr, atrUnit: isGold ? 'USD' : 'PIPS', session,
-    dataAsOfUtc: latest?.timestampUtc ?? null, blockers,
+    dataAsOfUtc: latest?.timestampUtc ?? null, blockers: [...new Set(blockers)],
     sovereignShieldStatus: input.marketShield?.status ?? null,
     marketRiskCeilingPct: input.marketShield?.maxAllowedRiskPct ?? 0,
     marketShieldFlags: input.marketShield?.blockReasons ?? [],
