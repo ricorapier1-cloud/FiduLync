@@ -196,7 +196,8 @@ export default function AccountsPage() {
               ['MARGIN LEVEL', selected.margin_level === null ? '—' : Number(selected.margin_level).toFixed(1) + '%'],
             ].map(([label, value]) => <div key={label} className="macro-panel p-4"><span className="macro-kpi-label">{label}</span><strong className="mt-2 block break-all font-mono text-lg text-slate-100">{value}</strong></div>)}
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-3 xl:grid-cols-4">
+          <div className="mt-3 grid grid-cols-2 gap-3 xl:grid-cols-5">
+            <div className="macro-panel p-4"><span className="macro-kpi-label">REALIZED NET P/L</span><strong className={'mt-2 block font-mono text-xl ' + (analytics.net >= 0 ? 'text-emerald-300' : 'text-amber-300')}>{money(analytics.net, selected.currency)}</strong></div>
             <div className="macro-panel p-4"><span className="macro-kpi-label">OPEN POSITIONS</span><strong className="mt-2 block font-mono text-xl text-slate-100">{selected.positions.length}</strong></div>
             <div className="macro-panel p-4"><span className="macro-kpi-label">CLOSED POSITIONS SYNCED</span><strong className="mt-2 block font-mono text-xl text-slate-100">{analytics.count}</strong></div>
             <div className="macro-panel p-4"><span className="macro-kpi-label">WIN RATE · CLOSED POSITIONS</span><strong className="mt-2 block font-mono text-xl text-slate-100">{analytics.winRate === null ? '—' : analytics.winRate.toFixed(1) + '%'}</strong></div>
