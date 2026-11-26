@@ -1,4 +1,4 @@
-export type SovereignShieldStatus = 'NORMAL' | 'ELEVATED_VOLATILITY' | 'BLACK_SWAN_LOCKOUT';
+export type SovereignShieldStatus = 'NORMAL' | 'ELEVATED_VOLATILITY' | 'BLACK_SWAN_LOCKOUT' | 'DATA_UNAVAILABLE';
 export type GovernanceState = {
   tradesToday: number | null;
   lossesToday: number | null;
@@ -27,13 +27,16 @@ export type SovereignShieldResult = {
 export function evaluateSovereignShield(input: SovereignShieldInput): SovereignShieldResult {
   const reasons: string[] = [];
   const vix = input.vix;
-  const volatilityLock = (vix !== null && vix >= 28)
-    || (input.intradayRangeAtrMultiple !== null && input.intradayRangeAtrMultiple !== undefined && input.intradayRangeAtrMultiple > 2.5);
-  const elevated = !volatilityLock && vix !== null && vix >= 22;
-  const status: SovereignShieldStatus = volatilityLock ? 'BLACK_SWAN_LOCKOUT' : elevated ? 'ELEVATED_VOLATILITY' : 'NORMAL';
-  let maxAllowedRiskPct = status === 'BLACK_SWAN_LOCKOUT' ? 0 : status === 'ELEVATED_VOLATILITY' ? 0.5 : 1;
+  const vixAvailable = typeof vix === 'number' && Number.isFinite(vix);
+  const volatilityLock = (vixAvailable && vix >= 28)
+    || (typeof input.intradayRangeAtrMultiple === 'number' && Number.isFinite(input.intradayRangeAtrMultiple) && input.intradayRangeAtrMultiple > 2.5);
+  const elevated = !volatilityLock && vixAvailable && vix >= 22;
+  const status: SovereignShieldStatus = volatilityLock ? 'BLACK_SWAN_LOCKOUT'
+    : !vixAvailable ? 'DATA_UNAVAILABLE'
+      : elevated ? 'ELEVATED_VOLATILITY' : 'NORMAL';
+  let maxAllowedRiskPct = status === 'BLACK_SWAN_LOCKOUT' || status === 'DATA_UNAVAILABLE' ? 0 : status === 'ELEVATED_VOLATILITY' ? 0.5 : 1;
 
-  if (vix === null) reasons.push('VIX_UNAVAILABLE');
+  if (!vixAvailable) reasons.push('VIX_UNAVAILABLE');
   if (volatilityLock) reasons.push('BLACK_SWAN_VOLATILITY_LOCKOUT');
   if (elevated) reasons.push('ELEVATED_VOLATILITY_HALF_RISK');
 
@@ -64,6 +67,7 @@ export function evaluateSovereignShield(input: SovereignShieldInput): SovereignS
   }
 
   const hardBlock = status === 'BLACK_SWAN_LOCKOUT'
+    || status === 'DATA_UNAVAILABLE'
     || spreadBlowoutBlock
     || eventWindow
     || !governanceVerified
