@@ -19,7 +19,7 @@ type JournalEntry = { id: string; timeUtc: string; symbol: string; result: 'WIN'
 type Journal = { dateWAT: string; trades: number; wins: number; losses: number; netPnl: number; entries: JournalEntry[] };
 type SymbolCode = string;
 type Direction = 'BUY' | 'SELL';
-const symbols: SymbolCode[] = ['EURUSD', 'XAUUSD', 'USDJPY'];
+const symbols: SymbolCode[] = ['EURUSD', 'GBPUSD', 'XAUUSD', 'USDJPY'];
 const currencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CHF', 'CAD'] as const;
 const JOURNAL_KEY = 'fidulync-desk-journal-v1';
 const TRADE_JOURNAL_KEY = 'fidulync-quant-trade-journal-v1';
@@ -443,7 +443,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
         <div className="desk-form-grid">
           <label>Account balance USD<input inputMode="decimal" placeholder="Enter live equity" value={balance} onChange={(e) => setBalance(e.target.value)} /></label>
           <label>Risk %<input inputMode="decimal" placeholder="Set risk per trade" value={riskPct} onChange={(e) => setRiskPct(e.target.value)} /></label>
-          <label>Instrument<select value={selected} onChange={(e) => { setSelected(e.target.value as SymbolCode); setJournalSymbol(e.target.value as SymbolCode); }}><option value="EURUSD">EUR/USD</option><option value="XAUUSD">XAU/USD</option><option value="USDJPY">USD/JPY</option>{satelliteSymbol && <option value={satelliteSymbol}>SATELLITE #1 · {satelliteSymbol}</option>}</select></label>
+          <label>Instrument<select value={selected} onChange={(e) => { setSelected(e.target.value as SymbolCode); setJournalSymbol(e.target.value as SymbolCode); }}><option value="EURUSD">EUR/USD</option><option value="GBPUSD">GBP/USD</option><option value="XAUUSD">XAU/USD</option><option value="USDJPY">USD/JPY</option>{satelliteSymbol && <option value={satelliteSymbol}>SATELLITE #1 · {satelliteSymbol}</option>}</select></label>
           <label>{selected === 'XAUUSD' ? 'Stop distance ($)' : 'Stop loss (pips)'}<input inputMode="decimal" placeholder="Enter planned stop" value={sl} onChange={(e) => setSl(e.target.value)} /></label>
           <label>{selected === 'XAUUSD' ? 'Target distance ($)' : 'Take profit (pips)'}<input inputMode="decimal" placeholder="Enter planned target" value={tp} onChange={(e) => setTp(e.target.value)} /></label>
           <label>Direction<select value={direction} onChange={(e) => setDirection(e.target.value as Direction)}><option value="BUY">BUY</option><option value="SELL">SELL</option></select></label>
