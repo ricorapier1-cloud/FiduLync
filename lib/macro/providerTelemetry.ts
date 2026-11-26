@@ -11,6 +11,15 @@ function latestDate(...dates: Array<string | undefined>): string | null {
   return dates.filter((date): date is string => Boolean(date) && Number.isFinite(Date.parse(date!))).sort().at(-1) ?? null;
 }
 
+function utcWeekWindow(): string {
+  const start = new Date();
+  start.setUTCHours(0, 0, 0, 0);
+  start.setUTCDate(start.getUTCDate() - ((start.getUTCDay() + 6) % 7));
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 6);
+  return start.toISOString().slice(0, 10) + ' → ' + end.toISOString().slice(0, 10) + ' UTC';
+}
+
 function feedStatus(available: boolean, fresh: boolean, configured: boolean) {
   if (available && fresh) return { status: 'HEALTHY' as const, freshness: 'LATEST PUBLISHED' as const };
   if (available) return { status: 'DEGRADED' as const, freshness: 'STALE' as const };
@@ -105,6 +114,6 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
     { name: 'Norges Bank policy rate', endpoint: 'https://data.norges-bank.no/api/data/IR/B.KPRA.SD.R', ...norgesBank, latencyMs: null, lastSuccessfulSyncUtc: null, latestObservationDate: nok?.policyRateObservationDate ?? null, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'US Bureau of Labor Statistics', endpoint: 'https://api.bls.gov/publicAPI/v2/timeseries/data/', ...bls, latencyMs: null, lastSuccessfulSyncUtc: null, latestObservationDate: latestDate(usd?.unemploymentObservationDate, usd?.wageGrowthObservationDate), rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'US Bureau of Economic Analysis', endpoint: 'https://apps.bea.gov/api/data/', ...bea, latencyMs: null, lastSuccessfulSyncUtc: null, latestObservationDate: usd?.gdpObservationDate ?? null, rateLimitRemaining: null, circuitBreakerTripped: false },
-    { name: 'Economic Calendar' + (snapshot.calendarProvider ? ' · ' + snapshot.calendarProvider : ''), endpoint: snapshot.calendarProvider === 'FAIRECONOMY_PUBLIC' ? 'https://nfs.faireconomy.media/ff_calendar_thisweek.json' : 'Provider calendar adapter', ...calendar, latencyMs: null, lastSuccessfulSyncUtc: null, latestObservationDate: latestDate(...snapshot.catalysts.map((item) => item.scheduledAt.slice(0, 10))), detail: calendarActive ? 'Verified ' + snapshot.calendarProvider + ' calendar feed; active weekly event window is evaluated and retained in UTC.' : 'No verified calendar provider is active. Event risk remains fail-closed; no static dates are inserted.', nextAction: calendarActive ? undefined : 'Restore an eligible public or entitled calendar adapter; event risk remains blocked until verified.', rateLimitRemaining: null, circuitBreakerTripped: false },
+    { name: 'Economic Calendar' + (snapshot.calendarProvider ? ' · ' + snapshot.calendarProvider : ''), endpoint: snapshot.calendarProvider === 'FAIRECONOMY_PUBLIC' ? 'https://nfs.faireconomy.media/ff_calendar_thisweek.json' : 'Provider calendar adapter', ...calendar, latencyMs: null, lastSuccessfulSyncUtc: null, latestObservationDate: latestDate(...snapshot.catalysts.map((item) => item.scheduledAt.slice(0, 10))), detail: calendarActive ? 'Verified ' + snapshot.calendarProvider + ' calendar feed; active weekly event window ' + utcWeekWindow() + '; provider event timestamps are retained in UTC.' : 'No verified calendar provider is active. Event risk remains fail-closed; no static dates are inserted.', nextAction: calendarActive ? undefined : 'Restore an eligible public or entitled calendar adapter; event risk remains blocked until verified.', rateLimitRemaining: null, circuitBreakerTripped: false },
   ];
 }
