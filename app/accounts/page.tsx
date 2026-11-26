@@ -210,8 +210,8 @@ export default function AccountsPage() {
           <div className="macro-panel overflow-x-auto">
             {closedTrades.length ? <table className="w-full min-w-[760px] text-xs">
               <thead className="text-left text-[10px] text-slate-500"><tr><th className="p-3">CLOSED · BROKER SERVER</th><th className="p-3">SYMBOL</th><th className="p-3">SIDE</th><th className="p-3">VOLUME</th><th className="p-3">NET TRADE P/L · {selected.currency}</th><th className="p-3">MAGIC / EA</th><th className="p-3">POSITION ID</th></tr></thead>
-              <tbody>{selectedDeals.slice(0,100).map((deal) => <tr key={deal.deal_ticket} className="border-t border-white/[0.06]">
-                <td className="p-3 text-slate-400">{deal.deal_time_utc}</td><td className="p-3 font-mono text-slate-100">{deal.symbol}</td><td className="p-3">{deal.side}</td><td className="p-3 font-mono">{deal.volume}</td><td className={'p-3 font-mono ' + (netDeal(deal) >= 0 ? 'text-emerald-300' : 'text-amber-300')}>{money(netDeal(deal), selected.currency)}</td><td className="p-3 font-mono">{deal.magic || '—'}</td><td className="p-3 font-mono">{deal.deal_ticket}</td>
+              <tbody>{closedTrades.slice(0,100).map((trade) => <tr key={trade.positionId} className="border-t border-white/[0.06]">
+                <td className="p-3 text-slate-400">{trade.closedAt}</td><td className="p-3 font-mono text-slate-100">{trade.symbol}</td><td className="p-3">{trade.side}</td><td className="p-3 font-mono">{trade.volume}</td><td className={'p-3 font-mono ' + (trade.net >= 0 ? 'text-emerald-300' : 'text-amber-300')}>{money(trade.net, selected.currency)}</td><td className="p-3 font-mono">{trade.magic || '—'}</td><td className="p-3 font-mono">{trade.positionId}</td>
               </tr>)}</tbody>
             </table> : <p className="p-5 text-xs text-slate-500">No fully reconciled closed-position history has arrived yet.</p>}
           </div>
