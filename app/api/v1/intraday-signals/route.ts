@@ -54,7 +54,7 @@ export async function GET(request: Request) {
       })
       .filter((item) => item.uncrowded && (item.confidence === 'HIGH' || item.confidence === 'MODERATE') && Math.abs(item.score) >= 25)
       .sort((a, b) => Math.abs(b.score) - Math.abs(a.score))[0]?.symbol ?? null;
-    const symbols = ['EURUSD', 'XAUUSD', 'USDJPY', ...(satellite ? [satellite] : [])];
+    const symbols = ['EURUSD', 'GBPUSD', 'XAUUSD', 'USDJPY', ...(satellite ? [satellite] : [])];
     const origin = new URL(request.url).origin;
     const quoteResponse = await fetch(new URL('/api/v1/live-quotes' + (satellite ? '?satellite=' + satellite : ''), origin), {
       cache: 'no-store', signal: AbortSignal.timeout(9_000),
