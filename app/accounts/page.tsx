@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 type Deal = {
-  account_key: string; deal_ticket: string; symbol: string; side: string; entry_type: string;
+  account_key: string; deal_ticket: string; position_id: string | null; symbol: string; side: string; entry_type: string;
   volume: number; price: number; profit: number; commission: number; swap: number; fee: number;
   deal_time_server: string; magic: string | null; comment: string | null;
 };
 type Position = {
-  ticket: string; symbol: string; side: string; volume: number; openPrice: number;
+  ticket: string; positionId: string | null; symbol: string; side: string; volume: number; openPrice: number;
   currentPrice: number; profit: number; swap: number; stopLoss: number | null;
   takeProfit: number | null; openedAtServer: string; magic: string | null; comment: string | null;
 };
@@ -70,10 +70,35 @@ export default function AccountsPage() {
 
   const selected = payload?.accounts[0] ?? null;
   const selectedDeals = useMemo(() => selected
-    ? (payload?.deals ?? []).filter((deal) => deal.account_key === selected.account_key && closed(deal))
+    ? (payload?.deals ?? []).filter((deal) => deal.account_key === selected.account_key)
     : [], [payload?.deals, selected]);
+  const closedTrades = useMemo(() => {
+    if (!selected) return [];
+    const openIds = new Set(selected.positions.map((position) => position.positionId).filter((value): value is string => Boolean(value)));
+    const groups = new Map<string, Deal[]>();
+    selectedDeals.forEach((deal) => {
+      if (!deal.position_id) return;
+      const current = groups.get(deal.position_id) ?? [];
+      current.push(deal);
+      groups.set(deal.position_id, current);
+    });
+    return [...groups.entries()].flatMap(([positionId, items]) => {
+      if (openIds.has(positionId) || !items.some(closesPosition)) return [];
+      const entry = items.find((deal) => deal.entry_type === 'IN' && (deal.side === 'BUY' || deal.side === 'SELL')) ?? items[0];
+      const exit = items.filter(closesPosition).sort((left, right) => right.deal_time_server.localeCompare(left.deal_time_server))[0];
+      return [{
+        positionId,
+        symbol: entry.symbol,
+        side: entry.side,
+        volume: items.filter((deal) => deal.entry_type === 'IN').reduce((sum, deal) => sum + Number(deal.volume), 0),
+        net: items.reduce((sum, deal) => sum + netDeal(deal), 0),
+        closedAt: exit.deal_time_server,
+        magic: entry.magic,
+      }];
+    }).sort((left, right) => right.closedAt.localeCompare(left.closedAt));
+  }, [selected, selectedDeals]);
   const analytics = useMemo(() => {
-    const values = selectedDeals.map(netDeal);
+    const values = closedTrades.map((trade) => trade.net);
     const wins = values.filter((value) => value > 0);
     const losses = values.filter((value) => value < 0);
     const grossWin = wins.reduce((sum, value) => sum + value, 0);
@@ -174,7 +199,7 @@ export default function AccountsPage() {
             {selected.positions.length ? <table className="w-full min-w-[720px] text-xs">
               <thead className="text-left text-[10px] text-slate-500"><tr><th className="p-3">SYMBOL</th><th className="p-3">SIDE</th><th className="p-3">VOLUME</th><th className="p-3">OPEN</th><th className="p-3">CURRENT</th><th className="p-3">FLOATING P/L</th><th className="p-3">OPENED · BROKER SERVER</th></tr></thead>
               <tbody>{selected.positions.map((position) => <tr key={position.ticket} className="border-t border-white/[0.06]">
-                <td className="p-3 font-mono text-slate-100">{position.symbol}</td><td className="p-3">{position.side}</td><td className="p-3 font-mono">{position.volume}</td><td className="p-3 font-mono">{position.openPrice}</td><td className="p-3 font-mono">{position.currentPrice}</td><td className={'p-3 font-mono ' + (position.profit >= 0 ? 'text-emerald-300' : 'text-amber-300')}>{money(position.profit + position.swap, selected.currency)}</td><td className="p-3 text-slate-400">{position.openedAtUtc}</td>
+                <td className="p-3 font-mono text-slate-100">{position.symbol}</td><td className="p-3">{position.side}</td><td className="p-3 font-mono">{position.volume}</td><td className="p-3 font-mono">{position.openPrice}</td><td className="p-3 font-mono">{position.currentPrice}</td><td className={'p-3 font-mono ' + (position.profit >= 0 ? 'text-emerald-300' : 'text-amber-300')}>{money(position.profit + position.swap, selected.currency)}</td><td className="p-3 text-slate-400">{position.openedAtServer}</td>
               </tr>)}</tbody>
             </table> : <p className="p-5 text-xs text-slate-500">No open positions reported by the latest account snapshot.</p>}
           </div>
