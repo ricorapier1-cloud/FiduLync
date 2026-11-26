@@ -57,7 +57,7 @@ function ema(values: number[], period: number): number | null {
 }
 
 function vwap(bars: OhlcvBar[]): number | null {
-  const window = bars.slice(-48);
+  const window = bars.slice(-20);
   const usable = window.filter((bar) => finite(bar.volume) && bar.volume > 0);
   const volume = usable.reduce((sum, bar) => sum + (bar.volume ?? 0), 0);
   return volume > 0 ? usable.reduce((sum, bar) => sum + ((bar.high + bar.low + bar.close) / 3) * (bar.volume ?? 0), 0) / volume : null;
@@ -121,7 +121,13 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
   }
   if (blockers.length) return empty('WAIT_NO_SETUP', 'Macro, OHLCV history or trend-quality confirmation is insufficient.');
 
-  const prior = bars.slice(-13, -1);
+  const latestWatDate = latest ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(latest.timestampUtc)) : '';
+  const sessionReference = bars.filter((bar) => {
+    const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(bar.timestampUtc));
+    const hour = watHour(bar.timestampUtc);
+    return date === latestWatDate && (session === 'LONDON' ? hour < 8 : hour >= 8 && hour < 12);
+  });
+  const prior = sessionReference.length ? sessionReference : bars.slice(-13, -1);
   const priorHigh = Math.max(...prior.map((bar) => bar.high));
   const priorLow = Math.min(...prior.map((bar) => bar.low));
   const sweptHigh = Boolean(latest && latest.high > priorHigh && latest.close < priorHigh);
@@ -148,7 +154,7 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
     takeProfit1: round(takeProfit1, digits), takeProfit2: round(takeProfit2, digits),
     slPips: round(riskDistance / pipSize, isGold ? 2 : 1), confluenceScore: score,
     triggerRationale: rationale, macroScore: input.macroScore, hurst, ker,
-    atr14: round(atr!, isGold ? 2 : digits), atrUnit: isGold ? 'USD' : 'PIPS',
+    atr14: round(atr! / pipSize, isGold ? 2 : 1), atrUnit: isGold ? 'USD' : 'PIPS',
     session, dataAsOfUtc: latest?.timestampUtc ?? null, blockers: [],
   };
 }
