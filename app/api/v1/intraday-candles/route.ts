@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { OhlcvBar } from '@/lib/quant/technicalConfluence';
+import { getCachedData } from '@/lib/redisCache';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -57,10 +58,10 @@ export async function GET(request: Request) {
   const symbol = (new URL(request.url).searchParams.get('symbol') ?? '').trim().toUpperCase();
   if (!ALLOWED.has(symbol)) return NextResponse.json({ error: 'Unsupported instrument.' }, { status: 400 });
   try {
-    const [intraday, daily] = await Promise.all([
+    const [intraday, daily] = await getCachedData('intraday:ohlcv:v1:' + symbol, () => Promise.all([
       loadBars(symbol, '5m', '5d'),
       loadBars(symbol, '1d', '1mo'),
-    ]);
+    ]), 60);
     const latest = intraday.at(-1);
     const ageMs = latest ? Date.now() - Date.parse(latest.timestampUtc) : null;
     const fresh = ageMs !== null && ageMs >= -60_000 && ageMs <= 15 * 60_000;
