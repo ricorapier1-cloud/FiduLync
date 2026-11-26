@@ -252,12 +252,6 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
     document.addEventListener('visibilitychange', onVisibility);
     return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisibility); };
   }, [ready, refreshFx]);
-  useEffect(() => {
-    if (journal.dateWAT !== currentDateWAT) {
-      const timer = window.setTimeout(() => setJournal(blankJournal(currentDateWAT)), 0);
-      return () => window.clearTimeout(timer);
-    }
-  }, [journal.dateWAT, currentDateWAT]);
 
   const strength = useMemo(() => {
     if (fxRows.length < 2) return [];
@@ -414,11 +408,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
             <p className="mt-2 text-[10px] leading-relaxed text-slate-400">{signal.triggerRationale}</p>
             {signal.blockers.length > 0 && <p className="mt-2 text-[10px] text-amber-300">{signal.blockers.join(' · ')}</p>}
             <p className="mt-1 text-[9px] text-slate-500">Spread baseline: {signal.spreadBaselineStatus ?? 'UNAVAILABLE'} · {signal.spreadBaselineObservations ?? 0}/20 samples</p>
-            <button type="button" className="desk-record-button mt-3 w-full" disabled={!canLoad} onClick={() => {
-              setSelected(signal.symbol); setJournalSymbol(signal.symbol); setDirection(signal.direction as Direction);
-              setSl(String(signal.slPips)); setTp(String(signal.slPips! * 2));
-              document.getElementById('desk-position-sizing')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }}>LOAD INTO CALCULATOR</button>
+            <p className="mt-3 text-[10px] text-slate-500">Research context only. Your MT5 EA independently validates technical structure and execution.</p>
             {signal.dataAsOfUtc && <small className="mt-2 block text-[9px] text-slate-500">OHLCV {signal.dataAsOfUtc} · {signal.session}</small>}
           </div>;
         })}
@@ -426,7 +416,6 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
       </div>
       <div className="desk-syncline"><span>Signal refresh {signalSyncUtc ?? 'NOT AVAILABLE'}</span><span>Macro score ≥ +25 BUY / ≤ −25 SELL</span><span>Signals are research-only; MT5 must independently validate spread and execution</span><button type="button" onClick={() => void refreshIntradaySignals()}>REFRESH SIGNALS</button></div>
     </article>
-    <div className="desk-workflow"><strong>DESK WORKFLOW</strong><span>1 Macro Bias</span><b>→</b><span>2 Position Sizing</span><b>→</b><span>3 6/6 Gate</span><b>→</b><span>4 MT5 Execution</span><b>→</b><span>5 Trade Journal</span></div>
     <div className="desk-grid">
       <article className="desk-panel"><header><div><span className="desk-kicker">A / UNIFIED CURRENCY MATRIX</span><h3>Spot Momentum vs Fundamental Rate Strength</h3></div><small>20-DAY REFERENCE · LIVE MACRO</small></header>
         <div className="overflow-x-auto"><table className="w-full min-w-[480px] text-xs"><thead><tr className="border-b border-white/10 text-left text-[10px] font-mono text-slate-500"><th className="py-2">CCY</th><th className="py-2">SPOT MOMENTUM / 10</th><th className="py-2">MACRO RATE / 100</th><th className="py-2">RELATION</th></tr></thead><tbody>
