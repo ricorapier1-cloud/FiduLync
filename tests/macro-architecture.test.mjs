@@ -82,20 +82,17 @@ test('architecture: macro context API is read-only and contains no order executi
   assert.match(macroContextRoute, /Retry-After/);
 });
 
-test('trade journal provides private local ledger, performance analytics and portable import/export', () => {
-  assert.match(notebookPage, /fidulync-quant-trade-journal-v1/);
-  assert.match(notebookPage, /Profit Factor|PROFIT FACTOR/);
-  assert.match(notebookPage, /MAX DRAWDOWN/);
-  assert.match(notebookPage, /macroAlignment/);
-  assert.match(notebookPage, /Export CSV|exportCsv/);
-  assert.match(notebookPage, /Import JSON \/ CSV/);
-  assert.match(notebookPage, /localStorage/);
-  assert.match(notebookPage, /sanitizeDeskRecord/);
-  assert.match(notebookPage, /capturedAtEntry/);
-  assert.match(notebookPage, /rMultiple: null/);
-  assert.match(notebookPage, /\[\.\.\.fromDesk, \.\.\.imported\]/);
-  assert.match(notebookPage, /maxDd:validStartingEquity\?maxDd:null/);
+test('architecture: manual journal is retired and legacy route redirects to account intelligence', () => {
+  assert.match(notebookPage, /redirect\('\/accounts'\)/);
+  const shell = read('../components/PlatformShell.tsx');
+  const footer = read('../components/PlatformFooter.tsx');
+  const desk = read('../app/components/DeskTerminal.tsx');
+  assert.match(shell, /Portfolio & Accounts/);
+  assert.match(footer, /Portfolio &amp; Account Intelligence/);
+  assert.doesNotMatch(shell + footer + desk, /Trade Journal|Position Sizing|LIVE RISK CALCULATOR|WAT Daily Circuit Breaker|Mandatory 6\/6 Pre-Trade Gate/);
+  assert.doesNotMatch(desk, /fidulync-quant-trade-journal-v1|fidulync-desk-journal-v1/);
 });
+
 
 test('public MT5 bridge is read-only macro context with no licensing, heartbeat or synthetic tester path', () => {
   const bridge = read('../public/mql5/MacroLyncBridge.mqh');
