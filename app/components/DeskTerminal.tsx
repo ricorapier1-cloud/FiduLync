@@ -119,14 +119,17 @@ export default function DeskTerminal({ initialSnapshot, onSnapshotChange, onGold
     return () => { active = false; window.clearInterval(timer); };
   }, []);
   useEffect(() => {
-    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-    try {
-      const savedMode = window.localStorage.getItem('fidulync-manual-desk-mode-v1') === 'true';
-      const raw = window.localStorage.getItem('fidulync-manual-desk-ledger-v1');
-      const saved = raw ? JSON.parse(raw) as { date?: string; trades?: number; losses?: number; legs?: string[] } : null;
-      setManualDeskMode(savedMode);
-      setManualLedger(saved?.date === today ? { date: today, trades: Math.min(2, Math.max(0, saved.trades ?? 0)), losses: Math.min(2, Math.max(0, saved.losses ?? 0)), legs: Array.isArray(saved.legs) ? saved.legs : [] } : { date: today, trades: 0, losses: 0, legs: [] });
-    } catch { setManualDeskMode(false); setManualLedger({ date: today, trades: 0, losses: 0, legs: [] }); }
+    const timer = window.setTimeout(() => {
+      const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+      try {
+        const savedMode = window.localStorage.getItem('fidulync-manual-desk-mode-v1') === 'true';
+        const raw = window.localStorage.getItem('fidulync-manual-desk-ledger-v1');
+        const saved = raw ? JSON.parse(raw) as { date?: string; trades?: number; losses?: number; legs?: string[] } : null;
+        setManualDeskMode(savedMode);
+        setManualLedger(saved?.date === today ? { date: today, trades: Math.min(2, Math.max(0, saved.trades ?? 0)), losses: Math.min(2, Math.max(0, saved.losses ?? 0)), legs: Array.isArray(saved.legs) ? saved.legs : [] } : { date: today, trades: 0, losses: 0, legs: [] });
+      } catch { setManualDeskMode(false); setManualLedger({ date: today, trades: 0, losses: 0, legs: [] }); }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
   const saveManualLedger = (next: typeof manualLedger) => {
     setManualLedger(next);
