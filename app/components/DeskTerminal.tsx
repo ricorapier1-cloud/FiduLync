@@ -83,6 +83,8 @@ export default function DeskTerminal({ initialSnapshot, onSnapshotChange, onGold
   const [forceSyncing, setForceSyncing] = useState(false);
   const [intradaySignals, setIntradaySignals] = useState<IntradaySignal[]>([]);
   const [signalSyncUtc, setSignalSyncUtc] = useState<string | null>(null);
+  const [manualDeskMode, setManualDeskMode] = useState(false);
+  const [manualLedger, setManualLedger] = useState<{ date: string; trades: number; losses: number; legs: string[] }>({ date: '', trades: 0, losses: 0, legs: [] });
 
   const quoteFor = useCallback((symbol: string) => quotes.find((q) => q.symbol === symbol) ?? null, [quotes]);
   const refreshIntradaySignals = useCallback(async () => {
@@ -116,6 +118,24 @@ export default function DeskTerminal({ initialSnapshot, onSnapshotChange, onGold
     const timer = window.setInterval(() => void load(), 60_000);
     return () => { active = false; window.clearInterval(timer); };
   }, []);
+  useEffect(() => {
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    try {
+      const savedMode = window.localStorage.getItem('fidulync-manual-desk-mode-v1') === 'true';
+      const raw = window.localStorage.getItem('fidulync-manual-desk-ledger-v1');
+      const saved = raw ? JSON.parse(raw) as { date?: string; trades?: number; losses?: number; legs?: string[] } : null;
+      setManualDeskMode(savedMode);
+      setManualLedger(saved?.date === today ? { date: today, trades: Math.min(2, Math.max(0, saved.trades ?? 0)), losses: Math.min(2, Math.max(0, saved.losses ?? 0)), legs: Array.isArray(saved.legs) ? saved.legs : [] } : { date: today, trades: 0, losses: 0, legs: [] });
+    } catch { setManualDeskMode(false); setManualLedger({ date: today, trades: 0, losses: 0, legs: [] }); }
+  }, []);
+  const saveManualLedger = (next: typeof manualLedger) => {
+    setManualLedger(next);
+    try { window.localStorage.setItem('fidulync-manual-desk-ledger-v1', JSON.stringify(next)); } catch { setManualDeskMode(false); }
+  };
+  const toggleManualDeskMode = (enabled: boolean) => {
+    setManualDeskMode(enabled);
+    try { window.localStorage.setItem('fidulync-manual-desk-mode-v1', String(enabled)); } catch { setManualDeskMode(false); }
+  };
   const hourWAT = zonedDecimalHour(new Date(now), 'Africa/Lagos');
   const watDay = new Date(now + 60 * 60_000).getUTCDay();
   const isWeekdayWAT = watDay >= 1 && watDay <= 5;
@@ -265,18 +285,19 @@ export default function DeskTerminal({ initialSnapshot, onSnapshotChange, onGold
       <div><span className="desk-kicker">MACROLYNC / PRIVATE SYSTEMATIC RESEARCH</span><h2>MacroLync Terminal</h2></div>
       <div className="desk-top-meta"><span className={quoteStatus === 'HEALTHY' && quotes.every((item) => item.freshness === 'LIVE' && item.ageMs !== null && item.ageMs <= 60_000) ? 'desk-live' : 'desk-warning'}><i />{quoteStatus === 'HEALTHY' && quotes.some((item) => item.freshness === 'LIVE' && item.ageMs !== null && item.ageMs <= 60_000) ? 'FRESH BBO · 15s' : quoteStatus === 'HEALTHY' ? 'STALE BBO' : quoteStatus}</span><span>WAT {watClock}</span><span>UTC {utcClock}</span><span className={healthyProviderCount === totalProviderCount && totalProviderCount > 0 ? 'desk-live' : 'desk-warning'}>DATA HEALTH {healthyProviderCount}/{totalProviderCount}</span><button type="button" onClick={() => void forceSync()} disabled={forceSyncing}>{forceSyncing ? 'SYNCING…' : 'FORCE SYNC'}</button></div>
     </div>
-    <section className="mb-3 rounded-lg border border-red-500/40 bg-[#1b1114] p-3 sm:p-4" aria-label="Desk command banner">
+    <section className={`mb-3 rounded-lg border p-3 sm:p-4 ${manualDeskMode ? 'border-amber-400/40 bg-[#17170f]' : 'border-red-500/40 bg-[#1b1114]'}`} aria-label="Desk command banner">
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div><span className="desk-kicker">EXECUTIVE DESK COMMAND · AFRICA/LAGOS</span><h3 className="mt-1 text-sm font-semibold tracking-wide text-red-300">STAND DOWN · LOCKOUT ACTIVE · 0.0% RISK</h3></div>
-          <span className="rounded border border-red-400/40 px-2 py-1 text-[10px] font-mono text-red-200">ACCOUNT GOVERNANCE UNVERIFIED</span>
+          <div><span className="desk-kicker">EXECUTIVE DESK COMMAND · AFRICA/LAGOS</span><h3 className={`mt-1 text-sm font-semibold tracking-wide ${manualDeskMode && activeSession !== 'OFF-SESSION' && manualLedger.trades < 2 && manualLedger.losses < 2 ? 'text-amber-300' : 'text-red-300'}`}>{manualDeskMode && activeSession !== 'OFF-SESSION' && manualLedger.trades < 2 && manualLedger.losses < 2 ? 'MANUAL DESK · ' + (snapshot.sovereignShield?.status === 'ELEVATED_VOLATILITY_HALF_RISK' ? 'HALF-RISK' : 'CLEARED') : 'STAND DOWN · LOCKOUT ACTIVE'}</h3></div>
+          <label className="flex items-center gap-2 rounded border border-white/15 px-3 py-2 text-xs text-slate-100"><input type="checkbox" checked={manualDeskMode} onChange={(event) => toggleManualDeskMode(event.target.checked)} /> Manual Desk Mode (Browser Ledger Verified)</label>
         </div>
-        <p className="text-xs text-slate-200">Reason: No authenticated MT5 account ledger is connected. Daily trade count, daily losses and currency-leg exposure cannot be verified, so this terminal does not clear manual or EA execution.</p>
+        <p className="text-xs text-slate-300">{manualDeskMode ? 'Manual mode uses this browser’s local ledger; it is not an authenticated MT5 account statement and does not authorize automated EA calls.' : 'No authenticated MT5 account ledger is connected. Manual execution remains locked until Browser Ledger Verified mode is explicitly enabled.'}</p>
         <div className="grid grid-cols-1 gap-3 border-t border-white/10 pt-3 sm:grid-cols-3">
           <div><span className="desk-kicker">ACTIVE WAT SESSION</span><strong className="mt-1 block text-sm text-slate-100">{activeSession === 'OFF-SESSION' ? 'OFF-SESSION DEAD ZONE' : activeSession + ' EXECUTION'}</strong><small className="text-slate-400">{activeSession === 'OFF-SESSION' ? 'Next session opens in ' + durationLabel(nextWATSessionOpen(now) - now) : 'Session closes in ' + durationLabel((activeSession === 'LONDON' ? 12 : 17) * 60 * 60_000 - (hourWAT * 60 * 60_000))}</small></div>
-          <div><span className="desk-kicker">TODAY’S APPROVED PLAYBOOK</span><strong className="mt-1 block text-sm text-slate-100">NO EXECUTION CLEARED</strong><small className="text-slate-400">{intradaySignals.filter((item) => item.signalState === 'ACTIVE_SETUP').length ? 'Research candidates: ' + intradaySignals.filter((item) => item.signalState === 'ACTIVE_SETUP').map((item) => item.direction + ' ' + item.symbol).join(' · ') : 'Wait for a fully validated macro-aligned setup'}</small></div>
-          <div><span className="desk-kicker">DAILY RISK BUDGET</span><strong className="mt-1 block text-sm text-slate-100">Trades: UNVERIFIED · Losses: UNVERIFIED</strong><small className="text-slate-400">Locked currency legs: UNVERIFIED · MT5 ledger required</small></div>
+          <div><span className="desk-kicker">TODAY’S APPROVED PLAYBOOK</span><strong className="mt-1 block text-sm text-slate-100">{manualDeskMode && activeSession !== 'OFF-SESSION' ? 'MANUAL REVIEW PERMITTED' : 'NO EXECUTION CLEARED'}</strong><small className="text-slate-400">{intradaySignals.filter((item) => item.signalState === 'ACTIVE_SETUP').length ? intradaySignals.filter((item) => item.signalState === 'ACTIVE_SETUP').map((item) => item.direction + ' ' + item.symbol).join(' · ') : 'Wait for a fully validated macro-aligned setup'}</small></div>
+          <div><span className="desk-kicker">DAILY RISK BUDGET · WAT</span><strong className="mt-1 block text-sm text-slate-100">Trades: {manualDeskMode ? manualLedger.trades + '/2' : 'UNVERIFIED'} · Losses: {manualDeskMode ? manualLedger.losses + '/2' : 'UNVERIFIED'}</strong><small className="text-slate-400">Locked currency legs: {manualDeskMode ? manualLedger.legs.join(', ') || 'None' : 'UNVERIFIED'}</small></div>
         </div>
+        {manualDeskMode && <div className="flex flex-wrap gap-2 text-xs"><button type="button" disabled={manualLedger.trades >= 2} onClick={() => saveManualLedger({ ...manualLedger, trades: manualLedger.trades + 1 })} className="rounded border border-white/20 px-3 py-2 disabled:opacity-40">LOG TRADE</button><button type="button" disabled={manualLedger.losses >= 2} onClick={() => saveManualLedger({ ...manualLedger, losses: manualLedger.losses + 1 })} className="rounded border border-white/20 px-3 py-2 disabled:opacity-40">LOG LOSS</button>{['USD','EUR','GBP','JPY','AUD','CHF','CAD'].map((leg) => <button key={leg} type="button" disabled={manualLedger.legs.includes(leg)} onClick={() => saveManualLedger({ ...manualLedger, legs: [...manualLedger.legs, leg] })} className="rounded border border-white/20 px-2 py-2 disabled:opacity-40">LOCK {leg}</button>)}</div>}
       </div>
     </section>
     <div className="desk-quote-grid">{displaySymbols.map((symbol) => {
