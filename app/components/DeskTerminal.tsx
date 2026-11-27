@@ -40,6 +40,33 @@ function readStorage<T>(key: string): T | null {
 }
 function display(value: number | null | undefined, digits: number) { return value === null || value === undefined || !Number.isFinite(value) ? '—' : value.toFixed(digits); }
 function clamp(value: number, min: number, max: number) { return Math.max(min, Math.min(max, value)); }
+function explainBlocker(code: string): string {
+  const labels: Record<string, string> = {
+    VIX_UNAVAILABLE: 'Volatility reference unavailable',
+    VIX_BLACK_SWAN_LOCKOUT: 'Extreme volatility lockout',
+    CALENDAR_UNVERIFIED: 'Economic calendar not verified',
+    RATE_DECISION_LOCKOUT: 'Central-bank decision window',
+    TIER_ONE_EVENT_LOCKOUT: 'High-impact news window',
+    OUTSIDE_LONDON_NEW_YORK_WAT_WINDOWS: 'Outside London / New York WAT session',
+    SPREAD_BASELINE_UNAVAILABLE: 'Spread reference unavailable',
+    SPREAD_BLOWOUT_BLOCK: 'Spread is more than 2× normal',
+    LIVE_BBO_UNAVAILABLE_OR_STALE: 'Live bid / ask is stale or unavailable',
+    INTRADAY_CANDLES_STALE: 'Intraday candles are stale',
+    MACRO_SCORE_BELOW_20_THRESHOLD: 'Gold macro score below threshold',
+    MACRO_SCORE_BELOW_25_THRESHOLD: 'FX macro score below threshold',
+    KER_BELOW_0_30: 'Price efficiency below 0.30',
+    HURST_UNAVAILABLE: 'Trend regime estimate unavailable',
+    HURST_NOT_TREND_PERSISTENT: 'Trend persistence not confirmed',
+    MEAN_REVERSION_ONLY: 'Mean-reversion regime: trend entry disabled',
+    ZSCORE_UNAVAILABLE: '20-period Z-score unavailable',
+    ZSCORE_ENTRY_TOO_EXTENDED: 'Price is too extended from its mean',
+    WAIT_FOR_STATISTICAL_PULLBACK: 'Wait for the statistical pullback zone',
+    ADR_HISTORY_UNAVAILABLE: '14-day average range unavailable',
+    ADR_EXHAUSTED_WAIT_PULLBACK: 'Daily range ≥85% of ADR: wait for pullback',
+    OHLCV_HISTORY_INSUFFICIENT: 'Price history is insufficient',
+  };
+  return labels[code] ?? code.toLowerCase().replaceAll('_', ' ');
+}
 
 export default function DeskTerminal({ initialSnapshot, onSnapshotChange, onGoldContextChange }: { initialSnapshot: MacroSnapshot; initialGoldContext: GoldMacroContext | null; onSnapshotChange: (snapshot: MacroSnapshot) => void; onGoldContextChange: (context: GoldMacroContext | null) => void }) {
   const snapshot = initialSnapshot;
@@ -287,8 +314,8 @@ export default function DeskTerminal({ initialSnapshot, onSnapshotChange, onGold
             </div>
             <p className="mt-2 text-[10px] leading-relaxed text-slate-400">{signal.triggerRationale}</p>
              <p className="mt-1 text-[9px] font-mono text-slate-500">SOVEREIGN SHIELD {signal.sovereignShieldStatus ?? 'UNAVAILABLE'} · MARKET RISK CEILING {signal.marketRiskCeilingPct?.toFixed(2) ?? '—'}%</p>
-             {signal.marketShieldFlags && signal.marketShieldFlags.length > 0 && <p className="mt-1 text-[9px] text-amber-300">SHIELD FLAGS {signal.marketShieldFlags.join(' · ')}</p>}
-            {signal.blockers.length > 0 && <p className="mt-2 text-[10px] text-amber-300">{signal.blockers.join(' · ')}</p>}
+             {signal.marketShieldFlags && signal.marketShieldFlags.length > 0 && <p className="mt-1 text-[9px] text-amber-300">SHIELD FLAGS {signal.marketShieldFlags.map(explainBlocker).join(' · ')}</p>}
+            {signal.blockers.length > 0 && <p className="mt-2 text-[10px] text-amber-300">{signal.blockers.map(explainBlocker).join(' · ')}</p>}
             <p className="mt-1 text-[9px] text-slate-500">Spread guard: {signal.spreadBaselineStatus === 'CONFIGURED_REFERENCE' ? 'CONFIGURED REFERENCE' : signal.spreadBaselineStatus ?? 'UNAVAILABLE'} · {signal.spreadBaselineObservations ?? 0} observed samples</p>
             <p className="mt-3 text-[10px] text-slate-500">Research context only. Your MT5 EA independently validates technical structure and execution.</p>
             {signal.dataAsOfUtc && <small className="mt-2 block text-[9px] text-slate-500">OHLCV {signal.dataAsOfUtc} · {signal.session}</small>}
