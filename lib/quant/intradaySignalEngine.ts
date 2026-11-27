@@ -1,6 +1,7 @@
 import {
   calculateAtr,
   calculateKaufmanEfficiencyRatio,
+  estimateHurstExponent,
   type OhlcvBar,
 } from '@/lib/quant/technicalConfluence';
 import type { MarketRiskShieldResult } from '@/lib/quant/sovereignShield';
@@ -32,6 +33,15 @@ export type IntradaySignal = {
   sovereignShieldStatus?: MarketRiskShieldResult['status'] | null;
   marketRiskCeilingPct?: number;
   marketShieldFlags?: string[];
+  zScore: number | null;
+  zScoreZone: 'DISCOUNT_PULLBACK' | 'PREMIUM_PULLBACK' | 'EXTENDED' | 'NEUTRAL' | 'UNAVAILABLE';
+  hurstRegime: 'TREND_CONTINUATION' | 'MEAN_REVERSION_ONLY' | 'RANDOM_WALK_NOISE' | 'UNAVAILABLE';
+  adr14: number | null;
+  adrUsedPct: number | null;
+  pdh: number | null;
+  pdl: number | null;
+  asianRangeHigh: number | null;
+  asianRangeLow: number | null;
 };
 export type IntradaySignalInput = {
   symbol: string;
@@ -70,7 +80,7 @@ function vwap(bars: OhlcvBar[]): number | null {
   return volume > 0 ? usable.reduce((sum, bar) => sum + ((bar.high + bar.low + bar.close) / 3) * (bar.volume ?? 0), 0) / volume : null;
 }
 
-function watHour(timestamp: string): number {
+function watDateForSignal(timestamp: string): string {\n  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(timestamp));\n}\n\nfunction watHour(timestamp: string): number {
   const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Lagos', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(timestamp));
   return Number(parts.find((part) => part.type === 'hour')?.value ?? -1)
     + Number(parts.find((part) => part.type === 'minute')?.value ?? 0) / 60;
@@ -102,9 +112,29 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
   const daily = input.dailyBars;
   const closes = bars.map((bar) => bar.close);
   // Hurst remains unavailable to the execution desk until its estimator is independently validated.
-  const hurst: number | null = null;
+  const hurst = estimateHurstExponent(closes);
   const ker = calculateKaufmanEfficiencyRatio(closes, 14);
   const atr = calculateAtr(daily, 14);
+  const zWindow = closes.slice(-20);
+  const zMean = zWindow.length === 20 ? mean(zWindow) : null;
+  const zVariance = zMean === null ? null : mean(zWindow.map((value) => (value - zMean) ** 2));
+  const zScore = zMean !== null && zVariance !== null && zVariance > 0 && finite(input.quoteMid)
+    ? (input.quoteMid - zMean) / Math.sqrt(zVariance) : null;
+  const completedDaily = daily.length >= 15 ? daily.slice(-15, -1) : [];
+  const adrRanges = completedDaily.map((bar) => bar.high - bar.low).filter((value) => Number.isFinite(value) && value > 0);
+  const adr14 = adrRanges.length === 14 ? mean(adrRanges) : null;
+  const todayWAT = watDateForSignal(now);
+  const todayBars = bars.filter((bar) => watDateForSignal(bar.timestampUtc) === todayWAT);
+  const todayRange = todayBars.length ? Math.max(...todayBars.map((bar) => bar.high)) - Math.min(...todayBars.map((bar) => bar.low)) : null;
+  const adrUsedPct = adr14 !== null && todayRange !== null && adr14 > 0 ? todayRange / adr14 * 100 : null;
+  const priorDay = daily.length >= 2 ? daily.at(-2)! : null;
+  const asianBars = bars.filter((bar) => watDateForSignal(bar.timestampUtc) === todayWAT && watHour(bar.timestampUtc) < 8);
+  const asianRangeHigh = asianBars.length ? Math.max(...asianBars.map((bar) => bar.high)) : null;
+  const asianRangeLow = asianBars.length ? Math.min(...asianBars.map((bar) => bar.low)) : null;
+  const hurstRegime = hurst === null ? 'UNAVAILABLE' as const : hurst < 0.45 ? 'MEAN_REVERSION_ONLY' as const : hurst > 0.52 ? 'TREND_CONTINUATION' as const : 'RANDOM_WALK_NOISE' as const;
+  const zScoreZone = zScore === null ? 'UNAVAILABLE' as const : Math.abs(zScore) > 2.5 ? 'EXTENDED' as const
+    : direction === 'BUY' && zScore <= -1 && zScore >= -2 ? 'DISCOUNT_PULLBACK' as const
+      : direction === 'SELL' && zScore >= 1 && zScore <= 2 ? 'PREMIUM_PULLBACK' as const : 'NEUTRAL' as const;
   const latest = bars.at(-1);
   const quoteAge = input.quoteTimestampUtc ? Date.parse(now) - Date.parse(input.quoteTimestampUtc) : Number.POSITIVE_INFINITY;
   const candleAge = latest ? Date.parse(now) - Date.parse(latest.timestampUtc) : Number.POSITIVE_INFINITY;
@@ -123,7 +153,7 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
   if (!Number.isFinite(candleAge) || candleAge < -60_000 || candleAge > 15 * 60_000) blockers.push('INTRADAY_CANDLES_STALE');
   if (direction === 'NONE') blockers.push(`MACRO_SCORE_BELOW_${isGold ? 20 : 25}_THRESHOLD`);
   if (bars.length < 60 || daily.length < 15 || !finite(ker) || !finite(atr)) blockers.push('OHLCV_HISTORY_INSUFFICIENT');
-  if (finite(ker) && ker < 0.30) blockers.push('KER_BELOW_0_30');
+  if (finite(ker) && ker < 0.30) blockers.push('KER_BELOW_0_30');\n  if (hurst === null) blockers.push('HURST_UNAVAILABLE');\n  else if (hurst <= 0.52) blockers.push(hurst < 0.45 ? 'MEAN_REVERSION_ONLY' : 'HURST_NOT_TREND_PERSISTENT');\n  if (zScore === null) blockers.push('ZSCORE_UNAVAILABLE');\n  else if (Math.abs(zScore) > 2.5) blockers.push('ZSCORE_ENTRY_TOO_EXTENDED');\n  else if (direction !== 'NONE' && zScoreZone !== (direction === 'BUY' ? 'DISCOUNT_PULLBACK' : 'PREMIUM_PULLBACK')) blockers.push('WAIT_FOR_STATISTICAL_PULLBACK');\n  if (adrUsedPct === null) blockers.push('ADR_HISTORY_UNAVAILABLE');\n  else if (adrUsedPct >= 85) blockers.push('ADR_EXHAUSTED_WAIT_PULLBACK');
 
   const empty = (state: IntradaySignalState, rationale: string): IntradaySignal => ({
     symbol, signalState: state, direction: state === 'SHIELD_BLOCKED' ? 'NONE' : direction,
@@ -133,8 +163,7 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
     dataAsOfUtc: latest?.timestampUtc ?? null, blockers: [...new Set(blockers)],
     sovereignShieldStatus: input.marketShield?.status ?? null,
     marketRiskCeilingPct: input.marketShield?.maxAllowedRiskPct ?? 0,
-    marketShieldFlags: input.marketShield?.blockReasons ?? [],
-  });
+    marketShieldFlags: input.marketShield?.blockReasons ?? [],\n    zScore, zScoreZone, hurstRegime, adr14, adrUsedPct,\n    pdh: priorDay?.high ?? null, pdl: priorDay?.low ?? null, asianRangeHigh, asianRangeLow,\n  });
   if (input.marketShield && !input.marketShield.marketConditionsClear) return empty('SHIELD_BLOCKED', 'Sovereign market-risk shield is blocking this setup.');
   if (blockers.some((item) => ['VIX_UNAVAILABLE', 'VIX_BLACK_SWAN_LOCKOUT', 'CALENDAR_UNVERIFIED', 'RATE_DECISION_LOCKOUT', 'TIER_ONE_EVENT_LOCKOUT', 'OUTSIDE_LONDON_NEW_YORK_WAT_WINDOWS', 'SPREAD_BASELINE_UNAVAILABLE', 'SPREAD_BLOWOUT_BLOCK', 'LIVE_BBO_UNAVAILABLE_OR_STALE', 'INTRADAY_CANDLES_STALE'].includes(item))) {
     return empty('SHIELD_BLOCKED', 'Sovereign Shield or live market-data gate is not clear.');
@@ -184,6 +213,5 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
     session, dataAsOfUtc: latest?.timestampUtc ?? null, blockers: [],
     sovereignShieldStatus: input.marketShield?.status ?? null,
     marketRiskCeilingPct: shieldCap,
-    marketShieldFlags: input.marketShield?.blockReasons ?? [],
-  };
+    marketShieldFlags: input.marketShield?.blockReasons ?? [],\n    zScore, zScoreZone, hurstRegime, adr14, adrUsedPct,\n    pdh: priorDay?.high ?? null, pdl: priorDay?.low ?? null, asianRangeHigh, asianRangeLow,\n  };
 }

@@ -755,3 +755,19 @@ test('all distributable MacroLync MT5 bridge copies share one authenticated read
   assert.match(canonicalBridge, /safe_to_trade = false/);
   assert.doesNotMatch(canonicalBridge, /OrderSend|PositionModify|PositionClose/);
 });
+
+
+test('institutional technical confluence exposes Hurst, Gaussian Z-score and ADR/liquidity metrics with fail-closed gates', () => {
+  const engine = read('../lib/quant/intradaySignalEngine.ts');
+  const confluence = read('../lib/quant/technicalConfluence.ts');
+  assert.match(engine, /estimateHurstExponent\(closes\)/);
+  assert.match(engine, /hurst <= 0\.52/);
+  assert.match(engine, /MEAN_REVERSION_ONLY/);
+  assert.match(engine, /zScoreZone/);
+  assert.match(engine, /Math\.abs\(zScore\) > 2\.5/);
+  assert.match(engine, /adrUsedPct >= 85/);
+  assert.match(engine, /asianRangeHigh/);
+  assert.match(engine, /pdh: priorDay\?\.high/);
+  assert.match(confluence, /zScore20/);
+  assert.match(confluence, /value > 0\.52/);
+});

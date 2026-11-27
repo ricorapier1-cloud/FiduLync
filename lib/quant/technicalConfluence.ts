@@ -22,13 +22,14 @@ export type TechnicalConfluence = {
   warning: string | null;
   observationsUsed: number;
   latestBarUtc: string | null;
+  zScore20: number | null;
 };
 
 const finite = (value: number) => Number.isFinite(value);
 const mean = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
 
 function classifyHurst(value: number): HurstRegime {
-  if (value > 0.55) return 'TRENDING_PERSISTENT';
+  if (value > 0.52) return 'TRENDING_PERSISTENT';
   if (value < 0.45) return 'MEAN_REVERTING';
   return 'RANDOM_WALK_NOISE';
 }
@@ -92,6 +93,11 @@ export function buildTechnicalConfluence(
   const atr = calculateAtr(bars, 14);
   const hurst = estimateHurstExponent(closes);
   const ker = calculateKaufmanEfficiencyRatio(closes, 14);
+  const zWindow = closes.slice(-20);
+  const zMean = zWindow.length === 20 ? mean(zWindow) : null;
+  const zVariance = zMean === null ? null : mean(zWindow.map((value) => (value - zMean) ** 2));
+  const zScore20 = zMean !== null && zVariance !== null && zVariance > 0 && closes.length >= 20
+    ? (closes.at(-1)! - zMean) / Math.sqrt(zVariance) : null;
   const valid = bars.length >= 40 && atr !== null && hurst !== null && ker !== null;
   const multiplier = isGold ? 1 : (options.pipSize && options.pipSize > 0 ? 1 / options.pipSize : 1);
   const atrDisplay = atr === null ? null : atr * multiplier;
@@ -111,5 +117,6 @@ export function buildTechnicalConfluence(
       : null,
     observationsUsed: bars.length,
     latestBarUtc: bars.at(-1)?.timestampUtc ?? null,
+    zScore20,
   };
 }
