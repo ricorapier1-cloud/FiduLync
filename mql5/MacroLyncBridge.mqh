@@ -86,6 +86,21 @@ struct MacroLyncSignal
    string intraday_signal_state;
    string intraday_signal_direction;
    double recommended_sl;
+   string desk_status;
+   double max_risk_pct;
+   string active_session_wat;
+   string desk_lockout_reason;
+   double z_score;
+   double hurst_exponent;
+   double ker;
+   double adr_used_pct;
+   double pdh;
+   double pdl;
+   double entry_price;
+   double stop_loss;
+   double take_profit1;
+   double take_profit2;
+   bool   has_execution_metrics;
 };
 
 string ML_JsonString(const string json, const string key)
@@ -369,6 +384,11 @@ bool MacroLyncGetSignal(const string symbol, const string endpoint, const string
       signal.intraday_signal_state = "WAIT_NO_SETUP";
       signal.intraday_signal_direction = "NONE";
       signal.recommended_sl = 0.0;
+      signal.desk_status = "LOCKOUT"; signal.max_risk_pct = 0.0;
+      signal.active_session_wat = "OFF_SESSION"; signal.desk_lockout_reason = "Macro context unavailable";
+      signal.z_score = 0.0; signal.hurst_exponent = 0.0; signal.ker = 0.0; signal.adr_used_pct = 0.0;
+      signal.pdh = 0.0; signal.pdl = 0.0; signal.entry_price = 0.0; signal.stop_loss = 0.0;
+      signal.take_profit1 = 0.0; signal.take_profit2 = 0.0; signal.has_execution_metrics = false;
       return false;
    }
    signal.symbol = context.symbol;
@@ -393,6 +413,13 @@ bool MacroLyncGetSignal(const string symbol, const string endpoint, const string
    signal.intraday_signal_state = context.intraday_signal_state;
    signal.intraday_signal_direction = context.intraday_signal_direction;
    signal.recommended_sl = context.recommended_sl;
+   signal.desk_status = context.desk_status; signal.max_risk_pct = context.max_risk_pct;
+   signal.active_session_wat = context.active_session_wat; signal.desk_lockout_reason = context.desk_lockout_reason;
+   signal.z_score = context.z_score; signal.hurst_exponent = context.hurst_exponent;
+   signal.ker = context.ker; signal.adr_used_pct = context.adr_used_pct;
+   signal.pdh = context.pdh; signal.pdl = context.pdl; signal.entry_price = context.entry_price;
+   signal.stop_loss = context.stop_loss; signal.take_profit1 = context.take_profit1;
+   signal.take_profit2 = context.take_profit2; signal.has_execution_metrics = context.has_execution_metrics;
    return true;
 }
 
