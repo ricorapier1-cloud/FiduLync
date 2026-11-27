@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 const source = readFileSync(new URL('../lib/quant/technicalConfluence.ts', import.meta.url), 'utf8');
 
 test('technical confluence exposes Hurst regime boundaries and 14-period KER', () => {
-  assert.match(source, /value > 0\.55/);
+  assert.match(source, /value > 0\.52/);
   assert.match(source, /value < 0\.45/);
   assert.match(source, /RANDOM_WALK_NOISE/);
   assert.match(source, /calculateKaufmanEfficiencyRatio\(closes: number\[\], period = 14\)/);

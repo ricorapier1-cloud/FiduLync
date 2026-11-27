@@ -603,8 +603,11 @@ test('intraday signal engine enforces macro threshold, trend quality, live sessi
   assert.match(engine, /isGold \? 20 : 25/);
   assert.match(engine, /isGold \? -20 : -25/);
   assert.match(engine, /calculateKaufmanEfficiencyRatio\(closes, 14\)/);
-  assert.match(engine, /const hurst: number \| null = null/);
-  assert.doesNotMatch(engine, /estimateHurstExponent|HURST_NOT_TREND_PERSISTENT/);
+  assert.match(engine, /estimateHurstExponent/);
+  assert.match(engine, /hurst <= 0\.52/);
+  assert.match(engine, /MEAN_REVERSION_ONLY/);
+  assert.match(engine, /zScoreZone/);
+  assert.match(engine, /adrUsedPct >= 85/);
   assert.match(engine, /ker < 0\.30/);
   assert.match(engine, /const stopAtrMultiple = finite\(input\.vix\) && input\.vix >= 25 \? 1\.5 : 1\.35/);
   assert.match(engine, /riskDistance \* 2/);
@@ -622,8 +625,7 @@ test('intraday signal engine enforces macro threshold, trend quality, live sessi
   assert.match(engine, /TIER_ONE_EVENT_LOCKOUT/);
   assert.match(engine, /RATE_DECISION_LOCKOUT/);
   assert.match(engine, /America\/New_York/);
-  assert.match(engine, /newYorkHour >= 8 && newYorkHour < 12/);
-  assert.doesNotMatch(engine, /hour >= 13 && hour < 17/);
+  assert.match(engine, /hour >= 13 && hour < 17/);
   assert.match(engine, /INTRADAY_CANDLES_STALE/);
 });
 
@@ -784,8 +786,9 @@ test('macro context exposes zero-ambiguity executive desk fields and bridge pars
   for (const field of ['zScore','hurstExponent','ker','adrUsedPct','pdh','pdl','entryPrice','stopLoss','takeProfit1','takeProfit2']) {
     assert.match(route, new RegExp(field));
     assert.match(types, new RegExp(field));
-    assert.match(bridge, new RegExp(field));
   }
+  for (const field of ['z_score','hurst_exponent','ker','adr_used_pct','pdh','pdl','entry_price','stop_loss','take_profit1','take_profit2']) assert.match(bridge, new RegExp(field));
+  assert.match(bridge, /ML_JsonScalar\(selected_signal_json, "hurst"\)/);
   assert.match(bridge, /context\.desk_status == "LOCKOUT" && context\.max_risk_pct != 0\.0/);
   assert.match(bridge, /context\.allowed_to_trade = false/);
 });
