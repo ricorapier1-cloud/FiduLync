@@ -18,6 +18,7 @@ const REFERENCE_SPREADS: Record<string, number> = {
   USDJPY: 0.020,
   XAUUSD: 0.85,
   GBPJPY: 0.030,
+  AUDCHF: 0.00030,
 };
 
 export async function recordAndEvaluateSpreadBaseline(
