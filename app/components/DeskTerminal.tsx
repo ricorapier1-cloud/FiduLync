@@ -26,7 +26,7 @@ function nextWATSessionOpen(nowMs: number): number {
   const year = shifted.getUTCFullYear(), month = shifted.getUTCMonth(), day = shifted.getUTCDate();
   const minuteOfDay = shifted.getUTCHours() * 60 + shifted.getUTCMinutes();
   const targetDay = new Date(Date.UTC(year, month, day));
-  const targetHour = minuteOfDay < 8 * 60 ? 8 : minuteOfDay < 13 * 60 ? 13 : 8;
+  let targetHour = minuteOfDay < 8 * 60 ? 8 : minuteOfDay < 13 * 60 ? 13 : 8;
   if (minuteOfDay >= 17 * 60) targetDay.setUTCDate(targetDay.getUTCDate() + 1);
   while (targetDay.getUTCDay() === 0 || targetDay.getUTCDay() === 6) { targetDay.setUTCDate(targetDay.getUTCDate() + 1); targetHour = 8; }
   return Date.UTC(targetDay.getUTCFullYear(), targetDay.getUTCMonth(), targetDay.getUTCDate(), targetHour - 1, 0, 0);
