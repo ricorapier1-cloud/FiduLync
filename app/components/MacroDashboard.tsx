@@ -428,6 +428,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
                 </div>
               </div>
             ) : (
+              <>
             <div className={`macro-score macro-score-${dossier.biasScore > 0 ? 'up' : dossier.biasScore < 0 ? 'down' : 'flat'}`}>
               <span className="mono">{dossier.biasScore > 0 ? '+' : ''}{dossier.biasScore}</span>
               <span>/ 100</span>
@@ -505,6 +506,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
               <span className="text-rose-400">Bear —</span>
               <span className="text-[10px] text-slate-500">PROBABILITY NOT CALIBRATED · EVENT LOCKOUT: {dossier.eventRiskLockout ? 'ACTIVE' : 'CLEAR'}</span>
             </div>
+              </>
             )}
           </div>
         </section>
