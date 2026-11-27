@@ -97,9 +97,9 @@ function hourInZone(date: Date, timeZone: string): number {
 }
 
 export function classifyWATSession(now = new Date()): 'LONDON' | 'NEW_YORK' | 'CLOSED' {
-  if (watHour(now.toISOString()) >= 8 && watHour(now.toISOString()) < 12) return 'LONDON';
-  const newYorkHour = hourInZone(now, 'America/New_York');
-  if (newYorkHour >= 8 && newYorkHour < 12) return 'NEW_YORK';
+  const hour = watHour(now.toISOString());
+  if (hour >= 8 && hour < 12) return 'LONDON';
+  if (hour >= 13 && hour < 17) return 'NEW_YORK';
   return 'CLOSED';
 }
 

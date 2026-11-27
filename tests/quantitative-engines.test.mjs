@@ -789,3 +789,27 @@ test('macro context exposes zero-ambiguity executive desk fields and bridge pars
   assert.match(bridge, /context\.desk_status == "LOCKOUT" && context\.max_risk_pct != 0\.0/);
   assert.match(bridge, /context\.allowed_to_trade = false/);
 });
+
+
+test('London and New York execution windows are fixed in WAT across daylight-saving changes', () => {
+  const engine = read('../lib/quant/intradaySignalEngine.ts');
+  const route = read('../app/api/v1/macro-context/route.ts');
+  const desk = read('../app/components/DeskTerminal.tsx');
+  assert.match(engine, /hour >= 8 && hour < 12/);
+  assert.match(engine, /hour >= 13 && hour < 17/);
+  assert.match(route, /watHour >= 13 && watHour < 17/);
+  assert.match(desk, /hourWAT >= 13 && hourWAT < 17/);
+  assert.match(desk, /EXECUTIVE DESK COMMAND/);
+  assert.match(desk, /ACCOUNT GOVERNANCE UNVERIFIED/);
+  assert.match(desk, /nextWATSessionOpen/);
+});
+
+test('desk quote grid always reserves a fourth satellite slot and labels core instruments explicitly', () => {
+  const desk = read('../app/components/DeskTerminal.tsx');
+  assert.match(desk, /const activeSatelliteSymbol = satelliteSymbol \?\? 'GBPUSD'/);
+  assert.match(desk, /CORE #1 · EURUSD/);
+  assert.match(desk, /CORE #2 · XAUUSD/);
+  assert.match(desk, /CORE #3 · USDJPY/);
+  assert.match(desk, /SATELLITE #1 · /);
+  assert.match(desk, /const displaySymbols = \[\.\.\.symbols, activeSatelliteSymbol\]/);
+});

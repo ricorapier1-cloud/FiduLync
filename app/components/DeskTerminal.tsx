@@ -21,6 +21,20 @@ function zonedDecimalHour(date: Date, timeZone: string) {
   const parts = new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date);
   return Number(parts.find((p) => p.type === 'hour')?.value ?? 0) + Number(parts.find((p) => p.type === 'minute')?.value ?? 0) / 60;
 }
+function nextWATSessionOpen(nowMs: number): number {
+  const shifted = new Date(nowMs + 60 * 60_000);
+  const year = shifted.getUTCFullYear(), month = shifted.getUTCMonth(), day = shifted.getUTCDate();
+  const minuteOfDay = shifted.getUTCHours() * 60 + shifted.getUTCMinutes();
+  let targetDay = new Date(Date.UTC(year, month, day));
+  let targetHour = minuteOfDay < 8 * 60 ? 8 : minuteOfDay < 13 * 60 ? 13 : 8;
+  if (minuteOfDay >= 17 * 60) targetDay.setUTCDate(targetDay.getUTCDate() + 1);
+  while (targetDay.getUTCDay() === 0 || targetDay.getUTCDay() === 6) targetDay.setUTCDate(targetDay.getUTCDate() + 1);
+  return Date.UTC(targetDay.getUTCFullYear(), targetDay.getUTCMonth(), targetDay.getUTCDate(), targetHour - 1, 0, 0);
+}
+function durationLabel(ms: number): string {
+  const minutes = Math.max(0, Math.ceil(ms / 60_000));
+  return Math.floor(minutes / 60) + 'h ' + String(minutes % 60).padStart(2, '0') + 'm';
+}
 function readStorage<T>(key: string): T | null {
   try { const value = window.localStorage.getItem(key); return value ? JSON.parse(value) as T : null; } catch { return null; }
 }
@@ -76,8 +90,7 @@ export default function DeskTerminal({ initialSnapshot, onSnapshotChange, onGold
     return () => { active = false; window.clearInterval(timer); };
   }, []);
   const hourWAT = zonedDecimalHour(new Date(now), 'Africa/Lagos');
-  const hourNewYork = zonedDecimalHour(new Date(now), 'America/New_York');
-  const activeSession = hourWAT >= 8 && hourWAT < 12 ? 'LONDON' : hourNewYork >= 8 && hourNewYork < 12 ? 'NEW YORK' : 'OFF-SESSION';
+  const activeSession = hourWAT >= 8 && hourWAT < 12 ? 'LONDON' : hourWAT >= 13 && hourWAT < 17 ? 'NEW YORK' : 'OFF-SESSION';
   const healthyProviderCount = snapshot.providerStatus?.filter((provider) => provider.status === 'HEALTHY').length ?? 0;
   const totalProviderCount = snapshot.providerStatus?.length ?? 0;
 
@@ -223,6 +236,20 @@ export default function DeskTerminal({ initialSnapshot, onSnapshotChange, onGold
       <div><span className="desk-kicker">MACROLYNC / PRIVATE SYSTEMATIC RESEARCH</span><h2>MacroLync Terminal</h2></div>
       <div className="desk-top-meta"><span className={quoteStatus === 'HEALTHY' && quotes.every((item) => item.freshness === 'LIVE' && item.ageMs !== null && item.ageMs <= 60_000) ? 'desk-live' : 'desk-warning'}><i />{quoteStatus === 'HEALTHY' && quotes.some((item) => item.freshness === 'LIVE' && item.ageMs !== null && item.ageMs <= 60_000) ? 'FRESH BBO · 15s' : quoteStatus === 'HEALTHY' ? 'STALE BBO' : quoteStatus}</span><span>WAT {watClock}</span><span>UTC {utcClock}</span><span className={healthyProviderCount === totalProviderCount && totalProviderCount > 0 ? 'desk-live' : 'desk-warning'}>DATA HEALTH {healthyProviderCount}/{totalProviderCount}</span><button type="button" onClick={() => void forceSync()} disabled={forceSyncing}>{forceSyncing ? 'SYNCING…' : 'FORCE SYNC'}</button></div>
     </div>
+    <section className="mb-3 rounded-lg border border-red-500/40 bg-[#1b1114] p-3 sm:p-4" aria-label="Desk command banner">
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div><span className="desk-kicker">EXECUTIVE DESK COMMAND · AFRICA/LAGOS</span><h3 className="mt-1 text-sm font-semibold tracking-wide text-red-300">STAND DOWN · LOCKOUT ACTIVE · 0.0% RISK</h3></div>
+          <span className="rounded border border-red-400/40 px-2 py-1 text-[10px] font-mono text-red-200">ACCOUNT GOVERNANCE UNVERIFIED</span>
+        </div>
+        <p className="text-xs text-slate-200">Reason: No authenticated MT5 account ledger is connected. Daily trade count, daily losses and currency-leg exposure cannot be verified, so this terminal does not clear manual or EA execution.</p>
+        <div className="grid grid-cols-1 gap-3 border-t border-white/10 pt-3 sm:grid-cols-3">
+          <div><span className="desk-kicker">ACTIVE WAT SESSION</span><strong className="mt-1 block text-sm text-slate-100">{activeSession === 'OFF-SESSION' ? 'OFF-SESSION DEAD ZONE' : activeSession + ' EXECUTION'}</strong><small className="text-slate-400">{activeSession === 'OFF-SESSION' ? 'Next session opens in ' + durationLabel(nextWATSessionOpen(now) - now) : 'Session closes in ' + durationLabel((activeSession === 'LONDON' ? 12 : 17) * 60 * 60_000 - (hourWAT * 60 * 60_000))}</small></div>
+          <div><span className="desk-kicker">TODAY’S APPROVED PLAYBOOK</span><strong className="mt-1 block text-sm text-slate-100">NO EXECUTION CLEARED</strong><small className="text-slate-400">{intradaySignals.filter((item) => item.signalState === 'ACTIVE_SETUP').length ? 'Research candidates: ' + intradaySignals.filter((item) => item.signalState === 'ACTIVE_SETUP').map((item) => item.direction + ' ' + item.symbol).join(' · ') : 'Wait for a fully validated macro-aligned setup'}</small></div>
+          <div><span className="desk-kicker">DAILY RISK BUDGET</span><strong className="mt-1 block text-sm text-slate-100">Trades: UNVERIFIED · Losses: UNVERIFIED</strong><small className="text-slate-400">Locked currency legs: UNVERIFIED · MT5 ledger required</small></div>
+        </div>
+      </div>
+    </section>
     <div className="desk-quote-grid">{displaySymbols.map((symbol) => {
       const item = quoteFor(symbol); const digits = symbol.slice(3) === 'JPY' ? 3 : symbol === 'XAUUSD' ? 2 : 5;
       return <article className="desk-quote-card" key={symbol}><span>{symbol === activeSatelliteSymbol ? 'SATELLITE #1 · ' + symbol : symbol === 'EURUSD' ? 'CORE #1 · EURUSD' : symbol === 'XAUUSD' ? 'CORE #2 · XAUUSD' : 'CORE #3 · USDJPY'}</span><strong>{display(item?.mid, digits)}</strong><small>{item?.freshness ?? 'PENDING'} · {item?.latencyMs ?? '—'} ms · {activeSession}</small><div><span>BID {display(item?.bid, digits)}</span><span>ASK {display(item?.ask, digits)}</span></div><small>SPREAD {display(item?.spread, symbol === 'XAUUSD' ? 2 : 6)} · {item?.quoteTimeUtc ?? 'NO QUOTE'}</small></article>;
@@ -242,6 +269,19 @@ export default function DeskTerminal({ initialSnapshot, onSnapshotChange, onGold
               <span>STOP <b className="block text-slate-100">{display(signal.stopLoss, signal.symbol === 'XAUUSD' ? 2 : signal.symbol.endsWith('JPY') ? 3 : 5)}</b></span>
               <span>TP1 <b className="block text-slate-100">{display(signal.takeProfit1, signal.symbol === 'XAUUSD' ? 2 : signal.symbol.endsWith('JPY') ? 3 : 5)}</b></span>
               <span>TP2 <b className="block text-slate-100">{display(signal.takeProfit2, signal.symbol === 'XAUUSD' ? 2 : signal.symbol.endsWith('JPY') ? 3 : 5)}</b></span>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1 text-[9px]">
+              <span className="rounded bg-white/5 px-2 py-1">Macro: {signal.direction === 'NONE' ? 'Not aligned' : 'Aligned'}</span>
+              <span className="rounded bg-white/5 px-2 py-1">Z: {display(signal.zScore, 2)} · {signal.zScoreZone.replaceAll('_', ' ')}</span>
+              <span className="rounded bg-white/5 px-2 py-1">H: {display(signal.hurst, 2)} · {signal.hurstRegime.replaceAll('_', ' ')}</span>
+              <span className="rounded bg-white/5 px-2 py-1">KER: {display(signal.ker, 2)}</span>
+              <span className="rounded bg-white/5 px-2 py-1">ADR Used: {display(signal.adrUsedPct, 0)}%</span>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-1 text-[9px] font-mono text-slate-400">
+              <span>PDH <b className="text-slate-100">{display(signal.pdh, signal.symbol === 'XAUUSD' ? 2 : signal.symbol.endsWith('JPY') ? 3 : 5)}</b></span>
+              <span>PDL <b className="text-slate-100">{display(signal.pdl, signal.symbol === 'XAUUSD' ? 2 : signal.symbol.endsWith('JPY') ? 3 : 5)}</b></span>
+              <span>ASIAN HIGH <b className="text-slate-100">{display(signal.asianRangeHigh, signal.symbol === 'XAUUSD' ? 2 : signal.symbol.endsWith('JPY') ? 3 : 5)}</b></span>
+              <span>ASIAN LOW <b className="text-slate-100">{display(signal.asianRangeLow, signal.symbol === 'XAUUSD' ? 2 : signal.symbol.endsWith('JPY') ? 3 : 5)}</b></span>
             </div>
             <p className="mt-2 text-[10px] leading-relaxed text-slate-400">{signal.triggerRationale}</p>
              <p className="mt-1 text-[9px] font-mono text-slate-500">SOVEREIGN SHIELD {signal.sovereignShieldStatus ?? 'UNAVAILABLE'} · MARKET RISK CEILING {signal.marketRiskCeilingPct?.toFixed(2) ?? '—'}%</p>
