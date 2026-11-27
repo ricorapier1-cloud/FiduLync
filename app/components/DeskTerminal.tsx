@@ -140,8 +140,9 @@ export default function DeskTerminal({ initialSnapshot, onSnapshotChange, onGold
   const watDay = new Date(now + 60 * 60_000).getUTCDay();
   const isWeekdayWAT = watDay >= 1 && watDay <= 5;
   const activeSession = !isWeekdayWAT ? 'OFF-SESSION' : hourWAT >= 8 && hourWAT < 12 ? 'LONDON' : hourWAT >= 13 && hourWAT < 17 ? 'NEW YORK' : 'OFF-SESSION';
-  const healthyProviderCount = snapshot.providerStatus?.filter((provider) => provider.status === 'HEALTHY').length ?? 0;
-  const totalProviderCount = snapshot.providerStatus?.length ?? 0;
+  const coverageProviders = (snapshot.providerStatus ?? []).filter((provider) => provider.name !== 'World Bank CPI' && provider.name !== 'ECB Data Portal');
+  const healthyProviderCount = coverageProviders.filter((provider) => provider.status === 'HEALTHY' || provider.status === 'STANDBY').length;
+  const totalProviderCount = coverageProviders.length;
 
   const refreshQuotes = useCallback(async () => {
     if (document.visibilityState === 'hidden') return;
