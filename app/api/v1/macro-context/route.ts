@@ -65,6 +65,9 @@ function isFreshCotReport(date: string | undefined, maxAgeDays = 14): boolean {
 }
 
 function activeMarketSession(date = new Date()): 'LONDON' | 'NY' | 'CLOSED' {
+  const watDate = new Date(date.getTime() + 60 * 60_000);
+  const watDay = watDate.getUTCDay();
+  if (watDay === 0 || watDay === 6) return 'CLOSED';
   const watHour = hourInZone(date, 'Africa/Lagos');
   if (watHour >= 8 && watHour < 12) return 'LONDON';
   if (watHour >= 13 && watHour < 17) return 'NY';

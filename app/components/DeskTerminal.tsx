@@ -28,7 +28,7 @@ function nextWATSessionOpen(nowMs: number): number {
   const targetDay = new Date(Date.UTC(year, month, day));
   const targetHour = minuteOfDay < 8 * 60 ? 8 : minuteOfDay < 13 * 60 ? 13 : 8;
   if (minuteOfDay >= 17 * 60) targetDay.setUTCDate(targetDay.getUTCDate() + 1);
-  while (targetDay.getUTCDay() === 0 || targetDay.getUTCDay() === 6) targetDay.setUTCDate(targetDay.getUTCDate() + 1);
+  while (targetDay.getUTCDay() === 0 || targetDay.getUTCDay() === 6) { targetDay.setUTCDate(targetDay.getUTCDate() + 1); targetHour = 8; }
   return Date.UTC(targetDay.getUTCFullYear(), targetDay.getUTCMonth(), targetDay.getUTCDate(), targetHour - 1, 0, 0);
 }
 function durationLabel(ms: number): string {
@@ -90,7 +90,9 @@ export default function DeskTerminal({ initialSnapshot, onSnapshotChange, onGold
     return () => { active = false; window.clearInterval(timer); };
   }, []);
   const hourWAT = zonedDecimalHour(new Date(now), 'Africa/Lagos');
-  const activeSession = hourWAT >= 8 && hourWAT < 12 ? 'LONDON' : hourWAT >= 13 && hourWAT < 17 ? 'NEW YORK' : 'OFF-SESSION';
+  const watDay = new Date(now + 60 * 60_000).getUTCDay();
+  const isWeekdayWAT = watDay >= 1 && watDay <= 5;
+  const activeSession = !isWeekdayWAT ? 'OFF-SESSION' : hourWAT >= 8 && hourWAT < 12 ? 'LONDON' : hourWAT >= 13 && hourWAT < 17 ? 'NEW YORK' : 'OFF-SESSION';
   const healthyProviderCount = snapshot.providerStatus?.filter((provider) => provider.status === 'HEALTHY').length ?? 0;
   const totalProviderCount = snapshot.providerStatus?.length ?? 0;
 
