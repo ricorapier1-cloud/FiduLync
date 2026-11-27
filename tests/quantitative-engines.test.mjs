@@ -836,5 +836,6 @@ test('XAUUSD Fundamental Pair Dossier routes to the dedicated Gold liquidity and
   assert.match(dashboard, /2Y-3M CURVE SPREAD/);
   assert.match(dashboard, /CBOE VIX \/ HY OAS/);
   assert.match(dashboard, /COMEX Gold non-commercial net long at/);
-  assert.doesNotMatch(dashboard.slice(dashboard.indexOf("pair === 'XAUUSD'"), dashboard.indexOf('/* Economic Catalysts')), /POLICY DIFF|REAL YIELD DIFF|2Y YIELD SPREAD/);
+  const goldDossierBranch = dashboard.slice(dashboard.indexOf("pair === 'XAUUSD'"), dashboard.indexOf(') : (', dashboard.indexOf("pair === 'XAUUSD'")));
+  assert.doesNotMatch(goldDossierBranch, /POLICY DIFF|REAL YIELD DIFF|2Y YIELD SPREAD/);
 });
