@@ -825,3 +825,16 @@ test('Gold real-yield driver prefers the same canonical Treasury snapshot vintag
   assert.match(gold, /const treasuryRetrievedAtUtc = snapshotTreasury\?\.retrievedAtUtc/);
   assert.match(telemetry, /calendarActive && snapshot\.calendarProvider === 'FAIRECONOMY_PUBLIC' \? utcWeekWindow\(\)/);
 });
+
+
+test('XAUUSD Fundamental Pair Dossier routes to the dedicated Gold liquidity and real-yield engine', () => {
+  const dashboard = read('../app/components/MacroDashboard.tsx');
+  assert.match(dashboard, /pair === 'XAUUSD' \? \(/);
+  assert.match(dashboard, /goldContext\?\.goldBiasScore/);
+  assert.match(dashboard, /goldContext\?\.liquidityRegime/);
+  assert.match(dashboard, /10Y TIPS REAL YIELD/);
+  assert.match(dashboard, /2Y-3M CURVE SPREAD/);
+  assert.match(dashboard, /CBOE VIX \/ HY OAS/);
+  assert.match(dashboard, /COMEX Gold non-commercial net long at/);
+  assert.doesNotMatch(dashboard.slice(dashboard.indexOf("pair === 'XAUUSD'"), dashboard.indexOf('/* Economic Catalysts')), /POLICY DIFF|REAL YIELD DIFF|2Y YIELD SPREAD/);
+});

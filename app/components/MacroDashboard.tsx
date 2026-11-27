@@ -358,6 +358,76 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
               <BrandGlyph name="chevron-down" size={16} />
             </div>
 
+            {pair === 'XAUUSD' ? (
+              <div className="space-y-3">
+                <div className={`macro-score macro-score-${(goldContext?.goldBiasScore ?? 0) > 0 ? 'up' : (goldContext?.goldBiasScore ?? 0) < 0 ? 'down' : 'flat'}`}>
+                  <span className="mono">{goldContext?.goldBiasScore === null || goldContext?.goldBiasScore === undefined ? '—' : goldContext.goldBiasScore > 0 ? '+' : ''}{goldContext?.goldBiasScore ?? ''}</span>
+                  <span>/ 100</span>
+                </div>
+                <div className="macro-score-label">
+                  <strong>{goldContext?.directionalVerdict?.replace(/_/g, ' ') ?? 'INSUFFICIENT EVIDENCE'}</strong>
+                  <span className="mono">REGIME: {goldContext?.liquidityRegime?.replace(/_/g, ' ') ?? 'INSUFFICIENT EVIDENCE'}</span>
+                </div>
+                <div className="macro-bias-meter">
+                  <span className="macro-meter-mid" />
+                  <span className={`macro-meter-pointer ${(goldContext?.goldBiasScore ?? 0) >= 0 ? 'macro-pointer-up' : 'macro-pointer-down'}`} style={{ left: `${50 + (goldContext?.goldBiasScore ?? 0) / 2}%` }} />
+                </div>
+                <div className="macro-meter-scale mono"><span>-100 BEAR</span><span>NEUTRAL</span><span>+100 BULL</span></div>
+                <div className="macro-bias-drivers">
+                  <div>
+                    <span>10Y TIPS REAL YIELD</span>
+                    <strong className="mono">{goldContext?.drivers.DFII10.value === null || goldContext?.drivers.DFII10.value === undefined ? '—' : formatRate(goldContext.drivers.DFII10.value)}</strong>
+                    <small className="block text-[10px] text-slate-500">{goldContext?.drivers.DFII10.state ?? 'UNAVAILABLE'} · {goldContext?.drivers.DFII10.observationDate ?? 'NO OBSERVATION DATE'}</small>
+                  </div>
+                  <div>
+                    <span>2Y-3M CURVE SPREAD</span>
+                    <strong className="mono">{goldContext?.drivers.twoYearMinusThreeMonthPct === null || goldContext?.drivers.twoYearMinusThreeMonthPct === undefined ? '—' : formatRate(goldContext.drivers.twoYearMinusThreeMonthPct)}</strong>
+                    <small className="block text-[10px] text-slate-500">DGS2 minus DTB3 · Treasury yield spread</small>
+                  </div>
+                  <div>
+                    <span>CBOE VIX / HY OAS</span>
+                    <strong className="mono">{goldContext?.drivers.VIXCLS.value ?? '—'} / {goldContext?.drivers.BAMLH0A0HYM2.value ?? '—'}</strong>
+                    <small className="block text-[10px] text-slate-500">VIX: {goldContext?.drivers.VIXCLS.observationDate ?? '—'} · HY OAS: {goldContext?.drivers.BAMLH0A0HYM2.observationDate ?? '—'}</small>
+                  </div>
+                </div>
+                <div className="mt-4 p-3 rounded-lg bg-black/40 border border-white/[0.08] text-xs space-y-2">
+                  <span className="font-mono text-[10px] uppercase text-emerald-400 block tracking-wider">Gold Liquidity &amp; Real-Yield Thesis</span>
+                  <p className="text-slate-300 leading-relaxed font-sans">
+                    {goldContext?.goldBiasScore === null || goldContext?.goldBiasScore === undefined
+                      ? 'Gold model has insufficient verified inputs; no directional conclusion is permitted.'
+                      : `XAUUSD gold-liquidity model is ${goldContext.directionalVerdict} (${goldContext.goldBiasScore > 0 ? '+' : ''}${goldContext.goldBiasScore}/100) under ${goldContext.liquidityRegime.replace(/_/g, ' ')}. Evidence coverage is ${goldContext.evidenceCoveragePct}% (coverage, not probability). This dossier uses the same dedicated Gold engine as 07 / XAUUSD Dedicated Research.`}
+                  </p>
+                  <small className="text-slate-500">Engine state: {goldContext?.overallState ?? 'UNAVAILABLE'} · Generated {goldContext?.generatedAtUtc ?? '—'}</small>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                  <div className="p-3 rounded-lg bg-emerald-950/20 border border-emerald-500/20 text-[11px]">
+                    <span className="font-mono text-[10px] uppercase text-emerald-400 block mb-1">Supporting Evidence</span>
+                    {goldContext?.supportingEvidence.length
+                      ? <ul className="list-disc list-inside space-y-0.5 text-slate-300">{goldContext.supportingEvidence.map((item, index) => <li key={index}>{item}</li>)}</ul>
+                      : <p className="macro-empty">No verified supporting evidence is currently available.</p>}
+                  </div>
+                  <div className="p-3 rounded-lg bg-rose-950/20 border border-rose-500/20 text-[11px]">
+                    <span className="font-mono text-[10px] uppercase text-rose-400 block mb-1">Contradicting Evidence / Invalidation</span>
+                    {goldContext?.contradictingEvidence.length
+                      ? <ul className="list-disc list-inside space-y-0.5 text-slate-300">{goldContext.contradictingEvidence.map((item, index) => <li key={index}>{item}</li>)}</ul>
+                      : <p className="macro-empty">No verified contradicting evidence is currently available.</p>}
+                    {goldContext?.invalidationTriggers.length
+                      ? <ul className="list-disc list-inside space-y-0.5 text-slate-300 mt-2">{goldContext.invalidationTriggers.map((item, index) => <li key={index}>{item}</li>)}</ul>
+                      : null}
+                  </div>
+                </div>
+                <div className="macro-panel p-3 text-[11px]">
+                  <span className="font-mono text-[10px] uppercase text-slate-400 block mb-1">CFTC COMEX Gold Positioning</span>
+                  <strong className="mono">{goldContext?.cot.nonCommercialNet === null || goldContext?.cot.nonCommercialNet === undefined ? 'UNAVAILABLE' : formatContracts(goldContext.cot.nonCommercialNet)} contracts</strong>
+                  <p className="text-slate-300 mt-1">
+                    {goldContext?.cot.nonCommercialNet === null || goldContext?.cot.nonCommercialNet === undefined
+                      ? 'Current CFTC COMEX Gold non-commercial net positioning is unavailable.'
+                      : `COMEX Gold non-commercial net long at ${snapshot.cot.find((item) => item.market === 'GOLD')?.percentile ?? 'unavailable'}th percentile of 3-year range (light speculative crowding).`}
+                  </p>
+                  <small className="text-slate-500">CFTC report: {goldContext?.cot.reportDate ?? 'UNAVAILABLE'} · Feed: {goldContext?.cot.state ?? 'UNAVAILABLE'}</small>
+                </div>
+              </div>
+            ) : (
             <div className={`macro-score macro-score-${dossier.biasScore > 0 ? 'up' : dossier.biasScore < 0 ? 'down' : 'flat'}`}>
               <span className="mono">{dossier.biasScore > 0 ? '+' : ''}{dossier.biasScore}</span>
               <span>/ 100</span>
@@ -435,6 +505,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
               <span className="text-rose-400">Bear —</span>
               <span className="text-[10px] text-slate-500">PROBABILITY NOT CALIBRATED · EVENT LOCKOUT: {dossier.eventRiskLockout ? 'ACTIVE' : 'CLEAR'}</span>
             </div>
+            )}
           </div>
         </section>
 
