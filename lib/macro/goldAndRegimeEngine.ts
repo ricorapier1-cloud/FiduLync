@@ -527,10 +527,10 @@ export async function buildGoldMacroContext(snapshot?: MacroSnapshot): Promise<G
     });
   }
   const snapshotTreasury = snapshot?.usTreasury;
-  const treasuryHistory = treasuryResult?.history?.length
-    ? treasuryResult.history
-    : snapshotTreasury?.history?.length
-      ? snapshotTreasury.history
+  const treasuryHistory = snapshotTreasury?.history?.length
+    ? snapshotTreasury.history
+    : treasuryResult?.history?.length
+      ? treasuryResult.history
       : snapshotTreasury ? [{
         date: snapshotTreasury.observationDate,
         nominal2YPct: snapshotTreasury.nominal2YPct,
@@ -539,8 +539,8 @@ export async function buildGoldMacroContext(snapshot?: MacroSnapshot): Promise<G
         real10YPct: snapshotTreasury.real10YPct,
         breakevenTenYearPct: snapshotTreasury.breakevenTenYearPct,
       }] : [];
-  const treasuryRetrievedAtUtc = treasuryResult?.retrievedAtUtc ?? snapshotTreasury?.retrievedAtUtc ?? new Date().toISOString();
-  const treasuryObservedLatencyMs = treasuryResult ? treasuryLatencyMs : snapshotTreasury ? 0 : null;
+  const treasuryRetrievedAtUtc = snapshotTreasury?.retrievedAtUtc ?? treasuryResult?.retrievedAtUtc ?? new Date().toISOString();
+  const treasuryObservedLatencyMs = snapshotTreasury ? 0 : treasuryResult ? treasuryLatencyMs : null;
   const newestFirst = (items: Observation[]) => items.sort((left, right) => right.date.localeCompare(left.date));
   const treasurySeries: Record<string, Observation[]> = {
     DFII10: newestFirst(treasuryHistory.map((item) => ({ date: item.date, value: item.real10YPct }))),

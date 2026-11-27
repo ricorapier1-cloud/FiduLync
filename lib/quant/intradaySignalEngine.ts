@@ -127,14 +127,17 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
   const zVariance = zMean === null ? null : mean(zWindow.map((value) => (value - zMean) ** 2));
   const zScore = zMean !== null && zVariance !== null && zVariance > 0 && finite(input.quoteMid)
     ? (input.quoteMid - zMean) / Math.sqrt(zVariance) : null;
-  const completedDaily = daily.length >= 15 ? daily.slice(-15, -1) : [];
-  const adrRanges = completedDaily.map((bar) => bar.high - bar.low).filter((value) => Number.isFinite(value) && value > 0);
+  const latestDailyIsToday = daily.length > 0 && watDateForSignal(daily.at(-1)!.timestampUtc) === watDateForSignal(now);
+  const completedDaily = latestDailyIsToday ? daily.slice(0, -1) : daily;
+  const adrWindow = completedDaily.slice(-14);
+  const adrRanges = adrWindow.map((bar) => bar.high - bar.low).filter((value) => Number.isFinite(value) && value > 0);
   const adr14 = adrRanges.length === 14 ? mean(adrRanges) : null;
   const todayWAT = watDateForSignal(now);
   const todayBars = bars.filter((bar) => watDateForSignal(bar.timestampUtc) === todayWAT);
   const todayRange = todayBars.length ? Math.max(...todayBars.map((bar) => bar.high)) - Math.min(...todayBars.map((bar) => bar.low)) : null;
   const adrUsedPct = adr14 !== null && todayRange !== null && adr14 > 0 ? todayRange / adr14 * 100 : null;
-  const priorDay = daily.length >= 2 ? daily.at(-2)! : null;
+  const priorDayIndex = latestDailyIsToday ? daily.length - 2 : daily.length - 1;
+  const priorDay = priorDayIndex >= 0 ? daily[priorDayIndex] : null;
   const asianBars = bars.filter((bar) => watDateForSignal(bar.timestampUtc) === todayWAT && watHour(bar.timestampUtc) < 8);
   const asianRangeHigh = asianBars.length ? Math.max(...asianBars.map((bar) => bar.high)) : null;
   const asianRangeLow = asianBars.length ? Math.min(...asianBars.map((bar) => bar.low)) : null;

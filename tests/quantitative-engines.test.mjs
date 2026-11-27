@@ -816,3 +816,12 @@ test('desk quote grid always reserves a fourth satellite slot and labels core in
   assert.match(desk, /SATELLITE #1 · /);
   assert.match(desk, /const displaySymbols = \[\.\.\.symbols, activeSatelliteSymbol\]/);
 });
+
+
+test('Gold real-yield driver prefers the same canonical Treasury snapshot vintage as cross-asset telemetry', () => {
+  const gold = read('../lib/macro/goldAndRegimeEngine.ts');
+  const telemetry = read('../lib/macro/providerTelemetry.ts');
+  assert.match(gold, /const treasuryHistory = snapshotTreasury\?\.history\?\.length/);
+  assert.match(gold, /const treasuryRetrievedAtUtc = snapshotTreasury\?\.retrievedAtUtc/);
+  assert.match(telemetry, /calendarActive && snapshot\.calendarProvider === 'FAIRECONOMY_PUBLIC' \? utcWeekWindow\(\)/);
+});
