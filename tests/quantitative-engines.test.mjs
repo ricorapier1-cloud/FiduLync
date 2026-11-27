@@ -771,3 +771,21 @@ test('institutional technical confluence exposes Hurst, Gaussian Z-score and ADR
   assert.match(confluence, /zScore20/);
   assert.match(confluence, /value > 0\.52/);
 });
+
+
+test('macro context exposes zero-ambiguity executive desk fields and bridge parses them fail-closed', () => {
+  const route = read('../app/api/v1/macro-context/route.ts');
+  const types = read('../types/desk.ts');
+  const bridge = read('../public/MacroLyncBridge.mqh');
+  assert.match(route, /deskStatus/);
+  assert.match(route, /maxRiskPct/);
+  assert.match(route, /activeSessionWat/);
+  assert.match(route, /deskLockoutReason/);
+  for (const field of ['zScore','hurstExponent','ker','adrUsedPct','pdh','pdl','entryPrice','stopLoss','takeProfit1','takeProfit2']) {
+    assert.match(route, new RegExp(field));
+    assert.match(types, new RegExp(field));
+    assert.match(bridge, new RegExp(field));
+  }
+  assert.match(bridge, /context\.desk_status == "LOCKOUT" && context\.max_risk_pct != 0\.0/);
+  assert.match(bridge, /context\.allowed_to_trade = false/);
+});

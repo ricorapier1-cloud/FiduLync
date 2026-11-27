@@ -185,6 +185,8 @@ export async function GET(request: Request) {
       ? await signalResponse.json() as { signals?: MacroContextPayload['signals'] }
       : null;
     const intradaySignals = signalPayload?.signals ?? [];
+    const selectedSignal = intradaySignals.find((item) => item.symbol === symbol) ?? null;
+
     const hasFreshBaseCot = snapshot.cotSource === 'provider' && snapshot.cot.some((position) => position.market === dossier.base && isFreshCotReport(position.reportDate));
     const hasFreshQuoteCot = snapshot.cotSource === 'provider' && snapshot.cot.some((position) => position.market === dossier.quote && isFreshCotReport(position.reportDate));
     const selectedBias = symbolBiases[symbol];
@@ -192,11 +194,37 @@ export async function GET(request: Request) {
       && selectedBias?.directionalVerdict !== 'INSUFFICIENT_EVIDENCE'
       && Math.abs(selectedBias?.biasScore ?? 0) >= 20
       && activeSession !== 'CLOSED' && !newsLockoutActive);
+    const setupReady = selectedSignal?.signalState === 'ACTIVE_SETUP' && selectedSignal.direction !== 'NONE';
+    const effectiveAllowed = allowedToTrade && setupReady;
+    const deskStatus: MacroContextPayload['deskStatus'] = !effectiveAllowed ? 'LOCKOUT'
+      : sovereignShield.maxAllowedRiskPct <= 0.5 ? 'HALF_RISK' : 'CLEARED';
+    const deskLockoutReason = effectiveAllowed ? null
+      : !sovereignShield.governanceVerified ? 'MT5 account governance ledger is not connected and verified'
+        : activeSession === 'CLOSED' ? 'Outside London/New York execution session'
+          : newsLockoutActive ? 'Economic calendar or event-risk gate is not clear'
+            : selectedSignal?.blockers?.[0] ?? 'No active macro-aligned intraday setup';
+    const activeSessionWat: MacroContextPayload['activeSessionWat'] = activeSession === 'NY' ? 'NEW_YORK'
+      : activeSession === 'LONDON' ? 'LONDON' : 'OFF_SESSION';
+
     const payload: MacroContextPayload = {
       schema_version: '1.0.0',
       generated_at_utc: new Date().toISOString(),
       timezone: 'Africa/Lagos',
-      allowedToTrade,
+      allowedToTrade: effectiveAllowed,
+      deskStatus,
+      maxRiskPct: effectiveAllowed ? sovereignShield.maxAllowedRiskPct : 0,
+      activeSessionWat,
+      deskLockoutReason,
+      zScore: selectedSignal?.zScore ?? null,
+      hurstExponent: selectedSignal?.hurst ?? null,
+      ker: selectedSignal?.ker ?? null,
+      adrUsedPct: selectedSignal?.adrUsedPct ?? null,
+      pdh: selectedSignal?.pdh ?? null,
+      pdl: selectedSignal?.pdl ?? null,
+      entryPrice: selectedSignal?.entryPrice ?? null,
+      stopLoss: selectedSignal?.stopLoss ?? null,
+      takeProfit1: selectedSignal?.takeProfit1 ?? null,
+      takeProfit2: selectedSignal?.takeProfit2 ?? null,
       biasScore: selectedBias?.biasScore ?? null,
       directionalVerdict: selectedBias?.directionalVerdict ?? 'INSUFFICIENT_EVIDENCE',
       newsLockoutActive,
