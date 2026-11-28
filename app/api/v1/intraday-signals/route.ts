@@ -33,6 +33,11 @@ function freshCot(snapshot: Awaited<ReturnType<typeof getMacroSnapshot>>, curren
 
 export async function GET(request: Request) {
   try {
+    const requestUrl = new URL(request.url);
+    const accountKey = requestUrl.searchParams.get('accountKey')?.trim() ?? '';
+    const authorization = request.headers.get('authorization') ?? '';
+    const marketParams = new URLSearchParams();
+    if (accountKey) marketParams.set('accountKey', accountKey);
     const snapshot = await getMacroSnapshot();
     const gold = await buildGoldMacroContext(snapshot);
     const now = new Date();
@@ -65,15 +70,21 @@ export async function GET(request: Request) {
       .filter((item) => item.uncrowded && (item.confidence === 'HIGH' || item.confidence === 'MODERATE') && Math.abs(item.score) >= 25)
       .sort((a, b) => Math.abs(b.score) - Math.abs(a.score))[0]?.symbol ?? null;
     const symbols = ['EURUSD', 'GBPUSD', 'XAUUSD', 'USDJPY', ...(satellite ? [satellite] : [])];
-    const origin = new URL(request.url).origin;
-    const quoteResponse = await fetch(new URL('/api/v1/live-quotes' + (satellite ? '?satellite=' + satellite : ''), origin), {
-      cache: 'no-store', signal: AbortSignal.timeout(9_000),
+    const origin = requestUrl.origin;
+    const quoteParams = new URLSearchParams(marketParams);
+    if (satellite) quoteParams.set('satellite', satellite);
+    const quoteQuery = quoteParams.size ? '?' + quoteParams.toString() : '';
+    const marketHeaders = authorization ? { Authorization: authorization } : {};
+    const quoteResponse = await fetch(new URL('/api/v1/live-quotes' + quoteQuery, origin), {
+      cache: 'no-store', headers: marketHeaders, signal: AbortSignal.timeout(9_000),
     }).catch(() => null);
     const quotePayload = quoteResponse?.ok ? await quoteResponse.json() as QuotePayload : {};
     const quotes = quotePayload.quotes ?? [];
     const results = await Promise.all(symbols.map(async (symbol): Promise<IntradaySignal> => {
-      const candleResponse = await fetch(new URL('/api/v1/intraday-candles?symbol=' + symbol, origin), {
-        cache: 'no-store', signal: AbortSignal.timeout(18_000),
+      const candleParams = new URLSearchParams(marketParams);
+      candleParams.set('symbol', symbol);
+      const candleResponse = await fetch(new URL('/api/v1/intraday-candles?' + candleParams.toString(), origin), {
+        cache: 'no-store', headers: marketHeaders, signal: AbortSignal.timeout(18_000),
       }).catch(() => null);
       const candles = candleResponse?.ok ? await candleResponse.json() as CandlePayload : null;
       const quote = quotes.find((item) => item.symbol === symbol);
