@@ -27,7 +27,8 @@ function freshCot(snapshot: Awaited<ReturnType<typeof getMacroSnapshot>>, curren
   const reportTimestamp = Date.parse(item.reportDate);
   const ageMs = Date.now() - reportTimestamp;
   if (!Number.isFinite(reportTimestamp) || ageMs < -5 * 60_000 || ageMs > 14 * 86_400_000) return null;
-  return Number.isFinite(item.percentile) && item.percentile >= 0 && item.percentile <= 100 ? item.percentile : null;
+  return typeof item.percentile === 'number' && Number.isFinite(item.percentile)
+    && item.percentile >= 0 && item.percentile <= 100 ? item.percentile : null;
 }
 
 export async function GET(request: Request) {
