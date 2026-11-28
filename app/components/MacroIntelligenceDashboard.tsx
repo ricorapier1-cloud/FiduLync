@@ -73,7 +73,7 @@ export default function MacroIntelligenceDashboard({ snapshot }: { snapshot: Mac
               <div className="rounded-lg bg-black/20 p-3"><p className="text-[10px] text-slate-500">Unemployment</p><p className="mt-1 font-mono text-xl">{format(us?.unemploymentRatePct, '%')}</p><p className="text-[10px] text-slate-600">{us?.unemploymentPeriod ?? 'Period unavailable'}</p></div>
               <div className="rounded-lg bg-black/20 p-3"><p className="text-[10px] text-slate-500">Nonfarm payroll change</p><p className="mt-1 font-mono text-xl">{format(us?.nonfarmPayrollMonthlyChangeThousands, 'k')}</p><p className="text-[10px] text-slate-600">{us?.payrollPeriod ?? 'Period unavailable'}</p></div>
             </div>
-            <p className="mt-4 text-[10px] text-slate-500">US sources: {us?.sources.join(' · ') || 'Unavailable'} · retrieved {timestamp(us?.retrievedAt)}</p>
+            <p className="mt-4 text-[10px] text-slate-500">US sources: {us?.sources.join(' · ') || 'Unavailable'} · BLS/BEA retrieved {timestamp(us?.retrievedAt)} · FRED retrieved {timestamp(us?.fredRetrievedAt)}</p>
           </article>
         </section>
 
