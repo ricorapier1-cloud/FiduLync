@@ -55,6 +55,10 @@ export type IntradaySignalInput = {
   eventMinutesAway: number | null;
   rateDecision: boolean;
   spreadMultipleOfBaseline: number | null;
+  candleSource: string;
+  candleSourceVerified: boolean;
+  quoteSource: string;
+  brokerQuoteVerified: boolean;
   session: 'LONDON' | 'NEW_YORK' | 'CLOSED';
   nowUtc?: string;
   marketShield?: MarketRiskShieldResult;
@@ -151,6 +155,8 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
   const price = finite(input.quoteMid) && input.quoteMid > 0 ? input.quoteMid : latest?.close ?? null;
   const session = input.session;
 
+  if (!input.candleSourceVerified) blockers.push('BROKER_CANDLE_SOURCE_NOT_VERIFIED');
+  if (!input.brokerQuoteVerified) blockers.push('BROKER_EXECUTION_QUOTE_NOT_VERIFIED');
   if (input.vix === null) blockers.push('VIX_UNAVAILABLE');
   if (input.marketShield && !input.marketShield.marketConditionsClear) blockers.push(...input.marketShield.blockReasons);
   else if (input.vix >= 32) blockers.push('VIX_BLACK_SWAN_LOCKOUT');
@@ -181,6 +187,9 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
     sovereignShieldStatus: input.marketShield?.status ?? null,
     marketRiskCeilingPct: input.marketShield?.maxAllowedRiskPct ?? 0,
     marketShieldFlags: input.marketShield?.blockReasons ?? [],
+    executionDataVerified: input.candleSourceVerified && input.brokerQuoteVerified,
+    candleDataSource: input.candleSource,
+    quoteDataSource: input.quoteSource,
     zScore, zScoreZone, hurstRegime, adr14, adrUsedPct,
     pdh: priorDay?.high ?? null, pdl: priorDay?.low ?? null, asianRangeHigh, asianRangeLow,
   });
@@ -222,7 +231,7 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
   const takeProfit2 = direction === 'BUY' ? price! + riskDistance * 3 : price! - riskDistance * 3;
   const score = Math.min(100, Math.round(25 + (Math.abs(input.macroScore ?? 0) / 100) * 20 + (ker! * 25) + (alignedTrigger ? 15 : 0)));
   const shieldCap = input.marketShield?.maxAllowedRiskPct ?? 0;
-  const rationale = `${direction} Macro (${input.macroScore}) + ${sweptLow ? 'prior-session low sweep' : sweptHigh ? 'prior-session high sweep' : valueZone ? 'EMA20/VWAP value-zone pullback' : 'trend aligned'} + KER ${ker!.toFixed(2)} + ${stopAtrMultiple.toFixed(2)}x daily ATR stop · market risk ceiling ${shieldCap.toFixed(2)}% · Hurst unavailable pending validation`;
+  const rationale = `${direction} Macro (${input.macroScore}) + ${sweptLow ? 'prior-session low sweep' : sweptHigh ? 'prior-session high sweep' : valueZone ? 'EMA20/VWAP value-zone pullback' : 'trend aligned'} + KER ${ker!.toFixed(2)} + ${stopAtrMultiple.toFixed(2)}x daily ATR stop · market risk ceiling ${shieldCap.toFixed(2)}% · Hurst ${hurst === null ? 'unavailable' : hurst.toFixed(2)} (regime diagnostic, not win probability)`;
   return {
     symbol, signalState: alignedTrigger ? 'ACTIVE_SETUP' : 'FORMING_PULLBACK', direction,
     entryPrice: round(price!, digits), stopLoss: round(stopLoss, digits),
@@ -234,6 +243,9 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
     sovereignShieldStatus: input.marketShield?.status ?? null,
     marketRiskCeilingPct: shieldCap,
     marketShieldFlags: input.marketShield?.blockReasons ?? [],
+    executionDataVerified: input.candleSourceVerified && input.brokerQuoteVerified,
+    candleDataSource: input.candleSource,
+    quoteDataSource: input.quoteSource,
     zScore, zScoreZone, hurstRegime, adr14, adrUsedPct,
     pdh: priorDay?.high ?? null, pdl: priorDay?.low ?? null, asianRangeHigh, asianRangeLow,
   };
