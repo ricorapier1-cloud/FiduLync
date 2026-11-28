@@ -36,7 +36,7 @@ test('walk-forward reports available folds but never passes an undersized sample
   assert.equal(result.foldCount, 3);
   assert.equal(result.outOfSampleTrades, 45);
   assert.equal(result.status, 'INSUFFICIENT_SAMPLE');
-  const missingTime = makeTrades(700).map(({ closeTime, ...trade }) => trade);
+  const missingTime = makeTrades(700).map((trade) => { const clone = { ...trade }; delete clone.closeTime; return clone; });
   assert.equal(runWalkForwardAnalysis(missingTime, 10_000).chronologicalDataVerified, false);
   assert.equal(runWalkForwardAnalysis(missingTime, 10_000).status, 'INSUFFICIENT_SAMPLE');
 });
