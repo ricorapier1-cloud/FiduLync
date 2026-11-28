@@ -142,14 +142,32 @@ export async function GET(request: Request) {
         spreadMultipleOfBaseline: baseline.multiple,
       };
     }));
+    const coreSignals = results.filter((item) => ['EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD'].includes(item.symbol));
+    const brokerMarketDataVerified = quotePayload.executionGrade === true
+      && coreSignals.length === 4 && coreSignals.every((item) => item.executionDataVerified);
+    const candleProviders = [...new Set(results.map((item) => item.candleDataSource))];
+    const quoteProvider = quotePayload.source ?? 'UNAVAILABLE';
     return NextResponse.json({
       generatedAtUtc: now.toISOString(),
       timezone: 'Africa/Lagos',
-      source: 'Yahoo Finance OHLCV (reference only) + Swissquote public BBO (external, non-broker) + MacroLync macro research',
+      source: brokerMarketDataVerified
+        ? 'Authenticated MT5 broker quotes and closed M5/D1 candles + MacroLync macro research'
+        : 'External reference market data + MacroLync macro research; broker feed not fully verified',
       marketDataQuality: {
-        candles: { provider: 'Yahoo Finance', status: 'REFERENCE_ONLY', executionGrade: false },
-        quotes: { provider: quotePayload.source ?? 'UNAVAILABLE', status: 'EXTERNAL_REFERENCE', executionGrade: false },
-        brokerMarketData: { status: 'NOT_CONNECTED', executionGrade: false },
+        candles: {
+          provider: candleProviders.join(' + '),
+          status: brokerMarketDataVerified ? 'BROKER_LIVE_VERIFIED' : 'REFERENCE_OR_INCOMPLETE',
+          executionGrade: brokerMarketDataVerified,
+        },
+        quotes: {
+          provider: quoteProvider,
+          status: quotePayload.executionGrade === true ? 'BROKER_LIVE_VERIFIED' : 'REFERENCE_ONLY_OR_UNAVAILABLE',
+          executionGrade: quotePayload.executionGrade === true,
+        },
+        brokerMarketData: {
+          status: brokerMarketDataVerified ? 'BROKER_LIVE_VERIFIED' : 'NOT_CONNECTED_OR_INCOMPLETE',
+          executionGrade: brokerMarketDataVerified,
+        },
       },
       satelliteSymbol: satellite,
       signals: results,
