@@ -29,9 +29,9 @@ test('macro observations preserve source observation dates, not only retrieval t
   for (const field of ['policyRateAsOf', 'corePceAsOf', 'cpiAsOf', 'twoYearYieldAsOf']) {
     assert.match(macroData, new RegExp(field));
   }
-  assert.match(macroEngine, /observationFresh\(currency\.policyRateAsOf, 10\)/);
-  assert.match(macroEngine, /observationFresh\(currency\.inflationAsOf, 60\)/);
-  assert.match(macroEngine, /observationFresh\(currency\.twoYearYieldAsOf, 10\)/);
+  assert.match(macroEngine, /observationFresh\\(currency\\.policyRateAsOf, policyRateMaxAgeDays\\(currency\\.policyRateProvider\\)\\)/);
+  assert.match(macroEngine, /observationFresh\\(currency\\.inflationAsOf, 75\\)/);
+  assert.match(macroEngine, /observationFresh\\(currency\\.twoYearYieldAsOf, 10\\)/);
 });
 
 test('stale macro snapshots are rejected instead of silently reused', () => {
@@ -158,7 +158,7 @@ test('annual World Bank inflation cannot enter current monthly relative-strength
 test('market quote aggregation never substitutes daily reference rates or mixes installations', () => {
   assert.doesNotMatch(marketFeeds, /getFrankfurterQuotes|getExchangeRateQuotes|getGoldQuote/);
   assert.doesNotMatch(marketFeeds, /getCachedData|market:live-quotes/);
-  assert.match(marketFeeds, /if \(installationId\)/);
+  assert.match(marketFeeds, /installationId\\s*\\?/);
   assert.match(marketFeeds, /installation\.status/);
   assert.match(marketFeeds, /now - quoteTime > 30_000/);
 });
