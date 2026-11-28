@@ -1,6 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
-import { recordMT5Heartbeat } from '@/lib/quant/mt5Heartbeat';
+import { recordMT5Heartbeat, isFreshMT5Timestamp } from '@/lib/quant/mt5Heartbeat';
 import { evaluateSovereignShield } from '@/lib/quant/sovereignShield';
 import { getMacroSnapshot } from '@/lib/macroEngine';
 import { buildGoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
@@ -25,14 +25,14 @@ function authenticate(request: Request): boolean {
     process.env.MT5_ACCOUNT_INGEST_TOKEN?.trim(),
     process.env.MACROLYNC_API_SECRET?.trim(),
     process.env.ALGO_PRIVATE_API_KEY?.trim(),
-  ].filter((token): token is string => Boolean(token && token.length >= 16));
+  ].filter((token): token is string => Boolean(token && token.length >= 32));
 
-  if (validTokens.length === 0) {
-    // If no secret configured in dev/testing, allow if token length >= 16
-    return candidate.length >= 16;
-  }
-
+  // Production must never accept an arbitrary length-only token.
   return validTokens.some((valid) => safeEqual(candidate, valid));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 export async function POST(request: Request) {
@@ -46,105 +46,134 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: 'Invalid JSON payload.' }, { status: 400 });
   }
-
-  if (!body || typeof body !== 'object') {
+  if (!isRecord(body)) {
     return NextResponse.json({ error: 'Missing heartbeat payload.' }, { status: 400 });
   }
 
-  const payload = body as Record<string, unknown>;
-  const accountEquity = typeof payload.accountEquity === 'number' && Number.isFinite(payload.accountEquity)
-    ? payload.accountEquity : null;
-  const accountBalance = typeof payload.accountBalance === 'number' && Number.isFinite(payload.accountBalance)
-    ? payload.accountBalance : null;
-  const dailyClosedTrades = typeof payload.dailyClosedTrades === 'number' && Number.isInteger(payload.dailyClosedTrades) && payload.dailyClosedTrades >= 0
-    ? payload.dailyClosedTrades : 0;
-  const dailyLosses = typeof payload.dailyLosses === 'number' && Number.isInteger(payload.dailyLosses) && payload.dailyLosses >= 0
-    ? payload.dailyLosses : 0;
-  const liveBrokerSpread = typeof payload.liveBrokerSpread === 'number' && Number.isFinite(payload.liveBrokerSpread) && payload.liveBrokerSpread >= 0
-    ? payload.liveBrokerSpread : 0;
-  const timestampUtc = typeof payload.timestampUtc === 'string' && payload.timestampUtc.trim().length > 0
-    ? payload.timestampUtc.trim() : new Date().toISOString();
+  const login = typeof body.login === 'string' ? body.login.trim() : '';
+  const server = typeof body.server === 'string' ? body.server.trim() : '';
+  const broker = typeof body.broker === 'string' ? body.broker.trim() : null;
+  const timestampUtc = typeof body.timestampUtc === 'string' ? body.timestampUtc.trim() : '';
+  const accountEquity = typeof body.accountEquity === 'number' && Number.isFinite(body.accountEquity)
+    ? body.accountEquity : null;
+  const accountBalance = typeof body.accountBalance === 'number' && Number.isFinite(body.accountBalance)
+    ? body.accountBalance : null;
+  const dailyClosedTrades = typeof body.dailyClosedTrades === 'number'
+    && Number.isSafeInteger(body.dailyClosedTrades) ? body.dailyClosedTrades : null;
+  const dailyLosses = typeof body.dailyLosses === 'number'
+    && Number.isSafeInteger(body.dailyLosses) ? body.dailyLosses : null;
+  const dailyStatsTimeBasis = body.dailyStatsTimeBasis;
+  const liveBrokerSpread = typeof body.liveBrokerSpread === 'number'
+    && Number.isFinite(body.liveBrokerSpread) && body.liveBrokerSpread >= 0
+    ? body.liveBrokerSpread : null;
+  const spreadSymbol = typeof body.spreadSymbol === 'string' ? body.spreadSymbol.trim().toUpperCase() : null;
 
-  let openCurrencyLegs: string[] = [];
-  if (Array.isArray(payload.openCurrencyLegs)) {
-    openCurrencyLegs = payload.openCurrencyLegs.filter((item): item is string => typeof item === 'string' && item.length <= 5);
-  } else if (typeof payload.openCurrencyLegs === 'string') {
-    openCurrencyLegs = payload.openCurrencyLegs.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean);
+  let openCurrencyLegs: string[] | null = null;
+  if (body.openCurrencyLegs !== undefined && body.openCurrencyLegs !== null) {
+    if (!Array.isArray(body.openCurrencyLegs)
+      || !body.openCurrencyLegs.every((item) => typeof item === 'string' && /^[A-Z0-9._-]{3,16}$/.test(item))) {
+      return NextResponse.json({ error: 'openCurrencyLegs must be an array of valid broker symbols.' }, { status: 422 });
+    }
+    openCurrencyLegs = body.openCurrencyLegs as string[];
   }
 
-  if (accountEquity === null || accountBalance === null) {
+  if (!login || login.length > 32 || !server || server.length > 128
+    || accountEquity === null || accountEquity <= 0
+    || accountBalance === null || accountBalance <= 0
+    || dailyClosedTrades === null || dailyClosedTrades < 0
+    || dailyLosses === null || dailyLosses < 0 || dailyLosses > dailyClosedTrades
+    || dailyStatsTimeBasis !== 'BROKER_SERVER_DAY'
+    || !timestampUtc || !isFreshMT5Timestamp(timestampUtc)
+    || (spreadSymbol !== null && !/^[A-Z0-9._-]{3,16}$/.test(spreadSymbol))) {
     return NextResponse.json({
-      error: 'Invalid broker state: accountEquity and accountBalance must be valid numbers.',
+      error: 'Incomplete or invalid MT5 heartbeat. Require broker identity, positive equity/balance, explicit daily counts, broker-day basis and a fresh timezone-aware UTC timestamp.',
     }, { status: 422 });
   }
 
-  const stored = recordMT5Heartbeat({
-    accountEquity,
-    accountBalance,
-    dailyClosedTrades,
-    dailyLosses,
-    openCurrencyLegs,
-    liveBrokerSpread,
-    timestampUtc,
-    accountKey: typeof payload.accountKey === 'string' ? payload.accountKey : undefined,
-    login: typeof payload.login === 'string' ? payload.login : undefined,
-    server: typeof payload.server === 'string' ? payload.server : undefined,
-    broker: typeof payload.broker === 'string' ? payload.broker : undefined,
-  });
+  let stored;
+  try {
+    stored = await recordMT5Heartbeat({
+      login,
+      server,
+      broker,
+      accountEquity,
+      accountBalance,
+      dailyClosedTrades,
+      dailyLosses,
+      dailyStatsTimeBasis: 'BROKER_SERVER_DAY',
+      openCurrencyLegs,
+      liveBrokerSpread,
+      spreadSymbol,
+      timestampUtc,
+      accountKey: typeof body.accountKey === 'string' ? body.accountKey : undefined,
+    });
+  } catch (error) {
+    console.error('MT5 heartbeat persistence rejected:', error);
+    return NextResponse.json({
+      error: 'MT5 heartbeat could not be durably verified. Governance remains locked.',
+    }, { status: 503 });
+  }
 
-  // Evaluate governance and kill-switch
   const snapshot = await getMacroSnapshot();
   const goldContext = await buildGoldMacroContext(snapshot);
   const vix = goldContext.drivers.VIXCLS.state === 'HEALTHY' ? goldContext.drivers.VIXCLS.value : null;
-
-  const rollingDrawdownPct = accountBalance > 0
-    ? Math.min(0, ((accountEquity - accountBalance) / accountBalance) * 100)
-    : 0;
+  const highImpactWindow = snapshot.catalysts.some((event) => event.impact === 'High'
+    && Math.abs(Date.parse(event.scheduledAt) - Date.now()) <= 30 * 60_000);
+  const newsLockoutActive = snapshot.calendarSource !== 'provider'
+    || !snapshot.calendarProvider
+    || highImpactWindow;
 
   const sovereignShield = evaluateSovereignShield({
     vix,
     governance: {
-      tradesToday: dailyClosedTrades,
-      lossesToday: dailyLosses,
-      rollingSevenDayDrawdownPct: rollingDrawdownPct,
-      ledgerVerified: true,
+      tradesToday: stored.dailyClosedTrades,
+      lossesToday: stored.dailyLosses,
+      rollingSevenDayDrawdownPct: stored.rollingSevenDayDrawdownPct,
+      ledgerVerified: stored.governanceVerified,
     },
   });
 
-  // Independent killswitch conditions
-  const killSwitchActive = dailyLosses >= 2
-    || dailyClosedTrades >= 2
-    || rollingDrawdownPct <= -4.0
+  const dailyLimitReached = stored.dailyLosses >= 2 || stored.dailyClosedTrades >= 2;
+  const drawdownLimitReached = stored.rollingSevenDayDrawdownPct !== null
+    && stored.rollingSevenDayDrawdownPct <= -4.0;
+  const killSwitchActive = !stored.governanceVerified
+    || dailyLimitReached
+    || drawdownLimitReached
     || (vix !== null && vix >= 32.0)
+    || newsLockoutActive
     || sovereignShield.status === 'BLACK_SWAN_LOCKOUT';
 
-  const killSwitchReason = killSwitchActive
-    ? dailyLosses >= 2 ? 'Daily loss limit reached (2 losses today)'
-      : dailyClosedTrades >= 2 ? 'Daily maximum trade count reached (2 trades taken today)'
-        : rollingDrawdownPct <= -4.0 ? 'Sovereign Shield drawdown floor breached (-4.0% drawdown limit)'
-          : vix !== null && vix >= 32.0 ? 'VIX Black Swan Lockout (VIX >= 32.0)'
-            : 'Sovereign Shield Lockout Active'
-    : null;
+  const killSwitchReason = !stored.governanceVerified
+    ? 'Seven-day MT5 equity history is not yet complete and verified'
+    : stored.dailyLosses >= 2 ? 'Daily loss limit reached (broker server day)'
+      : stored.dailyClosedTrades >= 2 ? 'Daily maximum trade count reached (broker server day)'
+        : drawdownLimitReached ? 'Verified seven-day peak-to-trough equity drawdown limit breached'
+          : newsLockoutActive ? 'Economic calendar is unavailable or a high-impact event is inside the lockout window'
+            : vix !== null && vix >= 32.0 ? 'VIX Black Swan Lockout (VIX >= 32.0)'
+              : sovereignShield.blockReasons[0] ?? null;
 
   const deskStatus = killSwitchActive || !sovereignShield.allowedToTrade ? 'LOCKOUT'
     : sovereignShield.maxAllowedRiskPct <= 0.5 ? 'HALF_RISK' : 'CLEARED';
 
   return NextResponse.json({
-    status: 'HEARTBEAT_ACCEPTED',
+    status: 'HEARTBEAT_PERSISTED',
     receivedAtUtc: stored.receivedAtUtc,
     deskStatus,
-    allowedDirection: killSwitchActive ? 'NONE' : 'STAND_BY',
-    maxRiskPct: killSwitchActive ? 0.0 : sovereignShield.maxAllowedRiskPct,
+    allowedDirection: 'NONE',
+    maxRiskPct: killSwitchActive ? 0 : sovereignShield.maxAllowedRiskPct,
     stopLossDistance: null,
-    newsLockoutActive: sovereignShield.blockReasons.includes('CALENDAR_EVENT_WINDOW_ACTIVE'),
+    newsLockoutActive,
     killSwitchActive,
     killSwitchReason,
-    openLegsCount: openCurrencyLegs.length,
+    openLegsCount: stored.openCurrencyLegs?.length ?? null,
     accountGovernance: {
-      dailyClosedTrades,
-      dailyLosses,
-      drawdownPct: Number(rollingDrawdownPct.toFixed(2)),
-      governanceVerified: true,
+      dailyClosedTrades: stored.dailyClosedTrades,
+      dailyLosses: stored.dailyLosses,
+      dailyStatsTimeBasis: stored.dailyStatsTimeBasis,
+      rollingSevenDayDrawdownPct: stored.rollingSevenDayDrawdownPct,
+      drawdownSampleCount: stored.drawdownSampleCount,
+      drawdownCoverageComplete: stored.drawdownCoverageComplete,
+      governanceVerified: stored.governanceVerified,
       allowedToTrade: !killSwitchActive && sovereignShield.allowedToTrade,
     },
   });
