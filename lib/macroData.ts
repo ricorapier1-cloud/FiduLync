@@ -138,7 +138,7 @@ function isCatalyst(value: unknown): value is EconomicCatalyst {
     && typeof value.region === 'string'
     && typeof value.title === 'string'
     && typeof value.scheduledAt === 'string'
-    && /(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(value.scheduledAt)
+    && /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value.scheduledAt)
     && Number.isFinite(Date.parse(value.scheduledAt))
     && (value.impact === 'High' || value.impact === 'Medium')
     && typeof value.consensus === 'string'
@@ -155,10 +155,10 @@ function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies'
   const calendarRetrievedAtUtc = value.calendarRetrievedAtUtc;
   const calendarCoverageEndUtc = value.calendarCoverageEndUtc;
   const calendarMetadataValid = typeof calendarRetrievedAtUtc === 'string'
-    && /(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(calendarRetrievedAtUtc)
+    && /(?:Z|[+-]\d{2}:?\d{2})$/i.test(calendarRetrievedAtUtc)
     && Number.isFinite(Date.parse(calendarRetrievedAtUtc))
     && typeof calendarCoverageEndUtc === 'string'
-    && /(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(calendarCoverageEndUtc)
+    && /(?:Z|[+-]\d{2}:?\d{2})$/i.test(calendarCoverageEndUtc)
     && Number.isFinite(Date.parse(calendarCoverageEndUtc));
   return {
     currencies: value.currencies,
@@ -509,8 +509,7 @@ async function getFairEconomyCatalysts(): Promise<CalendarFeedData> {
   };
   const hasUntimedHighImpact = payload.some((item) => isRecord(item)
     && item.impact === 'High'
-    && typeof item.date === 'string'
-    && !/(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(item.date));
+    && (typeof item.date !== 'string' || !/(?:Z|[+-]\d{2}:?\d{2})$/i.test(item.date)));
   if (hasUntimedHighImpact) throw new Error('FairEconomy high-impact event has no explicit timezone.');
   const events = payload.flatMap((item, index): EconomicCatalyst[] => {
     if (!isRecord(item)) return [];
@@ -555,11 +554,11 @@ async function getFinnhubCatalysts(apiKey: string): Promise<CalendarFeedData> {
   };
   const hasUntimedHighImpact = payload.economicCalendar.some((item) => isRecord(item)
     && typeof item.impact === 'string' && item.impact.toLowerCase().includes('high')
-    && typeof item.time === 'string' && !/(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(item.time));
+    && (typeof item.time !== 'string' || !/(?:Z|[+-]\d{2}:?\d{2})$/i.test(item.time)));
   if (hasUntimedHighImpact) throw new Error('Finnhub high-impact event has no explicit timezone.');
   const events = payload.economicCalendar.flatMap((item, index): EconomicCatalyst[] => {
     if (!isRecord(item) || typeof item.time !== 'string' || typeof item.country !== 'string'
-      || typeof item.event !== 'string' || !/(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(item.time)) return [];
+      || typeof item.event !== 'string' || !/(?:Z|[+-]\d{2}:?\d{2})$/i.test(item.time)) return [];
     const impactText = typeof item.impact === 'string' ? item.impact.toLowerCase() : '';
     const impact = impactText.includes('high') ? 'High' : impactText.includes('medium') ? 'Medium' : null;
     const scheduledAt = new Date(item.time);
@@ -642,11 +641,11 @@ async function getFmpCatalysts(apiKey: string): Promise<CalendarFeedData> {
   };
   const hasUntimedHighImpact = payload.some((item) => isRecord(item)
     && typeof item.impact === 'string' && item.impact.toLowerCase().includes('high')
-    && typeof item.date === 'string' && !/(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(item.date));
+    && (typeof item.date !== 'string' || !/(?:Z|[+-]\d{2}:?\d{2})$/i.test(item.date)));
   if (hasUntimedHighImpact) throw new Error('FMP high-impact event has no explicit timezone.');
   const events = payload.flatMap((item, index): EconomicCatalyst[] => {
     if (!isRecord(item) || typeof item.date !== 'string'
-      || !/(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(item.date)) return [];
+      || !/(?:Z|[+-]\d{2}:?\d{2})$/i.test(item.date)) return [];
     const scheduledAt = new Date(item.date);
     const impactText = typeof item.impact === 'string' ? item.impact.toLowerCase() : '';
     const impact = impactText.includes('high') ? 'High' : impactText.includes('medium') ? 'Medium' : null;
@@ -1348,6 +1347,6 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
     console.error('Live macro APIs unavailable; checking the persisted snapshot:', error);
   }
   if (persisted) return mergeWithFallback(persisted);
-  console.warn('No live macro source or persisted snapshot is available; serving reference macro levels.');
+  console.warn('No live macro source or sufficiently fresh persisted snapshot is available; returning an unavailable state.');
   return getFallbackSnapshot();
 }
