@@ -838,7 +838,7 @@ test('MT5 account publisher transports broker quotes, closed M5/D1 bars and acco
   assert.match(publisher, /BuildQuotes\(\)/);
   assert.match(publisher, /PERIOD_M5/);
   assert.match(publisher, /PERIOD_D1/);
-  assert.match(publisher, /isClosed\\\\":true/);
+  assert.match(publisher, /isClosed\\":true/);
   assert.match(publisher, /dailyStatsTimeBasis/);
   assert.match(publisher, /BuildDailyClosedStats/);
   assert.match(publisher, /openCurrencyLegs/);
@@ -846,7 +846,7 @@ test('MT5 account publisher transports broker quotes, closed M5/D1 bars and acco
   assert.match(accountSync, /recordMT5Heartbeat/);
   assert.match(accountSync, /macrolinc_market_quotes/);
   assert.match(accountSync, /macrolinc_market_candles/);
-  assert.match(accountSync, /quoteAgeMs > 30_000/);
+  assert.match(accountSync, /ageMs > 30_000/);
   assert.match(accountSync, /candle\.isClosed !== true/);
   assert.match(accountSync, /dailyStatsTimeBasis === 'BROKER_SERVER_DAY'/);
   assert.doesNotMatch(publisher, /OrderSend|CTrade|PositionClose/);
