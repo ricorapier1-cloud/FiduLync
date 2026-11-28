@@ -232,10 +232,7 @@ export default function AccountsPage() {
   }, [token, status, selectedAccountKey, refresh]);
 
   useEffect(() => {
-    if (!token || !selectedAccountKey || status !== 'CONNECTED') {
-      setMarketData(null);
-      return;
-    }
+    if (!token || !selectedAccountKey || status !== 'CONNECTED') return;
     void refreshMarketData(token, selectedAccountKey);
     const timer = window.setInterval(() => void refreshMarketData(token, selectedAccountKey), 15_000);
     return () => window.clearInterval(timer);
@@ -375,7 +372,7 @@ export default function AccountsPage() {
             <li>Copy the downloaded file into MT5 <code>MQL5/Experts</code> and compile it in MetaEditor.</li>
             <li>In MT5, open Tools → Options → Expert Advisors and allow WebRequest for <code>https://fidulync.vercel.app</code>.</li>
             <li>Attach the publisher to one chart. Set <code>InpAccountIngestToken</code> to the exact Vercel <code>MT5_ACCOUNT_INGEST_TOKEN</code> value.</li>
-            <li>Set <code>InpMarketWatchSymbols</code> to your broker's exact names. The default is <code>EURUSD,GBPUSD,USDJPY,XAUUSD</code>; add suffixes such as <code>EURUSD.a</code> if your broker uses them.</li>
+            <li>Set <code>InpMarketWatchSymbols</code> to your broker&apos;s exact names. The default is <code>EURUSD,GBPUSD,USDJPY,XAUUSD</code>; add suffixes such as <code>EURUSD.a</code> if your broker uses them.</li>
             <li>Keep MT5 online. Quotes publish every 15 seconds; closed M5/D1 history and account-deal history are refreshed automatically.</li>
             <li>Return to the Desk. The selected account is shared in this browser session; broker data is execution-grade only when a real account, fresh quotes and sufficient fresh candles are verified.</li>
           </ol>
