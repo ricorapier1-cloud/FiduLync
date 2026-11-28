@@ -30,18 +30,18 @@ export default function EABridgeDiagnostics() {
     <section id="ea-diagnostics" className="macro-section scroll-mt-24" aria-labelledby="ea-diagnostics-title">
       <details className="rounded-xl border border-white/10 bg-[#0b1119] p-4 sm:p-5">
         <summary id="ea-diagnostics-title" className="cursor-pointer list-none font-mono text-sm font-semibold text-slate-100">
-          <span className="text-emerald-300">ZONE 4</span> · EA BRIDGE &amp; SYSTEM DIAGNOSTICS · EXPAND
+          <span className="text-emerald-300">ZONE 4</span> · EA BRIDGE &amp; SYSTEM DIAGNOSTICS · API SCHEMA ONLY · EXPAND
         </summary>
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
           <article className="min-w-0">
             <h3 className="text-sm font-semibold text-slate-100">Unified MT5 Macro Context</h3>
-            <p className="mt-1 text-xs text-slate-400">One authenticated request returns the selected instrument plus a per-symbol bias map. Null values mean verified evidence is insufficient; the EA must not infer a direction.</p>
+            <p className="mt-1 text-xs text-slate-400">API response contract example only—not live market data. Runtime values are read from the authenticated endpoint; null values mean verified evidence is insufficient and the EA must not infer a direction.</p>
             <code className="mt-2 block break-all rounded bg-black/30 p-2 text-[11px] text-emerald-300">GET /api/v1/macro-context?symbol=EURUSD</code>
             <pre className="mt-2 max-h-80 overflow-auto rounded-lg border border-white/10 bg-black/30 p-3 text-[10px] leading-relaxed text-slate-300">{JSON.stringify(macroContextSchema, null, 2)}</pre>
           </article>
           <article className="min-w-0">
             <h3 className="text-sm font-semibold text-slate-100">Dedicated XAU/USD Context</h3>
-            <p className="mt-1 text-xs text-slate-400">Gold-specific Treasury, CBOE VIX, CFTC positioning, spot and evidence-coverage diagnostics.</p>
+            <p className="mt-1 text-xs text-slate-400">Gold API response contract example only—not live market data. Runtime Treasury, CBOE VIX and CFTC fields are populated only from provider observations.</p>
             <code className="mt-2 block break-all rounded bg-black/30 p-2 text-[11px] text-emerald-300">GET /api/v1/xauusd-context</code>
             <pre className="mt-2 max-h-80 overflow-auto rounded-lg border border-white/10 bg-black/30 p-3 text-[10px] leading-relaxed text-slate-300">{JSON.stringify(goldContextSchema, null, 2)}</pre>
           </article>
