@@ -28,6 +28,10 @@ export type CotPosition = {
   percentile: number;
   weeklyChange: number;
   asOf?: string;
+  /** Number of weekly observations used to calculate the percentile. */
+  sampleSize?: number;
+  /** Actual publication timestamp, distinct from the Tuesday position date. */
+  publishedAt?: string;
 };
 
 export type EconomicCatalyst = {
@@ -92,7 +96,7 @@ export type MarketQuote = {
   price: number;
   changePercent: number | null;
   timestamp: string;
-  source: 'mt5' | 'finnhub' | 'frankfurter' | 'exchangerate-api' | 'gold-api';
+  source: 'mt5' | 'finnhub';
   bid?: number;
   ask?: number;
   spread_points?: number;
