@@ -282,3 +282,74 @@ export function monteCarloBootstrap(
     ruinProbability: ruined / iterations,
   };
 }
+
+
+/**
+ * Circular moving-block bootstrap. Contiguous observed trade outcomes are
+ * resampled together to retain short-run clustering better than IID draws.
+ */
+export function monteCarloBlockBootstrap(
+  trades: NetTrade[],
+  options: {
+    iterations?: number;
+    horizon?: number;
+    seed?: number;
+    blockLength?: number;
+    startingEquityR?: number;
+    ruinDrawdownPct?: number;
+  } = {},
+): {
+  method: 'CIRCULAR_MOVING_BLOCK';
+  iterations: number;
+  seed: number;
+  horizon: number;
+  blockLength: number;
+  endingEquityR: { p05: number; p50: number; p95: number };
+  maxDrawdownPct: { p50: number; p95: number; p99: number };
+  ruinProbability: number;
+} | null {
+  const iterations = options.iterations ?? 5000;
+  const horizon = options.horizon ?? trades.length;
+  const seed = options.seed ?? 20261128;
+  const blockLength = options.blockLength ?? Math.max(1, Math.floor(Math.sqrt(trades.length)));
+  const startingEquityR = options.startingEquityR ?? 100;
+  const ruinDrawdownPct = options.ruinDrawdownPct ?? 50;
+  if (!trades.length || trades.some((trade) => !Number.isFinite(trade.netR))
+    || !Number.isSafeInteger(iterations) || iterations < 100 || iterations > 100_000
+    || !Number.isSafeInteger(horizon) || horizon < 1 || horizon > 100_000
+    || !Number.isSafeInteger(seed)
+    || !Number.isSafeInteger(blockLength) || blockLength < 1 || blockLength > trades.length
+    || !Number.isFinite(startingEquityR) || startingEquityR <= 0
+    || !Number.isFinite(ruinDrawdownPct) || ruinDrawdownPct <= 0 || ruinDrawdownPct >= 100) return null;
+
+  const random = mulberry32(seed);
+  const endings: number[] = [], drawdowns: number[] = [];
+  let ruined = 0;
+  for (let path = 0; path < iterations; path += 1) {
+    let equity = startingEquityR, peak = startingEquityR, maxDd = 0, step = 0;
+    while (step < horizon) {
+      const blockStart = Math.floor(random() * trades.length);
+      for (let offset = 0; offset < blockLength && step < horizon; offset += 1) {
+        const trade = trades[(blockStart + offset) % trades.length];
+        equity = Math.max(0, equity + trade.netR);
+        peak = Math.max(peak, equity);
+        const drawdown = peak > 0 ? ((peak - equity) / peak) * 100 : 100;
+        maxDd = Math.max(maxDd, drawdown);
+        step += 1;
+      }
+    }
+    endings.push(equity);
+    drawdowns.push(maxDd);
+    if (maxDd >= ruinDrawdownPct) ruined += 1;
+  }
+  return {
+    method: 'CIRCULAR_MOVING_BLOCK',
+    iterations,
+    seed,
+    horizon,
+    blockLength,
+    endingEquityR: { p05: percentile(endings, 0.05), p50: percentile(endings, 0.5), p95: percentile(endings, 0.95) },
+    maxDrawdownPct: { p50: percentile(drawdowns, 0.5), p95: percentile(drawdowns, 0.95), p99: percentile(drawdowns, 0.99) },
+    ruinProbability: ruined / iterations,
+  };
+}
