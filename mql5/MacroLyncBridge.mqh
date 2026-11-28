@@ -539,7 +539,8 @@ bool MacroLyncEvaluateAccountGuardian(MacroLyncAccountGuardian &guardian, const 
    guardian.daily_closed_trades = -1;
    guardian.daily_losses = -1;
    datetime startOfDay = iTime(_Symbol, PERIOD_D1, 0);
-   if(startOfDay <= 0 || !HistorySelect(startOfDay, TimeCurrent()))
+   datetime historyStart = TimeCurrent() - 90 * 86400;
+   if(startOfDay <= 0 || !HistorySelect(historyStart, TimeCurrent()))
    {
       guardian.kill_switch_active = true;
       guardian.kill_switch_reason = "Broker daily deal history is unavailable";
@@ -548,8 +549,12 @@ bool MacroLyncEvaluateAccountGuardian(MacroLyncAccountGuardian &guardian, const 
 
    long positionIds[];
    double positionNetPnl[];
+   bool positionHasEntry[];
+   bool positionClosedToday[];
    ArrayResize(positionIds, 0);
    ArrayResize(positionNetPnl, 0);
+   ArrayResize(positionHasEntry, 0);
+   ArrayResize(positionClosedToday, 0);
 
    int deals_count = HistoryDealsTotal();
    for(int i = 0; i < deals_count; i++)
@@ -557,12 +562,11 @@ bool MacroLyncEvaluateAccountGuardian(MacroLyncAccountGuardian &guardian, const 
       ulong ticket = HistoryDealGetTicket(i);
       if(ticket == 0) continue;
 
-      long entry = HistoryDealGetInteger(ticket, DEAL_ENTRY);
-      if(entry != DEAL_ENTRY_OUT && entry != DEAL_ENTRY_INOUT) continue;
-
       long positionId = HistoryDealGetInteger(ticket, DEAL_POSITION_ID);
       if(positionId <= 0) continue;
 
+      long entry = HistoryDealGetInteger(ticket, DEAL_ENTRY);
+      datetime dealTime = (datetime)HistoryDealGetInteger(ticket, DEAL_TIME);
       double netPnl = HistoryDealGetDouble(ticket, DEAL_PROFIT)
                     + HistoryDealGetDouble(ticket, DEAL_COMMISSION)
                     + HistoryDealGetDouble(ticket, DEAL_SWAP)
@@ -578,16 +582,26 @@ bool MacroLyncEvaluateAccountGuardian(MacroLyncAccountGuardian &guardian, const 
          found = ArraySize(positionIds);
          ArrayResize(positionIds, found + 1);
          ArrayResize(positionNetPnl, found + 1);
+         ArrayResize(positionHasEntry, found + 1);
+         ArrayResize(positionClosedToday, found + 1);
          positionIds[found] = positionId;
          positionNetPnl[found] = 0.0;
+         positionHasEntry[found] = false;
+         positionClosedToday[found] = false;
       }
+
       positionNetPnl[found] += netPnl;
+      if(entry == DEAL_ENTRY_IN) positionHasEntry[found] = true;
+      if((entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_INOUT) && dealTime >= startOfDay)
+         positionClosedToday[found] = true;
    }
 
    int tradesToday = 0;
    int lossesToday = 0;
    for(int i = 0; i < ArraySize(positionIds); i++)
    {
+      if(!positionClosedToday[i]) continue;
+
       bool stillOpen = false;
       for(int p = 0; p < PositionsTotal(); p++)
       {
@@ -600,6 +614,15 @@ bool MacroLyncEvaluateAccountGuardian(MacroLyncAccountGuardian &guardian, const 
          }
       }
       if(stillOpen) continue;
+
+      // If the entry leg predates the 90-day history window, realised net P&L is incomplete.
+      if(!positionHasEntry[i])
+      {
+         guardian.kill_switch_active = true;
+         guardian.kill_switch_reason = "Closed position history is incomplete for net daily P&L";
+         return false;
+      }
+
       tradesToday++;
       if(positionNetPnl[i] < 0.0) lossesToday++;
    }
