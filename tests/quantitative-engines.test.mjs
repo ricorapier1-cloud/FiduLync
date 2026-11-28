@@ -332,7 +332,7 @@ test('MT5 macro bridge rejects unsupported instruments and withholds stale provi
   assert.match(route, /freshness === 'STALE' \? null : quote\.price/);
   assert.match(route, /age_ms: ageMs/);
   assert.match(route, /rawAgeMs >= -5 \* 60_000/);
-  assert.match(types, /freshness: 'FRESH' \| 'STALE' \| 'REFERENCE'/);
+  assert.match(types, /freshness: 'FRESH' \| 'STALE'/);
 });
 test('XAUUSD dashboard, intraday signals and MT5 context use the dedicated gold macro engine', () => {
   const page = read('../app/page.tsx');
