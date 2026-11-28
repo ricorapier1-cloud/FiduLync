@@ -14,6 +14,7 @@ const SUPPORTED_NON_FX_SYMBOLS = new Set(['XAUUSD']);
 const NO_STORE = { 'Cache-Control': 'no-store, max-age=0', Pragma: 'no-cache' };
 const REGION_ALIASES: Record<string, string[]> = {
   USD: ['USD', 'US', 'USA', 'UNITED STATES', 'FEDERAL RESERVE'],
+  XAU: ['XAU', 'GOLD'],
   EUR: ['EUR', 'EU', 'EURO AREA', 'EUROZONE', 'EUROPEAN CENTRAL BANK'],
   GBP: ['GBP', 'UK', 'UNITED KINGDOM', 'BRITAIN', 'BANK OF ENGLAND'],
   JPY: ['JPY', 'JP', 'JAPAN', 'BANK OF JAPAN'],
@@ -53,6 +54,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const symbol = (searchParams.get('symbol') ?? '').trim().toUpperCase();
   const isG8Pair = /^[A-Z]{6}$/.test(symbol)
+    && symbol.slice(0, 3) !== symbol.slice(3)
     && CURRENCIES.has(symbol.slice(0, 3)) && CURRENCIES.has(symbol.slice(3));
   if (!isG8Pair && !SUPPORTED_NON_FX_SYMBOLS.has(symbol)) {
     return response({ error: 'A supported G8 currency pair or XAUUSD is required.' }, 400);
@@ -95,8 +97,8 @@ export async function GET(request: Request) {
       && isFresh(base.twoYearYieldAsOf, 10) && isFresh(quote.twoYearYieldAsOf, 10));
     const hasReleasedCot = (market: string) => snapshot.cot.some((item) =>
       item.market === market
-      && Number.isSafeInteger(item.sampleSize)
-      && Number(item.sampleSize) >= 52
+      && typeof item.sampleSize === 'number'
+      && Number.isSafeInteger(item.sampleSize) && item.sampleSize >= 52
       && typeof item.publishedAt === 'string'
       && hasTimezone(item.publishedAt)
       && isFresh(item.publishedAt, 14));
@@ -157,7 +159,7 @@ export async function GET(request: Request) {
       fundamental_bias: bias,
       bias_status: evidenceVerified ? 'FULL_FACTOR_COVERAGE_UNCALIBRATED' : 'INSUFFICIENT_EVIDENCE',
       fundamental_score: score,
-      score_method: 'Uncalibrated multi-factor heuristic; emitted only with full pair, two-year yield, COT and risk-currency coverage. Not a probability or execution signal.',
+      score_method: 'Uncalibrated multi-factor heuristic; emitted only with full pair, two-year yield, release-timestamped COT with at least 52 observations, and risk-currency coverage. Not a probability or execution signal.',
       evidence_coverage: {
         pair_policy_and_inflation: pairRatesVerified,
         matched_currency_two_year_yields: twoYearYieldCoverage,
