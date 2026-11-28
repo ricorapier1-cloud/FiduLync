@@ -29,9 +29,9 @@ test('macro observations preserve source observation dates, not only retrieval t
   for (const field of ['policyRateAsOf', 'corePceAsOf', 'cpiAsOf', 'twoYearYieldAsOf']) {
     assert.match(macroData, new RegExp(field));
   }
-  assert.match(macroEngine, /observationFresh\\(currency\\.policyRateAsOf, policyRateMaxAgeDays\\(currency\\.policyRateProvider\\)\\)/);
-  assert.match(macroEngine, /observationFresh\\(currency\\.inflationAsOf, 75\\)/);
-  assert.match(macroEngine, /observationFresh\\(currency\\.twoYearYieldAsOf, 10\\)/);
+  assert.ok(macroEngine.includes('observationFresh(currency.policyRateAsOf, policyRateMaxAgeDays(currency.policyRateProvider))'));
+  assert.ok(macroEngine.includes('observationFresh(currency.inflationAsOf, 75)'));
+  assert.ok(macroEngine.includes('observationFresh(currency.twoYearYieldAsOf, 10)'));
 });
 
 test('stale macro snapshots are rejected instead of silently reused', () => {
