@@ -11,9 +11,13 @@ type Quote = {
   symbol: string; bid: number | null; ask: number | null; mid: number | null;
   spread: number | null; quoteTimeUtc: string | null; retrievedAtUtc: string;
   ageMs: number | null; freshness: 'LIVE' | 'STALE' | 'UNAVAILABLE';
-  latencyMs: number; source: string; error: string | null;
+  latencyMs: number | null; source: string; error: string | null;
+  executionGrade?: boolean; broker?: string | null; server?: string | null; accountMode?: string | null;
 };
-type QuoteResponse = { generatedAtUtc: string; latencyMs: number; status: string; quotes: Quote[] };
+type QuoteResponse = {
+  generatedAtUtc: string; latencyMs: number; status: string; quotes: Quote[];
+  source?: string; executionGrade?: boolean; broker?: string | null; server?: string | null; accountMode?: string | null;
+};
 type FxRow = { date: string; rates: Record<string, number> };
 const symbols: string[] = ['EURUSD', 'XAUUSD', 'USDJPY'];
 const currencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CHF', 'CAD'] as const;
@@ -63,6 +67,12 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const [quoteStatus, setQuoteStatus] = useState('CONNECTING');
   const [latency, setLatency] = useState<number | null>(null);
   const [quoteSync, setQuoteSync] = useState<string | null>(null);
+  const [accountReadToken, setAccountReadToken] = useState<string | null>(null);
+  const [accountKey, setAccountKey] = useState<string | null>(null);
+  const [accountMode, setAccountMode] = useState<string | null>(null);
+  const [brokerIdentity, setBrokerIdentity] = useState<string | null>(null);
+  const [quoteExecutionGrade, setQuoteExecutionGrade] = useState(false);
+  const [signalMarketDataQuality, setSignalMarketDataQuality] = useState('NOT_CONNECTED');
   const [fxRows, setFxRows] = useState<FxRow[]>([]);
   const [fxStatus, setFxStatus] = useState('NOT SYNCED');
   const [fxSync, setFxSync] = useState<string | null>(null);
@@ -99,21 +109,54 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
     let active = true;
     const load = async () => {
       try {
-        const response = await fetch('/api/v1/intraday-signals', { cache: 'no-store' });
+        const response = await fetch('/api/v1/accounts', { cache: 'no-store', headers: accountReadToken ? { Authorization: 'Bearer ' + accountReadToken } : {} });
+        if (!accountReadToken || !response.ok) throw new Error('Private MT5 account feed is not connected');
+        const payload = await response.json() as { accounts?: Array<{ account_key: string; broker: string | null; server: string; account_mode: string }> };
+        const savedKey = window.sessionStorage.getItem('macrolinc-selected-account-key');
+        const selected = payload.accounts?.find((item) => item.account_key === savedKey) ?? payload.accounts?.[0];
+        if (active) {
+          setAccountKey(selected?.account_key ?? null);
+          setAccountMode(selected?.account_mode ?? null);
+          setBrokerIdentity(selected ? [selected.broker ?? 'MT5', selected.server].filter(Boolean).join(' · ') : null);
+        }
+      } catch {
+        if (active) { setAccountKey(null); setAccountMode(null); setBrokerIdentity(null); }
+      }
+    };
+    if (accountReadToken) void load();
+    const timer = window.setInterval(() => { if (accountReadToken) void load(); }, 60_000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [accountReadToken]);
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const params = new URLSearchParams();
+        if (accountKey) params.set('accountKey', accountKey);
+        const query = params.size ? '?' + params.toString() : '';
+        const response = await fetch('/api/v1/intraday-signals' + query, {
+          cache: 'no-store',
+          headers: accountReadToken && accountKey ? { Authorization: 'Bearer ' + accountReadToken } : {},
+        });
         if (!response.ok) throw new Error('Intraday signal feed unavailable');
-        const payload = await response.json() as { signals?: IntradaySignal[]; generatedAtUtc?: string };
+        const payload = await response.json() as {
+          signals?: IntradaySignal[];
+          generatedAtUtc?: string;
+          marketDataQuality?: { brokerMarketData?: { status?: string } };
+        };
         if (active) {
           setIntradaySignals(Array.isArray(payload.signals) ? payload.signals : []);
+          setSignalMarketDataQuality(payload.marketDataQuality?.brokerMarketData?.status ?? 'NOT_CONNECTED');
           setSignalSyncUtc(payload.generatedAtUtc ?? new Date().toISOString());
         }
       } catch {
-        if (active) { setIntradaySignals([]); setSignalSyncUtc(null); }
+        if (active) { setIntradaySignals([]); setSignalMarketDataQuality('UNAVAILABLE'); setSignalSyncUtc(null); }
       }
     };
     void load();
     const timer = window.setInterval(() => void load(), 60_000);
     return () => { active = false; window.clearInterval(timer); };
-  }, []);
+  }, [accountKey, accountReadToken]);
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
@@ -191,22 +234,31 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const nextSessionOpenUtc = getNextMarketSessionOpenUtc(new Date(now));
   const activeSessionCloseUtc = getActiveMarketSessionCloseUtc(new Date(now), activeSessionValue);
   const isForexWeekendClosed = isForexMarketWeekendClosed(new Date(now));
-  const globalDeskLockout = activeSession === 'OFF-SESSION' || !manualLedgerComplete || (manualDeskMode && (manualLedger.losses >= 2));
+  const brokerExecutionDataReady = quoteExecutionGrade && signalMarketDataQuality === 'BROKER_LIVE_VERIFIED' && accountMode === 'REAL';
+  const globalDeskLockout = activeSession === 'OFF-SESSION'
+    || (manualDeskMode ? !manualLedgerComplete || manualLedger.losses >= 2 : !brokerExecutionDataReady);
   const coverageProviders = snapshot.providerStatus ?? [];
   const healthyProviderCount = coverageProviders.filter((provider) => provider.status === 'HEALTHY' || provider.status === 'STANDBY').length;
   const totalProviderCount = coverageProviders.length;
 
   const refreshQuotes = useCallback(async () => {
     if (document.visibilityState === 'hidden') return;
-    const query = satelliteSymbol ? '?satellite=' + encodeURIComponent(satelliteSymbol) : '';
-    const response = await fetch('/api/v1/live-quotes' + query, { cache: 'no-store' });
+    const params = new URLSearchParams();
+    if (accountKey) params.set('accountKey', accountKey);
+    if (satelliteSymbol) params.set('satellite', satelliteSymbol);
+    const query = params.size ? '?' + params.toString() : '';
+    const headers = accountReadToken && accountKey ? { Authorization: 'Bearer ' + accountReadToken } : {};
+    const response = await fetch('/api/v1/live-quotes' + query, { cache: 'no-store', headers });
     if (!response.ok) throw new Error(`Live quote proxy HTTP ${response.status}`);
     const payload = await response.json() as QuoteResponse;
     setQuotes(payload.quotes);
     setQuoteStatus(payload.status);
     setLatency(payload.latencyMs);
     setQuoteSync(payload.generatedAtUtc);
-  }, [satelliteSymbol]);
+    setQuoteExecutionGrade(payload.executionGrade === true);
+    setAccountMode(payload.accountMode ?? null);
+    setBrokerIdentity(payload.broker ? [payload.broker, payload.server].filter(Boolean).join(' · ') : brokerIdentity);
+  }, [accountKey, accountReadToken, brokerIdentity, satelliteSymbol]);
   const refreshFx = useCallback(async () => {
     if (document.visibilityState === 'hidden') return;
     try {
@@ -228,6 +280,8 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
+      const token = window.sessionStorage.getItem('macrolinc-account-read-token');
+      if (token) setAccountReadToken(token);
       const cachedFx = readStorage<{ rows: FxRow[]; retrievedAtUtc: string }>(FX_KEY);
       if (cachedFx?.rows?.length) { setFxRows(cachedFx.rows); setFxSync(cachedFx.retrievedAtUtc); setFxStatus('CACHED'); }
       setReady(true);
@@ -339,7 +393,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   return <section id="desk-terminal" className="desk-terminal scroll-mt-24" aria-label="Macro and fundamental research terminal">
     <div className="desk-topbar">
       <div><span className="desk-kicker">MACROLYNC / PRIVATE SYSTEMATIC RESEARCH</span><h2>MacroLync Terminal</h2></div>
-      <div className="desk-top-meta"><span className={isForexWeekendClosed ? 'desk-warning' : quoteStatus === 'HEALTHY' && quotes.some((item) => item.freshness === 'LIVE' && item.ageMs !== null && item.ageMs <= 60_000) ? 'desk-live' : 'desk-warning'}><i />{isForexWeekendClosed ? 'MARKET CLOSED (WEEKEND)' : quoteStatus === 'HEALTHY' && quotes.some((item) => item.freshness === 'LIVE' && item.ageMs !== null && item.ageMs <= 60_000) ? 'FRESH BBO · 15s' : quoteStatus === 'HEALTHY' ? 'STALE BBO' : 'FEED UNAVAILABLE'}</span><span>WAT {watClock}</span><span>UTC {utcClock}</span><span className={healthyProviderCount === totalProviderCount && totalProviderCount > 0 ? 'desk-live' : 'desk-warning'}>DATA HEALTH {healthyProviderCount}/{totalProviderCount}</span><button type="button" onClick={() => void forceSync()} disabled={forceSyncing}>{forceSyncing ? 'SYNCING…' : 'FORCE SYNC'}</button></div>
+      <div className="desk-top-meta"><span className={isForexWeekendClosed ? 'desk-warning' : quoteExecutionGrade ? 'desk-live' : 'desk-warning'}><i />{isForexWeekendClosed ? 'MARKET CLOSED (WEEKEND)' : quoteExecutionGrade ? 'BROKER-VERIFIED MT5 QUOTES' : quoteStatus === 'HEALTHY' ? 'PUBLIC REFERENCE BBO · NOT BROKER' : 'BROKER FEED UNAVAILABLE'}</span><span>WAT {watClock}</span><span>UTC {utcClock}</span><span className={healthyProviderCount === totalProviderCount && totalProviderCount > 0 ? 'desk-live' : 'desk-warning'}>DATA HEALTH {healthyProviderCount}/{totalProviderCount}</span><button type="button" onClick={() => void forceSync()} disabled={forceSyncing}>{forceSyncing ? 'SYNCING…' : 'FORCE SYNC'}</button></div>
     </div>
         {/* 1. Mobile-First "3-Number Execution Ticket" (Zero-Ambiguity Top Command Bar) */}
     <section className="mb-4 rounded-xl border border-teal-500/40 bg-[#070d14] p-4 text-xs font-mono shadow-lg" aria-label="3-Number Execution Ticket">
@@ -353,7 +407,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
           </div>
           <div className="flex flex-wrap items-center gap-2 text-[11px]">
             <span className={`px-2.5 py-1 rounded font-bold border ${activeSession === 'LONDON' || activeSession === 'NEW YORK'  ? 'bg-emerald-950/80 border-emerald-600 text-emerald-300' : 'bg-rose-950/80 border-rose-700 text-rose-300'}`}>
-              WAT SESSION: {activeSession === 'LONDON' ? 'LONDON 08:00–12:00 WAT' : (activeSession === 'NEW YORK' ) ? 'NEW YORK 13:00–17:00 WAT' : 'OFF-SESSION LOCKOUT'}
+              WAT SESSION: {activeSession === 'LONDON' ? 'LONDON 08:00–12:00 WAT' : (activeSession === 'NEW YORK' ) ? 'NEW YORK 08:00–12:00 ET · DST-ADJUSTED' : 'OFF-SESSION LOCKOUT'}
             </span>
             <div className="flex items-center gap-1 bg-slate-900 border border-slate-700 rounded px-2 py-0.5 text-slate-300">
               <span>BAL: {manualLedgerComplete && ticketBalance !== null ? ticketBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USD' : 'NOT SET (ENTER REAL BALANCE)'}</span>
