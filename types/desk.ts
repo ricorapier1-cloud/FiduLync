@@ -53,6 +53,37 @@ export type MacroContextPayload = {
   decision_status: 'INSUFFICIENT_EVIDENCE' | 'RESEARCH_CONTEXT_AVAILABLE';
   bias_score: number | null;
   confidence: 'HIGH' | 'MODERATE' | 'LOW' | 'INSUFFICIENT_EVIDENCE';
+  confidence_basis: 'EVIDENCE_COMPLETENESS_NOT_WIN_PROBABILITY';
+  research_objectives: {
+    targetWinRateMin: number;
+    targetWinRateMax: number;
+    plannedRewardRisk: number;
+    priority: 'BALANCED_GROWTH';
+    drawdownPriority: 'CONTROLLED_DRAWDOWN';
+    setupPolicy: 'HIGH_QUALITY_ONLY';
+    dailyTradeQuota: null;
+    minimumOutOfSampleTrades: number;
+    minimumWalkForwardFolds: number;
+    minimumCotObservations: number;
+  };
+  strategy_validation: {
+    status: 'NOT_VALIDATED' | 'VALIDATED';
+    verified: boolean;
+    approved_report_id: string | null;
+    blockers: string[];
+  };
+  point_in_time_integrity: {
+    status: 'VERIFIED' | 'NOT_VERIFIED' | 'UNAVAILABLE';
+    observations: number;
+    withReleaseTimestamp: number;
+    withVintageTimestamp: number;
+    releaseTimestampCoveragePct: number | null;
+    vintageTimestampCoveragePct: number | null;
+    sourceCount: number;
+    latestRetrievedAtUtc: string | null;
+    historicalValidationEligible: false;
+    blockers: string[];
+  };
   policy_diff_bps: number | null;
   real_policy_rate_diff_bps: number | null;
   real_yield_diff_bps: null;
