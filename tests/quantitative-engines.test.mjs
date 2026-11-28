@@ -791,7 +791,8 @@ test('production UI fails closed on unconfigured account balance and never seeds
   const validationEngine = read('../lib/quant/monteCarloEngine.ts');
   const validationPage = read('../app/validation/page.tsx');
   assert.doesNotMatch(validationEngine, /initialBalance = 10_000|volume: 0\.1|profit \/ 50|net \/ 100|99\.9/);
-  assert.match(validationPage, /NO VERIFIED TRADE HISTORY — IMPORT MT5 REPORT OR LOG REAL TRADES TO RUN MONTE CARLO/);
+  assert.match(validationPage, /No qualifying chronological sample/);
+  assert.match(validationPage, /Load linked REAL MT5 history/);
   assert.match(validationPage, /startingBalance === null/);
   assert.doesNotMatch(accounts, /ManualTrade|profitSweeps|manualTrades/);
 });
@@ -921,7 +922,7 @@ test('validation workspace uses linked real MT5 history or imported reports, nev
   assert.match(page, /Load linked REAL MT5 history/);
   assert.match(page, /MT5_BACKTEST_CSV/);
   assert.match(page, /account_mode !== 'REAL'/);
-  assert.match(page, /initial stop-loss risk is not included in deal history/);
+  assert.match(page, /Entry cash-risk amount is not included in deal history/);
   assert.match(page, /ROBUST CANDIDATE · NOT APPROVED/);
   assert.doesNotMatch(page, /fidulync-manual-trades-history-v1|Load From Verified Manual Ledger|manualLedger|profitSweeps/);
 });
