@@ -140,12 +140,12 @@ export async function POST(request: Request) {
     },
   });
 
-  const dailyLimitReached = stored.dailyLosses >= 2 || stored.dailyClosedTrades >= 2;
+  const dailyLossLimitReached = stored.dailyLosses >= 2;
   const drawdownLimitReached = stored.rollingSevenDayDrawdownPct !== null
     && stored.rollingSevenDayDrawdownPct <= -4.0;
   const killSwitchActive = !stored.governanceVerified
     || !validationGate.verified
-    || dailyLimitReached
+    || dailyLossLimitReached
     || drawdownLimitReached
     || (vix !== null && vix >= 32.0)
     || newsLockoutActive
@@ -155,11 +155,10 @@ export async function POST(request: Request) {
     ? 'Seven-day MT5 equity history is not yet complete and verified'
     : !validationGate.verified ? (validationGate.blockers[0] ?? 'Strategy has no owner-approved out-of-sample validation')
       : stored.dailyLosses >= 2 ? 'Daily loss limit reached (broker server day)'
-      : stored.dailyClosedTrades >= 2 ? 'Daily maximum trade count reached (broker server day)'
-        : drawdownLimitReached ? 'Verified seven-day peak-to-trough equity drawdown limit breached'
-          : newsLockoutActive ? 'Economic calendar is unavailable or a high-impact event is inside the lockout window'
-            : vix !== null && vix >= 32.0 ? 'VIX Black Swan Lockout (VIX >= 32.0)'
-              : sovereignShield.blockReasons[0] ?? null;
+      : drawdownLimitReached ? 'Verified seven-day peak-to-trough equity drawdown limit breached'
+        : newsLockoutActive ? 'Economic calendar is unavailable or a high-impact event is inside the lockout window'
+          : vix !== null && vix >= 32.0 ? 'VIX Black Swan Lockout (VIX >= 32.0)'
+            : sovereignShield.blockReasons[0] ?? null;
 
   const deskStatus = killSwitchActive || !sovereignShield.allowedToTrade ? 'LOCKOUT'
     : sovereignShield.maxAllowedRiskPct <= 0.5 ? 'HALF_RISK' : 'CLEARED';
