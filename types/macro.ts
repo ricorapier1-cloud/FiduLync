@@ -66,8 +66,9 @@ export type MacroCurrency = {
 export type CotPosition = {
   market: string;
   netContracts: number;
-  percentile: number;
-  weeklyChange: number;
+  percentile: number | null;
+  weeklyChange: number | null;
+  sampleSize?: number;
   commercialNet?: number;
   openInterest?: number;
   reportDate?: string;
@@ -217,6 +218,8 @@ export type MacroSnapshot = {
   cotSource?: 'unavailable' | 'provider';
   calendarSource?: 'unavailable' | 'reference' | 'provider';
   calendarProvider?: 'FAIRECONOMY_PUBLIC' | 'FINNHUB' | 'FMP';
+  calendarRetrievedAtUtc?: string;
+  calendarCoverageEndUtc?: string;
   ecbRates?: Record<string, number>;
   currencies: MacroCurrency[];
   cot: CotPosition[];
