@@ -32,9 +32,6 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
   const worldBankCurrencies = snapshot.currencies.filter((item) => item.inflationProvider === 'World Bank' && item.inflationObservationDate);
   const fredKeyPresent = Boolean(process.env.FRED_API_KEY?.trim());
   const fredStorageAllowed = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED?.trim().toLowerCase() !== 'false';
-  const finnhubKeyPresent = Boolean(process.env.FINNHUB_API_KEY?.trim());
-  const finnhubPlanActive = process.env.FINNHUB_PERSONAL_PLAN_ACTIVE === 'true';
-  const finnhubConfigured = finnhubPlanActive && finnhubKeyPresent;
   // The public FairEconomy adapter requires no API key; health depends on
   // observed retrieval freshness and verified forward coverage below.
   const calendarConfigured = true;
