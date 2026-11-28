@@ -79,18 +79,11 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const [now, setNow] = useState(() => Date.parse(initialSnapshot.asOf) || 0);
   const [ready, setReady] = useState(false);
   const [forceSyncing, setForceSyncing] = useState(false);
-  const [ticketSymbol, setTicketSymbol] = useState<'EURUSD' | 'USDJPY' | 'XAUUSD'>('EURUSD');
-  const [ticketBalance, setTicketBalance] = useState<number | null>(null);
-  const [ticketBalanceInput, setTicketBalanceInput] = useState('');
-  const [balanceSaveMessage, setBalanceSaveMessage] = useState<string | null>(null);
-  const [balanceHydrated, setBalanceHydrated] = useState(false);
-  const [manualClosedTradesPnl, setManualClosedTradesPnl] = useState<number | null>(null);
-  const [ledgerPnlHydrated, setLedgerPnlHydrated] = useState(false);
+  const [quoteSource, setQuoteSource] = useState('UNAVAILABLE');
 
   const [intradaySignals, setIntradaySignals] = useState<IntradaySignal[]>([]);
   const [signalSyncUtc, setSignalSyncUtc] = useState<string | null>(null);
   const [manualDeskMode, setManualDeskMode] = useState(false);
-  const [manualLedger, setManualLedger] = useState<{ date: string; trades: number; losses: number; legs: string[] }>({ date: '', trades: 0, losses: 0, legs: [] });
 
   const quoteFor = useCallback((symbol: string) => quotes.find((q) => q.symbol === symbol) ?? null, [quotes]);
   const refreshIntradaySignals = useCallback(async () => {
@@ -159,74 +152,14 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   }, [accountKey, accountReadToken]);
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-      try {
-        const savedMode = window.localStorage.getItem('fidulync-manual-desk-mode-v1') === 'true';
-        const raw = window.localStorage.getItem('fidulync-manual-desk-ledger-v1');
-        const saved = raw ? JSON.parse(raw) as { date?: string; trades?: number; losses?: number; legs?: string[] } : null;
-        setManualDeskMode(savedMode);
-        setManualLedger(saved?.date === today ? { date: today, trades: Math.max(0, saved.trades ?? 0), losses: Math.min(2, Math.max(0, saved.losses ?? 0)), legs: Array.isArray(saved.legs) ? saved.legs : [] } : { date: today, trades: 0, losses: 0, legs: [] });
-      } catch { setManualDeskMode(false); setManualLedger({ date: today, trades: 0, losses: 0, legs: [] }); }
+      setManualDeskMode(window.localStorage.getItem('fidulync-manual-desk-mode-v1') === 'true');
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
-  const saveManualLedger = (next: typeof manualLedger) => {
-    setManualLedger(next);
-    try { window.localStorage.setItem('fidulync-manual-desk-ledger-v1', JSON.stringify(next)); } catch { setManualDeskMode(false); }
-  };
   const toggleManualDeskMode = (enabled: boolean) => {
     setManualDeskMode(enabled);
-    try { window.localStorage.setItem('fidulync-manual-desk-mode-v1', String(enabled)); } catch { setManualDeskMode(false); }
-  };
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      try {
-        const raw = window.localStorage.getItem('macrolinc-manual-account-balance-v1');
-        const saved = raw ? JSON.parse(raw) as { balance?: number } : null;
-        if (saved && typeof saved.balance === 'number' && Number.isFinite(saved.balance) && saved.balance > 0) {
-          setTicketBalance(saved.balance);
-          setTicketBalanceInput(String(saved.balance));
-        }
-      } catch {
-        setTicketBalance(null);
-        setTicketBalanceInput('');
-      } finally {
-        setBalanceHydrated(true);
-      }
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      try {
-        const raw = window.localStorage.getItem('fidulync-manual-trades-history-v1');
-        if (!raw) setManualClosedTradesPnl(0);
-        else {
-          const trades = JSON.parse(raw) as Array<{ profit?: number }>;
-          if (!Array.isArray(trades) || trades.some((trade) => typeof trade.profit !== 'number' || !Number.isFinite(trade.profit))) setManualClosedTradesPnl(null);
-          else setManualClosedTradesPnl(trades.reduce((sum, trade) => sum + (trade.profit ?? 0), 0));
-        }
-      } catch {
-        setManualClosedTradesPnl(null);
-      } finally {
-        setLedgerPnlHydrated(true);
-      }
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
-  const currentManualEquity = balanceHydrated && ledgerPnlHydrated && manualDeskMode && ticketBalance !== null && manualClosedTradesPnl !== null
-    ? ticketBalance + manualClosedTradesPnl : null;
-  const manualLedgerComplete = balanceHydrated && ledgerPnlHydrated && manualDeskMode && ticketBalance !== null && Number.isFinite(ticketBalance) && ticketBalance > 0
-    && manualClosedTradesPnl !== null && currentManualEquity !== null && currentManualEquity > 0;
-  const saveTicketBalance = () => {
-    const value = Number(ticketBalanceInput);
-    if (!manualDeskMode) { setBalanceSaveMessage('Enable Manual Review Mode before saving a user-attested balance.'); return; }
-    if (!Number.isFinite(value) || value <= 0) { setTicketBalance(null); setBalanceSaveMessage('Enter a valid positive real account balance.'); return; }
-    try {
-      window.localStorage.setItem('macrolinc-manual-account-balance-v1', JSON.stringify({ balance: value, currency: 'USD', savedAtUtc: new Date().toISOString(), source: 'USER_ATTESTED_MANUAL' }));
-      setTicketBalance(value);
-      setBalanceSaveMessage('User-attested starting balance saved in this browser.');
-    } catch { setTicketBalance(null); setBalanceSaveMessage('Browser storage unavailable. Balance remains unverified.'); }
+    try { window.localStorage.setItem('fidulync-manual-desk-mode-v1', String(enabled)); }
+    catch { setManualDeskMode(false); }
   };
   const activeSessionValue = getActiveMarketSession(new Date(now));
   const activeSession = activeSessionValue === 'CLOSED' ? 'OFF-SESSION'
@@ -235,8 +168,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   const activeSessionCloseUtc = getActiveMarketSessionCloseUtc(new Date(now), activeSessionValue);
   const isForexWeekendClosed = isForexMarketWeekendClosed(new Date(now));
   const brokerExecutionDataReady = quoteExecutionGrade && signalMarketDataQuality === 'BROKER_LIVE_VERIFIED' && accountMode === 'REAL';
-  const globalDeskLockout = activeSession === 'OFF-SESSION'
-    || (manualDeskMode ? !manualLedgerComplete || manualLedger.losses >= 2 : !brokerExecutionDataReady);
+  const globalDeskLockout = activeSession === 'OFF-SESSION' || !brokerExecutionDataReady;
   const coverageProviders = snapshot.providerStatus ?? [];
   const healthyProviderCount = coverageProviders.filter((provider) => provider.status === 'HEALTHY' || provider.status === 'STANDBY').length;
   const totalProviderCount = coverageProviders.length;
@@ -252,6 +184,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
     if (!response.ok) throw new Error(`Live quote proxy HTTP ${response.status}`);
     const payload = await response.json() as QuoteResponse;
     setQuotes(payload.quotes);
+    setQuoteSource(payload.source ?? 'UNAVAILABLE');
     setQuoteStatus(payload.status);
     setLatency(payload.latencyMs);
     setQuoteSync(payload.generatedAtUtc);
@@ -388,162 +321,13 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   };
   const watClock = new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Lagos', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).format(new Date(now));
   const utcClock = new Date(now).toISOString().slice(11, 19);
-  const activeSatelliteSymbol = satelliteSymbol ?? 'GBPUSD';
-  const displaySymbols = [...symbols, activeSatelliteSymbol];
+  const activeSatelliteSymbol = satelliteSymbol;
+  const displaySymbols = activeSatelliteSymbol ? [...symbols, activeSatelliteSymbol] : symbols;
   return <section id="desk-terminal" className="desk-terminal scroll-mt-24" aria-label="Macro and fundamental research terminal">
     <div className="desk-topbar">
       <div><span className="desk-kicker">MACROLYNC / PRIVATE SYSTEMATIC RESEARCH</span><h2>MacroLync Terminal</h2></div>
       <div className="desk-top-meta"><span className={isForexWeekendClosed ? 'desk-warning' : quoteExecutionGrade ? 'desk-live' : 'desk-warning'}><i />{isForexWeekendClosed ? 'MARKET CLOSED (WEEKEND)' : quoteExecutionGrade ? 'BROKER-VERIFIED MT5 QUOTES' : accountMode === 'DEMO' ? 'DEMO MT5 DATA · NOT EXECUTION-GRADE' : quoteStatus === 'HEALTHY' ? 'PUBLIC REFERENCE BBO · NOT BROKER' : 'BROKER FEED UNAVAILABLE'}</span><span>WAT {watClock}</span><span>UTC {utcClock}</span><span className={healthyProviderCount === totalProviderCount && totalProviderCount > 0 ? 'desk-live' : 'desk-warning'}>DATA HEALTH {healthyProviderCount}/{totalProviderCount}</span><button type="button" onClick={() => void forceSync()} disabled={forceSyncing}>{forceSyncing ? 'SYNCING…' : 'FORCE SYNC'}</button></div>
     </div>
-        {/* 1. Mobile-First "3-Number Execution Ticket" (Zero-Ambiguity Top Command Bar) */}
-    <section className="mb-4 rounded-xl border border-teal-500/40 bg-[#070d14] p-4 text-xs font-mono shadow-lg" aria-label="3-Number Execution Ticket">
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-teal-900/40 pb-3">
-          <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-teal-400 animate-pulse" />
-            <h3 className="text-sm font-extrabold tracking-wider text-white uppercase">
-              3-Number Execution Ticket · Institutional Command Bar
-            </h3>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-[11px]">
-            <span className={`px-2.5 py-1 rounded font-bold border ${activeSession === 'LONDON' || activeSession === 'NEW YORK'  ? 'bg-emerald-950/80 border-emerald-600 text-emerald-300' : 'bg-rose-950/80 border-rose-700 text-rose-300'}`}>
-              WAT SESSION: {activeSession === 'LONDON' ? 'LONDON 08:00–12:00 WAT' : (activeSession === 'NEW YORK' ) ? 'NEW YORK 08:00–12:00 ET · DST-ADJUSTED' : 'OFF-SESSION LOCKOUT'}
-            </span>
-            <div className="flex items-center gap-1 bg-slate-900 border border-slate-700 rounded px-2 py-0.5 text-slate-300">
-              <span>BAL: {manualLedgerComplete && ticketBalance !== null ? ticketBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USD' : 'NOT SET (ENTER REAL BALANCE)'}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* 1. Allowed Desk Universe & Approved Direction Row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-          {[
-            {
-              sym: 'EURUSD' as const,
-              name: 'EUR/USD Primary Core',
-              dir: globalDeskLockout ? 'STAND DOWN' : (intradaySignals.find((s) => s.symbol === 'EURUSD')?.direction === 'SELL' ? 'SELL ONLY' : intradaySignals.find((s) => s.symbol === 'EURUSD')?.direction === 'BUY' ? 'BUY ONLY' : 'STAND DOWN'),
-              cls: globalDeskLockout ? 'text-slate-400 border-slate-800 bg-slate-950/40' : intradaySignals.find((s) => s.symbol === 'EURUSD')?.direction === 'SELL' ? 'text-amber-300 border-amber-600/50 bg-amber-950/20' : intradaySignals.find((s) => s.symbol === 'EURUSD')?.direction === 'BUY' ? 'text-emerald-300 border-emerald-600/50 bg-emerald-950/20' : 'text-slate-400 border-slate-800 bg-slate-950/40',
-            },
-            {
-              sym: 'USDJPY' as const,
-              name: 'USD/JPY Primary Core',
-              dir: globalDeskLockout ? 'STAND DOWN' : (intradaySignals.find((s) => s.symbol === 'USDJPY')?.direction === 'BUY' ? 'BUY ONLY' : intradaySignals.find((s) => s.symbol === 'USDJPY')?.direction === 'SELL' ? 'SELL ONLY' : 'STAND DOWN'),
-              cls: globalDeskLockout ? 'text-slate-400 border-slate-800 bg-slate-950/40' : intradaySignals.find((s) => s.symbol === 'USDJPY')?.direction === 'BUY' ? 'text-emerald-300 border-emerald-600/50 bg-emerald-950/20' : intradaySignals.find((s) => s.symbol === 'USDJPY')?.direction === 'SELL' ? 'text-amber-300 border-amber-600/50 bg-amber-950/20' : 'text-slate-400 border-slate-800 bg-slate-950/40',
-            },
-            {
-              sym: 'XAUUSD' as const,
-              name: 'XAU/USD Macro-Hedge',
-              dir: globalDeskLockout ? 'STAND DOWN' : (intradaySignals.find((s) => s.symbol === 'XAUUSD')?.direction === 'BUY' ? 'BUY ONLY (HALF-RISK HEDGE)' : intradaySignals.find((s) => s.symbol === 'XAUUSD')?.direction === 'SELL' ? 'SELL ONLY (HALF-RISK HEDGE)' : 'HALF-RISK HEDGE / GATED'),
-              cls: globalDeskLockout ? 'text-slate-400 border-slate-800 bg-slate-950/40' : 'text-amber-200 border-amber-500/50 bg-amber-950/20',
-            },
-          ].map((item) => (
-            <button
-              key={item.sym}
-              type="button"
-              onClick={() => setTicketSymbol(item.sym)}
-              className={`p-2.5 rounded-lg border text-left transition flex items-center justify-between ${ticketSymbol === item.sym ? 'ring-2 ring-teal-400 ' + item.cls : item.cls + ' opacity-80 hover:opacity-100'}`}
-            >
-              <div>
-                <div className="text-[10px] text-slate-400 uppercase font-semibold">{item.name}</div>
-                <div className="text-xs font-extrabold mt-0.5">{item.sym === 'EURUSD' ? `EUR/USD: ${item.dir}` : item.sym === 'USDJPY' ? `USD/JPY: ${item.dir}` : `XAU/USD: ${item.dir}`}</div>
-              </div>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${ticketSymbol === item.sym ? 'bg-teal-400 text-slate-950' : 'bg-slate-800 text-slate-300'}`}>
-                {ticketSymbol === item.sym ? 'ACTIVE' : 'SELECT'}
-              </span>
-            </button>
-          ))}
-        </div>
-
-        {/* Selected Instrument: 2. Exact Lot Size & 3. Invalidation & Targets Grid */}
-        {(() => {
-          const selectedSig = intradaySignals.find((s) => s.symbol === ticketSymbol);
-          const digits = ticketSymbol === 'USDJPY' ? 3 : ticketSymbol === 'XAUUSD' ? 2 : 5;
-          const liveAsk = quoteFor(ticketSymbol)?.ask ?? null;
-          const isVixHigh = goldContext?.drivers.VIXCLS.state === 'HEALTHY' && (goldContext.drivers.VIXCLS.value ?? 0) >= 25;
-          const isVixLockout = goldContext?.drivers.VIXCLS.state === 'HEALTHY' && (goldContext.drivers.VIXCLS.value ?? 0) >= 32;
-          const stopDistancePips = ticketSymbol === 'XAUUSD' ? null : selectedSig?.slPips
-            ?? (selectedSig?.entryPrice != null && selectedSig?.stopLoss != null
-              ? Math.abs(selectedSig.entryPrice - selectedSig.stopLoss) * (ticketSymbol === 'USDJPY' ? 100 : 10_000)
-              : null);
-          const isSizingEvidenceComplete = manualLedgerComplete && !globalDeskLockout && !isVixLockout
-            && liveAsk !== null && liveAsk > 0 && stopDistancePips !== null && stopDistancePips > 0 && ticketSymbol !== 'XAUUSD';
-          const riskCap = globalDeskLockout || isVixLockout || !isSizingEvidenceComplete ? 0.0 : isVixHigh ? 0.5 : 1.0;
-          const dollarRisk = manualLedgerComplete && currentManualEquity !== null && riskCap > 0
-            ? currentManualEquity * (riskCap / 100) : 0;
-          let calculatedLots = 0.00;
-          if (isSizingEvidenceComplete && riskCap > 0 && stopDistancePips !== null && liveAsk !== null) {
-            const pipValueUsd = ticketSymbol === 'USDJPY' ? 1000 / liveAsk : 10;
-            calculatedLots = Math.floor((dollarRisk / (stopDistancePips * pipValueUsd)) * 100) / 100;
-          }
-
-          return (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-slate-800">
-              {/* Number 2: Exact 0.01-Rounded Lot Size */}
-              <div className="p-3 rounded-lg border border-teal-500/30 bg-[#09111c] flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-teal-400 uppercase font-bold tracking-wider">
-                      2. EXACT 0.01-ROUNDED LOT SIZE
-                    </span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${riskCap > 0 ? 'bg-teal-950 border border-teal-700 text-teal-300' : 'bg-rose-950 text-rose-300'}`}>
-                      {riskCap > 0 ? `${riskCap.toFixed(1)}% RISK CAP` : '0.0% LOCKOUT'}
-                    </span>
-                  </div>
-                  <div className="mt-2 flex items-baseline gap-2">
-                    <span className="text-3xl font-extrabold text-white">
-                      {calculatedLots > 0 ? calculatedLots.toFixed(2) : '0.00'}
-                    </span>
-                    <span className="text-xs text-slate-400 font-semibold">Standard Lots</span>
-                  </div>
-                </div>
-                <div className="mt-2 pt-2 border-t border-slate-800/80 text-[11px] text-slate-400 flex flex-wrap justify-between gap-1">
-                  <span>Dollar Risk: <strong className="text-slate-200">${dollarRisk.toFixed(2)}</strong></span>
-                  <span>Stop: <strong className="text-slate-200">{stopDistancePips === null ? '—' : stopDistancePips.toFixed(1) + ' pips'}</strong></span>
-                  {ticketSymbol === 'USDJPY' && <span>Pip Val: <strong className="text-slate-200">{liveAsk !== null && liveAsk > 0 ? '$' + (1000 / liveAsk).toFixed(2) : 'UNAVAILABLE'}</strong></span>}
-                  {!manualLedgerComplete && <span className="w-full text-amber-300">ENTER REAL ACCOUNT BALANCE TO COMPUTE LOTS</span>}
-                  {ticketSymbol === 'XAUUSD' && <span className="w-full text-amber-300">LOT SIZING LOCKED · BROKER CONTRACT SPECIFICATION REQUIRED</span>}
-                  {manualLedgerComplete && !isSizingEvidenceComplete && ticketSymbol !== 'XAUUSD' && <span className="w-full text-amber-300">LOT SIZING LOCKED · LIVE PRICE / VALID STOP UNAVAILABLE</span>}
-                </div>
-              </div>
-
-              {/* Number 3: Exact Invalidation & Targets */}
-              <div className="p-3 rounded-lg border border-slate-800 bg-[#09111c] space-y-2">
-                <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider border-b border-slate-800 pb-1">
-                  3. EXACT INVALIDATION &amp; TARGETS ({ticketSymbol})
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
-                  <div>
-                    <span className="text-[10px] text-slate-500 block">ENTRY ZONE</span>
-                    <strong className="text-white block font-mono">
-                      {selectedSig?.entryPrice ? display(selectedSig.entryPrice, digits) : 'AWAITING SETUP'}
-                    </strong>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block">STOP (1.35x ATR)</span>
-                    <strong className="text-rose-400 block font-mono">
-                      {selectedSig?.stopLoss ? display(selectedSig.stopLoss, digits) : '—'}
-                    </strong>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block">TP1 (2.0R)</span>
-                    <strong className="text-emerald-400 block font-mono">
-                      {selectedSig?.takeProfit1 ? display(selectedSig.takeProfit1, digits) : '—'}
-                    </strong>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block">TP2 (3.0R)</span>
-                    <strong className="text-emerald-300 block font-mono">
-                      {selectedSig?.takeProfit2 ? display(selectedSig.takeProfit2, digits) : '—'}
-                    </strong>
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-      </div>
-    </section>
-
     <section className={`mb-3 rounded-lg border p-3 sm:p-4 ${manualDeskMode ? 'border-amber-400/40 bg-[#17170f]' : 'border-red-500/40 bg-[#1b1114]'}`} aria-label="Desk command banner">
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -567,13 +351,43 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
         {manualDeskMode && <div className="flex flex-wrap gap-2 text-xs"><button type="button" onClick={() => saveManualLedger({ ...manualLedger, trades: manualLedger.trades + 1 })} className="rounded border border-white/20 px-3 py-2 disabled:opacity-40">LOG TRADE</button><button type="button" disabled={manualLedger.losses >= 2} onClick={() => saveManualLedger({ ...manualLedger, losses: manualLedger.losses + 1 })} className="rounded border border-white/20 px-3 py-2 disabled:opacity-40">LOG LOSS</button>{['USD','EUR','GBP','JPY','AUD','CHF','CAD'].map((leg) => <button key={leg} type="button" disabled={manualLedger.legs.includes(leg)} onClick={() => saveManualLedger({ ...manualLedger, legs: [...manualLedger.legs, leg] })} className="rounded border border-white/20 px-2 py-2 disabled:opacity-40">LOCK {leg}</button>)}</div>}
       </div>
     </section>
+    <section className="mb-3 rounded-lg border border-red-500/30 bg-[#11151d] p-3 sm:p-4" aria-label="Desk command banner">
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <span className="desk-kicker">EXECUTIVE DESK COMMAND · AFRICA/LAGOS</span>
+            <h3 className={`mt-1 text-sm font-semibold tracking-wide ${globalDeskLockout ? 'text-red-300' : 'text-amber-300'}`}>
+              {activeSession === 'OFF-SESSION' ? 'STAND DOWN · OFF-SESSION LOCKOUT'
+                : !brokerExecutionDataReady ? 'STAND DOWN · REAL MT5 MARKET DATA NOT VERIFIED'
+                  : 'BROKER MARKET DATA VERIFIED · RESEARCH ONLY · NO EXECUTION AUTHORITY'}
+            </h3>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`rounded border px-2 py-1 text-[10px] font-mono ${brokerExecutionDataReady ? 'border-emerald-400/40 text-emerald-200' : 'border-red-400/40 text-red-200'}`}>
+              {brokerExecutionDataReady ? 'REAL MT5 ACCOUNT + QUOTES + CANDLES VERIFIED' : 'BROKER GOVERNANCE / MARKET DATA NOT VERIFIED'}
+            </span>
+            <label className="flex items-center gap-2 rounded border border-white/15 px-3 py-2 text-xs text-slate-100">
+              <input type="checkbox" checked={manualDeskMode} onChange={(event) => toggleManualDeskMode(event.target.checked)} />
+              Manual Review Mode · no execution authority
+            </label>
+            <a href="/accounts" className="rounded border border-cyan-400/40 px-3 py-2 text-xs text-cyan-200 hover:bg-cyan-400/10">LINK MT5 ACCOUNT</a>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-3 border-t border-white/10 pt-3 sm:grid-cols-3">
+          <div><span className="desk-kicker">ACTIVE WAT SESSION</span><strong className="mt-1 block text-sm text-slate-100">{activeSession === 'OFF-SESSION' ? 'OFF-SESSION' : activeSession + ' SESSION'}</strong><small className="text-slate-400">{activeSession === 'OFF-SESSION' ? 'Next session opens in ' + durationLabel(nextSessionOpenUtc - now) : 'Session closes in ' + durationLabel(activeSessionCloseUtc - now)}</small></div>
+          <div><span className="desk-kicker">BROKER DATA STATUS</span><strong className="mt-1 block text-sm text-slate-100">{brokerExecutionDataReady ? 'VERIFIED REAL ACCOUNT FEED' : accountMode === 'DEMO' ? 'DEMO ONLY · NOT EXECUTION-GRADE' : 'NOT CONNECTED / NOT VERIFIED'}</strong><small className="text-slate-400">{brokerIdentity ?? 'No linked real MT5 account'}</small></div>
+          <div><span className="desk-kicker">MANUAL REVIEW STATUS</span><strong className="mt-1 block text-sm text-slate-100">{manualDeskMode ? 'ON · HUMAN REVIEW ONLY' : 'OFF'}</strong><small className="text-slate-400">Does not change server lockouts, lot sizing or EA permissions</small></div>
+        </div>
+        <p className="text-xs text-slate-400">Manual Review Mode is a display/research state only. Account balances and trade history come from the linked broker account workspace. No manual journal, risk calculator, lot-size estimate or daily trade quota is used here.</p>
+      </div>
+    </section>
     <div className="desk-quote-grid">{displaySymbols.map((symbol) => {
       const item = quoteFor(symbol); const digits = symbol.slice(3) === 'JPY' ? 3 : symbol === 'XAUUSD' ? 2 : 5;
       return <article className="desk-quote-card" key={symbol}><span>{symbol === activeSatelliteSymbol ? 'SATELLITE #1 · ' + symbol : symbol === 'EURUSD' ? 'CORE #1 · EURUSD' : symbol === 'XAUUSD' ? 'CORE #2 · XAUUSD' : 'CORE #3 · USDJPY'}</span><strong>{display(item?.mid, digits)}</strong><small>{item?.freshness ?? 'PENDING'} · {item?.latencyMs ?? '—'} ms · {activeSession}</small><div><span>BID {display(item?.bid, digits)}</span><span>ASK {display(item?.ask, digits)}</span></div><small>SPREAD {display(item?.spread, symbol === 'XAUUSD' ? 2 : 6)} · {item?.quoteTimeUtc ?? 'NO QUOTE'}</small></article>;
     })}</div>
-    <div className="desk-syncline"><span>Swissquote public BBO · {latency ?? '—'} ms</span><span>Retrieved {quoteSync ?? '—'}</span><span>Frankfurter DAILY REFERENCE · NOT LIVE · {fxStatus} · {fxSync ?? '—'}</span></div>
+    <div className="desk-syncline"><span>{quoteSource} · {latency ?? '—'} ms</span><span>Retrieved {quoteSync ?? '—'}</span><span>Frankfurter DAILY REFERENCE · NOT LIVE · {fxStatus} · {fxSync ?? '—'}</span></div>
     <article className="desk-panel mt-3" aria-label="Live execution signals">
-      <header><div><span className="desk-kicker">REFERENCE-ONLY INTRADAY RESEARCH</span><h3>Macro-Aligned Intraday Setups</h3></div><small>YAHOO OHLCV + SWISSQUOTE PUBLIC BBO · NOT BROKER EXECUTION DATA</small></header>
+      <header><div><span className="desk-kicker">INTRADAY RESEARCH · NO EXECUTION AUTHORITY</span><h3>Macro-Aligned Intraday Setups</h3></div><small>{signalMarketDataQuality === 'BROKER_LIVE_VERIFIED' ? 'AUTHENTICATED REAL MT5 QUOTES + MT5 M5/D1 CANDLES' : 'YAHOO OHLCV + SWISSQUOTE PUBLIC BBO · REFERENCE ONLY'}</small></header>
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         {intradaySignals.map((signal) => {
           const active = signal.signalState === 'ACTIVE_SETUP';
