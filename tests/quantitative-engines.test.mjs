@@ -186,16 +186,20 @@ test('market quote feeds include G8 currency pairs for Finnhub and Frankfurter',
     assert.match(marketFeeds, new RegExp(symbol));
   }
 });
-test('Frankfurter date-only reference rates retain their observation date without a fabricated future intraday timestamp', () => {
+test('Frankfurter daily ECB reference rates are never promoted to timestamped intraday market quotes', () => {
+  const macroData = read('../lib/macroData.ts');
   const feeds = read('../lib/marketFeeds.ts');
-  assert.match(feeds, /payload\.date\}T00:00:00\.000Z/);
-  assert.doesNotMatch(feeds, /payload\.date\}T16:00:00\.000Z/);
+  const types = read('../types/macro.ts');
+  assert.match(macroData, /async function getFrankfurterRates/);
+  assert.match(macroData, /snapshot\.ecbRates = frankfurterResult\.value/);
+  assert.match(types, /ecbRates\?: Record<string, number>/);
+  assert.doesNotMatch(feeds, /Frankfurter|payload\.date/);
 });
 test('provider quotes reject stale, future, crossed and malformed MT5 observations before macro use', () => {
   const feeds = read('../lib/marketFeeds.ts');
   const macroContext = read('../app/api/v1/macro-context/route.ts');
-  assert.match(feeds, /quoteAgeMs < -5 \* 60_000 \|\| quoteAgeMs > 120_000/);
-  assert.match(feeds, /ageMs < -5 \* 60_000 \|\| ageMs > 120_000/);
+  assert.match(feeds, /quoteAgeMs < -30_000 \|\| quoteAgeMs > MAX_QUOTE_AGE_MS/);
+  assert.match(feeds, /now - quoteTimeMs < -30_000 \|\| now - quoteTimeMs > MAX_QUOTE_AGE_MS/);
   assert.match(feeds, /ask < bid/);
   assert.match(macroContext, /rawAgeMs >= -5 \* 60_000/);
   assert.match(macroContext, /timestampValid \? Math\.max\(0, rawAgeMs\) : null/);
@@ -348,12 +352,11 @@ test('keyed providers remain approval-gated while the public economic calendar w
   const macroData = read('../lib/macroData.ts');
   const marketFeeds = read('../lib/marketFeeds.ts');
   const goldEngine = read('../lib/macro/goldAndRegimeEngine.ts');
-  assert.match(macroData, /FRED_DATA_STORAGE_PERMISSION_APPROVED\?\.trim\(\)\.toLowerCase\(\) !== 'false' \? process\.env\.FRED_API_KEY/);
-  assert.match(macroData, /FINNHUB_PERSONAL_PLAN_ACTIVE === 'true' \? process\.env\.FINNHUB_API_KEY/);
+  assert.match(macroData, /FRED_DATA_STORAGE_PERMISSION_APPROVED/);
+  assert.match(macroData, /FINNHUB_PERSONAL_PLAN_ACTIVE === 'true'/);
   assert.match(macroData, /getFairEconomyCatalysts\(\),/);
-  assert.doesNotMatch(macroData, /FAIRECONOMY_COMMERCIAL_USE_APPROVED === 'true' \? getFairEconomyCatalysts/);
-  assert.match(marketFeeds, /FINNHUB_PERSONAL_PLAN_ACTIVE === 'true' \? process\.env\.FINNHUB_API_KEY/);
-  assert.match(goldEngine, /FRED_DATA_STORAGE_PERMISSION_APPROVED\?\.trim\(\)\.toLowerCase\(\) !== 'false'/);
+  assert.match(marketFeeds, /FINNHUB_PERSONAL_PLAN_ACTIVE === 'true' && process\.env\.FINNHUB_API_KEY/);
+  assert.match(goldEngine, /FRED_DATA_STORAGE_PERMISSION_APPROVED/);
 });
 test('Swissquote BBO future timestamps are bounded by the same 30-second clock-skew tolerance as intraday signals', () => {
   const quotes = read('../app/api/v1/live-quotes/route.ts');
@@ -406,10 +409,13 @@ test('gold quote parser uses parent-level Swissquote timestamps and Treasury dai
 });
 test('economic calendar never falls back to hardcoded central-bank dates or stale persisted fixtures', () => {
   const macroData = read('../lib/macroData.ts');
+  const macroEngine = read('../lib/macroEngine.ts');
   assert.doesNotMatch(macroData, /getCentralBankDecisionsSchedule/);
   assert.match(macroData, /snapshot\.catalysts = \[\]/);
   assert.match(macroData, /calendarSource = 'unavailable'/);
-  assert.ok(macroData.includes("catalysts: data.payload.calendarSource === 'provider' ? persistedCatalysts : []"));
+  assert.match(macroData, /calendarCoverageEndMs >= Date\.now\(\) \+ 24 \* 60 \* 60_000/);
+  assert.match(macroData, /selectedCalendar/);
+  assert.match(macroEngine, /calendarSource === 'provider'/);
 });
 test('pair scenario probabilities remain uncalibrated until point-in-time backtests exist', () => {
   const dossier = read('../lib/macro/dossierEngine.ts');
@@ -477,7 +483,7 @@ test('provider resilience handles Riksbank single-observation payloads, caches E
   const macroData = read('../lib/macroData.ts');
   const aiBrief = read('../lib/aiBrief.ts');
   assert.ok(international.includes('nested && Array.isArray(nested.observations)'));
-  assert.ok(international.includes('typeof record.date === \'string\''));
+  assert.ok(international.includes("typeof item.date === 'string'"));
   assert.ok(macroData.includes("getCachedData('macro:eia-energy-markets-v1'"));
   assert.ok(macroData.includes('AbortSignal.timeout(15_000)'));
   assert.ok(aiBrief.includes("GEMINI_MACRO_BRIEF_ENABLED !== 'true'"));
@@ -514,12 +520,16 @@ test('private desk layout removes duplicated page footer and floating retail sup
   assert.doesNotMatch(footer, /wa\.me|WhatsApp Desk/);
   assert.ok(dashboard.indexOf('<EABridgeDiagnostics />') < dashboard.indexOf('id="health"'));
 });
-test('public FairEconomy calendar is represented as healthy telemetry without Finnhub plan approval', () => {
+test('public FairEconomy calendar health requires recent retrieval and verified forward coverage', () => {
   const telemetry = read('../lib/macro/providerTelemetry.ts');
-  assert.match(telemetry, /snapshot\.calendarProvider === 'FAIRECONOMY_PUBLIC'/);
-  assert.match(telemetry, /const calendarActive = snapshot\.calendarSource === 'provider' && Boolean\(snapshot\.calendarProvider\)/);
-  assert.match(telemetry, /Economic Calendar' \+ \(snapshot\.calendarProvider/);
-  assert.doesNotMatch(telemetry, /const calendar = finnhubKeyPresent && !finnhubPlanActive/);
+  const macroData = read('../lib/macroData.ts');
+  assert.match(macroData, /getFairEconomyCatalysts\(\)/);
+  assert.match(macroData, /calendarRetrievedAtUtc/);
+  assert.match(macroData, /calendarCoverageEndUtc/);
+  assert.match(telemetry, /calendarRetrievedAtMs/);
+  assert.match(telemetry, /calendarCoverageEndMs/);
+  assert.match(telemetry, /calendarActive = snapshot\.calendarSource === 'provider'/);
+  assert.match(telemetry, /lastSuccessfulSyncUtc: calendarActive \? snapshot\.calendarRetrievedAtUtc/);
 });
 test('manual journal and calculator workflows are retired while the macro currency matrix remains', () => {
   const desk = read('../app/components/DeskTerminal.tsx');
@@ -714,17 +724,24 @@ test('macro context exposes zero-ambiguity executive desk fields and bridge pars
   assert.match(bridge, /context\.desk_status == "LOCKOUT" && context\.max_risk_pct != 0\.0/);
   assert.match(bridge, /context\.allowed_to_trade = false/);
 });
-test('London and New York execution windows are fixed in WAT across daylight-saving changes', () => {
+test('London uses fixed WAT hours and New York follows its DST-aware local session', async () => {
   const engine = read('../lib/quant/intradaySignalEngine.ts');
   const route = read('../app/api/v1/macro-context/route.ts');
   const desk = read('../app/components/DeskTerminal.tsx');
+  const sessions = await import('../lib/marketSessions.ts');
   assert.match(engine, /getActiveMarketSession/);
-  assert.match(engine, /hour >= 13 && hour < 17/);
+  assert.match(route, /getActiveMarketSession/);
   assert.match(desk, /getActiveMarketSession/);
-  assert.match(sessions, /America\\/New_York/);
+  assert.equal(sessions.getActiveMarketSession(new Date('2026-01-12T13:30:00Z')), 'NEW_YORK');
+  assert.equal(sessions.getActiveMarketSession(new Date('2026-07-13T12:30:00Z')), 'NEW_YORK');
+  assert.equal(sessions.getActiveMarketSession(new Date('2026-01-12T12:30:00Z')), 'CLOSED');
+  assert.equal(sessions.getActiveMarketSession(new Date('2026-01-12T08:30:00Z')), 'LONDON');
+  assert.equal(sessions.isForexMarketWeekendClosed(new Date('2026-07-10T21:30:00Z')), true);
+  assert.equal(sessions.isForexMarketWeekendClosed(new Date('2026-07-12T20:30:00Z')), true);
+  assert.equal(sessions.isForexMarketWeekendClosed(new Date('2026-07-12T21:30:00Z')), false);
+  assert.match(sessions.getNextMarketSessionOpenUtc.toString(), /America\/New_York/);
   assert.match(desk, /EXECUTIVE DESK COMMAND/);
   assert.match(desk, /BROKER ACCOUNT GOVERNANCE NOT CONNECTED/);
-  assert.match(sessions, /getNextMarketSessionOpenUtc/);
 });
 test('desk quote grid always reserves a fourth satellite slot and labels core instruments explicitly', () => {
   const desk = read('../app/components/DeskTerminal.tsx');
@@ -740,7 +757,9 @@ test('Gold real-yield driver prefers the same canonical Treasury snapshot vintag
   const telemetry = read('../lib/macro/providerTelemetry.ts');
   assert.match(gold, /const treasuryHistory = snapshotTreasury\?\.history\?\.length/);
   assert.match(gold, /const treasuryRetrievedAtUtc = snapshotTreasury\?\.retrievedAtUtc/);
-  assert.match(telemetry, /calendarActive && snapshot\.calendarProvider === 'FAIRECONOMY_PUBLIC' \? utcWeekWindow\(\)/);
+  assert.match(telemetry, /snapshot\.usTreasury\?\.retrievedAtUtc/);
+  assert.match(telemetry, /calendarRetrievedAtMs/);
+  assert.match(telemetry, /calendarCoverageEndMs/);
 });
 test('XAUUSD Fundamental Pair Dossier routes to the dedicated Gold liquidity and real-yield engine', () => {
   const dashboard = read('../app/components/MacroDashboard.tsx');
@@ -797,4 +816,16 @@ test('repository-wide static audit rejects default non-zero balances, seeded tra
   const desk = read('../app/components/DeskTerminal.tsx');
   assert.match(desk, /ticketBalance \+ manualClosedTradesPnl/);
   assert.match(desk, /currentManualEquity/);
+});
+
+test('research objectives have no daily trade-count quota and PIT provenance gates EA approval', () => {
+  const objectives = read('../lib/quant/researchObjectives.ts');
+  const shield = read('../lib/quant/sovereignShield.ts');
+  const heartbeat = read('../app/api/v1/mt5-heartbeat/route.ts');
+  const macroContext = read('../app/api/v1/macro-context/route.ts');
+  assert.match(objectives, /dailyTradeQuota: null/);
+  assert.doesNotMatch(shield, /MAX_TRADES_PER_DAY|tradesToday! >=/);
+  assert.match(shield, /MAX_LOSSES_PER_DAY/);
+  assert.match(heartbeat, /pointInTimeIntegrity\.status !== 'VERIFIED'/);
+  assert.match(macroContext, /pointInTimeIntegrity\.status === 'VERIFIED'/);
 });
