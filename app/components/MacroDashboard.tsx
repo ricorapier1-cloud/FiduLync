@@ -72,7 +72,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
   const [aiBrief, setAiBrief] = useState<{ bullets: string[]; source: 'gemini' | 'rules' } | null>(null);
 
   const dossier: PairDossier = generatePairDossier(snapshot, pair);
-  const currentTimeMs = now ?? Date.now();
+  const currentTimeMs = now ?? Date.parse(snapshot.asOf);
   const calendarRetrievedAtMs = snapshot.calendarRetrievedAtUtc ? Date.parse(snapshot.calendarRetrievedAtUtc) : NaN;
   const calendarCoverageEndMs = snapshot.calendarCoverageEndUtc ? Date.parse(snapshot.calendarCoverageEndUtc) : NaN;
   const calendarVerified = snapshot.calendarSource === 'provider' && Boolean(snapshot.calendarProvider)
