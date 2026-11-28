@@ -24,7 +24,7 @@ test('Sovereign Shield blocks spread blowouts, event windows and crowded positio
 
 test('Sovereign Shield fails closed when account governance cannot be verified', () => {
   assert.match(source, /TRADE_GOVERNANCE_LEDGER_UNVERIFIED/);
-  assert.match(source, /governance\.tradesToday! >= 2/);
+  assert.doesNotMatch(source, /MAX_TRADES_PER_DAY|governance\.tradesToday! >= 2/);
   assert.match(source, /governance\.lossesToday! >= 2/);
   assert.match(source, /rollingSevenDayDrawdownPct! <= -4/);
   assert.match(source, /if \(hardBlock\) maxAllowedRiskPct = 0/);
