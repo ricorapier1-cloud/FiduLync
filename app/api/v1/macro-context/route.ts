@@ -7,6 +7,7 @@ import { getMarketQuotes } from '@/lib/marketFeeds';
 import { buildGoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
 import type { MacroContextPayload, MacroSymbolBias } from '@/types/desk';
 import { evaluateSovereignShield } from '@/lib/quant/sovereignShield';
+import { getLatestMT5Heartbeat } from '@/lib/quant/mt5Heartbeat';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -145,14 +146,28 @@ export async function GET(request: Request) {
     const crowdedPositions = snapshot.cot
       .filter((position) => isFreshCotReport(position.reportDate) && Number.isFinite(position.percentile))
       .map((position) => ({ symbol: position.market, percentile: position.percentile }));
+    const latestHeartbeat = getLatestMT5Heartbeat();
+    const hasFreshBrokerHeartbeat = Boolean(latestHeartbeat && latestHeartbeat.fresh);
+    const governance = hasFreshBrokerHeartbeat ? {
+      tradesToday: latestHeartbeat.dailyClosedTrades,
+      lossesToday: latestHeartbeat.dailyLosses,
+      rollingSevenDayDrawdownPct: latestHeartbeat.accountBalance > 0
+        ? Math.min(0, ((latestHeartbeat.accountEquity - latestHeartbeat.accountBalance) / latestHeartbeat.accountBalance) * 100)
+        : 0,
+      ledgerVerified: true,
+    } : {
+      tradesToday: null,
+      lossesToday: null,
+      rollingSevenDayDrawdownPct: null,
+      ledgerVerified: false,
+    };
+
     const sovereignShield = evaluateSovereignShield({
       vix: goldContext.drivers.VIXCLS.state === 'HEALTHY' ? goldContext.drivers.VIXCLS.value : null,
       eventMinutesAway: shieldEventMinutesAway,
       isCentralBankRateDecision: isRateDecision,
       cotPercentiles: crowdedPositions,
-      // No authenticated MT5 trade ledger is currently connected. Fail closed rather than
-      // pretending browser-local journal entries are authoritative account governance.
-      governance: { tradesToday: null, lossesToday: null, rollingSevenDayDrawdownPct: null, ledgerVerified: false },
+      governance,
     });
     const symbolBiases: Record<string, MacroSymbolBias> = Object.fromEntries(G8_PAIRS.map((candidate) => {
       if (candidate === 'XAUUSD') {
@@ -217,6 +232,8 @@ export async function GET(request: Request) {
       maxRiskPct: effectiveAllowed ? sovereignShield.maxAllowedRiskPct : 0,
       activeSessionWat,
       deskLockoutReason,
+      allowedDirection: selectedSignal?.direction ?? 'NONE',
+      stopLossDistance: selectedSignal?.slPips ?? null,
       zScore: selectedSignal?.zScore ?? null,
       hurstExponent: selectedSignal?.hurst ?? null,
       ker: selectedSignal?.ker ?? null,

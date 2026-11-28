@@ -68,8 +68,9 @@ function explainBlocker(code: string): string {
   return labels[code] ?? code.toLowerCase().replaceAll('_', ' ');
 }
 
-export default function DeskTerminal({ initialSnapshot, onSnapshotChange, onGoldContextChange }: { initialSnapshot: MacroSnapshot; initialGoldContext: GoldMacroContext | null; onSnapshotChange: (snapshot: MacroSnapshot) => void; onGoldContextChange: (context: GoldMacroContext | null) => void }) {
+export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSnapshotChange, onGoldContextChange }: { initialSnapshot: MacroSnapshot; initialGoldContext: GoldMacroContext | null; onSnapshotChange: (snapshot: MacroSnapshot) => void; onGoldContextChange: (context: GoldMacroContext | null) => void }) {
   const snapshot = initialSnapshot;
+  const [goldContext, setGoldContext] = useState<GoldMacroContext | null>(initialGoldContext);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [satelliteSymbol, setSatelliteSymbol] = useState<string | null>(null);
   const [quoteStatus, setQuoteStatus] = useState('CONNECTING');
@@ -81,6 +82,9 @@ export default function DeskTerminal({ initialSnapshot, onSnapshotChange, onGold
   const [now, setNow] = useState(() => Date.parse(initialSnapshot.asOf) || 0);
   const [ready, setReady] = useState(false);
   const [forceSyncing, setForceSyncing] = useState(false);
+  const [ticketSymbol, setTicketSymbol] = useState<'EURUSD' | 'USDJPY' | 'XAUUSD'>('EURUSD');
+  const [ticketBalance, setTicketBalance] = useState<number>(10000);
+
   const [intradaySignals, setIntradaySignals] = useState<IntradaySignal[]>([]);
   const [signalSyncUtc, setSignalSyncUtc] = useState<string | null>(null);
   const [manualDeskMode, setManualDeskMode] = useState(false);
@@ -143,7 +147,7 @@ export default function DeskTerminal({ initialSnapshot, onSnapshotChange, onGold
   const watDay = new Date(now + 60 * 60_000).getUTCDay();
   const isWeekdayWAT = watDay >= 1 && watDay <= 5;
   const activeSession = !isWeekdayWAT ? 'OFF-SESSION' : hourWAT >= 8 && hourWAT < 12 ? 'LONDON' : hourWAT >= 13 && hourWAT < 17 ? 'NEW YORK' : 'OFF-SESSION';
-  const coverageProviders = (snapshot.providerStatus ?? []).filter((provider) => provider.name !== 'World Bank CPI' && provider.name !== 'ECB Data Portal');
+  const coverageProviders = snapshot.providerStatus ?? [];
   const healthyProviderCount = coverageProviders.filter((provider) => provider.status === 'HEALTHY' || provider.status === 'STANDBY').length;
   const totalProviderCount = coverageProviders.length;
 
@@ -266,11 +270,14 @@ export default function DeskTerminal({ initialSnapshot, onSnapshotChange, onGold
         if (freshGold && typeof freshGold === 'object'
           && 'overallState' in freshGold && 'drivers' in freshGold) {
           onGoldContextChange(freshGold as GoldMacroContext);
+          setGoldContext(freshGold as GoldMacroContext);
         } else {
           onGoldContextChange(null);
+          setGoldContext(null);
         }
       } else {
         onGoldContextChange(null);
+          setGoldContext(null);
       }
       setNow(Date.now());
     } catch (error) {
@@ -289,6 +296,168 @@ export default function DeskTerminal({ initialSnapshot, onSnapshotChange, onGold
       <div><span className="desk-kicker">MACROLYNC / PRIVATE SYSTEMATIC RESEARCH</span><h2>MacroLync Terminal</h2></div>
       <div className="desk-top-meta"><span className={quoteStatus === 'HEALTHY' && quotes.every((item) => item.freshness === 'LIVE' && item.ageMs !== null && item.ageMs <= 60_000) ? 'desk-live' : 'desk-warning'}><i />{quoteStatus === 'HEALTHY' && quotes.some((item) => item.freshness === 'LIVE' && item.ageMs !== null && item.ageMs <= 60_000) ? 'FRESH BBO · 15s' : quoteStatus === 'HEALTHY' ? 'STALE BBO' : quoteStatus}</span><span>WAT {watClock}</span><span>UTC {utcClock}</span><span className={healthyProviderCount === totalProviderCount && totalProviderCount > 0 ? 'desk-live' : 'desk-warning'}>DATA HEALTH {healthyProviderCount}/{totalProviderCount}</span><button type="button" onClick={() => void forceSync()} disabled={forceSyncing}>{forceSyncing ? 'SYNCING…' : 'FORCE SYNC'}</button></div>
     </div>
+        {/* 1. Mobile-First "3-Number Execution Ticket" (Zero-Ambiguity Top Command Bar) */}
+    <section className="mb-4 rounded-xl border border-teal-500/40 bg-[#070d14] p-4 text-xs font-mono shadow-lg" aria-label="3-Number Execution Ticket">
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-teal-900/40 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-teal-400 animate-pulse" />
+            <h3 className="text-sm font-extrabold tracking-wider text-white uppercase">
+              3-Number Execution Ticket · Institutional Command Bar
+            </h3>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-[11px]">
+            <span className={`px-2.5 py-1 rounded font-bold border ${activeSession === 'LONDON' || activeSession === 'NEW YORK'  ? 'bg-emerald-950/80 border-emerald-600 text-emerald-300' : 'bg-rose-950/80 border-rose-700 text-rose-300'}`}>
+              WAT SESSION: {activeSession === 'LONDON' ? 'LONDON 08:00–12:00 WAT' : (activeSession === 'NEW YORK' ) ? 'NEW YORK 13:00–17:00 WAT' : 'OFF-SESSION LOCKOUT'}
+            </span>
+            <div className="flex items-center gap-1 bg-slate-900 border border-slate-700 rounded px-2 py-0.5 text-slate-300">
+              <span>BAL:</span>
+              <input
+                type="number"
+                value={ticketBalance}
+                onChange={(e) => setTicketBalance(Math.max(100, Number(e.target.value) || 10000))}
+                className="w-20 bg-transparent text-white font-bold outline-none text-right"
+              />
+              <span>$</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 1. Allowed Desk Universe & Approved Direction Row */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+          {[
+            {
+              sym: 'EURUSD' as const,
+              name: 'EUR/USD Primary Core',
+              dir: (intradaySignals.find((s) => s.symbol === 'EURUSD')?.direction === 'SELL' ? 'SELL ONLY' : intradaySignals.find((s) => s.symbol === 'EURUSD')?.direction === 'BUY' ? 'BUY ONLY' : 'STAND DOWN'),
+              cls: intradaySignals.find((s) => s.symbol === 'EURUSD')?.direction === 'SELL' ? 'text-amber-300 border-amber-600/50 bg-amber-950/20' : intradaySignals.find((s) => s.symbol === 'EURUSD')?.direction === 'BUY' ? 'text-emerald-300 border-emerald-600/50 bg-emerald-950/20' : 'text-slate-400 border-slate-800 bg-slate-950/40',
+            },
+            {
+              sym: 'USDJPY' as const,
+              name: 'USD/JPY Primary Core',
+              dir: (intradaySignals.find((s) => s.symbol === 'USDJPY')?.direction === 'BUY' ? 'BUY ONLY' : intradaySignals.find((s) => s.symbol === 'USDJPY')?.direction === 'SELL' ? 'SELL ONLY' : 'STAND DOWN'),
+              cls: intradaySignals.find((s) => s.symbol === 'USDJPY')?.direction === 'BUY' ? 'text-emerald-300 border-emerald-600/50 bg-emerald-950/20' : intradaySignals.find((s) => s.symbol === 'USDJPY')?.direction === 'SELL' ? 'text-amber-300 border-amber-600/50 bg-amber-950/20' : 'text-slate-400 border-slate-800 bg-slate-950/40',
+            },
+            {
+              sym: 'XAUUSD' as const,
+              name: 'XAU/USD Macro-Hedge',
+              dir: (intradaySignals.find((s) => s.symbol === 'XAUUSD')?.direction === 'BUY' ? 'BUY ONLY (HALF-RISK HEDGE)' : intradaySignals.find((s) => s.symbol === 'XAUUSD')?.direction === 'SELL' ? 'SELL ONLY (HALF-RISK HEDGE)' : 'HALF-RISK HEDGE / GATED'),
+              cls: 'text-amber-200 border-amber-500/50 bg-amber-950/20',
+            },
+          ].map((item) => (
+            <button
+              key={item.sym}
+              type="button"
+              onClick={() => setTicketSymbol(item.sym)}
+              className={`p-2.5 rounded-lg border text-left transition flex items-center justify-between ${ticketSymbol === item.sym ? 'ring-2 ring-teal-400 ' + item.cls : item.cls + ' opacity-80 hover:opacity-100'}`}
+            >
+              <div>
+                <div className="text-[10px] text-slate-400 uppercase font-semibold">{item.name}</div>
+                <div className="text-xs font-extrabold mt-0.5">{item.sym === 'EURUSD' ? `EUR/USD: ${item.dir}` : item.sym === 'USDJPY' ? `USD/JPY: ${item.dir}` : `XAU/USD: ${item.dir}`}</div>
+              </div>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${ticketSymbol === item.sym ? 'bg-teal-400 text-slate-950' : 'bg-slate-800 text-slate-300'}`}>
+                {ticketSymbol === item.sym ? 'ACTIVE' : 'SELECT'}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Selected Instrument: 2. Exact Lot Size & 3. Invalidation & Targets Grid */}
+        {(() => {
+          const selectedSig = intradaySignals.find((s) => s.symbol === ticketSymbol);
+          const digits = ticketSymbol === 'USDJPY' ? 3 : ticketSymbol === 'XAUUSD' ? 2 : 5;
+          const liveAsk = quoteFor(ticketSymbol)?.ask ?? (ticketSymbol === 'USDJPY' ? 154.50 : ticketSymbol === 'XAUUSD' ? 2650 : 1.085);
+          const isOffSession = activeSession === 'OFF-SESSION';
+          const isVixHigh = goldContext?.drivers.VIXCLS.state === 'HEALTHY' && (goldContext.drivers.VIXCLS.value ?? 0) >= 25;
+          const isVixLockout = goldContext?.drivers.VIXCLS.state === 'HEALTHY' && (goldContext.drivers.VIXCLS.value ?? 0) >= 32;
+          const isCircuitBreaker = manualDeskMode && (manualLedger.trades >= 2 || manualLedger.losses >= 2);
+
+          let riskCap = isOffSession && !manualDeskMode ? 0.0 : isVixLockout || isCircuitBreaker ? 0.0 : isVixHigh ? 0.5 : 1.0;
+          if (ticketSymbol === 'XAUUSD') riskCap = Math.min(riskCap, 0.5);
+
+          const dollarRisk = ticketBalance * (riskCap / 100);
+
+          let stopDistancePips = 30;
+          let calculatedLots = 0.00;
+
+          if (ticketSymbol === 'EURUSD') {
+            stopDistancePips = selectedSig?.slPips || (selectedSig?.entryPrice && selectedSig?.stopLoss ? Math.abs(selectedSig.entryPrice - selectedSig.stopLoss) * 10000 : 30);
+            calculatedLots = (riskCap > 0 && stopDistancePips > 0) ? Math.max(0.01, Math.floor((dollarRisk / (stopDistancePips * 10)) * 100) / 100) : 0.00;
+          } else if (ticketSymbol === 'USDJPY') {
+            const pipValueUsd = liveAsk > 0 ? (1000 / liveAsk) : 6.50;
+            stopDistancePips = selectedSig?.slPips || (selectedSig?.entryPrice && selectedSig?.stopLoss ? Math.abs(selectedSig.entryPrice - selectedSig.stopLoss) * 100 : 35);
+            calculatedLots = (riskCap > 0 && stopDistancePips > 0) ? Math.max(0.01, Math.floor((dollarRisk / (stopDistancePips * pipValueUsd)) * 100) / 100) : 0.00;
+          } else {
+            const stopDistDollars = selectedSig?.entryPrice && selectedSig?.stopLoss ? Math.abs(selectedSig.entryPrice - selectedSig.stopLoss) : 25;
+            stopDistancePips = stopDistDollars * 10;
+            calculatedLots = (riskCap > 0 && stopDistDollars > 0) ? Math.max(0.01, Math.floor((dollarRisk / (stopDistDollars * 100)) * 100) / 100) : 0.00;
+          }
+
+          return (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-slate-800">
+              {/* Number 2: Exact 0.01-Rounded Lot Size */}
+              <div className="p-3 rounded-lg border border-teal-500/30 bg-[#09111c] flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-teal-400 uppercase font-bold tracking-wider">
+                      2. EXACT 0.01-ROUNDED LOT SIZE
+                    </span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${riskCap > 0 ? 'bg-teal-950 border border-teal-700 text-teal-300' : 'bg-rose-950 text-rose-300'}`}>
+                      {riskCap > 0 ? `${riskCap.toFixed(1)}% RISK CAP` : '0.0% LOCKOUT'}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-baseline gap-2">
+                    <span className="text-3xl font-extrabold text-white">
+                      {calculatedLots > 0 ? calculatedLots.toFixed(2) : '0.00'}
+                    </span>
+                    <span className="text-xs text-slate-400 font-semibold">Standard Lots</span>
+                  </div>
+                </div>
+                <div className="mt-2 pt-2 border-t border-slate-800/80 text-[11px] text-slate-400 flex flex-wrap justify-between gap-1">
+                  <span>Dollar Risk: <strong className="text-slate-200">${dollarRisk.toFixed(2)}</strong></span>
+                  <span>Stop: <strong className="text-slate-200">{stopDistancePips.toFixed(1)} pips (1.35x ATR)</strong></span>
+                  {ticketSymbol === 'USDJPY' && <span>Pip Val: <strong className="text-slate-200">${(liveAsk > 0 ? 1000 / liveAsk : 6.50).toFixed(2)}</strong></span>}
+                </div>
+              </div>
+
+              {/* Number 3: Exact Invalidation & Targets */}
+              <div className="p-3 rounded-lg border border-slate-800 bg-[#09111c] space-y-2">
+                <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider border-b border-slate-800 pb-1">
+                  3. EXACT INVALIDATION &amp; TARGETS ({ticketSymbol})
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                  <div>
+                    <span className="text-[10px] text-slate-500 block">ENTRY ZONE</span>
+                    <strong className="text-white block font-mono">
+                      {selectedSig?.entryPrice ? display(selectedSig.entryPrice, digits) : 'AWAITING SETUP'}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 block">STOP (1.35x ATR)</span>
+                    <strong className="text-rose-400 block font-mono">
+                      {selectedSig?.stopLoss ? display(selectedSig.stopLoss, digits) : '—'}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 block">TP1 (2.0R)</span>
+                    <strong className="text-emerald-400 block font-mono">
+                      {selectedSig?.takeProfit1 ? display(selectedSig.takeProfit1, digits) : '—'}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 block">TP2 (3.0R)</span>
+                    <strong className="text-emerald-300 block font-mono">
+                      {selectedSig?.takeProfit2 ? display(selectedSig.takeProfit2, digits) : '—'}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+    </section>
+
     <section className={`mb-3 rounded-lg border p-3 sm:p-4 ${manualDeskMode ? 'border-amber-400/40 bg-[#17170f]' : 'border-red-500/40 bg-[#1b1114]'}`} aria-label="Desk command banner">
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">

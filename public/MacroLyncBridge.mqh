@@ -448,4 +448,127 @@ bool CheckRolloverWindow()
    return total_minutes >= 1245 && total_minutes <= 1335;
 }
 
+
+struct MacroLyncAccountGuardian
+{
+   double   account_equity;
+   double   account_balance;
+   int      daily_closed_trades;
+   int      daily_losses;
+   int      open_currency_legs_count;
+   double   live_broker_spread;
+   datetime last_heartbeat_time;
+   bool     heartbeat_posted;
+   bool     kill_switch_active;
+   string   kill_switch_reason;
+   string   desk_status;
+   string   allowed_direction;
+   double   max_risk_pct;
+   double   stop_loss_distance;
+   bool     news_lockout_active;
+};
+
+// Institutional Account Guardian: Reads true broker metrics and evaluates killswitch
+bool MacroLyncEvaluateAccountGuardian(MacroLyncAccountGuardian &guardian, const double drawdown_floor_pct = 4.0, const double current_vix = 0.0)
+{
+   guardian.account_equity = AccountInfoDouble(ACCOUNT_EQUITY);
+   guardian.account_balance = AccountInfoDouble(ACCOUNT_BALANCE);
+   guardian.live_broker_spread = SymbolInfoDouble(_Symbol, SYMBOL_ASK) - SymbolInfoDouble(_Symbol, SYMBOL_BID);
+
+   datetime startOfDay = iTime(_Symbol, PERIOD_D1, 0);
+   if(HistorySelect(startOfDay, TimeCurrent()))
+   {
+      int deals_count = HistoryDealsTotal();
+      int trades_today = 0;
+      int losses_today = 0;
+      for(int i = 0; i < deals_count; i++)
+      {
+         ulong ticket = HistoryDealGetTicket(i);
+         if(ticket > 0)
+         {
+            long entry = HistoryDealGetInteger(ticket, DEAL_ENTRY);
+            if(entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_INOUT)
+            {
+               trades_today++;
+               double profit = HistoryDealGetDouble(ticket, DEAL_PROFIT);
+               if(profit < 0) losses_today++;
+            }
+         }
+      }
+      guardian.daily_closed_trades = trades_today;
+      guardian.daily_losses = losses_today;
+   }
+
+   guardian.open_currency_legs_count = PositionsTotal();
+
+   double drawdown_pct = 0.0;
+   if(guardian.account_balance > 0)
+   {
+      drawdown_pct = ((guardian.account_balance - guardian.account_equity) / guardian.account_balance) * 100.0;
+   }
+
+   guardian.kill_switch_active = false;
+   guardian.kill_switch_reason = "";
+
+   if(guardian.daily_losses >= 2)
+   {
+      guardian.kill_switch_active = true;
+      guardian.kill_switch_reason = "Daily loss limit reached (2 losses today)";
+   }
+   else if(guardian.daily_closed_trades >= 2)
+   {
+      guardian.kill_switch_active = true;
+      guardian.kill_switch_reason = "Daily maximum trade count reached (2 trades today)";
+   }
+   else if(drawdown_pct >= drawdown_floor_pct)
+   {
+      guardian.kill_switch_active = true;
+      guardian.kill_switch_reason = "Sovereign Shield drawdown floor breached";
+   }
+   else if(current_vix >= 32.0)
+   {
+      guardian.kill_switch_active = true;
+      guardian.kill_switch_reason = "VIX Black Swan Lockout (VIX >= 32.0)";
+   }
+
+   return !guardian.kill_switch_active;
+}
+
+// Posts authenticated broker state heartbeat to MacroLync
+bool MacroLyncPostBrokerHeartbeat(
+   const string endpoint,
+   const string api_token,
+   MacroLyncAccountGuardian &guardian,
+   const int timeout_ms = 5000
+)
+{
+   string url = endpoint + "/api/v1/mt5-heartbeat";
+   string headers = "Content-Type: application/json\r\nAuthorization: Bearer " + api_token + "\r\n";
+   
+   string payload = StringFormat(
+      "{\"accountEquity\":%.2f,\"accountBalance\":%.2f,\"dailyClosedTrades\":%d,\"dailyLosses\":%d,\"liveBrokerSpread\":%.5f,\"timestampUtc\":\"%s\"}",
+      guardian.account_equity,
+      guardian.account_balance,
+      guardian.daily_closed_trades,
+      guardian.daily_losses,
+      guardian.live_broker_spread,
+      TimeToString(TimeGMT(), TIME_DATE|TIME_SECONDS)
+   );
+
+   char post_data[];
+   char result[];
+   string result_headers;
+   StringToCharArray(payload, post_data, 0, WHOLE_ARRAY, CP_UTF8);
+   ArrayResize(post_data, ArraySize(post_data) - 1);
+
+   int res = WebRequest("POST", url, headers, timeout_ms, post_data, result, result_headers);
+   if(res == 200)
+   {
+      guardian.last_heartbeat_time = TimeCurrent();
+      guardian.heartbeat_posted = true;
+      return true;
+   }
+   return false;
+}
+
 #endif // MACRO_LYNC_BRIDGE_MQH

@@ -25,6 +25,8 @@ export type MacroContextPayload = {
   maxRiskPct: number;
   activeSessionWat: 'LONDON' | 'NEW_YORK' | 'OFF_SESSION';
   deskLockoutReason: string | null;
+  allowedDirection?: 'BUY' | 'SELL' | 'NONE';
+  stopLossDistance?: number | null;
   zScore: number | null;
   hurstExponent: number | null;
   ker: number | null;
