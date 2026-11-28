@@ -6,7 +6,6 @@ import {
   getBankOfCanadaMacroInputs,
   getBankOfEnglandPolicyRate,
   getEcbMacroInputs,
-  getWorldBankG10Inflation,
   getBankOfJapanPolicyRate,
   getReserveBankOfAustraliaPolicyRate,
   getReserveBankOfNewZealandPolicyRate,
@@ -75,10 +74,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
-}
-
-function isNumericRecord(value: unknown): value is Record<string, number> {
-  return isRecord(value) && Object.values(value).every(isFiniteNumber);
 }
 
 function isCurrency(value: unknown): value is MacroCurrency {
@@ -262,22 +257,6 @@ async function getFredUsdUpdates(apiKey: string) {
     usHighYieldSpreadPct: creditSpreadResult.status === 'fulfilled' ? creditSpreadResult.value[0]?.value : undefined,
     usHighYieldSpreadAsOf: creditSpreadResult.status === 'fulfilled' ? creditSpreadResult.value[0]?.date : undefined,
   };
-}
-
-async function getFrankfurterRates(): Promise<Record<string, number>> {
-  const response = await fetch('https://api.frankfurter.app/latest?from=EUR', {
-    cache: 'no-store',
-    signal: AbortSignal.timeout(8_000),
-  });
-  if (!response.ok) throw new Error(`Frankfurter returned ${response.status}.`);
-  const payload: unknown = await response.json();
-  if (!isRecord(payload) || !isRecord(payload.rates)) throw new Error('Frankfurter returned an invalid ECB benchmark payload.');
-  const rates: Record<string, number> = {};
-  for (const [code, value] of Object.entries(payload.rates)) {
-    if (/^[A-Z]{3}$/.test(code) && typeof value === 'number' && Number.isFinite(value) && value > 0) rates[code] = value;
-  }
-  if (!Object.keys(rates).length) throw new Error('Frankfurter returned no usable ECB benchmark rates.');
-  return rates;
 }
 
 async function getFairEconomyCatalysts(): Promise<EconomicCatalyst[]> {
@@ -566,18 +545,16 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
     asOf: new Date().toISOString(),
     source: 'fallback',
   };
-  const [fredResult, finnhubResult, alphaResult, fmpResult, cotResult, frankfurterResult, calendarResult, ecbResult, bocResult, boeResult, worldBankResult, bojResult, rbaResult, rbnzResult, snbResult, usMacroResult] = await Promise.allSettled([
+  const [fredResult, finnhubResult, alphaResult, fmpResult, cotResult, calendarResult, ecbResult, bocResult, boeResult, bojResult, rbaResult, rbnzResult, snbResult, usMacroResult] = await Promise.allSettled([
     fredApiKey ? getFredUsdUpdates(fredApiKey) : Promise.resolve(null),
     finnhubApiKey ? getFinnhubCatalysts(finnhubApiKey) : Promise.resolve(null),
     alphaVantageKey ? getAlphaVantageUsdUpdates(alphaVantageKey) : Promise.resolve(null),
     fmpKey ? getFmpCatalysts(fmpKey) : Promise.resolve(null),
     cotProviderUrl ? getCotProvider(cotProviderUrl, cotProviderToken) : getCachedData('macro:cftc-cot', getCftcCot, 6 * 60 * 60),
-    getCachedData('macro:frankfurter-reference', getFrankfurterRates, 6 * 60 * 60),
     process.env.FAIRECONOMY_PERSONAL_PLAN_ACTIVE === 'true' ? getFairEconomyCatalysts() : Promise.resolve([]),
     getEcbMacroInputs(),
     getBankOfCanadaMacroInputs(),
     getBankOfEnglandPolicyRate(),
-    getWorldBankG10Inflation(),
     getBankOfJapanPolicyRate(),
     getReserveBankOfAustraliaPolicyRate(),
     getReserveBankOfNewZealandPolicyRate(),
@@ -645,13 +622,6 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
   }
   if (finnhubResult.status === 'rejected') {
     console.warn('Finnhub economic calendar unavailable; checking configured calendar adapters:', finnhubResult.reason);
-  }
-  if (frankfurterResult.status === 'fulfilled' && isNumericRecord(frankfurterResult.value)) {
-    // Frankfurter is a daily reference-rate source, not live macro evidence.
-    // Keep it separately labelled; it must not make an otherwise empty snapshot look live.
-    snapshot.ecbRates = frankfurterResult.value;
-  } else if (frankfurterResult.status === 'rejected') {
-    console.warn('ECB benchmark exchange rates are unavailable:', frankfurterResult.reason);
   }
   const calendarCandidates = [
     { provider: 'fair-economy' as const, events: calendarResult.status === 'fulfilled' ? calendarResult.value : [] },
@@ -754,21 +724,6 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
     hasLiveData = true;
   }
 
-  if (worldBankResult.status === 'fulfilled') {
-    for (const observation of worldBankResult.value) {
-      const currency = snapshot.currencies.find((item) => item.code === observation.currency);
-      if (!currency || currency.inflationSource === 'provider') continue;
-      currency.inflation = observation.inflation;
-      currency.inflationLabel = `CPI (annual, ${observation.year})`;
-      currency.inflationSource = 'provider';
-      currency.inflationProvider = 'world-bank';
-      currency.inflationAsOf = observation.year;
-      currency.inflationSourceUrl = `https://api.worldbank.org/v2/country/${({ GBP: 'GBR', JPY: 'JPN', CHF: 'CHE', AUD: 'AUS', NZD: 'NZL', SEK: 'SWE', NOK: 'NOR' } as Record<string, string>)[observation.currency]}/indicator/FP.CPI.TOTL.ZG`;
-      hasLiveData = true;
-    }
-  } else {
-    console.warn('World Bank G10 inflation data is unavailable:', worldBankResult.reason);
-  }
   if (!fredApiKey && alphaVantageKey) {
     if (alphaResult.status === 'fulfilled' && isRecord(alphaResult.value)) {
       let usd = snapshot.currencies.find((currency) => currency.code === 'USD');
@@ -901,11 +856,6 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
     const refreshedAt = Date.parse(data.refreshed_at);
     const snapshotAgeMs = Date.now() - refreshedAt;
     if (!parsed || !Number.isFinite(refreshedAt) || snapshotAgeMs < -5 * 60_000 || snapshotAgeMs > 24 * 60 * 60_000) return null;
-    const ecbRates = isRecord(data.payload.ecbRates)
-      ? Object.fromEntries(Object.entries(data.payload.ecbRates)
-        .filter((entry): entry is [string, number] => /^[A-Z]{3}$/.test(entry[0])
-          && isFiniteNumber(entry[1]) && entry[1] > 0))
-      : undefined;
     return {
       ...parsed,
       source: data.payload.source === 'partial'
@@ -921,7 +871,6 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
         && /(?:Z|[+-]\d{2}:?\d{2})$/i.test(data.payload.calendarRetrievedAt)
         && Number.isFinite(Date.parse(data.payload.calendarRetrievedAt)) ? data.payload.calendarRetrievedAt : undefined,
       asOf: data.refreshed_at,
-      ...(ecbRates && Object.keys(ecbRates).length > 0 ? { ecbRates } : {}),
     };
   } catch (error) {
     console.warn('Persisted macro snapshot is unavailable:', error);
@@ -963,14 +912,6 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
 
       const parsed = parseProviderSnapshot(await response.json() as unknown);
       if (!parsed) throw new Error('Macro provider payload failed validation.');
-      let ecbRates = persisted?.ecbRates;
-      {
-        try {
-          ecbRates = await getCachedData('macro:frankfurter-reference', getFrankfurterRates, 6 * 60 * 60);
-        } catch (error) {
-          console.warn('ECB benchmark exchange rates are unavailable:', error);
-        }
-      }
       const providerSnapshot = mergeWithFallback({
         ...getFallbackSnapshot(),
         ...parsed,
@@ -990,7 +931,6 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
         calendarProvider: parsed.catalysts.length > 0 ? 'macro-provider' : undefined,
         calendarRetrievedAt: parsed.calendarRetrievedAt,
         asOf: new Date().toISOString(),
-        ...(ecbRates ? { ecbRates } : {}),
       });
       const coreG10 = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'SEK', 'NOK'];
       const completeG10MacroCoverage = coreG10.every((code) => {
