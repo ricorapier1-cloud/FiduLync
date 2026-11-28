@@ -127,6 +127,8 @@ export async function GET(request: Request) {
           server: quote.server,
           digits: quote.digits,
           point: quote.point,
+          serverUtcOffsetMinutes: quote.server_utc_offset_minutes,
+          timeBasis: quote.time_basis,
           spreadPoints: quote.spread_points,
           executionGrade: fresh && accountFresh && account.account_mode === 'REAL',
           error: fresh ? null : 'Broker quote or account heartbeat is stale.',
