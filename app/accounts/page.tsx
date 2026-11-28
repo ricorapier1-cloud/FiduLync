@@ -4,250 +4,233 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 
 type Deal = {
-  account_key: string; deal_ticket: string; position_id: string | null; symbol: string; side: string; entry_type: string;
-  volume: number; price: number; profit: number; commission: number; swap: number; fee: number;
-  deal_time_server: string; magic: string | null; comment: string | null;
+  account_key: string;
+  deal_ticket: string;
+  position_id: string | null;
+  symbol: string;
+  side: string;
+  entry_type: string;
+  volume: number;
+  price: number;
+  profit: number;
+  commission: number;
+  swap: number;
+  fee: number;
+  deal_time_server: string;
+  magic: string | null;
+  comment: string | null;
 };
+
 type Position = {
-  ticket: string; positionId: string | null; symbol: string; side: string; volume: number; openPrice: number;
-  currentPrice: number; profit: number; swap: number; stopLoss: number | null;
-  takeProfit: number | null; openedAtServer: string; magic: string | null; comment: string | null;
+  ticket: string;
+  positionId: string | null;
+  symbol: string;
+  side: string;
+  volume: number;
+  openPrice: number;
+  currentPrice: number;
+  profit: number;
+  swap: number;
+  stopLoss: number | null;
+  takeProfit: number | null;
+  openedAtServer: string;
+  magic: string | null;
+  comment: string | null;
 };
+
 type Account = {
-  account_key: string; account_login: string; broker: string | null; server: string;
-  currency: string; leverage: number; account_mode: string; balance: number; equity: number;
-  margin: number; free_margin: number; margin_level: number | null; positions: Position[];
-  observed_at: string; received_at: string;
+  account_key: string;
+  account_login: string;
+  broker: string | null;
+  server: string;
+  currency: string;
+  leverage: number;
+  account_mode: string;
+  balance: number;
+  equity: number;
+  margin: number;
+  free_margin: number;
+  margin_level: number | null;
+  positions: Position[];
+  observed_at: string;
+  received_at: string;
 };
-type Payload = { status: string; generatedAtUtc: string; accounts: Account[]; deals: Deal[] };
+
+type Payload = {
+  status: string;
+  generatedAtUtc: string;
+  accounts: Account[];
+  deals: Deal[];
+  error?: string;
+};
+
+type MarketDataStatus = {
+  quoteStatus: string;
+  quoteExecutionGrade: boolean;
+  quoteUpdatedAtUtc: string | null;
+  candleStatus: string;
+  candleExecutionGrade: boolean;
+  latestCandleUtc: string | null;
+  executionGrade: boolean;
+  reason: string | null;
+};
+
+type ClosedTrade = {
+  positionId: string;
+  symbol: string;
+  side: string;
+  volume: number;
+  net: number;
+  closedAtServer: string;
+  magic: string | null;
+};
 
 const money = (value: number, currency: string) => {
-  const normalizedCurrency = currency.toUpperCase();
-  if (/^[A-Z]{3}$/.test(normalizedCurrency)) {
+  const normalized = currency.toUpperCase();
+  if (/^[A-Z]{3}$/.test(normalized)) {
     return new Intl.NumberFormat(undefined, {
-      style: 'currency', currency: normalizedCurrency, maximumFractionDigits: 2,
+      style: 'currency', currency: normalized, maximumFractionDigits: 2,
     }).format(value);
   }
-  return normalizedCurrency + ' ' + new Intl.NumberFormat(undefined, {
-    maximumFractionDigits: 2,
-  }).format(value);
+  return normalized + ' ' + new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
 };
-const dateTime = (value: string) => new Intl.DateTimeFormat(undefined, {
-  dateStyle: 'medium', timeStyle: 'medium', timeZone: 'Africa/Lagos',
-}).format(new Date(value));
-const netDeal = (deal: Deal) => Number(deal.profit) + Number(deal.commission) + Number(deal.swap) + Number(deal.fee);
-const closesPosition = (deal: Deal) => ['OUT','OUT_BY','INOUT'].includes(deal.entry_type);
+
+const number = (value: number | null | undefined, digits = 2) =>
+  value === null || value === undefined || !Number.isFinite(value)
+    ? '—'
+    : new Intl.NumberFormat(undefined, { maximumFractionDigits: digits }).format(value);
+
+const utcToWat = (value: string | null | undefined) => {
+  if (!value || !Number.isFinite(Date.parse(value))) return '—';
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium', timeStyle: 'medium', timeZone: 'Africa/Lagos',
+  }).format(new Date(value));
+};
+
+const netDeal = (deal: Deal) =>
+  Number(deal.profit) + Number(deal.commission) + Number(deal.swap) + Number(deal.fee);
+
+const closesPosition = (deal: Deal) => ['OUT', 'OUT_BY', 'INOUT'].includes(deal.entry_type);
 
 export default function AccountsPage() {
   const [token, setToken] = useState('');
   const [payload, setPayload] = useState<Payload | null>(null);
-  const [status, setStatus] = useState<'DISCONNECTED'|'CONNECTING'|'CONNECTED'|'ERROR'>('DISCONNECTED');
+  const [status, setStatus] = useState<'DISCONNECTED' | 'CONNECTING' | 'CONNECTED' | 'ERROR'>('DISCONNECTED');
   const [message, setMessage] = useState('');
   const [lastRefresh, setLastRefresh] = useState<string | null>(null);
-  const [now, setNow] = useState(0);
   const [selectedAccountKey, setSelectedAccountKey] = useState('');
+  const [marketData, setMarketData] = useState<MarketDataStatus | null>(null);
+  const [marketDataError, setMarketDataError] = useState<string | null>(null);
 
-  const refresh = useCallback(async (credential: string) => {
+  const refresh = useCallback(async (credential: string, preferredAccountKey = '') => {
+    if (!credential.trim()) return;
     setStatus('CONNECTING');
     try {
       const response = await fetch('/api/v1/accounts', {
-        cache: 'no-store', headers: { Authorization: 'Bearer ' + credential },
+        cache: 'no-store',
+        headers: { Authorization: 'Bearer ' + credential.trim() },
       });
-      const data = await response.json() as Payload & { error?: string };
+      const data = await response.json() as Payload;
       if (!response.ok) throw new Error(data.error ?? 'Account service unavailable.');
+      const selectedKey = data.accounts?.some((account) => account.account_key === preferredAccountKey)
+        ? preferredAccountKey
+        : data.accounts?.[0]?.account_key ?? '';
       setPayload(data);
-      setSelectedAccountKey((current) => current || data.accounts[0]?.account_key || '');
+      setSelectedAccountKey(selectedKey);
       setLastRefresh(new Date().toISOString());
       setStatus('CONNECTED');
-      setMessage(data.status === 'AWAITING_FIRST_SYNC' ? 'Access verified. Waiting for the first MT5 publisher sync.' : '');
+      setMessage(data.status === 'AWAITING_FIRST_SYNC'
+        ? 'Read access verified. Waiting for the first MT5 publisher sync.'
+        : data.accounts?.length ? '' : 'No MT5 account snapshot has been received yet.');
     } catch (error) {
       setStatus('ERROR');
       setMessage(error instanceof Error ? error.message : 'Could not retrieve private account data.');
     }
   }, []);
 
+  const refreshMarketData = useCallback(async (credential: string, accountKey: string) => {
+    if (!credential || !accountKey) {
+      setMarketData(null);
+      return;
+    }
+    try {
+      const headers = { Authorization: 'Bearer ' + credential };
+      const quoteUrl = '/api/v1/live-quotes?accountKey=' + encodeURIComponent(accountKey);
+      const candleUrl = '/api/v1/intraday-candles?symbol=EURUSD&accountKey=' + encodeURIComponent(accountKey);
+      const [quoteResponse, candleResponse] = await Promise.all([
+        fetch(quoteUrl, { cache: 'no-store', headers }),
+        fetch(candleUrl, { cache: 'no-store', headers }),
+      ]);
+      const [quotes, candles] = await Promise.all([
+        quoteResponse.json() as Promise<{
+          status?: string; executionGrade?: boolean; generatedAtUtc?: string; executionGradeReason?: string;
+        }>,
+        candleResponse.json() as Promise<{
+          status?: string; executionGrade?: boolean; latestBarUtc?: string; executionGradeReason?: string;
+        }>,
+      ]);
+      const quoteExecutionGrade = quoteResponse.ok && quotes.executionGrade === true;
+      const candleExecutionGrade = candleResponse.ok && candles.executionGrade === true;
+      setMarketData({
+        quoteStatus: quotes.status ?? (quoteResponse.ok ? 'UNKNOWN' : 'UNAVAILABLE'),
+        quoteExecutionGrade,
+        quoteUpdatedAtUtc: quotes.generatedAtUtc ?? null,
+        candleStatus: candles.status ?? (candleResponse.ok ? 'UNKNOWN' : 'UNAVAILABLE'),
+        candleExecutionGrade,
+        latestCandleUtc: candles.latestBarUtc ?? null,
+        executionGrade: quoteExecutionGrade && candleExecutionGrade,
+        reason: quotes.executionGradeReason ?? candles.executionGradeReason ?? null,
+      });
+      setMarketDataError(null);
+    } catch {
+      setMarketDataError('Private MT5 market-data status could not be retrieved.');
+      setMarketData({
+        quoteStatus: 'UNAVAILABLE', quoteExecutionGrade: false, quoteUpdatedAtUtc: null,
+        candleStatus: 'UNAVAILABLE', candleExecutionGrade: false, latestCandleUtc: null,
+        executionGrade: false, reason: 'Publisher or private market-data service is unavailable.',
+      });
+    }
+  }, []);
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      const saved = window.sessionStorage.getItem('macrolinc-account-read-token');
-      if (saved) {
-        setToken(saved);
-        void refresh(saved);
+      const savedToken = window.sessionStorage.getItem('macrolinc-account-read-token') ?? '';
+      const savedAccountKey = window.sessionStorage.getItem('macrolinc-selected-account-key') ?? '';
+      if (savedToken) {
+        setToken(savedToken);
+        void refresh(savedToken, savedAccountKey);
       }
+      if (savedAccountKey) setSelectedAccountKey(savedAccountKey);
     }, 0);
     return () => window.clearTimeout(timer);
   }, [refresh]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 15_000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    if (status !== 'CONNECTED' || !token) return;
-    const timer = window.setInterval(() => void refresh(token), 30_000);
-    return () => window.clearInterval(timer);
-  }, [status, token, payload?.accounts.length, refresh]);
-
-  const selected = payload?.accounts.find((account) => account.account_key === selectedAccountKey) ?? payload?.accounts[0] ?? null;
-  useEffect(() => {
     if (selectedAccountKey) window.sessionStorage.setItem('macrolinc-selected-account-key', selectedAccountKey);
   }, [selectedAccountKey]);
 
-  // Verified Manual Ledger Mode State
-  type ManualTrade = {
-    id: string;
-    ticket: string;
-    date: string;
-    symbol: string;
-    direction: 'BUY' | 'SELL';
-    volume: number;
-    profit: number;
-    rUnits: number;
-    slippagePips: number;
-    ruleAdhered: boolean;
-  };
-
-  type ProfitSweep = {
-    id: string;
-    date: string;
-    amount: number;
-    percent: number;
-    destination: string;
-  };
-
-  const [manualTrades, setManualTrades] = useState<ManualTrade[]>([]);
-  const [profitSweeps, setProfitSweeps] = useState<ProfitSweep[]>([]);
-  const [newSymbol, setNewSymbol] = useState('EURUSD');
-  const [newDirection, setNewDirection] = useState<'BUY' | 'SELL'>('SELL');
-  const [newVolume, setNewVolume] = useState('');
-  const [newProfit, setNewProfit] = useState('');
-  const [newRMultiple, setNewRMultiple] = useState('');
-  const [newSlippage, setNewSlippage] = useState('');
-  const [newRuleAdhered, setNewRuleAdhered] = useState(false);
-  const [ledgerError, setLedgerError] = useState<string | null>(null);
-
-  // Profit sweep form state
-  const [sweepAmount, setSweepAmount] = useState('');
-  const [sweepPercent, setSweepPercent] = useState(30);
-  const [sweepDest, setSweepDest] = useState('Treasury Reserve Bank');
-
-  // Load manual trades & sweeps from localStorage
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      try {
-        const storedTrades = window.localStorage.getItem('fidulync-manual-trades-history-v1');
-        if (storedTrades) {
-          setManualTrades(JSON.parse(storedTrades));
-        }
-        const storedSweeps = window.localStorage.getItem('fidulync-profit-sweeps-v1');
-        if (storedSweeps) {
-          setProfitSweeps(JSON.parse(storedSweeps));
-        }
-      } catch {
-        // ignore parsing errors
-      }
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
+    if (!token || status !== 'CONNECTED') return;
+    const timer = window.setInterval(() => void refresh(token, selectedAccountKey), 30_000);
+    return () => window.clearInterval(timer);
+  }, [token, status, selectedAccountKey, refresh]);
 
-  const saveManualTrades = (updatedList: ManualTrade[]) => {
-    setManualTrades(updatedList);
-    localStorage.setItem('fidulync-manual-trades-history-v1', JSON.stringify(updatedList));
-  };
-
-  const saveProfitSweeps = (updatedList: ProfitSweep[]) => {
-    setProfitSweeps(updatedList);
-    localStorage.setItem('fidulync-profit-sweeps-v1', JSON.stringify(updatedList));
-  };
-
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const tradesToday = manualTrades.filter((t) => t.date.slice(0, 10) === todayStr);
-  const lossesToday = tradesToday.filter((t) => t.profit < 0);
-  const circuitBreakerTripped = tradesToday.length >= 2 || lossesToday.length >= 2;
-
-  const handleAddManualTrade = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (circuitBreakerTripped) {
-      setLedgerError('Circuit breaker active: Daily maximum of 2 trades or 2 losses reached. Entry blocked.');
+  useEffect(() => {
+    if (!token || !selectedAccountKey || status !== 'CONNECTED') {
+      setMarketData(null);
       return;
     }
-    const profitNum = parseFloat(newProfit);
-    if (!Number.isFinite(profitNum)) {
-      setLedgerError('Enter a valid numeric profit amount.');
-      return;
-    }
-    const rNum = newRMultiple.trim() ? parseFloat(newRMultiple) : NaN;
-    const slipNum = newSlippage.trim() ? parseFloat(newSlippage) : NaN;
-    const volNum = newVolume.trim() ? parseFloat(newVolume) : NaN;
-    if (!Number.isFinite(rNum) || !Number.isFinite(volNum) || volNum <= 0 || !Number.isFinite(slipNum) || slipNum < 0) {
-      setLedgerError('Enter the actual traded volume, realized R-multiple and observed slippage before recording this trade.');
-      return;
-    }
+    void refreshMarketData(token, selectedAccountKey);
+    const timer = window.setInterval(() => void refreshMarketData(token, selectedAccountKey), 15_000);
+    return () => window.clearInterval(timer);
+  }, [token, selectedAccountKey, status, refreshMarketData]);
 
-    const newTrade: ManualTrade = {
-      id: 'TRD-' + Date.now(),
-      ticket: 'MAN-' + (manualTrades.length + 1),
-      date: new Date().toISOString(),
-      symbol: newSymbol,
-      direction: newDirection,
-      volume: volNum,
-      profit: profitNum,
-      rUnits: rNum,
-      slippagePips: slipNum,
-      ruleAdhered: newRuleAdhered,
-    };
-
-    const updated = [newTrade, ...manualTrades];
-    saveManualTrades(updated);
-    setNewProfit('');
-    setNewRMultiple('');
-    setLedgerError(null);
-  };
-
-  const handleAddSweep = (e: React.FormEvent) => {
-    e.preventDefault();
-    const amt = parseFloat(sweepAmount);
-    if (!Number.isFinite(amt) || amt <= 0) return;
-    const sweep: ProfitSweep = {
-      id: 'SWP-' + Date.now(),
-      date: new Date().toISOString().slice(0, 10),
-      amount: amt,
-      percent: sweepPercent,
-      destination: sweepDest,
-    };
-    saveProfitSweeps([sweep, ...profitSweeps]);
-    setSweepAmount('');
-  };
-
-  const exportLedgerCsv = () => {
-    if (manualTrades.length === 0) return;
-    const headers = 'ID,Date,Symbol,Direction,Volume,NetProfit,RMultiple,SlippagePips,RuleAdhered\n';
-    const rows = manualTrades.map((t) => `${t.ticket},${t.date},${t.symbol},${t.direction},${t.volume},${t.profit},${t.rUnits},${t.slippagePips},${t.ruleAdhered ? "YES" : "NO"}`).join('\n');
-    const blob = new Blob([headers + rows], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `fidulync-verified-ledger-${todayStr}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const exportLedgerJson = () => {
-    if (manualTrades.length === 0) return;
-    const blob = new Blob([JSON.stringify(manualTrades, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `fidulync-verified-ledger-${todayStr}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-
+  const selected = payload?.accounts.find((account) => account.account_key === selectedAccountKey) ?? payload?.accounts[0] ?? null;
   const selectedDeals = useMemo(() => selected
     ? (payload?.deals ?? []).filter((deal) => deal.account_key === selected.account_key)
     : [], [payload?.deals, selected]);
-  const closedTrades = useMemo(() => {
+
+  const closedTrades = useMemo<ClosedTrade[]>(() => {
     if (!selected) return [];
     const openIds = new Set(selected.positions.map((position) => position.positionId).filter((value): value is string => Boolean(value)));
     const groups = new Map<string, Deal[]>();
@@ -259,21 +242,22 @@ export default function AccountsPage() {
     });
     return [...groups.entries()].flatMap(([positionId, items]) => {
       if (openIds.has(positionId) || !items.some((deal) => deal.entry_type === 'IN') || !items.some(closesPosition)) return [];
-      const entry = items.find((deal) => deal.entry_type === 'IN' && (deal.side === 'BUY' || deal.side === 'SELL'));
-      if (!entry) return [];
-      const exit = items.filter(closesPosition).sort((left, right) => right.deal_time_server.localeCompare(left.deal_time_server))[0];
-      if (!exit) return [];
+      const entry = items.find((deal) => deal.entry_type === 'IN' && ['BUY', 'SELL'].includes(deal.side));
+      const exit = items.filter(closesPosition)
+        .sort((left, right) => right.deal_time_server.localeCompare(left.deal_time_server))[0];
+      if (!entry || !exit) return [];
       return [{
         positionId,
         symbol: entry.symbol,
         side: entry.side,
         volume: items.filter((deal) => deal.entry_type === 'IN').reduce((sum, deal) => sum + Number(deal.volume), 0),
         net: items.reduce((sum, deal) => sum + netDeal(deal), 0),
-        closedAt: exit.deal_time_server,
+        closedAtServer: exit.deal_time_server,
         magic: entry.magic,
       }];
-    }).sort((left, right) => right.closedAt.localeCompare(left.closedAt));
+    }).sort((left, right) => right.closedAtServer.localeCompare(left.closedAtServer));
   }, [selected, selectedDeals]);
+
   const analytics = useMemo(() => {
     const values = closedTrades.map((trade) => trade.net);
     const wins = values.filter((value) => value > 0);
@@ -288,537 +272,250 @@ export default function AccountsPage() {
     };
   }, [closedTrades]);
 
-  // Rolling 20-Trade Edge-Decay & Slippage Engine
-  // Prefers broker closed trades if connected, otherwise manual ledger trades
-  const rolling20Trades = useMemo(() => {
-    if (closedTrades.length >= 5) {
-      return closedTrades.slice(0, 20).map((t) => ({
-        profit: t.net,
-        rUnits: t.net >= 0 ? t.net / 100 : t.net / 100,
-        slippage: 0.4, // standard broker execution slippage baseline
-        ruleAdhered: true,
-      }));
-    }
-    return manualTrades.slice(0, 20).map((t) => ({
-      profit: t.profit,
-      rUnits: t.rUnits,
-      slippage: t.slippagePips,
-      ruleAdhered: t.ruleAdhered,
-    }));
-  }, [closedTrades, manualTrades]);
+  const accountAgeMs = selected ? Date.now() - Date.parse(selected.received_at) : null;
+  const accountFresh = accountAgeMs !== null && accountAgeMs >= -30_000 && accountAgeMs <= 60_000;
 
-  const rolling20Metrics = useMemo(() => {
-    if (rolling20Trades.length === 0) {
-      return { count: 0, expectancyR: null, expectancyDollars: null, profitFactor: null, avgSlippage: null, ruleAdherencePct: null, edgeDecayWarning: false };
-    }
-    const count = rolling20Trades.length;
-    const wins = rolling20Trades.filter((t) => t.profit > 0);
-    const losses = rolling20Trades.filter((t) => t.profit < 0);
-    const grossWin = wins.reduce((sum, t) => sum + t.profit, 0);
-    const grossLoss = Math.abs(losses.reduce((sum, t) => sum + t.profit, 0));
-    const profitFactor = grossLoss > 0 ? Number((grossWin / grossLoss).toFixed(2)) : grossWin > 0 ? 99.9 : 0;
-    const sumR = rolling20Trades.reduce((sum, t) => sum + t.rUnits, 0);
-    const expectancyR = Number((sumR / count).toFixed(2));
-    const sumDollars = rolling20Trades.reduce((sum, t) => sum + t.profit, 0);
-    const expectancyDollars = Number((sumDollars / count).toFixed(2));
-    const avgSlippage = Number((rolling20Trades.reduce((sum, t) => sum + t.slippage, 0) / count).toFixed(2));
-    const adheredCount = rolling20Trades.filter((t) => t.ruleAdhered).length;
-    const ruleAdherencePct = Number(((adheredCount / count) * 100).toFixed(1));
-
-    // Automatic Edge-Decay Throttle: If count >= 20 and (expectancyR < 0.0 or profitFactor < 1.05)
-    const edgeDecayWarning = count >= 20 && (expectancyR < 0.0 || profitFactor < 1.05);
-
-    return {
-      count,
-      expectancyR,
-      expectancyDollars,
-      profitFactor,
-      avgSlippage,
-      ruleAdherencePct,
-      edgeDecayWarning,
-    };
-  }, [rolling20Trades]);
-
-  // Capital Scaling Tier based on verified completed trades and equity
-  const totalCompletedTradesCount = closedTrades.length > 0 ? closedTrades.length : manualTrades.length;
-  const currentEquityNumber = selected && Number.isFinite(Number(selected.equity)) && Number(selected.equity) > 0 ? Number(selected.equity) : null;
-  const activeScalingTier = useMemo(() => {
-    if (currentEquityNumber === null) return null;
-    if (totalCompletedTradesCount >= 60 && currentEquityNumber >= 50000) {
-      return { tier: 4, name: 'Tier 4 · $100k Institutional', riskPercent: 1.0, dollarCap: 1000, nextRequirement: 'Maximum scale unlocked.' };
-    }
-    if (totalCompletedTradesCount >= 30 && currentEquityNumber >= 25000) {
-      return { tier: 3, name: 'Tier 3 · $50k Scale', riskPercent: 1.0, dollarCap: 500, nextRequirement: 'Unlock Tier 4 at 60 completed trades + $50k equity high.' };
-    }
-    if (totalCompletedTradesCount >= 30 && currentEquityNumber >= 10000) {
-      return { tier: 2, name: 'Tier 2 · $25k Scale', riskPercent: 1.0, dollarCap: 250, nextRequirement: 'Unlock Tier 3 at $25k equity high + 30 trades.' };
-    }
-    return { tier: 1, name: 'Tier 1 · Verified Base', riskPercent: 1.0, dollarCap: 100, nextRequirement: 'Unlock Tier 2 after verified equity high + 30 completed trades with positive expectancy.' };
-  }, [totalCompletedTradesCount, currentEquityNumber]);
-
-  const connect = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const saveToken = () => {
     const value = token.trim();
-    if (value.length < 32) { setMessage('Enter the private account-read token configured in Vercel.'); return; }
+    if (value.length < 32) {
+      setMessage('The account-read token must be at least 32 characters.');
+      setStatus('ERROR');
+      return;
+    }
     window.sessionStorage.setItem('macrolinc-account-read-token', value);
-    void refresh(value);
+    void refresh(value, selectedAccountKey);
   };
+
   const disconnect = () => {
     window.sessionStorage.removeItem('macrolinc-account-read-token');
+    window.sessionStorage.removeItem('macrolinc-selected-account-key');
     setToken('');
     setPayload(null);
     setSelectedAccountKey('');
+    setMarketData(null);
     setStatus('DISCONNECTED');
-    setMessage('Private account view disconnected in this browser tab.');
+    setMessage('Private account data disconnected from this browser session.');
   };
 
-  const observedAge = selected && now > 0 ? Math.max(0, now - Date.parse(selected.observed_at)) : null;
-  const freshness = observedAge === null ? 'NO DATA' : observedAge <= 90_000 ? 'FRESH' : observedAge <= 300_000 ? 'DELAYED' : 'STALE';
-
   return (
-    <div className="macro-page pb-24">
-      <div className="macro-statusline mono">
-        <span><span className="macro-pulse" /> PRIVATE PORTFOLIO INTELLIGENCE</span>
-        <span className="macro-status-right flex items-center gap-2">
-          <Link href="/" className="macro-refresh">← TERMINAL</Link>
-          <Link href="/validation" className="macro-refresh">MONTE CARLO WORKBENCH →</Link>
-          <span className="text-slate-500">READ-ONLY · MT5</span>
-        </span>
-      </div>
-      <section className="macro-intro" aria-labelledby="accounts-title">
-        <div>
-          <span className="eyebrow">ACCOUNT &amp; PERFORMANCE INTELLIGENCE</span>
-          <h1 id="accounts-title">Portfolio &amp; Accounts.<br /><span>Broker evidence, not manual entries.</span></h1>
-          <p>Connect an MT5 terminal publisher to review account equity, open exposure and broker-reported closed-trade history alongside your macro research.</p>
+    <main className="min-h-screen bg-[#070b12] px-4 py-8 text-slate-100 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-cyan-300">MacroLync · Private Account Data</p>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight">MT5 Account Link</h1>
+            <p className="mt-1 text-sm text-slate-400">Read-only broker snapshots, positions, closed trades and market-data integrity.</p>
+          </div>
+          <Link href="/desk" className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">
+            Return to Desk
+          </Link>
         </div>
-        <div className="macro-intro-meta mono">
-          <span>CONNECTION STATUS</span>
-          <span className={status === 'CONNECTED' ? 'text-emerald-300' : status === 'ERROR' ? 'text-amber-300' : 'text-slate-400'}>{status}</span>
-          {selected && <span className="text-slate-500">{freshness} · {observedAge === null ? '—' : Math.round(observedAge / 1000) + 's'} old</span>}
-        </div>
-      </section>
 
-      <section className="macro-section">
-        <div className="macro-section-heading">
-          <div><span className="eyebrow">PRIVATE DATA ACCESS</span><h2>Connect your account view</h2></div>
-          {status === 'CONNECTED' && <button type="button" className="macro-refresh" onClick={disconnect}>DISCONNECT VIEW</button>}
-        </div>
-        <div className="macro-panel p-5">
-          <form onSubmit={connect} className="flex flex-col gap-3 sm:flex-row">
-            <label className="flex-1 text-xs text-slate-400">
-              Private account-read token
-              <input type="password" autoComplete="off" value={token} onChange={(event) => setToken(event.target.value)}
-                placeholder="Paste MT5_ACCOUNT_READ_TOKEN (32+ characters)"
-                className="mt-2 w-full rounded-lg border border-white/10 bg-[#080c12] px-3 py-3 font-mono text-xs text-slate-100 outline-none focus:border-emerald-400/50" />
-            </label>
-            <button type="submit" disabled={status === 'CONNECTING'} className="self-end rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-5 py-3 text-xs font-semibold text-emerald-300 disabled:opacity-50">
-              {status === 'CONNECTING' ? 'CONNECTING…' : 'CONNECT ACCOUNT VIEW'}
+        <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-100">Private account-read credential</h2>
+              <p className="mt-1 text-xs leading-5 text-slate-400">Use the value of Vercel <code>MT5_ACCOUNT_READ_TOKEN</code>. It is stored in this browser session only.</p>
+            </div>
+            <span className={'rounded-full px-3 py-1 text-xs font-mono ' + (status === 'CONNECTED' ? 'bg-emerald-500/10 text-emerald-300' : status === 'ERROR' ? 'bg-rose-500/10 text-rose-300' : 'bg-slate-800 text-slate-300')}>
+              {status}
+            </span>
+          </div>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <input
+              type="password"
+              autoComplete="off"
+              value={token}
+              onChange={(event) => setToken(event.target.value)}
+              placeholder="Paste MT5_ACCOUNT_READ_TOKEN"
+              className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-400"
+            />
+            <button onClick={saveToken} className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-400">
+              Save & Connect
             </button>
-          </form>
-          {message && <p role="status" className="mt-3 text-xs text-amber-300">{message}</p>}
-          <p className="mt-3 text-[11px] leading-relaxed text-slate-500">The read token is kept in this browser tab&apos;s session storage only. It is not a broker password. Never paste your IC Markets master or investor password here.</p>
-        </div>
-      </section>
-
-      {selected ? <>
-        <section className="macro-section">
-          <div className="macro-section-heading">
-            <div><span className="eyebrow">BROKER ACCOUNT SNAPSHOT</span><h2>{selected.broker || 'MT5'} · {selected.server}</h2></div>
-            <span className="macro-section-note mono">{selected.account_mode} · {selected.currency} · 1:{selected.leverage}</span>
+            <button onClick={disconnect} className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800">
+              Disconnect
+            </button>
           </div>
-          {(payload?.accounts.length ?? 0) > 1 && <label className="mb-3 block text-xs text-slate-400">Connected MT5 account
-            <select value={selected.account_key} onChange={(event) => setSelectedAccountKey(event.target.value)} className="mt-2 block w-full rounded-lg border border-white/10 bg-[#080c12] px-3 py-2 text-slate-100">
-              {payload?.accounts.map((account) => <option key={account.account_key} value={account.account_key}>{account.broker || 'MT5'} · {account.server} · {account.account_login} · {account.account_mode}</option>)}
-            </select>
-          </label>}
-          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-            {[
-              ['BALANCE', money(Number(selected.balance), selected.currency)],
-              ['EQUITY', money(Number(selected.equity), selected.currency)],
-              ['FLOATING P/L', money(selected.positions.reduce((sum, position) => sum + Number(position.profit) + Number(position.swap), 0), selected.currency)],
-              ['FREE MARGIN', money(Number(selected.free_margin), selected.currency)],
-              ['MARGIN USED', money(Number(selected.margin), selected.currency)],
-              ['MARGIN LEVEL', selected.margin_level === null ? '—' : Number(selected.margin_level).toFixed(1) + '%'],
-            ].map(([label, value]) => <div key={label} className="macro-panel p-4"><span className="macro-kpi-label">{label}</span><strong className="mt-2 block break-all font-mono text-lg text-slate-100">{value}</strong></div>)}
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-3 xl:grid-cols-5">
-            <div className="macro-panel p-4"><span className="macro-kpi-label">REALIZED NET P/L</span><strong className={'mt-2 block font-mono text-xl ' + (analytics.net >= 0 ? 'text-emerald-300' : 'text-amber-300')}>{money(analytics.net, selected.currency)}</strong></div>
-            <div className="macro-panel p-4"><span className="macro-kpi-label">OPEN POSITIONS</span><strong className="mt-2 block font-mono text-xl text-slate-100">{selected.positions.length}</strong></div>
-            <div className="macro-panel p-4"><span className="macro-kpi-label">CLOSED POSITIONS SYNCED</span><strong className="mt-2 block font-mono text-xl text-slate-100">{analytics.count}</strong></div>
-            <div className="macro-panel p-4"><span className="macro-kpi-label">WIN RATE · CLOSED POSITIONS</span><strong className="mt-2 block font-mono text-xl text-slate-100">{analytics.winRate === null ? '—' : analytics.winRate.toFixed(1) + '%'}</strong></div>
-            <div className="macro-panel p-4"><span className="macro-kpi-label">PROFIT FACTOR · CLOSED POSITIONS</span><strong className="mt-2 block font-mono text-xl text-slate-100">{analytics.profitFactor === null ? '—' : analytics.profitFactor.toFixed(2)}</strong></div>
-          </div>
-          <p className="mt-3 text-[10px] text-slate-500">Account login {selected.account_login} · observed {dateTime(selected.observed_at)} WAT · received {dateTime(selected.received_at)} WAT. Trade-level P&L aggregates entry and exit deal costs by position identifier; no assumed starting balance or synthetic history.</p>
+          {message && <p className="mt-3 text-sm text-amber-200">{message}</p>}
+          {lastRefresh && <p className="mt-2 text-xs text-slate-500">Account API last refreshed: {utcToWat(lastRefresh)} WAT</p>}
         </section>
 
-        <section className="macro-section">
-          <div className="macro-section-heading"><div><span className="eyebrow">LIVE ACCOUNT EXPOSURE</span><h2>Open positions</h2></div><span className="macro-section-note mono">BROKER-REPORTED</span></div>
-          <div className="macro-panel overflow-x-auto">
-            {selected.positions.length ? <table className="w-full min-w-[720px] text-xs">
-              <thead className="text-left text-[10px] text-slate-500"><tr><th className="p-3">SYMBOL</th><th className="p-3">SIDE</th><th className="p-3">VOLUME</th><th className="p-3">OPEN</th><th className="p-3">CURRENT</th><th className="p-3">FLOATING P/L</th><th className="p-3">OPENED · BROKER SERVER</th></tr></thead>
-              <tbody>{selected.positions.map((position) => <tr key={position.ticket} className="border-t border-white/[0.06]">
-                <td className="p-3 font-mono text-slate-100">{position.symbol}</td><td className="p-3">{position.side}</td><td className="p-3 font-mono">{position.volume}</td><td className="p-3 font-mono">{position.openPrice}</td><td className="p-3 font-mono">{position.currentPrice}</td><td className={'p-3 font-mono ' + (position.profit >= 0 ? 'text-emerald-300' : 'text-amber-300')}>{money(position.profit + position.swap, selected.currency)}</td><td className="p-3 text-slate-400">{position.openedAtServer}</td>
-              </tr>)}</tbody>
-            </table> : <p className="p-5 text-xs text-slate-500">No open positions reported by the latest account snapshot.</p>}
+        <section className="mt-6 rounded-xl border border-cyan-400/20 bg-cyan-400/[0.035] p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-mono uppercase tracking-[0.18em] text-cyan-300">Live MT5 market-data connection</p>
+              <h2 className="mt-1 text-lg font-semibold text-slate-100">Install the read-only account publisher</h2>
+            </div>
+            <a href="/MacroLyncAccountPublisher.mq5" className="rounded-lg border border-cyan-300/40 px-3 py-2 text-sm font-semibold text-cyan-200 hover:bg-cyan-300/10" download>
+              Download MT5 publisher
+            </a>
           </div>
-        </section>
-
-        <section className="macro-section">
-          <div className="macro-section-heading"><div><span className="eyebrow">EXECUTION RECORD</span><h2>Recent closed trades</h2></div><span className="macro-section-note mono">RECONCILED BY POSITION IDENTIFIER</span></div>
-          <div className="macro-panel overflow-x-auto">
-            {closedTrades.length ? <table className="w-full min-w-[760px] text-xs">
-              <thead className="text-left text-[10px] text-slate-500"><tr><th className="p-3">CLOSED · BROKER SERVER</th><th className="p-3">SYMBOL</th><th className="p-3">SIDE</th><th className="p-3">VOLUME</th><th className="p-3">NET TRADE P/L · {selected.currency}</th><th className="p-3">MAGIC / EA</th><th className="p-3">POSITION ID</th></tr></thead>
-              <tbody>{closedTrades.slice(0,100).map((trade) => <tr key={trade.positionId} className="border-t border-white/[0.06]">
-                <td className="p-3 text-slate-400">{trade.closedAt}</td><td className="p-3 font-mono text-slate-100">{trade.symbol}</td><td className="p-3">{trade.side}</td><td className="p-3 font-mono">{trade.volume}</td><td className={'p-3 font-mono ' + (trade.net >= 0 ? 'text-emerald-300' : 'text-amber-300')}>{money(trade.net, selected.currency)}</td><td className="p-3 font-mono">{trade.magic || '—'}</td><td className="p-3 font-mono">{trade.positionId}</td>
-              </tr>)}</tbody>
-            </table> : <p className="p-5 text-xs text-slate-500">No fully reconciled closed-position history has arrived yet.</p>}
-            {selectedDeals.length >= 500 && <p className="p-3 text-[10px] text-amber-300">History sync reached the 500-deal batch cap. This view represents the latest synchronized records only; older history requires additional batches and is not assumed complete.</p>}
-          </div>
-        </section>
-      </> : <section className="macro-section">
-        <div className="macro-panel p-6">
-          <span className="eyebrow">AWAITING MT5 PUBLISHER</span>
-          <h2 className="mt-2 text-lg font-semibold text-slate-100">Your broker account is not connected yet.</h2>
-          <p className="mt-2 text-sm leading-relaxed text-slate-400">Set the two private Vercel environment tokens, install the read-only publisher in MT5, allow the MacroLync domain in MT5 WebRequest settings and start the publisher. The dashboard will populate after its first successful sync.</p>
-          <a href="/MacroLyncAccountPublisher.mq5" download className="mt-4 inline-flex rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-xs font-semibold text-emerald-300">DOWNLOAD MT5 ACCOUNT PUBLISHER</a>
-          <p className="mt-4 text-[11px] leading-relaxed text-slate-500">This connector transmits account metadata, positions and deal history only. It cannot open, modify or close orders. It never reads or transmits your broker password.</p>
-        </div>
-      </section>}
-
-      
-      {/* SECTION: Rolling 20-Trade Edge-Decay & Slippage Monitor */}
-      <section className="macro-section mt-8">
-        <div className="macro-section-heading">
-          <div><span className="eyebrow">STATISTICAL EDGE MONITOR</span><h2>Rolling 20-Trade Edge-Decay &amp; Slippage Monitor</h2></div>
-          <span className="macro-section-note mono">AUTONOMOUS RISK THROTTLE</span>
-        </div>
-        <div className="macro-panel p-5 space-y-4">
-          {rolling20Metrics.edgeDecayWarning && (
-            <div className="p-4 rounded-lg bg-rose-950/80 border border-rose-600 text-xs text-rose-200">
-              <strong className="block text-sm font-bold text-rose-300">
-                EDGE_DECAY_WARNING: Rolling 20-Trade expectancy is below threshold ({rolling20Metrics.expectancyR}R / Profit Factor {rolling20Metrics.profitFactor}).
-              </strong>
-              Recommended desk risk is automatically throttled by 50% (0.50% risk cap) to preserve capital until the next weekend quantitative audit.
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <div className="rounded border border-white/[0.08] bg-[#070a0f] p-4">
-              <span className="macro-kpi-label">ROLLING 20 EXPECTANCY</span>
-              <strong className={`mt-1 block font-mono text-xl ${rolling20Metrics.expectancyR !== null && rolling20Metrics.expectancyR >= 0 ? 'text-emerald-300' : 'text-amber-300'}`}>
-                {rolling20Metrics.expectancyR !== null ? `+${rolling20Metrics.expectancyR}R` : '—'}
-              </strong>
-              <small className="text-slate-500 font-mono">
-                {rolling20Metrics.expectancyDollars !== null ? `$${rolling20Metrics.expectancyDollars} / trade` : 'Awaiting trades'}
-              </small>
-            </div>
-
-            <div className="rounded border border-white/[0.08] bg-[#070a0f] p-4">
-              <span className="macro-kpi-label">ROLLING PROFIT FACTOR</span>
-              <strong className="mt-1 block font-mono text-xl text-slate-100">
-                {rolling20Metrics.profitFactor !== null ? rolling20Metrics.profitFactor.toFixed(2) : '—'}
-              </strong>
-              <small className="text-slate-500 font-mono">Min target: 1.20+</small>
-            </div>
-
-            <div className="rounded border border-white/[0.08] bg-[#070a0f] p-4">
-              <span className="macro-kpi-label">AVG LIVE SLIPPAGE</span>
-              <strong className="mt-1 block font-mono text-xl text-slate-100">
-                {rolling20Metrics.avgSlippage !== null ? `${rolling20Metrics.avgSlippage} pips` : '—'}
-              </strong>
-              <small className="text-slate-500 font-mono">Execution friction</small>
-            </div>
-
-            <div className="rounded border border-white/[0.08] bg-[#070a0f] p-4">
-              <span className="macro-kpi-label">RULE ADHERENCE</span>
-              <strong className="mt-1 block font-mono text-xl text-emerald-300">
-                {rolling20Metrics.ruleAdherencePct !== null ? `${rolling20Metrics.ruleAdherencePct}%` : '—'}
-              </strong>
-              <small className="text-slate-500 font-mono">Sovereign rules</small>
-            </div>
-          </div>
-          <p className="text-[11px] text-slate-400">
-            Calculated across the last 20 completed trades. If rolling expectancy falls below 0.0R or profit factor drops below 1.05, the Sovereign Shield automatically activates the 50% risk throttle.
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
+            This publisher sends authenticated broker quotes, closed M5/D1 candles, account snapshots and broker-server-day risk telemetry. It does not place, modify or close trades. Public Swissquote/Yahoo data remains reference-only and cannot clear the execution-data gate.
           </p>
-        </div>
-      </section>
+          <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-300">
+            <li>Copy the downloaded file into MT5 <code>MQL5/Experts</code> and compile it in MetaEditor.</li>
+            <li>In MT5, open Tools → Options → Expert Advisors and allow WebRequest for <code>https://fidulync.vercel.app</code>.</li>
+            <li>Attach the publisher to one chart. Set <code>InpAccountIngestToken</code> to the exact Vercel <code>MT5_ACCOUNT_INGEST_TOKEN</code> value.</li>
+            <li>Set <code>InpMarketWatchSymbols</code> to your broker's exact names. The default is <code>EURUSD,GBPUSD,USDJPY,XAUUSD</code>; add suffixes such as <code>EURUSD.a</code> if your broker uses them.</li>
+            <li>Keep MT5 online. Quotes publish every 15 seconds; closed M5/D1 history and account-deal history are refreshed automatically.</li>
+            <li>Return to the Desk. The selected account is shared in this browser session; broker data is execution-grade only when a real account, fresh quotes and sufficient fresh candles are verified.</li>
+          </ol>
+          <p className="mt-4 text-xs leading-5 text-amber-200/90">
+            The publisher has not been compiled or connected to your broker from this environment. Do not treat the feed as connected until the account, quote and candle timestamps appear fresh in the Desk.
+          </p>
+        </section>
 
-      {/* SECTION: Capital Scaling & Profit-Sweep Tracker */}
-      <section className="macro-section mt-8">
-        <div className="macro-section-heading">
-          <div><span className="eyebrow">CAPITAL MANAGEMENT</span><h2>Capital Scaling &amp; Profit-Sweep Tracker</h2></div>
-          <span className="macro-section-note mono">RESERVE ALLOCATION</span>
-        </div>
-        <div className="macro-panel p-5 space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="rounded-lg border border-white/[0.08] bg-[#070a0f] p-4 space-y-2">
-              <div className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Active Capital Scaling Tier</div>
-              {activeScalingTier ? <>
-                <div className="text-lg font-bold text-teal-300">{activeScalingTier.name}</div>
-                <div className="text-xs text-slate-300">
-                  Max Risk Allowed: <strong className="text-white">{activeScalingTier.riskPercent}% (${activeScalingTier.dollarCap}/trade)</strong>
-                </div>
-                <div className="text-xs text-slate-400 pt-2 border-t border-slate-800">
-                  Next Tier Requirement: <span className="text-slate-300">{activeScalingTier.nextRequirement}</span>
-                </div>
-              </> : <div className="text-sm font-semibold text-amber-300">NOT CONFIGURED · CONNECT A VERIFIED MT5 ACCOUNT TO CALCULATE CAPITAL TIER</div>}
-            </div>
+        {payload && payload.accounts.length > 1 && (
+          <section className="mt-6 flex flex-wrap items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+            <label htmlFor="account-select" className="text-sm text-slate-300">Linked MT5 account</label>
+            <select id="account-select" value={selectedAccountKey} onChange={(event) => setSelectedAccountKey(event.target.value)}
+              className="min-w-0 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100">
+              {payload.accounts.map((account) => (
+                <option key={account.account_key} value={account.account_key}>
+                  {account.broker ?? 'MT5'} · {account.account_login} · {account.server} · {account.account_mode}
+                </option>
+              ))}
+            </select>
+          </section>
+        )}
 
-            <div className="rounded-lg border border-white/[0.08] bg-[#070a0f] p-4 space-y-3">
-              <div className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Record Monthly Profit Sweep</div>
-              <form onSubmit={handleAddSweep} className="flex flex-wrap items-center gap-2">
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="Amount ($)"
-                  value={sweepAmount}
-                  onChange={(e) => setSweepAmount(e.target.value)}
-                  className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white w-28 outline-none"
-                  required
-                />
-                <select
-                  value={sweepPercent}
-                  onChange={(e) => setSweepPercent(Number(e.target.value))}
-                  className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white outline-none"
-                >
-                  <option value={30}>30% Reserve Sweep</option>
-                  <option value={40}>40% Reserve Sweep</option>
-                  <option value={50}>50% Reserve Sweep</option>
-                </select>
-                <input
-                  type="text"
-                  placeholder="Destination"
-                  value={sweepDest}
-                  onChange={(e) => setSweepDest(e.target.value)}
-                  className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white flex-1 min-w-[120px] outline-none"
-                />
-                <button
-                  type="submit"
-                  className="px-3 py-1.5 bg-teal-900 hover:bg-teal-800 border border-teal-700 rounded text-xs font-semibold text-teal-200 transition"
-                >
-                  Log Sweep
-                </button>
-              </form>
-              <p className="text-[10px] text-slate-500">
-                Preserves profits by allocating 30%–50% of realized monthly gains to external bank treasury.
+        {selected && (
+          <>
+            <section className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {[
+                ['BALANCE', money(selected.balance, selected.currency)],
+                ['EQUITY', money(selected.equity, selected.currency)],
+                ['FREE MARGIN', money(selected.free_margin, selected.currency)],
+                ['MARGIN LEVEL', selected.margin_level === null ? '—' : number(selected.margin_level) + '%'],
+              ].map(([label, value]) => (
+                <article key={label} className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+                  <p className="text-[11px] font-mono tracking-[0.16em] text-slate-500">{label}</p>
+                  <p className="mt-2 text-xl font-semibold tabular-nums text-slate-100">{value}</p>
+                </article>
+              ))}
+            </section>
+
+            <section className="mt-6 rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold">{selected.broker ?? 'MT5'} · {selected.account_login}</h2>
+                  <p className="mt-1 text-xs text-slate-400">{selected.server} · {selected.account_mode} · {selected.currency} · 1:{selected.leverage}</p>
+                </div>
+                <span className={'rounded-full px-3 py-1 text-xs font-mono ' + (accountFresh ? 'bg-emerald-500/10 text-emerald-300' : 'bg-amber-500/10 text-amber-200')}>
+                  {accountFresh ? 'ACCOUNT HEARTBEAT FRESH' : 'ACCOUNT SNAPSHOT STALE'}
+                </span>
+              </div>
+              <p className="mt-3 text-xs text-slate-500">
+                Broker observation: {utcToWat(selected.observed_at)} WAT · Server received: {utcToWat(selected.received_at)} WAT
               </p>
-            </div>
-          </div>
+            </section>
 
-          {profitSweeps.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead className="text-left text-[10px] text-slate-500 border-b border-white/[0.06]">
-                  <tr><th className="p-2">DATE</th><th className="p-2">SWEEP AMOUNT</th><th className="p-2">ALLOCATION %</th><th className="p-2">DESTINATION</th></tr>
-                </thead>
-                <tbody>
-                  {profitSweeps.map((sweep) => (
-                    <tr key={sweep.id} className="border-t border-white/[0.04]">
-                      <td className="p-2 text-slate-400">{sweep.date}</td>
-                      <td className="p-2 font-mono text-emerald-400 font-bold">${sweep.amount.toLocaleString()}</td>
-                      <td className="p-2 font-mono text-slate-300">{sweep.percent}%</td>
-                      <td className="p-2 text-slate-400">{sweep.destination}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* SECTION: Verified Manual Desk Mode (When Operating Without VPS) */}
-      <section className="macro-section mt-8">
-        <div className="macro-section-heading">
-          <div><span className="eyebrow">DISCIPLINED MANUAL GOVERNANCE</span><h2>Verified Manual Desk Mode (Mobile / Without VPS)</h2></div>
-          <span className="macro-section-note mono">2-TRADE / 2-LOSS HARD CIRCUIT BREAKER</span>
-        </div>
-        <div className="macro-panel p-5 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.08] pb-3">
-            <div>
-              <div className="text-xs font-bold text-slate-200">
-                Daily Sovereign Shield Governance (Today: {todayStr})
+            <section className="mt-6 rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold">Broker market-data integrity</h2>
+                  <p className="mt-1 text-xs text-slate-400">Quotes and candles must both be current and sourced from this real MT5 account.</p>
+                </div>
+                <span className={'rounded-full px-3 py-1 text-xs font-mono ' + (marketData?.executionGrade ? 'bg-emerald-500/10 text-emerald-300' : 'bg-amber-500/10 text-amber-200')}>
+                  {marketData?.executionGrade ? 'BROKER DATA VERIFIED' : 'NOT EXECUTION-GRADE'}
+                </span>
               </div>
-              <div className="text-xs text-slate-400 mt-0.5">
-                Trades Taken: <strong className={tradesToday.length >= 2 ? "text-rose-400" : "text-emerald-400"}>{tradesToday.length}/2</strong> · Losses: <strong className={lossesToday.length >= 2 ? "text-rose-400" : "text-emerald-400"}>{lossesToday.length}/2</strong>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-4">
+                  <p className="text-[11px] font-mono tracking-widest text-slate-500">LIVE BID / ASK QUOTES</p>
+                  <p className="mt-2 text-sm font-semibold">{marketData?.quoteExecutionGrade ? 'FRESH · REAL MT5 ACCOUNT' : marketData?.quoteStatus ?? 'WAITING'}</p>
+                  <p className="mt-1 text-xs text-slate-500">Updated: {utcToWat(marketData?.quoteUpdatedAtUtc)} WAT</p>
+                </div>
+                <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-4">
+                  <p className="text-[11px] font-mono tracking-widest text-slate-500">CLOSED M5 / D1 CANDLES</p>
+                  <p className="mt-2 text-sm font-semibold">{marketData?.candleExecutionGrade ? 'FRESH · REAL MT5 ACCOUNT' : marketData?.candleStatus ?? 'WAITING'}</p>
+                  <p className="mt-1 text-xs text-slate-500">Latest M5 bar: {utcToWat(marketData?.latestCandleUtc)} WAT</p>
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className={`text-xs px-2.5 py-1 rounded font-bold ${circuitBreakerTripped ? "bg-rose-950 border border-rose-700 text-rose-300" : "bg-emerald-950 border border-emerald-700 text-emerald-300"}`}>
-                {circuitBreakerTripped ? "CIRCUIT BREAKER: LOCKED OUT" : "GOVERNANCE: CLEARED"}
-              </span>
-              <button
-                type="button"
-                onClick={exportLedgerCsv}
-                disabled={manualTrades.length === 0}
-                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 border border-slate-600 rounded text-xs text-slate-300"
-              >
-                Export CSV
-              </button>
-              <button
-                type="button"
-                onClick={exportLedgerJson}
-                disabled={manualTrades.length === 0}
-                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 border border-slate-600 rounded text-xs text-slate-300"
-              >
-                Export JSON
-              </button>
-            </div>
-          </div>
+              {(marketData?.reason || marketDataError) && <p className="mt-3 text-xs text-amber-200">{marketDataError ?? marketData?.reason}</p>}
+              {selected.account_mode !== 'REAL' && <p className="mt-3 text-xs text-amber-200">Demo/contest accounts may be inspected, but they cannot produce execution-grade market data or clear the EA governance gate.</p>}
+            </section>
 
-          {/* Record Trade Form */}
-          <form onSubmit={handleAddManualTrade} className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-2 text-xs">
-            <div>
-              <label className="text-[10px] text-slate-500 block mb-1">SYMBOL</label>
-              <select
-                value={newSymbol}
-                onChange={(e) => setNewSymbol(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white"
-              >
-                <option value="EURUSD">EURUSD</option>
-                <option value="USDJPY">USDJPY</option>
-                <option value="XAUUSD">XAUUSD</option>
-                <option value="GBPUSD">GBPUSD</option>
-              </select>
-            </div>
+            <section className="mt-6 rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold">Open broker positions</h2>
+                  <p className="mt-1 text-xs text-slate-400">Live position snapshot from MT5; no manual entries are mixed into this table.</p>
+                </div>
+                <span className="text-xs font-mono text-slate-400">{selected.positions.length} OPEN</span>
+              </div>
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full min-w-[760px] text-left text-sm">
+                  <thead className="text-[11px] uppercase tracking-wider text-slate-500">
+                    <tr><th className="py-2">Symbol</th><th>Side</th><th>Volume</th><th>Open</th><th>Current</th><th>SL</th><th>TP</th><th>Net P/L</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {selected.positions.map((position) => (
+                      <tr key={position.ticket}>
+                        <td className="py-3 font-semibold">{position.symbol}</td>
+                        <td>{position.side}</td>
+                        <td className="tabular-nums">{number(position.volume, 3)}</td>
+                        <td className="tabular-nums">{number(position.openPrice, 5)}</td>
+                        <td className="tabular-nums">{number(position.currentPrice, 5)}</td>
+                        <td className="tabular-nums">{position.stopLoss === null ? '—' : number(position.stopLoss, 5)}</td>
+                        <td className="tabular-nums">{position.takeProfit === null ? '—' : number(position.takeProfit, 5)}</td>
+                        <td className={'tabular-nums font-semibold ' + (position.profit + position.swap >= 0 ? 'text-emerald-300' : 'text-rose-300')}>
+                          {money(position.profit + position.swap, selected.currency)}
+                        </td>
+                      </tr>
+                    ))}
+                    {selected.positions.length === 0 && <tr><td colSpan={8} className="py-6 text-center text-slate-500">No open positions in the latest broker snapshot.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </section>
 
-            <div>
-              <label className="text-[10px] text-slate-500 block mb-1">DIRECTION</label>
-              <select
-                value={newDirection}
-                onChange={(e) => setNewDirection(e.target.value as "BUY" | "SELL")}
-                className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white"
-              >
-                <option value="BUY">BUY</option>
-                <option value="SELL">SELL</option>
-              </select>
-            </div>
+            <section className="mt-6 rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold">Closed broker trade history</h2>
+                  <p className="mt-1 text-xs text-slate-400">Trades are reconstructed from MT5 deal tickets and position identifiers. Times below remain in broker-server time.</p>
+                </div>
+                <span className="text-xs font-mono text-slate-400">{analytics.count} CLOSED</span>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg bg-slate-950/70 p-3"><p className="text-[10px] font-mono text-slate-500">NET REALISED P/L</p><p className="mt-1 font-semibold">{money(analytics.net, selected.currency)}</p></div>
+                <div className="rounded-lg bg-slate-950/70 p-3"><p className="text-[10px] font-mono text-slate-500">OBSERVED WIN RATE</p><p className="mt-1 font-semibold">{analytics.winRate === null ? '—' : number(analytics.winRate) + '%'}</p></div>
+                <div className="rounded-lg bg-slate-950/70 p-3"><p className="text-[10px] font-mono text-slate-500">OBSERVED PROFIT FACTOR</p><p className="mt-1 font-semibold">{analytics.profitFactor === null ? '—' : number(analytics.profitFactor)}</p></div>
+              </div>
+              <p className="mt-2 text-[11px] text-slate-500">These are descriptive account statistics, not a validated forward win probability or proof of strategy expectancy.</p>
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full min-w-[720px] text-left text-sm">
+                  <thead className="text-[11px] uppercase tracking-wider text-slate-500">
+                    <tr><th className="py-2">Symbol</th><th>Side</th><th>Volume</th><th>Position ID</th><th>Closed (broker time)</th><th>Net P/L</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {closedTrades.slice(0, 100).map((trade) => (
+                      <tr key={trade.positionId}>
+                        <td className="py-3 font-semibold">{trade.symbol}</td>
+                        <td>{trade.side}</td>
+                        <td className="tabular-nums">{number(trade.volume, 3)}</td>
+                        <td className="font-mono text-xs text-slate-500">{trade.positionId}</td>
+                        <td className="font-mono text-xs">{trade.closedAtServer}</td>
+                        <td className={'tabular-nums font-semibold ' + (trade.net >= 0 ? 'text-emerald-300' : 'text-rose-300')}>{money(trade.net, selected.currency)}</td>
+                      </tr>
+                    ))}
+                    {closedTrades.length === 0 && <tr><td colSpan={6} className="py-6 text-center text-slate-500">No complete closed trades have been received from MT5 yet.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </>
+        )}
 
-            <div>
-              <label className="text-[10px] text-slate-500 block mb-1">LOTS</label>
-              <input
-                type="number"
-                step="0.01"
-                value={newVolume}
-                onChange={(e) => setNewVolume(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white"
-                placeholder="Enter actual lots"
-              />
-            </div>
-
-            <div>
-              <label className="text-[10px] text-slate-500 block mb-1">NET PROFIT ($)</label>
-              <input
-                type="number"
-                step="0.01"
-                value={newProfit}
-                onChange={(e) => setNewProfit(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white"
-                placeholder="+250 or -100"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="text-[10px] text-slate-500 block mb-1">R-MULTIPLE</label>
-              <input
-                type="number"
-                step="0.1"
-                value={newRMultiple}
-                onChange={(e) => setNewRMultiple(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white"
-                placeholder="Enter observed R"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="text-[10px] text-slate-500 block mb-1">SLIPPAGE (pips)</label>
-              <input
-                type="number"
-                step="0.1"
-                value={newSlippage}
-                onChange={(e) => setNewSlippage(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white"
-                placeholder="Enter observed pips"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="text-[10px] text-slate-500 block mb-1">RULE ADHERED</label>
-              <select
-                value={newRuleAdhered ? 'YES' : 'NO'}
-                onChange={(e) => setNewRuleAdhered(e.target.value === 'YES')}
-                className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white"
-              >
-                <option value="YES">YES</option>
-                <option value="NO">NO</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col justify-end">
-              <button
-                type="submit"
-                disabled={circuitBreakerTripped}
-                className="w-full py-1.5 bg-emerald-900 hover:bg-emerald-800 disabled:opacity-40 border border-emerald-700 text-emerald-200 rounded font-semibold text-xs transition"
-              >
-                Log Trade
-              </button>
-            </div>
-          </form>
-
-          {ledgerError && (
-            <div className="text-xs text-rose-400 bg-rose-950/40 border border-rose-800/60 p-2 rounded">
-              {ledgerError}
-            </div>
-          )}
-
-          {/* Manual Trade List */}
-          {manualTrades.length > 0 && (
-            <div className="overflow-x-auto pt-2">
-              <table className="w-full text-xs">
-                <thead className="text-left text-[10px] text-slate-500 border-b border-white/[0.06]">
-                  <tr>
-                    <th className="p-2">TICKET</th>
-                    <th className="p-2">DATE</th>
-                    <th className="p-2">SYMBOL</th>
-                    <th className="p-2">SIDE</th>
-                    <th className="p-2">VOLUME</th>
-                    <th className="p-2">NET P/L</th>
-                    <th className="p-2">R-MULTIPLE</th>
-                    <th className="p-2">SLIPPAGE</th>
-                    <th className="p-2">RULE ADHERED</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {manualTrades.slice(0, 50).map((trade) => (
-                    <tr key={trade.id} className="border-t border-white/[0.04]">
-                      <td className="p-2 font-mono text-slate-400">{trade.ticket}</td>
-                      <td className="p-2 text-slate-500">{trade.date.slice(0, 16).replace('T', ' ')}</td>
-                      <td className="p-2 font-mono font-bold text-white">{trade.symbol}</td>
-                      <td className="p-2">{trade.direction}</td>
-                      <td className="p-2 font-mono">{trade.volume}</td>
-                      <td className={`p-2 font-mono font-bold ${trade.profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                        ${trade.profit.toFixed(2)}
-                      </td>
-                      <td className="p-2 font-mono text-teal-300">{trade.rUnits > 0 ? `+${trade.rUnits}R` : `${trade.rUnits}R`}</td>
-                      <td className="p-2 font-mono text-slate-400">{trade.slippagePips} pips</td>
-                      <td className="p-2">
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${trade.ruleAdhered ? 'bg-emerald-950 text-emerald-400' : 'bg-rose-950 text-rose-400'}`}>
-                          {trade.ruleAdhered ? 'YES' : 'NO'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {lastRefresh && <p className="mt-6 text-right text-[10px] text-slate-500">Dashboard refresh {dateTime(lastRefresh)} WAT · auto-refresh every 30 seconds while connected</p>}
-    </div>
+        {status === 'CONNECTED' && !selected && (
+          <section className="mt-6 rounded-xl border border-slate-800 bg-slate-900/60 p-6 text-sm text-slate-300">
+            Access is verified. No MT5 account snapshot has arrived. Install the publisher above and keep the terminal connected.
+          </section>
+        )}
+      </div>
+    </main>
   );
 }
