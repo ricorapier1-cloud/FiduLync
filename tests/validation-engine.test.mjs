@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { QUANT_CORE_RESEARCH_OBJECTIVES, wilsonScoreInterval, calculateTradeMetrics, applyExecutionCostStress, evaluateWalkForward, monteCarloBootstrap, evaluateResearchObjectives } from '../.quant-test/validationEngine.js';
+import { QUANT_CORE_RESEARCH_OBJECTIVES, wilsonScoreInterval, calculateTradeMetrics, applyExecutionCostStress, evaluateWalkForward, monteCarloBootstrap, monteCarloBlockBootstrap, evaluateResearchObjectives } from '../.quant-test/validationEngine.js';
 import { assessMacroResearchEvidence } from '../.quant-test/quantPipeline.js';
 
 const trades = Array.from({ length: 40 }, (_, i) => ({ netR: i % 4 === 0 ? -0.5 : 0.4 }));
@@ -190,4 +190,16 @@ test('MacroLync can only clear its own research-evidence gate, not grant trading
   assert.equal(result.eligible, true);
   assert.equal(result.status, 'READY_FOR_INDEPENDENT_TRADE_VALIDATION');
   assert.equal(result.objectives.dailyTradeQuota, null);
+});
+
+test('moving-block bootstrap is reproducible and preserves contiguous outcome clusters', () => {
+  const clustered = Array.from({ length: 60 }, (_, i) => ({
+    netR: Math.floor(i / 10) % 2 === 0 ? 1.5 : -1,
+  }));
+  const first = monteCarloBlockBootstrap(clustered, { iterations: 500, seed: 2026, blockLength: 5 });
+  const second = monteCarloBlockBootstrap(clustered, { iterations: 500, seed: 2026, blockLength: 5 });
+  assert.deepEqual(first, second);
+  assert.equal(first?.method, 'CIRCULAR_MOVING_BLOCK');
+  assert.equal(first?.blockLength, 5);
+  assert.equal(monteCarloBlockBootstrap(clustered, { iterations: 50, blockLength: 5 }), null);
 });
