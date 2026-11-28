@@ -350,7 +350,7 @@ export default function AccountsPage() {
     if (totalCompletedTradesCount >= 30 && currentEquityNumber >= 10000) {
       return { tier: 2, name: 'Tier 2 · $25k Scale', riskPercent: 1.0, dollarCap: 250, nextRequirement: 'Unlock Tier 3 at $25k equity high + 30 trades.' };
     }
-    return { tier: 1, name: 'Tier 1 · $10k Base', riskPercent: 1.0, dollarCap: 100, nextRequirement: 'Unlock Tier 2 after verified equity high + 30 completed trades with positive expectancy.' };
+    return { tier: 1, name: 'Tier 1 · Verified Base', riskPercent: 1.0, dollarCap: 100, nextRequirement: 'Unlock Tier 2 after verified equity high + 30 completed trades with positive expectancy.' };
   }, [totalCompletedTradesCount, currentEquityNumber]);
 
   const connect = (event: React.FormEvent<HTMLFormElement>) => {

@@ -19,19 +19,22 @@ export default function ValidationPage() {
   const [startingBalance, setStartingBalance] = useState<number | null>(null);
   const [startingBalanceInput, setStartingBalanceInput] = useState('');
   useEffect(() => {
-    const raw = window.localStorage.getItem('macrolinc-manual-account-balance-v1');
-    const modeEnabled = window.localStorage.getItem('fidulync-manual-desk-mode-v1') === 'true';
-    if (!modeEnabled || !raw) return;
-    try {
-      const saved = JSON.parse(raw) as { balance?: number };
-      if (typeof saved.balance === 'number' && Number.isFinite(saved.balance) && saved.balance > 0) {
-        setStartingBalance(saved.balance);
-        setStartingBalanceInput(String(saved.balance));
+    const timer = window.setTimeout(() => {
+      try {
+        const raw = window.localStorage.getItem('macrolinc-manual-account-balance-v1');
+        const modeEnabled = window.localStorage.getItem('fidulync-manual-desk-mode-v1') === 'true';
+        if (!modeEnabled || !raw) return;
+        const saved = JSON.parse(raw) as { balance?: number };
+        if (typeof saved.balance === 'number' && Number.isFinite(saved.balance) && saved.balance > 0) {
+          setStartingBalance(saved.balance);
+          setStartingBalanceInput(String(saved.balance));
+        }
+      } catch {
+        setStartingBalance(null);
+        setStartingBalanceInput('');
       }
-    } catch {
-      setStartingBalance(null);
-      setStartingBalanceInput('');
-    }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
   const saveStartingBalance = () => {
     const value = Number(startingBalanceInput);
