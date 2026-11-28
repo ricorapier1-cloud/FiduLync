@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
-import { recordMT5Heartbeat, isFreshMT5Timestamp } from '@/lib/quant/mt5Heartbeat';
+import { deriveMT5AccountKey, recordMT5Heartbeat, isFreshMT5Timestamp } from '@/lib/quant/mt5Heartbeat';
+import { getMt5AccountMarketIdentity } from '@/lib/mt5AccountMarketData';
 import { evaluateSovereignShield } from '@/lib/quant/sovereignShield';
 import { getMacroSnapshot } from '@/lib/macroEngine';
 import { buildGoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
@@ -90,6 +91,17 @@ export async function POST(request: Request) {
     return NextResponse.json({
       error: 'Incomplete or invalid MT5 heartbeat. Require broker identity, positive equity/balance, explicit daily counts, broker-day basis and a fresh timezone-aware UTC timestamp.',
     }, { status: 422 });
+  }
+
+  const accountKey = deriveMT5AccountKey(login, server);
+  try {
+    const linkedAccount = await getMt5AccountMarketIdentity(accountKey);
+    if (!linkedAccount || linkedAccount.account_mode !== 'REAL') {
+      return NextResponse.json({ error: 'A linked real MT5 account is required for governance heartbeats. Demo and contest accounts cannot clear the execution gate.' }, { status: 403 });
+    }
+  } catch (error) {
+    console.error('MT5 account mode verification failed:', error);
+    return NextResponse.json({ error: 'Linked MT5 account mode could not be verified. Governance remains locked.' }, { status: 503 });
   }
 
   let stored;
