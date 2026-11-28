@@ -26,7 +26,8 @@ test('active dashboard is macro-only and does not consume technical FX signal ou
 test('currency context requires dated provider observations and excludes non-point-in-time COT', () => {
   assert.match(currencyStrength, /validObservationDate\(item\.policyRateAsOf/);
   assert.match(currencyStrength, /validObservationDate\(item\.inflationAsOf/);
-  assert.match(currencyStrength, /currencies\.length < 3/);
+  assert.match(currencyStrength, /currencies\.length !== MAJOR_CURRENCIES\.length/);
+  assert.match(currencyStrength, /MAJOR_CURRENCIES\.some\(\(code\) => !observedCodes\.has\(code\)\)/);
   assert.doesNotMatch(currencyStrength, /snapshot\.cot/);
 });
 
