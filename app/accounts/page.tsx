@@ -332,7 +332,7 @@ export default function AccountsPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold text-slate-100">Private account-read credential</h2>
-              <p className="mt-1 text-xs leading-5 text-slate-400">Use the value of Vercel <code>MT5_ACCOUNT_READ_TOKEN</code>. It is stored in this browser session only.</p>
+              <p className="mt-1 text-xs leading-5 text-slate-400">Use the value of Vercel <code>MT5_ACCOUNT_READ_TOKEN</code>. It is stored in this browser session only. Never paste your IC Markets master or investor password here.</p>
             </div>
             <span className={'rounded-full px-3 py-1 text-xs font-mono ' + (status === 'CONNECTED' ? 'bg-emerald-500/10 text-emerald-300' : status === 'ERROR' ? 'bg-rose-500/10 text-rose-300' : 'bg-slate-800 text-slate-300')}>
               {status}
