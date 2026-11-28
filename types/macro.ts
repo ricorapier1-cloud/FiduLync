@@ -87,7 +87,6 @@ export type MacroSnapshot = {
   calendarSource?: 'reference' | 'provider';
   calendarProvider?: 'fair-economy' | 'finnhub' | 'fmp' | 'macro-provider';
   calendarRetrievedAt?: string;
-  ecbRates?: Record<string, number>;
   currencies: MacroCurrency[];
   cot: CotPosition[];
   catalysts: EconomicCatalyst[];
