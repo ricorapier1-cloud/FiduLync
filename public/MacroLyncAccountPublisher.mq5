@@ -63,6 +63,103 @@ string CanonicalSymbol(string brokerSymbol)
    return brokerSymbol;
 }
 
+void BuildDailyClosedStats(int &closedTrades, int &losses)
+{
+   closedTrades = 0;
+   losses = 0;
+   datetime serverNow = TimeCurrent();
+   MqlDateTime day;
+   TimeToStruct(serverNow, day);
+   day.hour = 0;
+   day.min = 0;
+   day.sec = 0;
+   datetime dayStart = StructToTime(day);
+   if(!HistorySelect(dayStart, serverNow))
+   {
+      closedTrades = -1;
+      losses = -1;
+      return;
+   }
+
+   ulong positionIds[];
+   double positionPnl[];
+   int total = HistoryDealsTotal();
+   for(int i = 0; i < total; i++)
+   {
+      ulong ticket = HistoryDealGetTicket(i);
+      if(ticket == 0) continue;
+      long type = HistoryDealGetInteger(ticket, DEAL_TYPE);
+      if(type != DEAL_TYPE_BUY && type != DEAL_TYPE_SELL) continue;
+      ulong positionId = (ulong)HistoryDealGetInteger(ticket, DEAL_POSITION_ID);
+      if(positionId == 0) continue;
+      int index = -1;
+      for(int j = 0; j < ArraySize(positionIds); j++)
+         if(positionIds[j] == positionId) { index = j; break; }
+      if(index < 0)
+      {
+         index = ArraySize(positionIds);
+         ArrayResize(positionIds, index + 1);
+         ArrayResize(positionPnl, index + 1);
+         positionIds[index] = positionId;
+         positionPnl[index] = 0.0;
+      }
+      positionPnl[index] += HistoryDealGetDouble(ticket, DEAL_PROFIT)
+         + HistoryDealGetDouble(ticket, DEAL_COMMISSION)
+         + HistoryDealGetDouble(ticket, DEAL_SWAP)
+         + HistoryDealGetDouble(ticket, DEAL_FEE);
+   }
+
+   for(int i = 0; i < ArraySize(positionIds); i++)
+   {
+      bool stillOpen = false;
+      for(int j = 0; j < PositionsTotal(); j++)
+      {
+         ulong ticket = PositionGetTicket(j);
+         if(ticket == 0) continue;
+         if((ulong)PositionGetInteger(POSITION_IDENTIFIER) == positionIds[i])
+         {
+            stillOpen = true;
+            break;
+         }
+      }
+      if(stillOpen) continue;
+      closedTrades++;
+      if(positionPnl[i] < 0.0) losses++;
+   }
+}
+
+string BuildOpenCurrencyLegs()
+{
+   string legs[];
+   for(int i = 0; i < PositionsTotal(); i++)
+   {
+      ulong ticket = PositionGetTicket(i);
+      if(ticket == 0) continue;
+      string symbol = CanonicalSymbol(PositionGetString(POSITION_SYMBOL));
+      if(StringLen(symbol) < 6) continue;
+      string candidates[2] = {StringSubstr(symbol, 0, 3), StringSubstr(symbol, 3, 3)};
+      for(int j = 0; j < 2; j++)
+      {
+         bool exists = false;
+         for(int k = 0; k < ArraySize(legs); k++)
+            if(legs[k] == candidates[j]) { exists = true; break; }
+         if(!exists)
+         {
+            int size = ArraySize(legs);
+            ArrayResize(legs, size + 1);
+            legs[size] = candidates[j];
+         }
+      }
+   }
+   string json = "[";
+   for(int i = 0; i < ArraySize(legs); i++)
+   {
+      if(i > 0) json += ",";
+      json += "\"" + JsonEscape(legs[i]) + "\"";
+   }
+   return json + "]";
+}
+
 string BuildQuotes()
 {
    string json = "[";
@@ -283,13 +380,30 @@ string BuildPayload(bool includeHistory)
    account += "\"margin\":" + DoubleToString(AccountInfoDouble(ACCOUNT_MARGIN), 8) + ",";
    account += "\"freeMargin\":" + DoubleToString(AccountInfoDouble(ACCOUNT_MARGIN_FREE), 8) + ",";
    account += "\"marginLevel\":" + DoubleToString(AccountInfoDouble(ACCOUNT_MARGIN_LEVEL), 8) + ",";
-   account += "\"observedAtUtc\":\"" + UtcIsoNow() + "\"";
+   account += "\"observedAtUtc\":\"" + UtcIsoNow() + "\",";
+   account += "\"serverTime\":\"" + BrokerTime(TimeCurrent()) + "\"";
    account += "}";
 
+   int dailyClosedTrades, dailyLosses;
+   BuildDailyClosedStats(dailyClosedTrades, dailyLosses);
+   MqlTick currentTick;
+   double liveBrokerSpread = -1.0;
+   string spreadSymbol = CanonicalSymbol(_Symbol);
+   if(SymbolInfoTick(_Symbol, currentTick) && currentTick.ask >= currentTick.bid && currentTick.bid > 0.0)
+   {
+      double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+      if(point > 0.0) liveBrokerSpread = (currentTick.ask - currentTick.bid) / point;
+   }
    string deals = includeHistory ? BuildDeals() : "[]";
    return "{\"account\":" + account + ",\"positions\":" + BuildPositions()
       + ",\"deals\":" + deals + ",\"quotes\":" + BuildQuotes()
-      + ",\"candles\":" + BuildCandles() + "}";
+      + ",\"candles\":" + BuildCandles()
+      + ",\"dailyClosedTrades\":" + IntegerToString(dailyClosedTrades)
+      + ",\"dailyLosses\":" + IntegerToString(dailyLosses)
+      + ",\"dailyStatsTimeBasis\":\"BROKER_SERVER_DAY\""
+      + ",\"liveBrokerSpread\":" + (liveBrokerSpread >= 0.0 ? DoubleToString(liveBrokerSpread, 2) : "null")
+      + ",\"spreadSymbol\":\"" + JsonEscape(spreadSymbol) + "\""
+      + ",\"openCurrencyLegs\":" + BuildOpenCurrencyLegs() + "}";
 }
 
 bool PublishAccount(bool includeHistory)
