@@ -72,8 +72,15 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
   const [aiBrief, setAiBrief] = useState<{ bullets: string[]; source: 'gemini' | 'rules' } | null>(null);
 
   const dossier: PairDossier = generatePairDossier(snapshot, pair);
+  const currentTimeMs = now ?? Date.now();
+  const calendarRetrievedAtMs = snapshot.calendarRetrievedAtUtc ? Date.parse(snapshot.calendarRetrievedAtUtc) : NaN;
+  const calendarCoverageEndMs = snapshot.calendarCoverageEndUtc ? Date.parse(snapshot.calendarCoverageEndUtc) : NaN;
+  const calendarVerified = snapshot.calendarSource === 'provider' && Boolean(snapshot.calendarProvider)
+    && Number.isFinite(calendarRetrievedAtMs) && currentTimeMs - calendarRetrievedAtMs <= 60 * 60_000
+    && currentTimeMs - calendarRetrievedAtMs >= -30_000
+    && Number.isFinite(calendarCoverageEndMs) && calendarCoverageEndMs >= currentTimeMs + 24 * 60 * 60_000;
 
-  const sortedCatalysts = [...snapshot.catalysts]
+  const sortedCatalysts = (calendarVerified ? snapshot.catalysts : [])
     .filter((catalyst) => now === null || Date.parse(catalyst.scheduledAt) >= now)
     .sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt));
   const currencies = snapshot.currencies;
@@ -518,11 +525,11 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
               <span className="eyebrow">05 / EVENT RISK</span>
               <h2 id="catalyst-title">Tier-1 Economic Catalysts</h2>
             </div>
-            <span className="macro-section-note mono"><BrandGlyph name="calendar-clock" size={13} /> {snapshot.calendarSource === 'provider' && snapshot.calendarProvider ? 'HEALTHY · ' + snapshot.calendarProvider : 'UNAVAILABLE'} · UTC / WAT</span>
+            <span className="macro-section-note mono"><BrandGlyph name="calendar-clock" size={13} /> {calendarVerified && snapshot.calendarProvider ? 'VERIFIED · ' + snapshot.calendarProvider : 'UNAVAILABLE / STALE'} · UTC / WAT</span>
           </div>
 
           <div className="macro-panel macro-catalyst-panel">
-            {sortedCatalysts.length === 0 && <p className="macro-empty">{snapshot.calendarSource === 'provider' ? 'No upcoming provider events in the current calendar window.' : 'Economic calendar unavailable: no verified provider feed returned events. Event lockout remains conservative.'}</p>}
+            {sortedCatalysts.length === 0 && <p className="macro-empty">{calendarVerified ? 'No upcoming high-impact events are listed in the verified provider calendar through ' + snapshot.calendarCoverageEndUtc + '.' : 'Economic calendar is unavailable, stale, or lacks verified forward coverage. No-event status cannot be inferred; event lockout remains active.'}</p>}
             {sortedCatalysts.map((catalyst) => (
               <article className="macro-event" key={catalyst.id}>
                 <div className="macro-event-time">
@@ -546,7 +553,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
             ))}
             <div className="macro-calendar-note">
               <BrandGlyph name="clock" size={14} />
-              <span>Tier-1 catalyst events enforce a mandatory 30-minute pre- and post-release risk lockout window on connected execution systems.</span>
+              <span>{calendarVerified ? 'Provider retrieved at ' + snapshot.calendarRetrievedAtUtc + '; coverage ends ' + snapshot.calendarCoverageEndUtc + '. High-impact releases enforce a 30-minute pre/post lockout.' : 'Calendar verification failed. All execution approval remains locked until a fresh provider calendar with forward coverage is available.'}</span>
             </div>
           </div>
         </section>
