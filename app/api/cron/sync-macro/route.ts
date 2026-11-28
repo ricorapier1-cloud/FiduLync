@@ -16,7 +16,12 @@ export async function GET(req: Request) {
   try {
     const snapshot = await getMacroSnapshot(true);
     const hasLiveMacroData = snapshot.source === 'provider' || snapshot.source === 'partial';
-    const hasLiveCalendar = snapshot.calendarSource === 'provider';
+    const calendarRetrievedAtMs = snapshot.calendarRetrievedAtUtc ? Date.parse(snapshot.calendarRetrievedAtUtc) : NaN;
+    const calendarCoverageEndMs = snapshot.calendarCoverageEndUtc ? Date.parse(snapshot.calendarCoverageEndUtc) : NaN;
+    const hasLiveCalendar = snapshot.calendarSource === 'provider' && Boolean(snapshot.calendarProvider)
+      && Number.isFinite(calendarRetrievedAtMs) && Date.now() - calendarRetrievedAtMs <= 60 * 60_000
+      && Date.now() - calendarRetrievedAtMs >= -30_000
+      && Number.isFinite(calendarCoverageEndMs) && calendarCoverageEndMs >= Date.now() + 24 * 60 * 60_000;
     const provenance = !hasLiveMacroData
       ? 'REFERENCE_FALLBACK'
       : hasLiveCalendar
@@ -33,7 +38,10 @@ export async function GET(req: Request) {
         status,
         message: 'No live macro provider data was available; reference values were not represented as live.',
         source: snapshot.source,
-        calendarSource: snapshot.calendarSource,
+        calendarSource: hasLiveCalendar ? 'provider' : 'unavailable',
+        calendarProvider: hasLiveCalendar ? snapshot.calendarProvider : null,
+        calendarRetrievedAtUtc: hasLiveCalendar ? snapshot.calendarRetrievedAtUtc : null,
+        calendarCoverageEndUtc: hasLiveCalendar ? snapshot.calendarCoverageEndUtc : null,
         cotSource: snapshot.cotSource,
         currenciesCount: snapshot.currencies.length,
         provenance,
@@ -47,7 +55,10 @@ export async function GET(req: Request) {
         ? 'Live macro observations refreshed. The economic calendar remains unavailable or incomplete.'
         : 'Live macro observations refreshed with a verified provider calendar.',
       source: snapshot.source,
-      calendarSource: snapshot.calendarSource,
+      calendarSource: hasLiveCalendar ? 'provider' : 'unavailable',
+      calendarProvider: hasLiveCalendar ? snapshot.calendarProvider : null,
+      calendarRetrievedAtUtc: hasLiveCalendar ? snapshot.calendarRetrievedAtUtc : null,
+      calendarCoverageEndUtc: hasLiveCalendar ? snapshot.calendarCoverageEndUtc : null,
       cotSource: snapshot.cotSource,
       currenciesCount: snapshot.currencies.length,
       provenance,
