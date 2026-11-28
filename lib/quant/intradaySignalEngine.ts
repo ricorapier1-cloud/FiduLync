@@ -5,6 +5,7 @@ import {
   type OhlcvBar,
 } from '@/lib/quant/technicalConfluence';
 import type { MarketRiskShieldResult } from '@/lib/quant/sovereignShield';
+import { getActiveMarketSession } from '@/lib/marketSessions';
 
 export type IntradaySignalState = 'ACTIVE_SETUP' | 'FORMING_PULLBACK' | 'WAIT_NO_SETUP' | 'SHIELD_BLOCKED';
 export type SignalDirection = 'BUY' | 'SELL' | 'NONE';
@@ -104,13 +105,7 @@ function hourInZone(date: Date, timeZone: string): number {
 }
 
 export function classifyWATSession(now = new Date()): 'LONDON' | 'NEW_YORK' | 'CLOSED' {
-  const watDate = new Date(now.getTime() + 60 * 60_000);
-  const watDay = watDate.getUTCDay();
-  if (watDay === 0 || watDay === 6) return 'CLOSED';
-  const hour = watHour(now.toISOString());
-  if (hour >= 8 && hour < 12) return 'LONDON';
-  if (hour >= 13 && hour < 17) return 'NEW_YORK';
-  return 'CLOSED';
+  return getActiveMarketSession(now);
 }
 
 export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal {
