@@ -881,3 +881,17 @@ test('desk consumes the selected private MT5 account and labels public reference
   assert.match(quotes, /Swissquote public BBO reference feed/);
   assert.match(quotes, /executionGrade: false/);
 });
+
+
+test('MT5 accounts page is a read-only broker ledger with no manual trade journal or profit-sweep template', () => {
+  const page = read('../app/accounts/page.tsx');
+  const accountSync = read('../app/api/v1/account-sync/route.ts');
+  const heartbeat = read('../app/api/v1/mt5-heartbeat/route.ts');
+  assert.match(page, /closed broker trade history/i);
+  assert.match(page, /deal_time_server/);
+  assert.match(page, /MT5_ACCOUNT_READ_TOKEN/);
+  assert.match(page, /BROKER DATA VERIFIED/);
+  assert.doesNotMatch(page, /manualTrades|profitSweeps|handleAddManualTrade|handleAddSweep|circuitBreakerTripped|tradesToday\.length/);
+  assert.match(accountSync, /snapshot\.account_mode === 'REAL'/);
+  assert.match(heartbeat, /linkedAccount\.account_mode !== 'REAL'/);
+});
