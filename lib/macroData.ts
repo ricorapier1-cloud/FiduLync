@@ -127,7 +127,7 @@ function isCatalyst(value: unknown): value is EconomicCatalyst {
     && typeof value.region === 'string'
     && typeof value.title === 'string'
     && typeof value.scheduledAt === 'string'
-    && /(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(value.scheduledAt)
+    && /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value.scheduledAt)
     && Number.isFinite(Date.parse(value.scheduledAt))
     && (value.impact === 'High' || value.impact === 'Medium')
     && typeof value.consensus === 'string'
@@ -287,7 +287,7 @@ async function getFairEconomyCatalysts(): Promise<EconomicCatalyst[]> {
   return payload.flatMap((item, index): EconomicCatalyst[] => {
     if (!isRecord(item) || typeof item.currency !== 'string'
       || typeof item.title !== 'string' || typeof item.date !== 'string'
-      || !/(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(item.date)) return [];
+      || !/(?:Z|[+-]\d{2}:?\d{2})$/i.test(item.date)) return [];
     const impact = item.impact === 'High' ? 'High' : item.impact === 'Medium' ? 'Medium' : null;
     const scheduledAt = new Date(item.date);
     if (!impact || !regionMap[item.currency] || !Number.isFinite(scheduledAt.getTime())) return [];
@@ -322,7 +322,7 @@ async function getFinnhubCatalysts(apiKey: string): Promise<EconomicCatalyst[]> 
   return payload.economicCalendar.flatMap((item, index): EconomicCatalyst[] => {
     if (!isRecord(item) || typeof item.time !== 'string' || typeof item.country !== 'string'
       || typeof item.event !== 'string'
-      || !/(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(item.time)) return [];
+      || !/(?:Z|[+-]\d{2}:?\d{2})$/i.test(item.time)) return [];
     const impactText = typeof item.impact === 'string' ? item.impact.toLowerCase() : '';
     const impact = impactText.includes('high') ? 'High' : impactText.includes('medium') ? 'Medium' : null;
     const scheduledAt = new Date(item.time);
@@ -398,7 +398,7 @@ async function getFmpCatalysts(apiKey: string): Promise<EconomicCatalyst[]> {
   };
   return payload.flatMap((item, index): EconomicCatalyst[] => {
     if (!isRecord(item)) return [];
-    const scheduledAt = typeof item.date === 'string' && /(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(item.date) ? new Date(item.date) : null;
+    const scheduledAt = typeof item.date === 'string' && /(?:Z|[+-]\d{2}:?\d{2})$/i.test(item.date) ? new Date(item.date) : null;
     const impactText = typeof item.impact === 'string' ? item.impact.toLowerCase() : '';
     const impact = impactText.includes('high') ? 'High' : impactText.includes('medium') ? 'Medium' : null;
     const country = typeof item.country === 'string' ? item.country : '';
@@ -904,7 +904,7 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
       calendarSource: data.payload.calendarSource === 'provider' ? 'provider' : 'reference',
       calendarProvider: ['fair-economy', 'finnhub', 'fmp', 'macro-provider'].includes(String(data.payload.calendarProvider)) ? data.payload.calendarProvider as MacroSnapshot['calendarProvider'] : undefined,
       calendarRetrievedAt: typeof data.payload.calendarRetrievedAt === 'string'
-        && /(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(data.payload.calendarRetrievedAt)
+        && /(?:Z|[+-]\d{2}:?\d{2})$/i.test(data.payload.calendarRetrievedAt)
         && Number.isFinite(Date.parse(data.payload.calendarRetrievedAt)) ? data.payload.calendarRetrievedAt : undefined,
       asOf: data.refreshed_at,
       ...(ecbRates && Object.keys(ecbRates).length > 0 ? { ecbRates } : {}),
