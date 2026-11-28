@@ -830,3 +830,54 @@ test('research objectives have no daily trade-count quota and PIT provenance gat
   assert.match(heartbeat, /pointInTimeIntegrity\.status !== 'VERIFIED'/);
   assert.match(macroContext, /pointInTimeIntegrity\.status === 'VERIFIED'/);
 });
+
+test('MT5 account publisher transports broker quotes, closed M5/D1 bars and account governance telemetry', () => {
+  const publisher = read('../public/MacroLyncAccountPublisher.mq5');
+  const accountSync = read('../app/api/v1/account-sync/route.ts');
+  assert.match(publisher, /InpSyncIntervalSeconds = 15/);
+  assert.match(publisher, /BuildQuotes\(\)/);
+  assert.match(publisher, /PERIOD_M5/);
+  assert.match(publisher, /PERIOD_D1/);
+  assert.match(publisher, /isClosed\\\\":true/);
+  assert.match(publisher, /dailyStatsTimeBasis/);
+  assert.match(publisher, /BuildDailyClosedStats/);
+  assert.match(publisher, /openCurrencyLegs/);
+  assert.match(publisher, /BROKER_SERVER_CURRENT_OFFSET/);
+  assert.match(accountSync, /recordMT5Heartbeat/);
+  assert.match(accountSync, /macrolinc_market_quotes/);
+  assert.match(accountSync, /macrolinc_market_candles/);
+  assert.match(accountSync, /quoteAgeMs > 30_000/);
+  assert.match(accountSync, /candle\.isClosed !== true/);
+  assert.match(accountSync, /dailyStatsTimeBasis === 'BROKER_SERVER_DAY'/);
+  assert.doesNotMatch(publisher, /OrderSend|CTrade|PositionClose/);
+});
+
+test('account-specific market routes require the private read token and fail closed on demo or stale feeds', () => {
+  const helper = read('../lib/mt5AccountMarketData.ts');
+  const quotes = read('../app/api/v1/live-quotes/route.ts');
+  const candles = read('../app/api/v1/intraday-candles/route.ts');
+  assert.match(helper, /MT5_ACCOUNT_READ_TOKEN/);
+  assert.match(helper, /timingSafeEqual/);
+  assert.match(quotes, /isAuthorizedMt5AccountRead\(request\)/);
+  assert.match(quotes, /account\.account_mode === 'REAL'/);
+  assert.match(quotes, /required = \['EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD'\]/);
+  assert.match(quotes, /executionGrade: false/);
+  assert.match(candles, /intradayBars\.length >= 60 && dailyBars\.length >= 15/);
+  assert.match(candles, /intradayAgeMs <= 10 \* 60_000/);
+  assert.match(candles, /dailyAgeMs <= 2 \* 86_400_000/);
+  assert.match(candles, /timeBasis/);
+});
+
+test('desk consumes the selected private MT5 account and labels public reference data honestly', () => {
+  const desk = read('../app/components/DeskTerminal.tsx');
+  const accounts = read('../app/accounts/page.tsx');
+  const quotes = read('../app/api/v1/live-quotes/route.ts');
+  assert.match(desk, /macrolinc-account-read-token/);
+  assert.match(desk, /macrolinc-selected-account-key/);
+  assert.match(desk, /accountKey/);
+  assert.match(desk, /PUBLIC REFERENCE BBO · NOT BROKER/);
+  assert.match(desk, /BROKER-VERIFIED MT5 QUOTES/);
+  assert.match(accounts, /macrolinc-selected-account-key/);
+  assert.match(quotes, /Swissquote public BBO reference feed/);
+  assert.match(quotes, /executionGrade: false/);
+});
