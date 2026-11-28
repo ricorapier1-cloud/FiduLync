@@ -117,11 +117,17 @@ export async function POST(request: Request) {
   const snapshot = await getMacroSnapshot();
   const goldContext = await buildGoldMacroContext(snapshot);
   const vix = goldContext.drivers.VIXCLS.state === 'HEALTHY' ? goldContext.drivers.VIXCLS.value : null;
-  const highImpactWindow = snapshot.catalysts.some((event) => event.impact === 'High'
+  const calendarRetrievedAtMs = snapshot.calendarRetrievedAtUtc ? Date.parse(snapshot.calendarRetrievedAtUtc) : NaN;
+  const calendarCoverageEndMs = snapshot.calendarCoverageEndUtc ? Date.parse(snapshot.calendarCoverageEndUtc) : NaN;
+  const calendarVerified = snapshot.calendarSource === 'provider' && Boolean(snapshot.calendarProvider)
+    && Number.isFinite(calendarRetrievedAtMs)
+    && Date.now() - calendarRetrievedAtMs <= 60 * 60_000
+    && Date.now() - calendarRetrievedAtMs >= -30_000
+    && Number.isFinite(calendarCoverageEndMs)
+    && calendarCoverageEndMs >= Date.now() + 24 * 60 * 60_000;
+  const highImpactWindow = calendarVerified && snapshot.catalysts.some((event) => event.impact === 'High'
     && Math.abs(Date.parse(event.scheduledAt) - Date.now()) <= 30 * 60_000);
-  const newsLockoutActive = snapshot.calendarSource !== 'provider'
-    || !snapshot.calendarProvider
-    || highImpactWindow;
+  const newsLockoutActive = !calendarVerified || highImpactWindow;
 
   const sovereignShield = evaluateSovereignShield({
     vix,
