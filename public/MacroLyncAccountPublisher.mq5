@@ -449,7 +449,17 @@ bool PublishAccount(bool includeHistory)
 int OnInit()
 {
    if(StringLen(InpAccountIngestToken) < 32)
-      Print("MacroLync: set InpAccountIngestToken before enabling account synchronization.");
+   {
+      Print("MacroLync ERROR: InpAccountIngestToken must contain the configured 32+ character Vercel MT5_ACCOUNT_INGEST_TOKEN.");
+      return INIT_PARAMETERS_INCORRECT;
+   }
+   if(StringFind(InpAccountSyncEndpoint, "https://") != 0
+      || InpSyncIntervalSeconds < 5 || InpHistorySyncIntervalSeconds < 60
+      || StringLen(InpMarketWatchSymbols) < 6)
+   {
+      Print("MacroLync ERROR: invalid HTTPS endpoint, sync interval, or market-watch symbol list.");
+      return INIT_PARAMETERS_INCORRECT;
+   }
    EventSetTimer((int)MathMax(5, InpSyncIntervalSeconds));
    g_lastHistorySync = TimeCurrent();
    PublishAccount(true);
