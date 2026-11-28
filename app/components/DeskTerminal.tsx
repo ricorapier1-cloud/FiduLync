@@ -122,7 +122,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
         const raw = window.localStorage.getItem('fidulync-manual-desk-ledger-v1');
         const saved = raw ? JSON.parse(raw) as { date?: string; trades?: number; losses?: number; legs?: string[] } : null;
         setManualDeskMode(savedMode);
-        setManualLedger(saved?.date === today ? { date: today, trades: Math.min(2, Math.max(0, saved.trades ?? 0)), losses: Math.min(2, Math.max(0, saved.losses ?? 0)), legs: Array.isArray(saved.legs) ? saved.legs : [] } : { date: today, trades: 0, losses: 0, legs: [] });
+        setManualLedger(saved?.date === today ? { date: today, trades: Math.max(0, saved.trades ?? 0), losses: Math.min(2, Math.max(0, saved.losses ?? 0)), legs: Array.isArray(saved.legs) ? saved.legs : [] } : { date: today, trades: 0, losses: 0, legs: [] });
       } catch { setManualDeskMode(false); setManualLedger({ date: today, trades: 0, losses: 0, legs: [] }); }
     }, 0);
     return () => window.clearTimeout(timer);
