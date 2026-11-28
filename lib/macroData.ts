@@ -127,10 +127,9 @@ function isCotPosition(value: unknown): value is CotPosition {
   return isRecord(value)
     && typeof value.market === 'string'
     && isFiniteNumber(value.netContracts)
-    && isFiniteNumber(value.percentile)
-    && value.percentile >= 0
-    && value.percentile <= 100
-    && isFiniteNumber(value.weeklyChange);
+    && (value.percentile === null || (isFiniteNumber(value.percentile) && value.percentile >= 0 && value.percentile <= 100))
+    && (value.weeklyChange === null || isFiniteNumber(value.weeklyChange))
+    && (value.sampleSize === undefined || (Number.isSafeInteger(value.sampleSize) && Number(value.sampleSize) >= 0));
 }
 
 function isCatalyst(value: unknown): value is EconomicCatalyst {
@@ -139,23 +138,36 @@ function isCatalyst(value: unknown): value is EconomicCatalyst {
     && typeof value.region === 'string'
     && typeof value.title === 'string'
     && typeof value.scheduledAt === 'string'
+    && /(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(value.scheduledAt)
     && Number.isFinite(Date.parse(value.scheduledAt))
     && (value.impact === 'High' || value.impact === 'Medium')
     && typeof value.consensus === 'string'
     && (typeof value.actual === 'string' || value.actual === null);
 }
 
-function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies' | 'cot' | 'catalysts' | 'energyMarkets' | 'usTreasury' | 'vix'> | null {
+function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies' | 'cot' | 'catalysts' | 'energyMarkets' | 'usTreasury' | 'vix' | 'calendarRetrievedAtUtc' | 'calendarCoverageEndUtc'> | null {
   if (!isRecord(value)
     || !Array.isArray(value.currencies)
     || !Array.isArray(value.cot)
     || !Array.isArray(value.catalysts)) return null;
 
   if (!value.currencies.every(isCurrency) || !value.cot.every(isCotPosition) || !value.catalysts.every(isCatalyst)) return null;
+  const calendarRetrievedAtUtc = value.calendarRetrievedAtUtc;
+  const calendarCoverageEndUtc = value.calendarCoverageEndUtc;
+  const calendarMetadataValid = typeof calendarRetrievedAtUtc === 'string'
+    && /(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(calendarRetrievedAtUtc)
+    && Number.isFinite(Date.parse(calendarRetrievedAtUtc))
+    && typeof calendarCoverageEndUtc === 'string'
+    && /(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(calendarCoverageEndUtc)
+    && Number.isFinite(Date.parse(calendarCoverageEndUtc));
   return {
     currencies: value.currencies,
     cot: value.cot,
-    catalysts: value.catalysts,
+    catalysts: calendarMetadataValid ? value.catalysts : [],
+    ...(calendarMetadataValid ? {
+      calendarRetrievedAtUtc: calendarRetrievedAtUtc as string,
+      calendarCoverageEndUtc: calendarCoverageEndUtc as string,
+    } : {}),
     ...(isRecord(value.energyMarkets) && isRecord(value.energyMarkets.wti) && isRecord(value.energyMarkets.brent)
       && isFiniteNumber(value.energyMarkets.wti.valueUsdPerBarrel) && isFiniteNumber(value.energyMarkets.brent.valueUsdPerBarrel)
       && typeof value.energyMarkets.wti.observationDate === 'string' && typeof value.energyMarkets.brent.observationDate === 'string'
@@ -458,47 +470,74 @@ async function getFrankfurterRates(): Promise<Record<string, number>> {
   return rates;
 }
 
-function getFairEconomyCatalysts(): Promise<EconomicCatalyst[]> {
-  return getCachedData('macro:fair-economy-calendar', async () => {
-    const response = await fetch('https://nfs.faireconomy.media/ff_calendar_thisweek.json', {
-      cache: 'no-store',
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': 'Mozilla/5.0 (compatible; MacroLync/1.0)',
-      },
-      signal: AbortSignal.timeout(8_000),
-    });
-    if (!response.ok) throw new Error(`FairEconomy calendar returned ${response.status}.`);
-    const payload: unknown = await response.json();
-    if (!Array.isArray(payload)) throw new Error('FairEconomy calendar payload is invalid.');
-    const regionMap: Record<string, string> = {
-      USD: 'US', EUR: 'EU', GBP: 'UK', JPY: 'JP', CHF: 'CH',
-      CAD: 'CA', AUD: 'AU', NZD: 'NZ', SEK: 'SE', NOK: 'NO',
-    };
-    const events = payload.flatMap((item, index): EconomicCatalyst[] => {
-      if (!isRecord(item)) return [];
-      const code = typeof item.country === 'string' ? item.country : typeof item.currency === 'string' ? item.currency : '';
-      if (!code || typeof item.title !== 'string' || typeof item.date !== 'string') return [];
-      const impact = item.impact === 'High' ? 'High' : null;
-      const scheduledAt = new Date(item.date);
-      if (!impact || !['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CHF', 'CAD'].includes(code)
-        || !regionMap[code] || !Number.isFinite(scheduledAt.getTime())) return [];
-      return [{
-        id: `fair-economy-${scheduledAt.toISOString()}-${index}`,
-        region: regionMap[code],
-        title: item.title,
-        scheduledAt: scheduledAt.toISOString(),
-        impact,
-        consensus: typeof item.forecast === 'string' && item.forecast ? item.forecast : 'TBD',
-        actual: typeof item.actual === 'string' && item.actual ? item.actual : null,
-        previous: typeof item.previous === 'string' && item.previous ? item.previous : undefined,
-      }];
-    });
-    return events;
-  }, 7200);
+type CalendarFeedData = {
+  events: EconomicCatalyst[];
+  retrievedAtUtc: string;
+  coverageEndUtc: string;
+};
+
+function nextWeekCoverageEndUtc(): string {
+  const now = new Date();
+  const daysUntilSunday = (7 - now.getUTCDay()) % 7;
+  const currentSunday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysUntilSunday, 23, 59, 59);
+  return new Date(currentSunday + 7 * 24 * 60 * 60 * 1000).toISOString();
 }
 
-async function getFinnhubCatalysts(apiKey: string): Promise<EconomicCatalyst[]> {
+async function fetchFairEconomyWeek(fileName: 'ff_calendar_thisweek.json' | 'ff_calendar_nextweek.json'): Promise<unknown[]> {
+  const response = await fetch(`https://nfs.faireconomy.media/${fileName}`, {
+    cache: 'no-store',
+    headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0 (compatible; MacroLync/1.0)' },
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!response.ok) throw new Error(`FairEconomy ${fileName} returned ${response.status}.`);
+  const payload: unknown = await response.json();
+  if (!Array.isArray(payload)) throw new Error(`FairEconomy ${fileName} payload is invalid.`);
+  return payload;
+}
+
+async function getFairEconomyCatalysts(): Promise<CalendarFeedData> {
+  // Both calendar weeks must be fetched directly. A stale this-week cache is not
+  // sufficient to clear next week's event-risk lockout.
+  const [thisWeek, nextWeek] = await Promise.all([
+    fetchFairEconomyWeek('ff_calendar_thisweek.json'),
+    fetchFairEconomyWeek('ff_calendar_nextweek.json'),
+  ]);
+  const payload = [...thisWeek, ...nextWeek];
+  const regionMap: Record<string, string> = {
+    USD: 'US', EUR: 'EU', GBP: 'UK', JPY: 'JP', CHF: 'CH',
+    CAD: 'CA', AUD: 'AU', NZD: 'NZ', SEK: 'SE', NOK: 'NO',
+  };
+  const hasUntimedHighImpact = payload.some((item) => isRecord(item)
+    && item.impact === 'High'
+    && typeof item.date === 'string'
+    && !/(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(item.date));
+  if (hasUntimedHighImpact) throw new Error('FairEconomy high-impact event has no explicit timezone.');
+  const events = payload.flatMap((item, index): EconomicCatalyst[] => {
+    if (!isRecord(item)) return [];
+    const code = typeof item.country === 'string' ? item.country : typeof item.currency === 'string' ? item.currency : '';
+    if (!code || typeof item.title !== 'string' || typeof item.date !== 'string') return [];
+    const impact = item.impact === 'High' ? 'High' : null;
+    const scheduledAt = new Date(item.date);
+    if (!impact || !regionMap[code] || !Number.isFinite(scheduledAt.getTime())) return [];
+    return [{
+      id: `fair-economy-${scheduledAt.toISOString()}-${index}`,
+      region: regionMap[code],
+      title: item.title,
+      scheduledAt: scheduledAt.toISOString(),
+      impact,
+      consensus: typeof item.forecast === 'string' && item.forecast ? item.forecast : 'TBD',
+      actual: typeof item.actual === 'string' && item.actual ? item.actual : null,
+      previous: typeof item.previous === 'string' && item.previous ? item.previous : undefined,
+    }];
+  });
+  return {
+    events,
+    retrievedAtUtc: new Date().toISOString(),
+    coverageEndUtc: nextWeekCoverageEndUtc(),
+  };
+}
+
+async function getFinnhubCatalysts(apiKey: string): Promise<CalendarFeedData> {
   const from = new Date().toISOString().slice(0, 10);
   const to = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const providerUrl = new URL('https://finnhub.io/api/v1/calendar/economic');
@@ -514,9 +553,13 @@ async function getFinnhubCatalysts(apiKey: string): Promise<EconomicCatalyst[]> 
   const regions: Record<string, string> = {
     US: 'US', EU: 'EU', GB: 'UK', JP: 'JP', AU: 'AU', CH: 'CH', CA: 'CA', NZ: 'NZ', NO: 'NO', SE: 'SE',
   };
-  return payload.economicCalendar.flatMap((item, index): EconomicCatalyst[] => {
+  const hasUntimedHighImpact = payload.economicCalendar.some((item) => isRecord(item)
+    && typeof item.impact === 'string' && item.impact.toLowerCase().includes('high')
+    && typeof item.time === 'string' && !/(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(item.time));
+  if (hasUntimedHighImpact) throw new Error('Finnhub high-impact event has no explicit timezone.');
+  const events = payload.economicCalendar.flatMap((item, index): EconomicCatalyst[] => {
     if (!isRecord(item) || typeof item.time !== 'string' || typeof item.country !== 'string'
-      || typeof item.event !== 'string') return [];
+      || typeof item.event !== 'string' || !/(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(item.time)) return [];
     const impactText = typeof item.impact === 'string' ? item.impact.toLowerCase() : '';
     const impact = impactText.includes('high') ? 'High' : impactText.includes('medium') ? 'Medium' : null;
     const scheduledAt = new Date(item.time);
@@ -533,6 +576,11 @@ async function getFinnhubCatalysts(apiKey: string): Promise<EconomicCatalyst[]> 
       actual,
     }];
   });
+  return {
+    events,
+    retrievedAtUtc: new Date().toISOString(),
+    coverageEndUtc: `${to}T23:59:59.999Z`,
+  };
 }
 
 async function getAlphaVantageObservations(functionName: 'FEDERAL_FUNDS_RATE' | 'CPI', apiKey: string): Promise<Observation[]> {
@@ -572,12 +620,14 @@ async function getAlphaVantageUsdUpdates(apiKey: string) {
   return { policyRate, policyRateObservationDate: rates[0]?.date, inflation, inflationObservationDate: latestCpi?.date };
 }
 
-async function getFmpCatalysts(apiKey: string): Promise<EconomicCatalyst[]> {
+async function getFmpCatalysts(apiKey: string): Promise<CalendarFeedData> {
   const now = new Date();
   const end = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const from = now.toISOString().slice(0, 10);
+  const to = end.toISOString().slice(0, 10);
   const providerUrl = new URL('https://financialmodelingprep.com/stable/economic-calendar');
-  providerUrl.searchParams.set('from', now.toISOString().slice(0, 10));
-  providerUrl.searchParams.set('to', end.toISOString().slice(0, 10));
+  providerUrl.searchParams.set('from', from);
+  providerUrl.searchParams.set('to', to);
   providerUrl.searchParams.set('apikey', apiKey);
   const response = await fetch(providerUrl, {
     cache: 'no-store',
@@ -588,16 +638,21 @@ async function getFmpCatalysts(apiKey: string): Promise<EconomicCatalyst[]> {
   if (!Array.isArray(payload)) throw new Error('Financial Modeling Prep calendar payload is unavailable.');
   const regions: Record<string, string> = {
     US: 'US', 'United States': 'US', 'Euro Area': 'EU', 'United Kingdom': 'UK',
-    Japan: 'JP', Australia: 'AU', Switzerland: 'CH',
+    Japan: 'JP', Australia: 'AU', Switzerland: 'CH', Canada: 'CA', New Zealand: 'NZ',
   };
-  return payload.flatMap((item, index): EconomicCatalyst[] => {
-    if (!isRecord(item)) return [];
-    const scheduledAt = typeof item.date === 'string' ? new Date(item.date) : null;
+  const hasUntimedHighImpact = payload.some((item) => isRecord(item)
+    && typeof item.impact === 'string' && item.impact.toLowerCase().includes('high')
+    && typeof item.date === 'string' && !/(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(item.date));
+  if (hasUntimedHighImpact) throw new Error('FMP high-impact event has no explicit timezone.');
+  const events = payload.flatMap((item, index): EconomicCatalyst[] => {
+    if (!isRecord(item) || typeof item.date !== 'string'
+      || !/(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(item.date)) return [];
+    const scheduledAt = new Date(item.date);
     const impactText = typeof item.impact === 'string' ? item.impact.toLowerCase() : '';
     const impact = impactText.includes('high') ? 'High' : impactText.includes('medium') ? 'Medium' : null;
     const country = typeof item.country === 'string' ? item.country : '';
     const title = typeof item.event === 'string' ? item.event : '';
-    if (!scheduledAt || !Number.isFinite(scheduledAt.getTime()) || !impact || !regions[country] || !title) return [];
+    if (!Number.isFinite(scheduledAt.getTime()) || !impact || !regions[country] || !title) return [];
     const consensus = item.estimate === null || item.estimate === undefined ? 'Pending' : String(item.estimate);
     const actual = item.actual === null || item.actual === undefined ? null : String(item.actual);
     return [{
@@ -610,6 +665,11 @@ async function getFmpCatalysts(apiKey: string): Promise<EconomicCatalyst[]> {
       actual,
     }];
   });
+  return {
+    events,
+    retrievedAtUtc: new Date().toISOString(),
+    coverageEndUtc: `${to}T23:59:59.999Z`,
+  };
 }
 
 async function getCotProvider(urlValue: string, token?: string): Promise<CotPosition[]> {
@@ -672,7 +732,7 @@ async function getCftcCot(): Promise<CotPosition[]> {
     ['CANADIAN DOLLAR - CHICAGO MERCANTILE EXCHANGE', 'CAD'],
     ['GOLD - COMMODITY EXCHANGE INC.', 'GOLD'],
   ];
-  const byMarket = new Map<string, Array<{ date: string; netContracts: number; weeklyChange: number }>>();
+  const byMarket = new Map<string, Array<{ date: string; netContracts: number; weeklyChange: number | null }>>();
   for (const row of payload) {
     if (!isRecord(row) || typeof row.market_and_exchange_names !== 'string'
       || typeof row.report_date_as_yyyy_mm_dd !== 'string') continue;
@@ -689,7 +749,8 @@ async function getCftcCot(): Promise<CotPosition[]> {
     const position = {
       date: reportDate,
       netContracts: long - short,
-      weeklyChange: (Number.isFinite(changeLong) ? changeLong : 0) - (Number.isFinite(changeShort) ? changeShort : 0),
+      weeklyChange: Number.isFinite(changeLong) && Number.isFinite(changeShort)
+        ? changeLong - changeShort : null,
     };
     const history = byMarket.get(market) ?? [];
     history.push(position);
@@ -702,10 +763,19 @@ async function getCftcCot(): Promise<CotPosition[]> {
     if (!latest) return [];
     const below = history.filter((item) => item.netContracts < latest.netContracts).length;
     const equal = history.filter((item) => item.netContracts === latest.netContracts).length;
-    const percentile = history.length
-      ? Math.round(((below + equal / 2) / history.length) * 100)
-      : 50;
-    return [{ market, netContracts: latest.netContracts, percentile, weeklyChange: latest.weeklyChange, reportDate: latest.date, freshness: 'LATEST PUBLISHED' }];
+    const sampleSize = history.length;
+    const percentile = sampleSize >= 52
+      ? Math.round(((below + equal / 2) / sampleSize) * 100)
+      : null;
+    return [{
+      market,
+      netContracts: latest.netContracts,
+      percentile,
+      weeklyChange: latest.weeklyChange,
+      sampleSize,
+      reportDate: latest.date,
+      freshness: 'LATEST PUBLISHED',
+    }];
   });
   if (!positions.length) throw new Error('CFTC returned no supported currency or gold positions.');
   return positions;
@@ -830,32 +900,45 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
   } else if (frankfurterResult.status === 'rejected') {
     console.warn('ECB benchmark exchange rates are unavailable:', frankfurterResult.reason);
   }
-  const providerCalendar = filterCurrentCatalysts(
-    calendarResult.status === 'fulfilled' && calendarResult.value.length > 0
-      ? calendarResult.value
-      : finnhubResult.status === 'fulfilled' && finnhubResult.value?.length
-        ? finnhubResult.value
-        : fmpResult.status === 'fulfilled' && fmpResult.value?.length
-          ? fmpResult.value
-          : [],
-  ).filter((event) => event.impact === 'High' && ['US', 'EU', 'UK', 'JP', 'AU', 'CH', 'CA'].includes(event.region));
-  const calendarVerified = calendarResult.status === 'fulfilled'
-    || (finnhubResult.status === 'fulfilled' && Array.isArray(finnhubResult.value))
-    || (fmpResult.status === 'fulfilled' && Array.isArray(fmpResult.value));
-  if (calendarVerified) {
+  const calendarCandidates = [
+    calendarResult.status === 'fulfilled'
+      ? { provider: 'FAIRECONOMY_PUBLIC' as const, ...calendarResult.value }
+      : null,
+    finnhubResult.status === 'fulfilled' && finnhubResult.value
+      ? { provider: 'FINNHUB' as const, ...finnhubResult.value }
+      : null,
+    fmpResult.status === 'fulfilled' && fmpResult.value
+      ? { provider: 'FMP' as const, ...fmpResult.value }
+      : null,
+  ].filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== null);
+
+  const selectedCalendar = calendarCandidates.find((candidate) => {
+    const retrievedAt = Date.parse(candidate.retrievedAtUtc);
+    const coverageEnd = Date.parse(candidate.coverageEndUtc);
+    return Number.isFinite(retrievedAt) && Date.now() - retrievedAt <= 60 * 60_000
+      && Date.now() - retrievedAt >= -30_000
+      && Number.isFinite(coverageEnd) && coverageEnd >= Date.now() + 24 * 60 * 60_000;
+  });
+
+  const providerCalendar = selectedCalendar
+    ? filterCurrentCatalysts(selectedCalendar.events)
+      .filter((event) => event.impact === 'High' && ['US', 'EU', 'UK', 'JP', 'AU', 'CH', 'CA'].includes(event.region))
+    : [];
+
+  if (selectedCalendar) {
     snapshot.catalysts = providerCalendar;
     snapshot.calendarSource = 'provider';
-    snapshot.calendarProvider = calendarResult.status === 'fulfilled'
-      ? 'FAIRECONOMY_PUBLIC'
-      : finnhubResult.status === 'fulfilled' && Array.isArray(finnhubResult.value) ? 'FINNHUB' : 'FMP';
+    snapshot.calendarProvider = selectedCalendar.provider;
+    snapshot.calendarRetrievedAtUtc = selectedCalendar.retrievedAtUtc;
+    snapshot.calendarCoverageEndUtc = selectedCalendar.coverageEndUtc;
     hasAnyProviderData = true;
   } else {
     snapshot.catalysts = [];
     snapshot.calendarSource = 'unavailable';
     snapshot.calendarProvider = undefined;
-    if (calendarResult.status === 'rejected') {
-      console.warn('Economic calendar is unavailable; no provider-backed events will be displayed:', calendarResult.reason);
-    }
+    snapshot.calendarRetrievedAtUtc = undefined;
+    snapshot.calendarCoverageEndUtc = undefined;
+    console.warn('Economic calendar is unavailable or lacks forward coverage; event-risk gate remains locked.');
   }
   if (ecbResult.status === 'fulfilled') {
     const eur = snapshot.currencies.find((currency) => currency.code === 'EUR');
@@ -1126,7 +1209,12 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
     if (data.payload.source !== 'provider' && data.payload.source !== 'partial') return null;
     const parsed = parseProviderSnapshot(data.payload);
     if (!parsed || !Number.isFinite(Date.parse(data.refreshed_at))) return null;
-    const persistedCatalysts = filterCurrentCatalysts(parsed.catalysts);
+    const calendarRetrievedAtMs = parsed.calendarRetrievedAtUtc ? Date.parse(parsed.calendarRetrievedAtUtc) : NaN;
+    const calendarCoverageEndMs = parsed.calendarCoverageEndUtc ? Date.parse(parsed.calendarCoverageEndUtc) : NaN;
+    const calendarVerified = data.payload.calendarSource === 'provider'
+      && Number.isFinite(calendarRetrievedAtMs) && Date.now() - calendarRetrievedAtMs <= 60 * 60_000
+      && Number.isFinite(calendarCoverageEndMs) && calendarCoverageEndMs >= Date.now() + 24 * 60 * 60_000;
+    const persistedCatalysts = calendarVerified ? filterCurrentCatalysts(parsed.catalysts) : [];
     const ecbRates = isRecord(data.payload.ecbRates)
       ? Object.fromEntries(Object.entries(data.payload.ecbRates)
         .filter((entry): entry is [string, number] => /^[A-Z]{3}$/.test(entry[0])
@@ -1140,11 +1228,13 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
           ? 'provider'
           : 'fallback',
       cotSource: data.payload.cotSource === 'provider' ? 'provider' : 'unavailable',
-      catalysts: data.payload.calendarSource === 'provider' ? persistedCatalysts : [],
-      calendarSource: data.payload.calendarSource === 'provider' ? 'provider' : 'unavailable',
-      calendarProvider: data.payload.calendarProvider === 'FAIRECONOMY_PUBLIC' ? 'FAIRECONOMY_PUBLIC'
+      catalysts: persistedCatalysts,
+      calendarSource: calendarVerified ? 'provider' : 'unavailable',
+      calendarProvider: calendarVerified ? (data.payload.calendarProvider === 'FAIRECONOMY_PUBLIC' ? 'FAIRECONOMY_PUBLIC'
         : data.payload.calendarProvider === 'FINNHUB' ? 'FINNHUB'
-          : data.payload.calendarProvider === 'FMP' ? 'FMP' : undefined,
+          : data.payload.calendarProvider === 'FMP' ? 'FMP' : undefined) : undefined,
+      calendarRetrievedAtUtc: calendarVerified ? parsed.calendarRetrievedAtUtc : undefined,
+      calendarCoverageEndUtc: calendarVerified ? parsed.calendarCoverageEndUtc : undefined,
       ...(parsed.energyMarkets ? { energyMarkets: parsed.energyMarkets } : {}),
       asOf: data.refreshed_at,
       ...(ecbRates && Object.keys(ecbRates).length > 0 ? { ecbRates } : {}),
@@ -1224,10 +1314,19 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
           })),
         ],
         cot: parsed.cot.length > 0 ? parsed.cot : baseline.cot,
-        catalysts: providerCatalysts,
+        catalysts: parsed.calendarRetrievedAtUtc && parsed.calendarCoverageEndUtc
+          && Date.parse(parsed.calendarRetrievedAtUtc) >= Date.now() - 60 * 60_000
+          && Date.parse(parsed.calendarCoverageEndUtc) >= Date.now() + 24 * 60 * 60_000
+          ? providerCatalysts : [],
         source: 'provider',
         cotSource: 'provider',
-        calendarSource: providerCatalysts.length > 0 ? 'provider' : 'unavailable',
+        calendarSource: parsed.calendarRetrievedAtUtc && parsed.calendarCoverageEndUtc
+          && Date.parse(parsed.calendarRetrievedAtUtc) >= Date.now() - 60 * 60_000
+          && Date.parse(parsed.calendarCoverageEndUtc) >= Date.now() + 24 * 60 * 60_000
+          ? 'provider' : 'unavailable',
+        calendarProvider: parsed.calendarRetrievedAtUtc && parsed.calendarCoverageEndUtc ? 'FAIRECONOMY_PUBLIC' : undefined,
+        calendarRetrievedAtUtc: parsed.calendarRetrievedAtUtc,
+        calendarCoverageEndUtc: parsed.calendarCoverageEndUtc,
         asOf: new Date().toISOString(),
         ...(ecbRates ? { ecbRates } : {}),
       });
