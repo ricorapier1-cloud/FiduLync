@@ -89,6 +89,9 @@ export default function AccountsPage() {
   }, [status, token, payload?.accounts.length, refresh]);
 
   const selected = payload?.accounts.find((account) => account.account_key === selectedAccountKey) ?? payload?.accounts[0] ?? null;
+  useEffect(() => {
+    if (selectedAccountKey) window.sessionStorage.setItem('macrolinc-selected-account-key', selectedAccountKey);
+  }, [selectedAccountKey]);
 
   // Verified Manual Ledger Mode State
   type ManualTrade = {
