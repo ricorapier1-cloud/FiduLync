@@ -75,7 +75,7 @@ export async function GET(request: Request) {
       source: 'Yahoo Finance chart endpoint',
       marketDataQuality: 'REFERENCE_ONLY',
       executionGrade: false,
-      executionGradeReason: 'Yahoo Finance OHLCV is not an authenticated IC Markets MT5 candle feed and may be delayed.'
+      executionGradeReason: 'Yahoo Finance OHLCV is not an authenticated IC Markets MT5 candle feed and may be delayed.',
       interval: '5m',
       intradayBars: intraday,
       dailyBars: daily,
