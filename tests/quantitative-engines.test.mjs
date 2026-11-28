@@ -750,22 +750,22 @@ test('production UI fails closed on unconfigured account balance and never seeds
   const desk = read('../app/components/DeskTerminal.tsx');
   const accounts = read('../app/accounts/page.tsx');
   assert.match(desk, /useState<number \| null>\(null\)/);
-  assert.match(desk, /BAL:|NOT SET \\(ENTER REAL BALANCE\\)/);
+  assert.match(desk, /BAL:|NOT SET \(ENTER REAL BALANCE\)/);
   assert.match(desk, /ENTER REAL ACCOUNT BALANCE TO COMPUTE LOTS/);
   assert.match(desk, /SAVE &amp; LOCK REAL BALANCE/);
-  assert.match(desk, /MARKET CLOSED \\(WEEKEND\\)/);
-  assert.match(desk, /globalDeskLockout \\? 'STAND DOWN'/);
-  assert.doesNotMatch(desk, /useState<number>\\(10000\\)|154\\.50|2650|1\\.085|6\\.50/);
+  assert.match(desk, /MARKET CLOSED \(WEEKEND\)/);
+  assert.match(desk, /globalDeskLockout \? 'STAND DOWN'/);
+  assert.doesNotMatch(desk, /useState<number>\(10000\)|154\.50|2650|1\.085|6\.50/);
   assert.doesNotMatch(desk, /stopDistancePips = (?:30|35)|stopDistDollars[^;]*: 25/);
-  assert.match(accounts, /currentEquityNumber = selected[\\s\\S]*: null/);
+  assert.match(accounts, /currentEquityNumber = selected[\s\S]*: null/);
   assert.match(accounts, /NOT CONFIGURED · CONNECT A VERIFIED MT5 ACCOUNT/);
-  assert.doesNotMatch(accounts, /selected \\? Number\\(selected\\.equity\\) : 10000/);
+  assert.doesNotMatch(accounts, /selected \? Number\(selected\.equity\) : 10000/);
   const validationEngine = read('../lib/quant/monteCarloEngine.ts');
   const validationPage = read('../app/validation/page.tsx');
   assert.doesNotMatch(validationEngine, /initialBalance = 10_000|volume: 0\.1|profit \/ 50|net \/ 100|99\.9/);
   assert.match(validationPage, /NO VERIFIED TRADE HISTORY — IMPORT MT5 REPORT OR LOG REAL TRADES TO RUN MONTE CARLO/);
   assert.match(validationPage, /startingBalance === null/);
-  assert.match(accounts, /useState<ManualTrade\\[]>\\(\\[\\]\\)/);
+  assert.match(accounts, /useState<ManualTrade\[\]>\(\[\]\)/);
 });
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 function collectProductionSourceFiles(directory) {
@@ -782,6 +782,8 @@ test('repository-wide static audit rejects default non-zero balances, seeded tra
   const source = files.map((file) => readFileSync(file, 'utf8')).join('\n');
   assert.ok(files.length > 0, 'production source directories must be scanned');
   assert.doesNotMatch(source, /\b(?:accountBalance|accountEquity|ticketBalance|startingBalance|initialBalance)\s*(?::\s*number(?:\s*\|\s*null)?\s*)?=\s*\d+(?:\.\d+)?/);
+  assert.doesNotMatch(source, /\b(?:accountBalance|accountEquity|startingBalance|initialBalance)\s*:\s*\d+(?:\.\d+)?/);
+  assert.doesNotMatch(source, /\b(?:accountBalance|accountEquity|ticketBalance|startingBalance|initialBalance)\s*=\s*useState(?:<[^>]+>)?\(\s*\d/);
   assert.doesNotMatch(source, /\b(?:sample|demo|mock)(?:Trades|Positions|Journal|Portfolio)\s*=\s*\[\s*\{/i);
   assert.doesNotMatch(source, /\b(?:mock|demo|fake)(?:Price|Bid|Ask|Quote)\s*[:=]\s*\d/i);
   const desk = read('../app/components/DeskTerminal.tsx');
