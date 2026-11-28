@@ -170,3 +170,49 @@ export function assessValidationEvidence(evidence: ValidationEvidence): { eligib
   if (!evidence.untouchedOos) blockers.push('OOS_NOT_UNTOUCHED');
   return { eligible: blockers.length === 0, blockers };
 }
+
+
+export type MacroResearchEvidence = {
+  pointInTimeReleaseVintagesVerified: boolean;
+  synchronizedHistoricalObservationsVerified: boolean;
+  sourcePermissionsVerified: boolean;
+  untouchedOutOfSampleVerified: boolean;
+  walkForwardFolds: number;
+  spreadStressApplied: boolean;
+  slippageStressApplied: boolean;
+  commissionStressApplied: boolean;
+  swapStressApplied: boolean;
+  parameterSensitivityCompleted: boolean;
+  multiRegimeCoverageVerified: boolean;
+};
+
+/**
+ * MacroLync validates the research-data and methodology chain only.
+ * It does not calculate or display broker-trade performance or authorize orders.
+ */
+export function assessMacroResearchEvidence(evidence: MacroResearchEvidence): {
+  eligible: boolean;
+  status: 'NOT_VALIDATED' | 'INSUFFICIENT_EVIDENCE' | 'READY_FOR_INDEPENDENT_TRADE_VALIDATION';
+  blockers: string[];
+} {
+  const blockers: string[] = [];
+  if (!evidence.pointInTimeReleaseVintagesVerified) blockers.push('POINT_IN_TIME_RELEASE_VINTAGES_UNVERIFIED');
+  if (!evidence.synchronizedHistoricalObservationsVerified) blockers.push('SYNCHRONIZED_HISTORICAL_OBSERVATIONS_UNVERIFIED');
+  if (!evidence.sourcePermissionsVerified) blockers.push('SOURCE_PERMISSIONS_UNVERIFIED');
+  if (!evidence.untouchedOutOfSampleVerified) blockers.push('MACRO_OUT_OF_SAMPLE_NOT_UNTOUCHED');
+  if (!Number.isSafeInteger(evidence.walkForwardFolds) || evidence.walkForwardFolds < 3) blockers.push('MACRO_WALK_FORWARD_REQUIRES_THREE_OR_MORE_FOLDS');
+  if (!evidence.spreadStressApplied) blockers.push('SPREAD_STRESS_NOT_APPLIED');
+  if (!evidence.slippageStressApplied) blockers.push('SLIPPAGE_STRESS_NOT_APPLIED');
+  if (!evidence.commissionStressApplied) blockers.push('COMMISSION_STRESS_NOT_APPLIED');
+  if (!evidence.swapStressApplied) blockers.push('SWAP_STRESS_NOT_APPLIED');
+  if (!evidence.parameterSensitivityCompleted) blockers.push('PARAMETER_SENSITIVITY_NOT_COMPLETED');
+  if (!evidence.multiRegimeCoverageVerified) blockers.push('MULTI_REGIME_COVERAGE_UNVERIFIED');
+  const eligible = blockers.length === 0;
+  return {
+    eligible,
+    status: eligible ? 'READY_FOR_INDEPENDENT_TRADE_VALIDATION'
+      : blockers.some((blocker) => blocker.includes('UNVERIFIED') || blocker.includes('NOT_UNTOUCHED'))
+        ? 'NOT_VALIDATED' : 'INSUFFICIENT_EVIDENCE',
+    blockers,
+  };
+}
