@@ -94,7 +94,6 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
         && typeof position.sampleSize === 'number' && Number.isSafeInteger(position.sampleSize) && position.sampleSize >= 52)
       : [];
     const catalysts = calendarAllowed ? snapshot.catalysts : [];
-    const ecbRates = snapshot.ecbRates;
     const fredMacroAllowed = Boolean(process.env.FRED_API_KEY?.trim());
     const officialStatisticsFresh = observationFresh(snapshot.usIndicators?.retrievedAt, 1);
     const fredRetrievalFresh = observationFresh(snapshot.usIndicators?.fredRetrievedAt, 1);
@@ -148,7 +147,7 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
       ? filteredUsIndicators
       : undefined;
     const hasVerifiedProviderData = currencies.length > 0 || cot.length > 0 || catalysts.length > 0 || Boolean(usIndicators);
-    if (!hasVerifiedProviderData && (!ecbRates || Object.keys(ecbRates).length === 0)) return getFallbackSnapshot();
+    if (!hasVerifiedProviderData) return getFallbackSnapshot();
 
     return {
       ...snapshot,
@@ -163,7 +162,6 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
       usIndicators,
       calendarSource: calendarAllowed ? 'provider' : 'reference',
       calendarProvider: calendarAllowed ? snapshot.calendarProvider : undefined,
-      ecbRates,
     };
   } catch (error) {
     console.warn('Macro providers and cached snapshots are unavailable; no macro observations will be substituted.', error);
