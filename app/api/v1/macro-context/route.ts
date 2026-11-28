@@ -146,7 +146,8 @@ export async function GET(request: Request) {
     const isRateDecision = Boolean(nearestRateDecision && Math.abs(nearestRateDecision.minutes) <= 60);
     const shieldEventMinutesAway = isRateDecision ? nearestRateDecision!.minutes : nearestHighImpact?.minutes ?? null;
     const crowdedPositions = snapshot.cot
-      .filter((position) => isFreshCotReport(position.reportDate) && Number.isFinite(position.percentile))
+      .filter((position) => position.sampleSize !== undefined && position.sampleSize >= 52
+        && position.percentile !== null && isFreshCotReport(position.reportDate))
       .map((position) => ({ symbol: position.market, percentile: position.percentile }));
     const hasFreshBrokerHeartbeat = Boolean(latestHeartbeat && latestHeartbeat.fresh);
     const governance = hasFreshBrokerHeartbeat && latestHeartbeat ? {
