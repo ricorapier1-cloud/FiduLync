@@ -1,7 +1,7 @@
 /** Canonical research mandate shared by MacroLync and Integrated Quant_Core. */
 export const RESEARCH_OBJECTIVES = Object.freeze({
-  winRateMin: 0.60,
-  winRateMax: 0.65,
+  winRateTargetMin: 0.60,
+  winRateTargetMax: 0.65,
   plannedRewardRisk: 2,
   growthPriority: 'BALANCED_GROWTH' as const,
   drawdownPriority: 'CONTROLLED_DRAWDOWN' as const,
