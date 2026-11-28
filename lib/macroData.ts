@@ -143,7 +143,7 @@ function isUsIndicators(value: unknown): value is OfficialUsMacroIndicators {
     && dateKeys.every((key) => value[key] === undefined || typeof value[key] === 'string');
 }
 
-function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies' | 'cot' | 'catalysts' | 'usIndicators'> | null {
+function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies' | 'cot' | 'catalysts' | 'usIndicators' | 'calendarRetrievedAt'> | null {
   if (!isRecord(value)
     || !Array.isArray(value.currencies)
     || !Array.isArray(value.cot)
@@ -158,11 +158,17 @@ function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies'
   if (new Set(currencyCodes).size !== currencyCodes.length
     || new Set(cotMarkets).size !== cotMarkets.length
     || new Set(catalystIds).size !== catalystIds.length) return null;
+  const calendarRetrievedAt = value.calendarRetrievedAt;
+  const hasValidCalendarRetrieval = typeof calendarRetrievedAt === 'string'
+    && /(?:Z|[+-]\d{2}:?\d{2})$/i.test(calendarRetrievedAt)
+    && Number.isFinite(Date.parse(calendarRetrievedAt));
+  if (value.catalysts.length > 0 && !hasValidCalendarRetrieval) return null;
   return {
     currencies: value.currencies,
     cot: value.cot,
     catalysts: value.catalysts,
     ...(usIndicators === undefined ? {} : isUsIndicators(usIndicators) ? { usIndicators } : {}),
+    ...(hasValidCalendarRetrieval ? { calendarRetrievedAt: calendarRetrievedAt as string } : {}),
   };
 }
 
@@ -980,7 +986,7 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
         cotProvider: parsed.cot.length > 0 ? 'custom' : undefined,
         calendarSource: parsed.catalysts.length > 0 ? 'provider' : 'reference',
         calendarProvider: parsed.catalysts.length > 0 ? 'macro-provider' : undefined,
-        calendarRetrievedAt: parsed.catalysts.length > 0 ? new Date().toISOString() : undefined,
+        calendarRetrievedAt: parsed.calendarRetrievedAt,
         asOf: new Date().toISOString(),
         ...(ecbRates ? { ecbRates } : {}),
       });
