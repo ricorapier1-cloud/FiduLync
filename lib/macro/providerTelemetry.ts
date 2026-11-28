@@ -11,15 +11,6 @@ function latestDate(...dates: Array<string | undefined>): string | null {
   return dates.filter((date): date is string => Boolean(date) && Number.isFinite(Date.parse(date!))).sort().at(-1) ?? null;
 }
 
-function utcWeekWindow(): string {
-  const start = new Date();
-  start.setUTCHours(0, 0, 0, 0);
-  start.setUTCDate(start.getUTCDate() - ((start.getUTCDay() + 6) % 7));
-  const end = new Date(start);
-  end.setUTCDate(end.getUTCDate() + 6);
-  return start.toISOString().slice(0, 10) + ' → ' + end.toISOString().slice(0, 10) + ' UTC';
-}
-
 function feedStatus(available: boolean, fresh: boolean, configured: boolean) {
   if (available && fresh) return { status: 'HEALTHY' as const, freshness: 'LATEST PUBLISHED' as const };
   if (available) return { status: 'DEGRADED' as const, freshness: 'STALE' as const };
@@ -44,12 +35,11 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
   const finnhubKeyPresent = Boolean(process.env.FINNHUB_API_KEY?.trim());
   const finnhubPlanActive = process.env.FINNHUB_PERSONAL_PLAN_ACTIVE === 'true';
   const finnhubConfigured = finnhubPlanActive && finnhubKeyPresent;
-  const fairEconomyActive = snapshot.calendarSource === 'provider' && snapshot.calendarProvider === 'FAIRECONOMY_PUBLIC';
   const calendarConfigured = fairEconomyActive || finnhubConfigured
     || (process.env.FMP_COMMERCIAL_USE_APPROVED === 'true' && Boolean(process.env.FMP_API_KEY?.trim()));
   const bls = feedStatus(usd?.unemploymentProvider === 'BLS' && usd.wageGrowthProvider === 'BLS',
     isFresh(usd?.unemploymentObservationDate, 120) && isFresh(usd?.wageGrowthObservationDate, 120), true);
-  const bea = feedStatus(usd?.gdpProvider === 'BEA' && Boolean(usd.gdpObservationDate), Boolean(usd?.gdpObservationDate), Boolean(process.env.BEA_API_KEY?.trim()));
+  const bea = feedStatus(usd?.gdpProvider === 'BEA' && Boolean(usd.gdpObservationDate), isFresh(usd?.gdpObservationDate, 180), Boolean(process.env.BEA_API_KEY?.trim()));
 
   const fred = !fredStorageAllowed && fredKeyPresent
     ? { status: 'PERMISSION_REQUIRED' as const, freshness: 'UNAVAILABLE' as const }
@@ -94,9 +84,9 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
       worldBankCurrencies.some((item) => isFresh(item.inflationObservationDate, 365)), true);
   const eiaConfigured = Boolean(process.env.EIA_API_KEY?.trim());
   const treasury = feedStatus(Boolean(snapshot.usTreasury),
-    snapshot.usTreasury?.freshness === 'LATEST PUBLISHED', true);
+    isFresh(snapshot.usTreasury?.observationDate, 7), true);
   const cboeVix = feedStatus(Boolean(snapshot.vix),
-    snapshot.vix?.freshness === 'LATEST PUBLISHED', true);
+    isFresh(snapshot.vix?.observationDate, 3), true);
   const eia = feedStatus(Boolean(snapshot.energyMarkets),
     Boolean(snapshot.energyMarkets && isFresh(snapshot.energyMarkets.wti.observationDate, 10) && isFresh(snapshot.energyMarkets.brent.observationDate, 10)), eiaConfigured);
 
@@ -115,6 +105,6 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
     { name: 'Norges Bank policy rate', endpoint: 'https://data.norges-bank.no/api/data/IR/B.KPRA.SD.R', ...norgesBank, latencyMs: null, lastSuccessfulSyncUtc: null, latestObservationDate: nok?.policyRateObservationDate ?? null, rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'US Bureau of Labor Statistics', endpoint: 'https://api.bls.gov/publicAPI/v2/timeseries/data/', ...bls, latencyMs: null, lastSuccessfulSyncUtc: null, latestObservationDate: latestDate(usd?.unemploymentObservationDate, usd?.wageGrowthObservationDate), rateLimitRemaining: null, circuitBreakerTripped: false },
     { name: 'US Bureau of Economic Analysis', endpoint: 'https://apps.bea.gov/api/data/', ...bea, latencyMs: null, lastSuccessfulSyncUtc: null, latestObservationDate: usd?.gdpObservationDate ?? null, rateLimitRemaining: null, circuitBreakerTripped: false },
-    { name: 'Economic Calendar' + (snapshot.calendarProvider ? ' · ' + snapshot.calendarProvider : ''), endpoint: snapshot.calendarProvider === 'FAIRECONOMY_PUBLIC' ? 'https://nfs.faireconomy.media/ff_calendar_thisweek.json' : 'Provider calendar adapter', ...calendar, latencyMs: null, lastSuccessfulSyncUtc: null, latestObservationDate: calendarActive && snapshot.calendarProvider === 'FAIRECONOMY_PUBLIC' ? utcWeekWindow() : latestDate(...snapshot.catalysts.map((item) => item.scheduledAt.slice(0, 10))), detail: calendarActive ? 'Verified ' + snapshot.calendarProvider + ' calendar feed; active weekly event window ' + utcWeekWindow() + '; provider event timestamps are retained in UTC.' : 'No verified calendar provider is active. Event risk remains fail-closed; no static dates are inserted.', nextAction: calendarActive ? undefined : 'Restore an eligible public or entitled calendar adapter; event risk remains blocked until verified.', rateLimitRemaining: null, circuitBreakerTripped: false },
+    { name: 'Economic Calendar' + (snapshot.calendarProvider ? ' · ' + snapshot.calendarProvider : ''), endpoint: snapshot.calendarProvider === 'FAIRECONOMY_PUBLIC' ? 'https://nfs.faireconomy.media/ff_calendar_thisweek.json + ff_calendar_nextweek.json' : 'Provider calendar adapter', ...calendar, latencyMs: null, lastSuccessfulSyncUtc: calendarActive ? snapshot.calendarRetrievedAtUtc ?? null : null, latestObservationDate: calendarActive ? snapshot.calendarCoverageEndUtc?.slice(0, 10) ?? null : null, detail: calendarActive ? 'Verified ' + snapshot.calendarProvider + ' feed retrieved at ' + snapshot.calendarRetrievedAtUtc + '; forward coverage through ' + snapshot.calendarCoverageEndUtc + '. High-impact event timestamps are timezone-aware UTC.' : 'Calendar is unavailable, stale, or lacks at least 24 hours of verified forward coverage. Event risk remains fail-closed; no static dates are inserted.', nextAction: calendarActive ? undefined : 'Restore the public or entitled calendar adapter and verify its forward coverage; event risk remains blocked.', rateLimitRemaining: null, circuitBreakerTripped: false },
   ];
 }
