@@ -637,7 +637,7 @@ async function getFmpCatalysts(apiKey: string): Promise<CalendarFeedData> {
   if (!Array.isArray(payload)) throw new Error('Financial Modeling Prep calendar payload is unavailable.');
   const regions: Record<string, string> = {
     US: 'US', 'United States': 'US', 'Euro Area': 'EU', 'United Kingdom': 'UK',
-    Japan: 'JP', Australia: 'AU', Switzerland: 'CH', Canada: 'CA', New Zealand: 'NZ',
+    Japan: 'JP', Australia: 'AU', Switzerland: 'CH', Canada: 'CA', 'New Zealand': 'NZ',
   };
   const hasUntimedHighImpact = payload.some((item) => isRecord(item)
     && typeof item.impact === 'string' && item.impact.toLowerCase().includes('high')
