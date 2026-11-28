@@ -112,6 +112,11 @@ export async function GET(request: Request) {
         intradayAgeMs,
         dailyAgeMs,
         accountAgeMs,
+        timestampProvenance: {
+          timeBasis: latestIntraday ? intradayRows.at(-1)?.time_basis ?? null : null,
+          serverUtcOffsetMinutes: latestIntraday ? intradayRows.at(-1)?.server_utc_offset_minutes ?? null : null,
+          historicalOffsetCaveat: 'Broker server timestamps are converted using the current server UTC offset. Historical bars spanning a broker DST transition may have a one-hour timestamp shift; bar prices and ordering remain broker sourced.',
+        },
         broker: account.broker,
         server: account.server,
         accountMode: account.account_mode,
