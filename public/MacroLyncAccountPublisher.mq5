@@ -335,7 +335,7 @@ string BuildDeals()
 {
    string json = "[";
    bool first = true;
-   datetime to_time = TimeCurrent();
+   datetime to_time = TimeTradeServer();
    datetime from_time = to_time - (datetime)(MathMax(1, InpHistoryDays) * 86400);
    if(!HistorySelect(from_time, to_time)) return json + "]";
 
@@ -391,7 +391,7 @@ string BuildPayload(bool includeHistory, bool includeCandles, bool fullCandleHis
    account += "\"freeMargin\":" + DoubleToString(AccountInfoDouble(ACCOUNT_MARGIN_FREE), 8) + ",";
    account += "\"marginLevel\":" + DoubleToString(AccountInfoDouble(ACCOUNT_MARGIN_LEVEL), 8) + ",";
    account += "\"observedAtUtc\":\"" + UtcIsoNow() + "\",";
-   account += "\"serverTime\":\"" + BrokerTime(TimeCurrent()) + "\"";
+   account += "\"serverTime\":\"" + BrokerTime(TimeTradeServer()) + "\"";
    account += "}";
 
    int dailyClosedTrades, dailyLosses;
