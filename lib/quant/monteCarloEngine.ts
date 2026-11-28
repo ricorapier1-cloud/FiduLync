@@ -1,4 +1,4 @@
-import { RESEARCH_OBJECTIVES } from '@/lib/quant/researchObjectives';
+import { RESEARCH_OBJECTIVES } from './researchObjectives.ts';
 
 export type TradeInput = {
   ticket: string | number;
