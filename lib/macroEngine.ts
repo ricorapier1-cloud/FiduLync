@@ -2,6 +2,7 @@ import 'server-only';
 
 import { getFallbackSnapshot, loadMacroSnapshot } from '@/lib/macroData';
 import { getCachedData } from '@/lib/redisCache';
+import { isObservationFresh } from '@/lib/dataFreshness';
 import type { MacroCurrency, MacroSnapshot } from '@/types/macro';
 
 function isFiniteNumber(value: unknown): value is number {
@@ -30,32 +31,44 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
     }
 
     const policyProviderApproved = (provider: MacroCurrency['policyRateProvider']) => {
-      if (provider === 'fred') return true; // Personal FRED research use; attribution is displayed in the dashboard.
-      if (provider === 'alpha-vantage') return process.env.ALPHA_VANTAGE_PERSONAL_PLAN_ACTIVE === 'true';
-      if (provider === 'macro-provider') return process.env.MACRO_DATA_PROVIDER_PERSONAL_USE_ENABLED === 'true';
-      if (provider === 'swiss-national-bank') return process.env.SNB_DATA_SOURCE_ENABLED === 'true';
-      return Boolean(provider);
+      switch (provider) {
+        case 'fred': return true;
+        case 'alpha-vantage': return process.env.ALPHA_VANTAGE_PERSONAL_PLAN_ACTIVE === 'true';
+        case 'macro-provider': return process.env.MACRO_DATA_PROVIDER_PERSONAL_USE_ENABLED === 'true';
+        case 'swiss-national-bank': return process.env.SNB_PERSONAL_USE_ENABLED === 'true';
+        case 'ecb':
+        case 'bank-of-canada':
+        case 'bank-of-england':
+        case 'bank-of-japan':
+        case 'reserve-bank-of-australia':
+        case 'reserve-bank-of-new-zealand': return true;
+        default: return false;
+      }
     };
     const inflationProviderApproved = (provider: MacroCurrency['inflationProvider']) => {
-      if (provider === 'fred') return true;
-      if (provider === 'alpha-vantage') return process.env.ALPHA_VANTAGE_PERSONAL_PLAN_ACTIVE === 'true';
-      if (provider === 'macro-provider') return process.env.MACRO_DATA_PROVIDER_PERSONAL_USE_ENABLED === 'true';
-      return Boolean(provider);
+      switch (provider) {
+        case 'fred':
+        case 'ecb':
+        case 'bank-of-canada': return true;
+        case 'alpha-vantage': return process.env.ALPHA_VANTAGE_PERSONAL_PLAN_ACTIVE === 'true';
+        case 'macro-provider': return process.env.MACRO_DATA_PROVIDER_PERSONAL_USE_ENABLED === 'true';
+        // World Bank annual CPI is useful historical context, not a current monthly inflation input.
+        case 'world-bank':
+        default: return false;
+      }
     };
 
-    const observationFresh = (asOf: string | undefined, maxAgeDays: number) => {
-      if (!asOf) return false;
-      const observedAt = Date.parse(asOf);
-      const ageMs = Date.now() - observedAt;
-      return Number.isFinite(observedAt) && ageMs >= -5 * 60_000 && ageMs <= maxAgeDays * 24 * 60 * 60_000;
-    };
+    const observationFresh = (asOf: string | undefined, maxAgeDays: number) =>
+      isObservationFresh(asOf, maxAgeDays * 24 * 60 * 60_000);
+    const policyRateMaxAgeDays = (provider: MacroCurrency['policyRateProvider']) =>
+      provider === 'fred' ? 10 : provider === 'alpha-vantage' || provider === 'macro-provider' ? 45 : 180;
     const currencies = snapshot.currencies.filter((currency) =>
       currency.policyRateSource === 'provider'
       && currency.inflationSource === 'provider'
       && policyProviderApproved(currency.policyRateProvider)
       && inflationProviderApproved(currency.inflationProvider)
-      && (currency.policyRateProvider !== 'fred' || observationFresh(currency.policyRateAsOf, 10))
-      && (currency.inflationProvider !== 'fred' || observationFresh(currency.inflationAsOf, 60))
+      && observationFresh(currency.policyRateAsOf, policyRateMaxAgeDays(currency.policyRateProvider))
+      && observationFresh(currency.inflationAsOf, 75)
     ).map((currency) => {
       if (currency.twoYearYieldSource === 'provider' && !observationFresh(currency.twoYearYieldAsOf, 10)) {
         return { ...currency, twoYearYield: undefined, twoYearYieldSource: undefined, twoYearYieldAsOf: undefined };
@@ -75,7 +88,9 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
       || (snapshot.calendarProvider === 'macro-provider' && process.env.MACRO_DATA_PROVIDER_PERSONAL_USE_ENABLED === 'true')
     );
 
-    const cot = cotAllowed ? snapshot.cot : [];
+    const cot = cotAllowed
+      ? snapshot.cot.filter((position) => observationFresh(position.asOf, 21))
+      : [];
     const catalysts = calendarAllowed ? snapshot.catalysts : [];
     const ecbRates = snapshot.ecbRates;
     const fredMacroAllowed = Boolean(process.env.FRED_API_KEY?.trim());
@@ -150,27 +165,44 @@ export function getFundamentalSignal(snapshot: MacroSnapshot, pair: string): Fun
   const quote = snapshot.currencies.find((currency) => currency.code === quoteCode);
   const base = baseCode === 'XAU' ? null : snapshot.currencies.find((currency) => currency.code === baseCode);
   if (!quote || (baseCode !== 'XAU' && !base)) return null;
+
+  // COT position date is not its publication timestamp. Do not use a positioning
+  // percentile in a current bias until the provider supplies both release time and
+  // a sufficiently large historical reference sample for each side.
   const baseCotMarket = baseCode === 'XAU' ? 'GOLD' : baseCode;
   const baseCot = snapshot.cot.find((position) => position.market === baseCotMarket);
   const quoteCot = snapshot.cot.find((position) => position.market === quoteCode);
+  const qualifiedCot = (position: typeof baseCot) => Boolean(
+    position
+    && Number.isSafeInteger(position.sampleSize)
+    && Number(position.sampleSize) >= 52
+    && typeof position.publishedAt === 'string'
+    && /(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(position.publishedAt)
+    && isObservationFresh(position.publishedAt, 14 * 24 * 60 * 60_000),
+  );
+  if (!qualifiedCot(baseCot) || !qualifiedCot(quoteCot)) return null;
+
+  const requiredRiskCurrencies = ['AUD', 'NZD', 'CAD', 'JPY', 'CHF'];
+  const riskCurrencies = requiredRiskCurrencies.map((code) =>
+    snapshot.currencies.find((currency) => currency.code === code));
+  if (riskCurrencies.some((currency) => !currency)) return null;
+
   const policyDiffBps = base
     ? Math.round((base.policyRate - quote.policyRate) * 100)
     : Math.round(-quote.policyRate * 100);
   const realYieldDiffBps = base
     ? Math.round(((base.policyRate - base.inflation) - (quote.policyRate - quote.inflation)) * 100)
     : Math.round(-(quote.policyRate - quote.inflation) * 100);
-  const cotPositionDiff = Math.round((baseCot?.percentile ?? 50) - (quoteCot?.percentile ?? 50));
+  const cotPositionDiff = Math.round(baseCot!.percentile - quoteCot!.percentile);
   const twoYearDiffBps = base?.twoYearYield !== undefined && quote.twoYearYield !== undefined
     ? Math.round((base.twoYearYield - quote.twoYearYield) * 100)
     : null;
-  const riskOn = ['AUD', 'NZD', 'CAD'].reduce((sum, code) => {
-    const currency = snapshot.currencies.find((item) => item.code === code);
-    return sum + (currency ? currency.policyRate - currency.inflation : 0);
-  }, 0) / 3;
-  const riskOff = ['JPY', 'CHF'].reduce((sum, code) => {
-    const currency = snapshot.currencies.find((item) => item.code === code);
-    return sum + (currency ? currency.policyRate - currency.inflation : 0);
-  }, 0) / 2;
+  const riskOn = riskCurrencies
+    .filter((currency) => ['AUD', 'NZD', 'CAD'].includes(currency!.code))
+    .reduce((sum, currency) => sum + (currency!.policyRate - currency!.inflation), 0) / 3;
+  const riskOff = riskCurrencies
+    .filter((currency) => ['JPY', 'CHF'].includes(currency!.code))
+    .reduce((sum, currency) => sum + (currency!.policyRate - currency!.inflation), 0) / 2;
   const roroScore = Math.max(-100, Math.min(100, Math.round((riskOn - riskOff) * 12)));
   const rawScore = base
     ? (base.policyRate - quote.policyRate) * 12
