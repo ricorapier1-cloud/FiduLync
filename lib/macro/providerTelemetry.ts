@@ -35,8 +35,9 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
   const finnhubKeyPresent = Boolean(process.env.FINNHUB_API_KEY?.trim());
   const finnhubPlanActive = process.env.FINNHUB_PERSONAL_PLAN_ACTIVE === 'true';
   const finnhubConfigured = finnhubPlanActive && finnhubKeyPresent;
-  const calendarConfigured = fairEconomyActive || finnhubConfigured
-    || (process.env.FMP_COMMERCIAL_USE_APPROVED === 'true' && Boolean(process.env.FMP_API_KEY?.trim()));
+  // The public FairEconomy adapter requires no API key; health depends on
+  // observed retrieval freshness and verified forward coverage below.
+  const calendarConfigured = true;
   const bls = feedStatus(usd?.unemploymentProvider === 'BLS' && usd.wageGrowthProvider === 'BLS',
     isFresh(usd?.unemploymentObservationDate, 120) && isFresh(usd?.wageGrowthObservationDate, 120), true);
   const bea = feedStatus(usd?.gdpProvider === 'BEA' && Boolean(usd.gdpObservationDate), isFresh(usd?.gdpObservationDate, 180), Boolean(process.env.BEA_API_KEY?.trim()));
@@ -67,11 +68,15 @@ export function getProviderTelemetry(snapshot: MacroSnapshot): ProviderStatus[] 
   const boc = feedStatus(cad?.policyRateProvider === 'Bank of Canada' && cad.inflationProvider === 'Bank of Canada',
     isFresh(cad?.policyRateObservationDate, 180) && isFresh(cad?.inflationObservationDate, 120), true);
   const cftc = feedStatus(snapshot.cotSource === 'provider' && snapshot.cot.length > 0,
-    snapshot.cot.some((item) => isFresh(item.reportDate, 14)), true);
-  const calendarActive = snapshot.calendarSource === 'provider' && Boolean(snapshot.calendarProvider);
-  const calendar = feedStatus(calendarActive,
-    calendarActive && (snapshot.calendarProvider === 'FAIRECONOMY_PUBLIC'
-      || snapshot.catalysts.some((item) => Date.parse(item.scheduledAt) >= Date.now() - 60 * 60 * 1000 && Date.parse(item.scheduledAt) <= Date.now() + 45 * 24 * 60 * 60 * 1000)), calendarConfigured);
+    snapshot.cot.some((item) => item.sampleSize !== undefined && item.sampleSize >= 52
+      && item.percentile !== null && isFresh(item.reportDate, 14)), true);
+  const calendarRetrievedAtMs = snapshot.calendarRetrievedAtUtc ? Date.parse(snapshot.calendarRetrievedAtUtc) : NaN;
+  const calendarCoverageEndMs = snapshot.calendarCoverageEndUtc ? Date.parse(snapshot.calendarCoverageEndUtc) : NaN;
+  const calendarActive = snapshot.calendarSource === 'provider' && Boolean(snapshot.calendarProvider)
+    && Number.isFinite(calendarRetrievedAtMs) && Date.now() - calendarRetrievedAtMs <= 60 * 60_000
+    && Date.now() - calendarRetrievedAtMs >= -30_000
+    && Number.isFinite(calendarCoverageEndMs) && calendarCoverageEndMs >= Date.now() + 24 * 60 * 60_000;
+  const calendar = feedStatus(calendarActive, calendarActive, calendarConfigured);
   const bisCoverage = snapshot.currencies.filter((item) => item.policyRateProvider === 'BIS' && item.inflationProvider === 'BIS').length;
   const bis = feedStatus(bisCoverage >= 4, bisCoverage >= 4, true);
   const riksbank = feedStatus(sek?.policyRateProvider === 'Sveriges Riksbank',
