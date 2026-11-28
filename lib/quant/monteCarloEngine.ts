@@ -196,8 +196,7 @@ export function runWalkForwardAnalysis(
     folds: [],
   });
 
-  if (!Number.isFinite(initialBalance) || initialBalance <= 0
-    || trades.length < minimumOutOfSampleTrades || !chronologicalDataVerified) return insufficient();
+  if (!Number.isFinite(initialBalance) || initialBalance <= 0 || !chronologicalDataVerified) return insufficient();
 
   const initialTrainingRatio = 0.55;
   const outOfSampleFoldRatio = 0.15;
