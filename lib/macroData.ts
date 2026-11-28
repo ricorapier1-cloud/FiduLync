@@ -162,11 +162,11 @@ function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies'
   const hasValidCalendarRetrieval = typeof calendarRetrievedAt === 'string'
     && /(?:Z|[+-]\d{2}:?\d{2})$/i.test(calendarRetrievedAt)
     && Number.isFinite(Date.parse(calendarRetrievedAt));
-  if (value.catalysts.length > 0 && !hasValidCalendarRetrieval) return null;
+  const catalysts = hasValidCalendarRetrieval ? value.catalysts : [];
   return {
     currencies: value.currencies,
     cot: value.cot,
-    catalysts: value.catalysts,
+    catalysts,
     ...(usIndicators === undefined ? {} : isUsIndicators(usIndicators) ? { usIndicators } : {}),
     ...(hasValidCalendarRetrieval ? { calendarRetrievedAt: calendarRetrievedAt as string } : {}),
   };
