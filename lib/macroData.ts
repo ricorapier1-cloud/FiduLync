@@ -114,7 +114,11 @@ function isCotPosition(value: unknown): value is CotPosition {
     && value.percentile >= 0
     && value.percentile <= 100
     && isFiniteNumber(value.weeklyChange)
-    && (value.asOf === undefined || (typeof value.asOf === 'string' && Number.isFinite(Date.parse(value.asOf))));
+    && (value.asOf === undefined || (typeof value.asOf === 'string' && Number.isFinite(Date.parse(value.asOf))))
+    && (value.sampleSize === undefined || (Number.isSafeInteger(value.sampleSize) && Number(value.sampleSize) >= 0))
+    && (value.publishedAt === undefined || (typeof value.publishedAt === 'string'
+      && /(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(value.publishedAt)
+      && Number.isFinite(Date.parse(value.publishedAt))));
 }
 
 function isCatalyst(value: unknown): value is EconomicCatalyst {
@@ -481,15 +485,24 @@ async function getCftcCot(): Promise<CotPosition[]> {
     if (!Number.isFinite(Date.parse(reportDate))) continue;
     const market = marketCodes.find(([name]) => marketName === name)?.[1];
     if (!market) continue;
-    const long = Number(row.noncomm_positions_long_all);
-    const short = Number(row.noncomm_positions_short_all);
-    if (!Number.isFinite(long) || !Number.isFinite(short)) continue;
-    const changeLong = Number(row.change_in_noncomm_long_all);
-    const changeShort = Number(row.change_in_noncomm_short_all);
+    const parseCftcNumber = (value: unknown): number | null => {
+      if (typeof value === 'number' && Number.isFinite(value)) return value;
+      if (typeof value === 'string' && value.trim() !== '') {
+        const parsed = Number(value.replace(/,/g, '').trim());
+        return Number.isFinite(parsed) ? parsed : null;
+      }
+      return null;
+    };
+    const long = parseCftcNumber(row.noncomm_positions_long_all);
+    const short = parseCftcNumber(row.noncomm_positions_short_all);
+    const changeLong = parseCftcNumber(row.change_in_noncomm_long_all);
+    const changeShort = parseCftcNumber(row.change_in_noncomm_short_all);
+    // Missing weekly changes are missing data, not zero positioning change.
+    if (long === null || short === null || changeLong === null || changeShort === null) continue;
     const position = {
       date: reportDate,
       netContracts: long - short,
-      weeklyChange: (Number.isFinite(changeLong) ? changeLong : 0) - (Number.isFinite(changeShort) ? changeShort : 0),
+      weeklyChange: changeLong - changeShort,
     };
     const history = byMarket.get(market) ?? [];
     history.push(position);
@@ -499,13 +512,19 @@ async function getCftcCot(): Promise<CotPosition[]> {
   const positions = [...byMarket.entries()].flatMap(([market, history]): CotPosition[] => {
     history.sort((left, right) => Date.parse(right.date) - Date.parse(left.date));
     const latest = history[0];
-    if (!latest) return [];
+    // A percentile from fewer than 52 weekly observations is not a defensible positioning rank.
+    if (!latest || history.length < 52) return [];
     const below = history.filter((item) => item.netContracts < latest.netContracts).length;
     const equal = history.filter((item) => item.netContracts === latest.netContracts).length;
-    const percentile = history.length
-      ? Math.round(((below + equal / 2) / history.length) * 100)
-      : 50;
-    return [{ market, netContracts: latest.netContracts, percentile, weeklyChange: latest.weeklyChange, asOf: latest.date }];
+    const percentile = Math.round(((below + equal / 2) / history.length) * 100);
+    return [{
+      market,
+      netContracts: latest.netContracts,
+      percentile,
+      weeklyChange: latest.weeklyChange,
+      asOf: latest.date,
+      sampleSize: history.length,
+    }];
   });
   if (!positions.length) throw new Error('CFTC returned no supported currency or gold positions.');
   return positions;
@@ -614,8 +633,9 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
     console.warn('Finnhub economic calendar unavailable; checking configured calendar adapters:', finnhubResult.reason);
   }
   if (frankfurterResult.status === 'fulfilled' && isNumericRecord(frankfurterResult.value)) {
+    // Frankfurter is a daily reference-rate source, not live macro evidence.
+    // Keep it separately labelled; it must not make an otherwise empty snapshot look live.
     snapshot.ecbRates = frankfurterResult.value;
-    hasLiveData = true;
   } else if (frankfurterResult.status === 'rejected') {
     console.warn('ECB benchmark exchange rates are unavailable:', frankfurterResult.reason);
   }
