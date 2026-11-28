@@ -124,7 +124,9 @@ export async function GET(request: Request) {
   }
 
   try {
-    const [snapshot, quotes] = await Promise.all([getMacroSnapshot(), getMarketQuotes()]);
+    const [snapshot, quotes, latestHeartbeat] = await Promise.all([
+      getMacroSnapshot(), getMarketQuotes(), getLatestMT5Heartbeat(),
+    ]);
     const goldContext = await buildGoldMacroContext(snapshot);
     const dossier = generatePairDossier(snapshot, symbol);
     const goldAvailable = goldContext.overallState === 'AVAILABLE' && goldContext.goldBiasScore !== null;
@@ -146,15 +148,12 @@ export async function GET(request: Request) {
     const crowdedPositions = snapshot.cot
       .filter((position) => isFreshCotReport(position.reportDate) && Number.isFinite(position.percentile))
       .map((position) => ({ symbol: position.market, percentile: position.percentile }));
-    const latestHeartbeat = getLatestMT5Heartbeat();
     const hasFreshBrokerHeartbeat = Boolean(latestHeartbeat && latestHeartbeat.fresh);
-    const governance = hasFreshBrokerHeartbeat ? {
+    const governance = hasFreshBrokerHeartbeat && latestHeartbeat ? {
       tradesToday: latestHeartbeat.dailyClosedTrades,
       lossesToday: latestHeartbeat.dailyLosses,
-      rollingSevenDayDrawdownPct: latestHeartbeat.accountBalance > 0
-        ? Math.min(0, ((latestHeartbeat.accountEquity - latestHeartbeat.accountBalance) / latestHeartbeat.accountBalance) * 100)
-        : 0,
-      ledgerVerified: true,
+      rollingSevenDayDrawdownPct: latestHeartbeat.rollingSevenDayDrawdownPct,
+      ledgerVerified: latestHeartbeat.governanceVerified,
     } : {
       tradesToday: null,
       lossesToday: null,
@@ -280,10 +279,8 @@ export async function GET(request: Request) {
         const rawAgeMs = Date.now() - timestampMs;
         const timestampValid = Number.isFinite(timestampMs) && rawAgeMs >= -5 * 60_000;
         const ageMs = timestampValid ? Math.max(0, rawAgeMs) : null;
-        const providerQuote = quote.source === 'finnhub' || quote.source === 'mt5';
-        const freshness = !timestampValid ? 'STALE' as const : providerQuote
-          ? ageMs !== null && ageMs <= 120_000 ? 'FRESH' as const : 'STALE' as const
-          : 'REFERENCE' as const;
+        const freshness = !timestampValid || ageMs === null || ageMs > 120_000
+          ? 'STALE' as const : 'FRESH' as const;
         return {
           symbol: quote.symbol,
           mid: freshness === 'STALE' ? null : quote.price,
@@ -291,14 +288,22 @@ export async function GET(request: Request) {
           age_ms: ageMs,
           freshness,
           source: quote.source,
-          quote_type: providerQuote ? 'PROVIDER_QUOTE' as const : 'REFERENCE_RATE' as const,
+          quote_type: 'PROVIDER_QUOTE' as const,
         };
       }),
       daily_governance: {
-        state: 'NOT_CONNECTED_TO_SERVER',
-        trades_taken: null,
-        losses: null,
-        locked: null,
+        state: !hasFreshBrokerHeartbeat ? 'NOT_CONNECTED_TO_SERVER'
+          : latestHeartbeat?.governanceVerified ? 'VERIFIED_FROM_MT5_HEARTBEAT'
+            : 'CONNECTED_GOVERNANCE_UNVERIFIED',
+        trades_taken: hasFreshBrokerHeartbeat ? latestHeartbeat!.dailyClosedTrades : null,
+        losses: hasFreshBrokerHeartbeat ? latestHeartbeat!.dailyLosses : null,
+        rolling_7d_drawdown_pct: hasFreshBrokerHeartbeat ? latestHeartbeat!.rollingSevenDayDrawdownPct : null,
+        drawdown_sample_count: hasFreshBrokerHeartbeat ? latestHeartbeat!.drawdownSampleCount : 0,
+        daily_stats_time_basis: hasFreshBrokerHeartbeat ? latestHeartbeat!.dailyStatsTimeBasis : null,
+        heartbeat_received_at_utc: hasFreshBrokerHeartbeat ? latestHeartbeat!.receivedAtUtc : null,
+        governance_verified: Boolean(hasFreshBrokerHeartbeat && latestHeartbeat?.governanceVerified),
+        locked: !hasFreshBrokerHeartbeat || !latestHeartbeat?.governanceVerified
+          || (latestHeartbeat?.dailyClosedTrades ?? 0) >= 2 || (latestHeartbeat?.dailyLosses ?? 0) >= 2,
         authority: 'MT5_ACCOUNT_SIDE_ENFORCEMENT_REQUIRED',
       },
       calendar_verified: snapshot.calendarSource === 'provider' && Boolean(snapshot.calendarProvider),
