@@ -5,6 +5,7 @@ import { RESEARCH_OBJECTIVES } from '@/lib/quant/researchObjectives';
 
 type ValidationReport = {
   id: string;
+  research_run_id: string;
   report_type: string;
   evidence: Record<string, unknown>;
   metrics: Record<string, unknown>;
@@ -12,6 +13,18 @@ type ValidationReport = {
   eligible_for_review: boolean;
   reviewed_at: string | null;
   reviewer_note: string | null;
+};
+
+type ResearchRun = {
+  id: string;
+  status: string;
+  code_fingerprint: string;
+  dataset_fingerprint: string;
+  validation_start: string | null;
+  validation_end: string | null;
+  out_of_sample_start: string | null;
+  out_of_sample_end: string | null;
+  completed_at: string | null;
 };
 
 export type StrategyValidationGate = {
@@ -44,7 +57,7 @@ export async function getStrategyValidationGate(): Promise<StrategyValidationGat
 
   try {
     const query = new URLSearchParams({
-      select: 'id,report_type,evidence,metrics,blockers,eligible_for_review,reviewed_at,reviewer_note',
+      select: 'id,research_run_id,report_type,evidence,metrics,blockers,eligible_for_review,reviewed_at,reviewer_note',
       id: `eq.${reportId}`,
       report_type: 'eq.DEPLOYMENT_APPROVAL',
       eligible_for_review: 'eq.true',
@@ -57,12 +70,30 @@ export async function getStrategyValidationGate(): Promise<StrategyValidationGat
 
     const blockers: string[] = [];
     if (report.reviewer_note !== 'APPROVED_FOR_LIVE_USE') blockers.push('OWNER_REVIEW_APPROVAL_MISSING');
+    const runRows = await supabaseRead<ResearchRun[]>('research_runs', new URLSearchParams({
+      select: 'id,status,code_fingerprint,dataset_fingerprint,validation_start,validation_end,out_of_sample_start,out_of_sample_end,completed_at',
+      id: `eq.${report.research_run_id}`,
+      limit: '1',
+    }).toString());
+    const run = runRows?.[0];
+    const configuredCodeFingerprint = process.env.STRATEGY_VALIDATION_CODE_FINGERPRINT?.trim() ?? '';
+    if (!run || run.status !== 'COMPLETED' || !run.completed_at
+      || !run.validation_start || !run.validation_end
+      || !run.out_of_sample_start || !run.out_of_sample_end) {
+      blockers.push('RESEARCH_RUN_OR_UNTOUCHED_OOS_WINDOW_INCOMPLETE');
+    }
+    if (!configuredCodeFingerprint || !run || run.code_fingerprint !== configuredCodeFingerprint) {
+      blockers.push('VALIDATED_STRATEGY_CODE_FINGERPRINT_MISMATCH');
+    }
     if (!Array.isArray(report.blockers) || report.blockers.length > 0) blockers.push('VALIDATION_REPORT_HAS_BLOCKERS');
 
     const evidence = report.evidence ?? {};
     const metrics = report.metrics ?? {};
     const requiredEvidence: Array<[string, unknown]> = [
       ['POINT_IN_TIME_VINTAGES_NOT_VERIFIED', evidence.pointInTimeVintagesVerified],
+      ['SOURCE_MANIFEST_NOT_VERIFIED', evidence.sourceManifestVerified],
+      ['STRATEGY_PARAMETERS_NOT_FROZEN', evidence.strategyParametersFrozen],
+      ['INDEPENDENT_REVIEW_NOT_COMPLETED', evidence.independentReviewCompleted],
       ['UNTOUCHED_OUT_OF_SAMPLE_NOT_VERIFIED', evidence.untouchedOutOfSample],
       ['WALK_FORWARD_NOT_COMPLETED', Number(evidence.walkForwardFolds) >= RESEARCH_OBJECTIVES.minimumWalkForwardFolds],
       ['QUALITY_FILTER_NOT_ENFORCED', evidence.allTradesPassedQualityFilter],
@@ -88,8 +119,8 @@ export async function getStrategyValidationGate(): Promise<StrategyValidationGat
     const approvedDrawdown = finiteNumber(evidence.approvedMaxDrawdownPct);
 
     if (oosTrades === null || oosTrades < RESEARCH_OBJECTIVES.minimumOutOfSampleTrades) blockers.push('INSUFFICIENT_OUT_OF_SAMPLE_TRADES');
-    if (winRate === null || winRate < RESEARCH_OBJECTIVES.targetWinRateMin) blockers.push('OBSERVED_WIN_RATE_BELOW_60_PERCENT');
-    if (winRateLower === null || winRateLower < RESEARCH_OBJECTIVES.targetWinRateMin) blockers.push('WIN_RATE_95_PERCENT_LOWER_BOUND_BELOW_60_PERCENT');
+    if (winRate === null || winRate < RESEARCH_OBJECTIVES.targetWinRateMin || winRate > 1) blockers.push('OBSERVED_WIN_RATE_BELOW_60_PERCENT_OR_INVALID');
+    if (winRateLower === null || winRateLower < RESEARCH_OBJECTIVES.targetWinRateMin || winRateLower > 1) blockers.push('WIN_RATE_95_PERCENT_LOWER_BOUND_BELOW_60_PERCENT_OR_INVALID');
     if (realisedRewardRisk === null || realisedRewardRisk < RESEARCH_OBJECTIVES.plannedRewardRisk) blockers.push('NET_REALISED_REWARD_RISK_BELOW_1_TO_2');
     if (stressedExpectancy === null || stressedExpectancy <= 0) blockers.push('STRESSED_NET_EXPECTANCY_NOT_POSITIVE');
     if (approvedDrawdown === null || approvedDrawdown <= 0) blockers.push('APPROVED_DRAWDOWN_LIMIT_MISSING');
