@@ -81,7 +81,8 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
     const cotAllowed = snapshot.cotSource === 'provider'
       && (snapshot.cotProvider === 'cftc'
         || (snapshot.cotProvider === 'custom' && process.env.COT_DATA_PROVIDER_PERSONAL_USE_ENABLED === 'true'));
-    const calendarAllowed = snapshot.calendarSource === 'provider' && (
+    const calendarAllowed = snapshot.calendarSource === 'provider'
+      && isObservationFresh(snapshot.calendarRetrievedAt, 60 * 60_000) && (
       (snapshot.calendarProvider === 'fair-economy' && process.env.FAIRECONOMY_PERSONAL_PLAN_ACTIVE === 'true')
       || (snapshot.calendarProvider === 'finnhub' && process.env.FINNHUB_PERSONAL_PLAN_ACTIVE === 'true')
       || (snapshot.calendarProvider === 'fmp' && process.env.FMP_PERSONAL_PLAN_ACTIVE === 'true')
