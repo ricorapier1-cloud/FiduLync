@@ -69,6 +69,9 @@ type MarketDataStatus = {
   quoteExecutionGrade: boolean;
   quoteUpdatedAtUtc: string | null;
   candleStatus: string;
+  timestampBasis: string | null;
+  serverUtcOffsetMinutes: number | null;
+  timestampCaveat: string | null;
   candleExecutionGrade: boolean;
   latestCandleUtc: string | null;
   executionGrade: boolean;
@@ -121,10 +124,11 @@ export default function AccountsPage() {
   const [selectedAccountKey, setSelectedAccountKey] = useState('');
   const [marketData, setMarketData] = useState<MarketDataStatus | null>(null);
   const [marketDataError, setMarketDataError] = useState<string | null>(null);
+  const [now, setNow] = useState(0);
 
   const refresh = useCallback(async (credential: string, preferredAccountKey = '') => {
     if (!credential.trim()) return;
-    setStatus('CONNECTING');
+    setStatus((current) => current === 'CONNECTED' ? current : 'CONNECTING');
     try {
       const response = await fetch('/api/v1/accounts', {
         cache: 'no-store',
@@ -163,10 +167,11 @@ export default function AccountsPage() {
       ]);
       const [quotes, candles] = await Promise.all([
         quoteResponse.json() as Promise<{
-          status?: string; executionGrade?: boolean; generatedAtUtc?: string; executionGradeReason?: string;
+          status?: string; executionGrade?: boolean; latestQuoteUtc?: string; executionGradeReason?: string;
         }>,
         candleResponse.json() as Promise<{
           status?: string; executionGrade?: boolean; latestBarUtc?: string; executionGradeReason?: string;
+          timestampProvenance?: { timeBasis?: string | null; serverUtcOffsetMinutes?: number | null; historicalOffsetCaveat?: string };
         }>,
       ]);
       const quoteExecutionGrade = quoteResponse.ok && quotes.executionGrade === true;
@@ -174,10 +179,13 @@ export default function AccountsPage() {
       setMarketData({
         quoteStatus: quotes.status ?? (quoteResponse.ok ? 'UNKNOWN' : 'UNAVAILABLE'),
         quoteExecutionGrade,
-        quoteUpdatedAtUtc: quotes.generatedAtUtc ?? null,
+        quoteUpdatedAtUtc: quotes.latestQuoteUtc ?? null,
         candleStatus: candles.status ?? (candleResponse.ok ? 'UNKNOWN' : 'UNAVAILABLE'),
         candleExecutionGrade,
         latestCandleUtc: candles.latestBarUtc ?? null,
+        timestampBasis: candles.timestampProvenance?.timeBasis ?? null,
+        serverUtcOffsetMinutes: candles.timestampProvenance?.serverUtcOffsetMinutes ?? null,
+        timestampCaveat: candles.timestampProvenance?.historicalOffsetCaveat ?? null,
         executionGrade: quoteExecutionGrade && candleExecutionGrade,
         reason: quotes.executionGradeReason ?? candles.executionGradeReason ?? null,
       });
@@ -187,9 +195,17 @@ export default function AccountsPage() {
       setMarketData({
         quoteStatus: 'UNAVAILABLE', quoteExecutionGrade: false, quoteUpdatedAtUtc: null,
         candleStatus: 'UNAVAILABLE', candleExecutionGrade: false, latestCandleUtc: null,
+        timestampBasis: null, serverUtcOffsetMinutes: null, timestampCaveat: null,
         executionGrade: false, reason: 'Publisher or private market-data service is unavailable.',
       });
     }
+  }, []);
+
+  useEffect(() => {
+    const update = () => setNow(Date.now());
+    update();
+    const timer = window.setInterval(update, 15_000);
+    return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -272,8 +288,9 @@ export default function AccountsPage() {
     };
   }, [closedTrades]);
 
-  const accountAgeMs = selected ? Date.now() - Date.parse(selected.received_at) : null;
-  const accountFresh = accountAgeMs !== null && accountAgeMs >= -30_000 && accountAgeMs <= 60_000;
+  const accountAgeMs = selected && now > 0 ? now - Date.parse(selected.received_at) : null;
+  const accountFresh = accountAgeMs !== null && Number.isFinite(accountAgeMs)
+    && accountAgeMs >= -30_000 && accountAgeMs <= 60_000;
 
   const saveToken = () => {
     const value = token.trim();
@@ -432,9 +449,11 @@ export default function AccountsPage() {
                   <p className="text-[11px] font-mono tracking-widest text-slate-500">CLOSED M5 / D1 CANDLES</p>
                   <p className="mt-2 text-sm font-semibold">{marketData?.candleExecutionGrade ? 'FRESH · REAL MT5 ACCOUNT' : marketData?.candleStatus ?? 'WAITING'}</p>
                   <p className="mt-1 text-xs text-slate-500">Latest M5 bar: {utcToWat(marketData?.latestCandleUtc)} WAT</p>
+                  {marketData?.timestampBasis && <p className="mt-1 text-[10px] text-slate-600">Timestamp basis: {marketData.timestampBasis}; broker UTC offset {marketData.serverUtcOffsetMinutes ?? '—'} min.</p>}
                 </div>
               </div>
               {(marketData?.reason || marketDataError) && <p className="mt-3 text-xs text-amber-200">{marketDataError ?? marketData?.reason}</p>}
+              {marketData?.timestampCaveat && <p className="mt-3 text-[11px] leading-5 text-slate-500">{marketData.timestampCaveat}</p>}
               {selected.account_mode !== 'REAL' && <p className="mt-3 text-xs text-amber-200">Demo/contest accounts may be inspected, but they cannot produce execution-grade market data or clear the EA governance gate.</p>}
             </section>
 
