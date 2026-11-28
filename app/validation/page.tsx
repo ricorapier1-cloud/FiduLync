@@ -134,7 +134,7 @@ export default function StrategyValidationPage() {
       setCurrency(account.currency);
       setSourceType('MT5_LINKED_HISTORY');
       setDataSourceName(`MT5 linked account · ${account.broker ?? 'Broker'} · ${account.account_login} · ${loaded.length} reconciled closed positions`);
-      setStatusMessage('Loaded a recent broker-sourced deal sample. The API retains up to 500 recent deal records; this is descriptive account history, not a full historical backtest. Initial stop-loss risk is not included in deal history, so realised R-multiple and 1:2 risk/reward validation remain unavailable until a tester report supplies initial risk data.');
+      setStatusMessage('Loaded a recent broker-sourced deal sample. The API retains up to 500 recent deal records; this is descriptive account history, not a full historical backtest. Entry cash-risk amount is not included in deal history, so net R-multiple and 1:2 risk/reward validation remain unavailable until a tester report supplies an explicit R-multiple or initial cash-risk amount.');
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Could not load linked MT5 account history.');
     } finally {
@@ -151,13 +151,13 @@ export default function StrategyValidationPage() {
       const text = await file.text();
       const parsed = parseMt5ReportCsv(text);
       if (!parsed.length) {
-        throw new Error('No valid MT5 closed-trade rows found. Required columns: ticket/position, symbol, type, volume, profit. Include close time for walk-forward analysis and R-multiple or initial stop-loss for 1:2 risk validation.');
+        throw new Error('No valid MT5 closed-trade rows found. Required columns: ticket/position, symbol, type, volume, profit. Include close time for walk-forward analysis and explicit R-multiple or initial cash-risk amount for 1:2 risk validation.');
       }
       setTrades(parsed);
       setDataSourceName(file.name);
       setSourceType('MT5_BACKTEST_CSV');
       setCurrency(null);
-      setStatusMessage(`Imported ${parsed.length} rows from the supplied MT5 report. Verify that the file contains closed trades only, complete timestamps and initial stop-loss/R-multiple data before interpreting the validation output.`);
+      setStatusMessage(`Imported ${parsed.length} rows from the supplied MT5 report. Verify that the file contains closed trades only, complete timestamps and explicit R-multiple/initial cash-risk data before interpreting the validation output.`);
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : 'Could not parse the MT5 report.');
     }
@@ -348,7 +348,7 @@ export default function StrategyValidationPage() {
           <p className="font-mono text-[10px] tracking-widest text-amber-200">GOVERNANCE / LIVE APPROVAL</p>
           <h2 className="mt-1 text-lg font-semibold">This lab does not approve a strategy for live execution</h2>
           <p className="mt-2 text-sm leading-6 text-slate-300">
-            A candidate result is only a research screen. MacroLync remains fail-closed until the server-side validation gate receives a version-bound, independently reviewed report; at least {RESEARCH_OBJECTIVES.minimumOutOfSampleTrades} OOS trades across {RESEARCH_OBJECTIVES.minimumWalkForwardFolds} folds; a 95% Wilson win-rate lower bound meeting the target; genuine per-trade R multiples confirming the 1:2 objective; point-in-time release/vintage integrity; verified real-broker market data; realistic spread, commission, swap and slippage stress; and drawdown approval. No performance target is assumed achievable.
+            A candidate result is only a research screen. MacroLync remains fail-closed until the server-side validation gate receives a version-bound, independently reviewed report; at least {RESEARCH_OBJECTIVES.minimumOutOfSampleTrades} OOS trades across {RESEARCH_OBJECTIVES.minimumWalkForwardFolds} folds; a 95% Wilson win-rate lower bound meeting the target; genuine per-trade net R multiples (explicit R or net P/L divided by initial cash risk) confirming the 1:2 objective; point-in-time release/vintage integrity; verified real-broker market data; realistic spread, commission, swap and slippage stress; and drawdown approval. No performance target is assumed achievable.
           </p>
           <p className="mt-3 text-xs text-slate-400">
             Linked account deal history is limited to a recent sample and lacks initial stop-loss risk. Use a complete MT5 Strategy Tester report with chronological timestamps and initial SL or explicit R-multiples for formal testing.
