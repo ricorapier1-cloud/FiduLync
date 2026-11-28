@@ -53,7 +53,8 @@ test('architecture: quote display and polling are consolidated into the Swissquo
   const desk = read('../app/components/DeskTerminal.tsx');
   assert.doesNotMatch(dashboard, /api\/macro\/quotes|macro-quote-strip|MarketQuote|initialQuotes/);
   assert.match(desk, /api\/v1\/live-quotes/);
-  assert.match(desk, /FRESH BBO/);
+  assert.match(desk, /PUBLIC REFERENCE BBO/);
+  assert.match(desk, /BROKER-VERIFIED MT5 QUOTES/);
 });
 
 test('architecture: /analytics redirects to /workbench', () => {
