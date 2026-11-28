@@ -163,15 +163,17 @@ export function getFundamentalSignal(snapshot: MacroSnapshot, pair: string): Fun
 
   const baseCode = normalizedPair.slice(0, 3);
   const quoteCode = normalizedPair.slice(3);
+  // Gold needs its own verified real-yield, central-bank demand and positioning model.
+  // Do not treat XAU as a currency or reverse the USD rate proxy into a gold signal.
+  if (baseCode === 'XAU') return null;
   const quote = snapshot.currencies.find((currency) => currency.code === quoteCode);
-  const base = baseCode === 'XAU' ? null : snapshot.currencies.find((currency) => currency.code === baseCode);
-  if (!quote || (baseCode !== 'XAU' && !base)) return null;
+  const base = snapshot.currencies.find((currency) => currency.code === baseCode);
+  if (!quote || !base) return null;
 
   // COT position date is not its publication timestamp. Do not use a positioning
   // percentile in a current bias until the provider supplies both release time and
   // a sufficiently large historical reference sample for each side.
-  const baseCotMarket = baseCode === 'XAU' ? 'GOLD' : baseCode;
-  const baseCot = snapshot.cot.find((position) => position.market === baseCotMarket);
+  const baseCot = snapshot.cot.find((position) => position.market === baseCode);
   const quoteCot = snapshot.cot.find((position) => position.market === quoteCode);
   const qualifiedCot = (position: typeof baseCot) => Boolean(
     position
@@ -205,12 +207,10 @@ export function getFundamentalSignal(snapshot: MacroSnapshot, pair: string): Fun
     .filter((currency) => ['JPY', 'CHF'].includes(currency!.code))
     .reduce((sum, currency) => sum + (currency!.policyRate - currency!.inflation), 0) / 2;
   const roroScore = Math.max(-100, Math.min(100, Math.round((riskOn - riskOff) * 12)));
-  const rawScore = base
-    ? (base.policyRate - quote.policyRate) * 12
-      + ((base.policyRate - base.inflation) - (quote.policyRate - quote.inflation)) * 9
-      + (twoYearDiffBps ?? 0) * 0.05
-      + cotPositionDiff * 0.18
-    : (quote.policyRate - quote.inflation) * -18 + cotPositionDiff * 0.18;
+  const rawScore = (base.policyRate - quote.policyRate) * 12
+    + ((base.policyRate - base.inflation) - (quote.policyRate - quote.inflation)) * 9
+    + (twoYearDiffBps ?? 0) * 0.05
+    + cotPositionDiff * 0.18;
 
   return {
     score: Math.max(-100, Math.min(100, Math.round(rawScore + roroScore * 0.1))),
