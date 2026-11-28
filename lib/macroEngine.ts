@@ -89,7 +89,8 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
     );
 
     const cot = cotAllowed
-      ? snapshot.cot.filter((position) => observationFresh(position.asOf, 21))
+      ? snapshot.cot.filter((position) => observationFresh(position.asOf, 21)
+        && typeof position.sampleSize === 'number' && Number.isSafeInteger(position.sampleSize) && position.sampleSize >= 52)
       : [];
     const catalysts = calendarAllowed ? snapshot.catalysts : [];
     const ecbRates = snapshot.ecbRates;
@@ -142,8 +143,8 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
         : 'fallback',
       currencies,
       cot,
-      cotSource: cotAllowed ? 'provider' : 'unavailable',
-      cotProvider: cotAllowed ? snapshot.cotProvider : undefined,
+      cotSource: cot.length > 0 ? 'provider' : 'unavailable',
+      cotProvider: cot.length > 0 ? snapshot.cotProvider : undefined,
       catalysts,
       usIndicators,
       calendarSource: calendarAllowed ? 'provider' : 'reference',
