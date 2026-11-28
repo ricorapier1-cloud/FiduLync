@@ -68,17 +68,29 @@ test('account governance remains fail-closed while market-only ceiling remains s
   assert.ok(result.blockReasons.includes('TRADE_GOVERNANCE_LEDGER_UNVERIFIED'));
 });
 
-test('verified account governance permits only within market ceiling and daily limits', () => {
+test('verified account governance has no trade-count quota but enforces loss and drawdown limits', () => {
   const allowed = evaluateSovereignShield({
     vix: 28.29,
     governance: { tradesToday: 0, lossesToday: 0, rollingSevenDayDrawdownPct: 0, ledgerVerified: true },
   });
-  const dailyLimit = evaluateSovereignShield({
+  const noTradeQuota = evaluateSovereignShield({
     vix: 20,
-    governance: { tradesToday: 2, lossesToday: 0, rollingSevenDayDrawdownPct: 0, ledgerVerified: true },
+    governance: { tradesToday: 25, lossesToday: 0, rollingSevenDayDrawdownPct: 0, ledgerVerified: true },
+  });
+  const dailyLossLimit = evaluateSovereignShield({
+    vix: 20,
+    governance: { tradesToday: 25, lossesToday: 2, rollingSevenDayDrawdownPct: 0, ledgerVerified: true },
+  });
+  const drawdownLimit = evaluateSovereignShield({
+    vix: 20,
+    governance: { tradesToday: 25, lossesToday: 0, rollingSevenDayDrawdownPct: -4, ledgerVerified: true },
   });
   assert.equal(allowed.allowedToTrade, true);
   assert.equal(allowed.maxAllowedRiskPct, 0.5);
-  assert.equal(dailyLimit.allowedToTrade, false);
-  assert.equal(dailyLimit.maxAllowedRiskPct, 0);
+  assert.equal(noTradeQuota.allowedToTrade, true);
+  assert.equal(noTradeQuota.maxAllowedRiskPct, 1);
+  assert.equal(dailyLossLimit.allowedToTrade, false);
+  assert.equal(dailyLossLimit.maxAllowedRiskPct, 0);
+  assert.equal(drawdownLimit.allowedToTrade, false);
+  assert.equal(drawdownLimit.maxAllowedRiskPct, 0);
 });
