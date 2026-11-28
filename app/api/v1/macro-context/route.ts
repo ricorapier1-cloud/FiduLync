@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { getMacroSnapshot, getFundamentalSignal } from '@/lib/macroEngine';
+import { isObservationFresh } from '@/lib/dataFreshness';
 import { enforceDistributedRateLimit } from '@/lib/rateLimit';
 import { isSupabaseConfigured, supabaseRead } from '@/lib/supabaseAdmin';
 
@@ -9,6 +10,7 @@ export const runtime = 'nodejs';
 
 type Installation = { id: string; status: string };
 const CURRENCIES = new Set(['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD']);
+const SUPPORTED_NON_FX_SYMBOLS = new Set(['XAUUSD']);
 const NO_STORE = { 'Cache-Control': 'no-store, max-age=0', Pragma: 'no-cache' };
 const REGION_ALIASES: Record<string, string[]> = {
   USD: ['USD', 'US', 'USA', 'UNITED STATES', 'FEDERAL RESERVE'],
@@ -36,10 +38,7 @@ function validTimestamp(value: string | null): boolean {
 }
 
 function isFresh(value: string | undefined, maxAgeDays: number): boolean {
-  if (!value || !hasTimezone(value)) return false;
-  const time = Date.parse(value);
-  const age = Date.now() - time;
-  return Number.isFinite(time) && age >= -5 * 60_000 && age <= maxAgeDays * 86_400_000;
+  return isObservationFresh(value, maxAgeDays * 86_400_000);
 }
 
 export async function GET(request: Request) {
@@ -53,8 +52,10 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const symbol = (searchParams.get('symbol') ?? '').trim().toUpperCase();
-  if (!/^[A-Z]{6}$/.test(symbol) || !CURRENCIES.has(symbol.slice(0, 3)) || !CURRENCIES.has(symbol.slice(3))) {
-    return response({ error: 'A supported G8 currency pair is required.' }, 400);
+  const isG8Pair = /^[A-Z]{6}$/.test(symbol)
+    && CURRENCIES.has(symbol.slice(0, 3)) && CURRENCIES.has(symbol.slice(3));
+  if (!isG8Pair && !SUPPORTED_NON_FX_SYMBOLS.has(symbol)) {
+    return response({ error: 'A supported G8 currency pair or XAUUSD is required.' }, 400);
   }
 
   try {
@@ -77,24 +78,32 @@ export async function GET(request: Request) {
     const base = snapshot.currencies.find((item) => item.code === baseCode);
     const quote = snapshot.currencies.find((item) => item.code === quoteCode);
     const baseVerified = Boolean(base && base.policyRateSource === 'provider'
-      && base.inflationSource === 'provider' && isFresh(base.policyRateAsOf, 10)
-      && isFresh(base.inflationAsOf, 60));
+      && base.inflationSource === 'provider' && isFresh(base.policyRateAsOf, 180)
+      && isFresh(base.inflationAsOf, 75));
     const quoteVerified = Boolean(quote && quote.policyRateSource === 'provider'
-      && quote.inflationSource === 'provider' && isFresh(quote.policyRateAsOf, 10)
-      && isFresh(quote.inflationAsOf, 60));
+      && quote.inflationSource === 'provider' && isFresh(quote.policyRateAsOf, 180)
+      && isFresh(quote.inflationAsOf, 75));
     const pairRatesVerified = snapshot.source !== 'fallback' && baseVerified && quoteVerified;
     const requiredRiskCurrencies = ['AUD', 'NZD', 'CAD', 'JPY', 'CHF'];
     const riskCurrencyCoverage = requiredRiskCurrencies.every((code) => {
       const item = snapshot.currencies.find((currency) => currency.code === code);
       return Boolean(item && item.policyRateSource === 'provider' && item.inflationSource === 'provider'
-        && isFresh(item.policyRateAsOf, 10) && isFresh(item.inflationAsOf, 60));
+        && isFresh(item.policyRateAsOf, 180) && isFresh(item.inflationAsOf, 75));
     });
     const twoYearYieldCoverage = Boolean(base && quote
       && base.twoYearYieldSource === 'provider' && quote.twoYearYieldSource === 'provider'
       && isFresh(base.twoYearYieldAsOf, 10) && isFresh(quote.twoYearYieldAsOf, 10));
+    const hasReleasedCot = (market: string) => snapshot.cot.some((item) =>
+      item.market === market
+      && Number.isSafeInteger(item.sampleSize)
+      && Number(item.sampleSize) >= 52
+      && typeof item.publishedAt === 'string'
+      && hasTimezone(item.publishedAt)
+      && isFresh(item.publishedAt, 14));
+    const baseCotReleaseVerified = hasReleasedCot(baseCode === 'XAU' ? 'GOLD' : baseCode);
+    const quoteCotReleaseVerified = hasReleasedCot(quoteCode);
     const cotCoverage = snapshot.cotSource === 'provider'
-      && snapshot.cot.some((item) => item.market === baseCode)
-      && snapshot.cot.some((item) => item.market === quoteCode);
+      && baseCotReleaseVerified && quoteCotReleaseVerified;
     const compositeEvidenceVerified = pairRatesVerified && riskCurrencyCoverage
       && twoYearYieldCoverage && cotCoverage;
     const assessment = compositeEvidenceVerified ? getFundamentalSignal(snapshot, symbol) : null;
@@ -153,6 +162,8 @@ export async function GET(request: Request) {
         pair_policy_and_inflation: pairRatesVerified,
         matched_currency_two_year_yields: twoYearYieldCoverage,
         base_and_quote_cot: cotCoverage,
+        base_cot_release_verified: baseCotReleaseVerified,
+        quote_cot_release_verified: quoteCotReleaseVerified,
         risk_on_and_risk_off_currency_profiles: riskCurrencyCoverage,
         composite_bias_available: evidenceVerified,
       },
