@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateTradeMetrics, applyExecutionCostStress, evaluateWalkForward, monteCarloBootstrap } from '../.quant-test/validationEngine.js';
+import { QUANT_CORE_RESEARCH_OBJECTIVES, wilsonScoreInterval, calculateTradeMetrics, applyExecutionCostStress, evaluateWalkForward, monteCarloBootstrap, evaluateResearchObjectives } from '../.quant-test/validationEngine.js';
+import { assessMacroResearchEvidence } from '../.quant-test/quantPipeline.js';
 
 const trades = Array.from({ length: 40 }, (_, i) => ({ netR: i % 4 === 0 ? -0.5 : 0.4 }));
 const tradesBetween = (start, end) => {
@@ -47,15 +48,6 @@ test('Monte Carlo bootstrap is reproducible and uses actual trade R outcomes', (
 });
 
 
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import {
-  QUANT_CORE_RESEARCH_OBJECTIVES,
-  wilsonScoreInterval,
-  calculateTradeMetrics,
-  evaluateResearchObjectives,
-} from '../.quant-test/validationEngine.js';
-import { assessMacroResearchEvidence } from '../.quant-test/quantPipeline.js';
 
 test('research mandate is explicit and never creates a daily trade quota', () => {
   assert.equal(QUANT_CORE_RESEARCH_OBJECTIVES.winRateTargetMin, 0.60);
