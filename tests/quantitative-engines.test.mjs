@@ -224,19 +224,20 @@ test('gold refresh route reuses the synchronized macro snapshot and CBOE observa
   assert.match(route, /getMacroSnapshot\(\)/);
   assert.match(route, /buildGoldMacroContext\(snapshot\)/);
 });
-test('public FairEconomy calendar is no-key, Tier-1-only, and records source provenance', () => {
+test('public FairEconomy calendar is no-key, Tier-1-only, and records verified source provenance', () => {
   const macroData = read('../lib/macroData.ts');
   const types = read('../types/macro.ts');
   const macroContext = read('../app/api/v1/macro-context/route.ts');
   const signals = read('../app/api/v1/intraday-signals/route.ts');
   assert.match(macroData, /getFairEconomyCatalysts\(\),/);
-  assert.doesNotMatch(macroData, /FAIRECONOMY_COMMERCIAL_USE_APPROVED === 'true' \? getFairEconomyCatalysts/);
   assert.match(macroData, /item\.impact === 'High'/);
-  assert.match(macroData, /snapshot\.calendarProvider = calendarResult/);
+  assert.match(macroData, /snapshot\.calendarProvider = selectedCalendar\.provider/);
+  assert.match(macroData, /snapshot\.calendarRetrievedAtUtc = selectedCalendar\.retrievedAtUtc/);
+  assert.match(macroData, /snapshot\.calendarCoverageEndUtc = selectedCalendar\.coverageEndUtc/);
   assert.match(types, /calendarProvider\?: 'FAIRECONOMY_PUBLIC'/);
-  assert.match(macroContext, /calendar_verified: snapshot\.calendarSource === 'provider' && Boolean\(snapshot\.calendarProvider\)/);
-  assert.match(macroContext, /const newsLockoutActive = snapshot\.calendarSource !== 'provider'/);
-  assert.match(signals, /const calendarVerified = snapshot\.calendarSource === 'provider' && Boolean\(snapshot\.calendarProvider\)/);
+  assert.match(macroContext, /calendar_verified: calendarVerified/);
+  assert.match(macroContext, /const newsLockoutActive = !calendarVerified/);
+  assert.match(signals, /calendarVerified = snapshot\.calendarSource === 'provider'/);
 });
 test('Swissquote quote caching is per instrument so satellite selection cannot refetch every core pair', () => {
   const route = read('../app/api/v1/live-quotes/route.ts');
@@ -409,13 +410,12 @@ test('gold quote parser uses parent-level Swissquote timestamps and Treasury dai
 });
 test('economic calendar never falls back to hardcoded central-bank dates or stale persisted fixtures', () => {
   const macroData = read('../lib/macroData.ts');
-  const macroEngine = read('../lib/macroEngine.ts');
   assert.doesNotMatch(macroData, /getCentralBankDecisionsSchedule/);
   assert.match(macroData, /snapshot\.catalysts = \[\]/);
   assert.match(macroData, /calendarSource = 'unavailable'/);
   assert.match(macroData, /calendarCoverageEndMs >= Date\.now\(\) \+ 24 \* 60 \* 60_000/);
-  assert.match(macroData, /selectedCalendar/);
-  assert.match(macroEngine, /calendarSource === 'provider'/);
+  assert.match(macroData, /const persistedCatalysts = calendarVerified \? filterCurrentCatalysts\(parsed\.catalysts\) : \[\]/);
+  assert.match(macroData, /calendarSource: calendarVerified \? 'provider' : 'unavailable'/);
 });
 test('pair scenario probabilities remain uncalibrated until point-in-time backtests exist', () => {
   const dossier = read('../lib/macro/dossierEngine.ts');
@@ -578,7 +578,7 @@ test('intraday signal engine enforces macro threshold, trend quality, live sessi
   assert.match(engine, /TIER_ONE_EVENT_LOCKOUT/);
   assert.match(engine, /RATE_DECISION_LOCKOUT/);
   assert.match(engine, /America\/New_York/);
-  assert.match(route, /getActiveMarketSession/);
+  assert.match(route, /classifyWATSession/);
   assert.match(engine, /INTRADAY_CANDLES_STALE/);
 });
 test('Sovereign Shield fails closed when VIX evidence is missing or invalid', () => {
