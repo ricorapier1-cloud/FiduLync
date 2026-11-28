@@ -8,6 +8,9 @@ import { buildGoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
 import type { MacroContextPayload, MacroSymbolBias } from '@/types/desk';
 import { evaluateSovereignShield } from '@/lib/quant/sovereignShield';
 import { getLatestMT5Heartbeat } from '@/lib/quant/mt5Heartbeat';
+import { getStrategyValidationGate } from '@/lib/quant/strategyValidationGate';
+import { RESEARCH_OBJECTIVES } from '@/lib/quant/researchObjectives';
+import { getPointInTimeIntegrity } from '@/lib/quant/pointInTimeIntegrity';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -124,8 +127,12 @@ export async function GET(request: Request) {
   }
 
   try {
-    const [snapshot, quotes, latestHeartbeat] = await Promise.all([
-      getMacroSnapshot(), getMarketQuotes(), getLatestMT5Heartbeat(),
+    const [snapshot, quotes, latestHeartbeat, validationGate, pointInTimeIntegrity] = await Promise.all([
+      getMacroSnapshot(),
+      getMarketQuotes(),
+      getLatestMT5Heartbeat(),
+      getStrategyValidationGate(),
+      getPointInTimeIntegrity(),
     ]);
     const goldContext = await buildGoldMacroContext(snapshot);
     const dossier = generatePairDossier(snapshot, symbol);
@@ -212,22 +219,27 @@ export async function GET(request: Request) {
     const intradaySignals = signalPayload?.signals ?? [];
     const selectedSignal = intradaySignals.find((item) => item.symbol === symbol) ?? null;
 
-    const hasFreshBaseCot = snapshot.cotSource === 'provider' && snapshot.cot.some((position) => position.market === dossier.base && isFreshCotReport(position.reportDate));
-    const hasFreshQuoteCot = snapshot.cotSource === 'provider' && snapshot.cot.some((position) => position.market === dossier.quote && isFreshCotReport(position.reportDate));
+    const hasFreshBaseCot = snapshot.cotSource === 'provider' && snapshot.cot.some((position) => position.market === dossier.base
+      && position.sampleSize !== undefined && position.sampleSize >= 52 && position.percentile !== null && isFreshCotReport(position.reportDate));
+    const hasFreshQuoteCot = snapshot.cotSource === 'provider' && snapshot.cot.some((position) => position.market === dossier.quote
+      && position.sampleSize !== undefined && position.sampleSize >= 52 && position.percentile !== null && isFreshCotReport(position.reportDate));
     const selectedBias = symbolBiases[symbol];
-    const allowedToTrade = Boolean(sovereignShield.allowedToTrade && selectedBias?.biasScore !== null
+    const allowedToTrade = Boolean(validationGate.verified && sovereignShield.allowedToTrade
+      && selectedBias?.biasScore !== null
       && selectedBias?.directionalVerdict !== 'INSUFFICIENT_EVIDENCE'
       && Math.abs(selectedBias?.biasScore ?? 0) >= 20
       && activeSession !== 'CLOSED' && !newsLockoutActive);
-    const setupReady = selectedSignal?.signalState === 'ACTIVE_SETUP' && selectedSignal.direction !== 'NONE';
+    const setupReady = selectedSignal?.signalState === 'ACTIVE_SETUP'
+      && selectedSignal.direction !== 'NONE' && selectedSignal.executionDataVerified === true;
     const effectiveAllowed = allowedToTrade && setupReady;
     const deskStatus: MacroContextPayload['deskStatus'] = !effectiveAllowed ? 'LOCKOUT'
       : sovereignShield.maxAllowedRiskPct <= 0.5 ? 'HALF_RISK' : 'CLEARED';
     const deskLockoutReason = effectiveAllowed ? null
-      : !sovereignShield.governanceVerified ? 'MT5 account governance ledger is not connected and verified'
-        : activeSession === 'CLOSED' ? 'Outside London/New York execution session'
-          : newsLockoutActive ? 'Economic calendar or event-risk gate is not clear'
-            : selectedSignal?.blockers?.[0] ?? 'No active macro-aligned intraday setup';
+      : !validationGate.verified ? validationGate.blockers[0] ?? 'STRATEGY_VALIDATION_NOT_APPROVED'
+        : !sovereignShield.governanceVerified ? 'MT5 account governance ledger is not connected and verified'
+          : activeSession === 'CLOSED' ? 'Outside London/New York execution session'
+            : newsLockoutActive ? 'Economic calendar is unavailable, stale, or inside the event-risk lockout window'
+              : selectedSignal?.blockers?.[0] ?? 'No active broker-verified macro-aligned setup';
     const activeSessionWat: MacroContextPayload['activeSessionWat'] = activeSession === 'NY' ? 'NEW_YORK'
       : activeSession === 'LONDON' ? 'LONDON' : 'OFF_SESSION';
 
@@ -240,18 +252,18 @@ export async function GET(request: Request) {
       maxRiskPct: effectiveAllowed ? sovereignShield.maxAllowedRiskPct : 0,
       activeSessionWat,
       deskLockoutReason,
-      allowedDirection: selectedSignal?.direction ?? 'NONE',
-      stopLossDistance: selectedSignal?.slPips ?? null,
+      allowedDirection: effectiveAllowed ? selectedSignal?.direction ?? 'NONE' : 'NONE',
+      stopLossDistance: effectiveAllowed ? selectedSignal?.slPips ?? null : null,
       zScore: selectedSignal?.zScore ?? null,
       hurstExponent: selectedSignal?.hurst ?? null,
       ker: selectedSignal?.ker ?? null,
       adrUsedPct: selectedSignal?.adrUsedPct ?? null,
       pdh: selectedSignal?.pdh ?? null,
       pdl: selectedSignal?.pdl ?? null,
-      entryPrice: selectedSignal?.entryPrice ?? null,
-      stopLoss: selectedSignal?.stopLoss ?? null,
-      takeProfit1: selectedSignal?.takeProfit1 ?? null,
-      takeProfit2: selectedSignal?.takeProfit2 ?? null,
+      entryPrice: effectiveAllowed ? selectedSignal?.entryPrice ?? null : null,
+      stopLoss: effectiveAllowed ? selectedSignal?.stopLoss ?? null : null,
+      takeProfit1: effectiveAllowed ? selectedSignal?.takeProfit1 ?? null : null,
+      takeProfit2: effectiveAllowed ? selectedSignal?.takeProfit2 ?? null : null,
       biasScore: selectedBias?.biasScore ?? null,
       directionalVerdict: selectedBias?.directionalVerdict ?? 'INSUFFICIENT_EVIDENCE',
       newsLockoutActive,
@@ -276,6 +288,15 @@ export async function GET(request: Request) {
       decision_status: symbol === 'XAUUSD' ? (goldAvailable ? 'RESEARCH_CONTEXT_AVAILABLE' : 'INSUFFICIENT_EVIDENCE') : dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? 'INSUFFICIENT_EVIDENCE' : 'RESEARCH_CONTEXT_AVAILABLE',
       bias_score: symbol === 'XAUUSD' ? (goldAvailable ? goldBias : null) : dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier.biasScore,
       confidence: symbol === 'XAUUSD' ? (goldAvailable ? 'LOW' : 'INSUFFICIENT_EVIDENCE') : dossier.confidence,
+      confidence_basis: 'EVIDENCE_COMPLETENESS_NOT_WIN_PROBABILITY',
+      research_objectives: RESEARCH_OBJECTIVES,
+      strategy_validation: {
+        status: validationGate.status,
+        verified: validationGate.verified,
+        approved_report_id: validationGate.approvedReportId,
+        blockers: validationGate.blockers,
+      },
+      point_in_time_integrity: pointInTimeIntegrity,
       policy_diff_bps: symbol === 'XAUUSD' ? null : dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier.policyDiffBps,
       real_policy_rate_diff_bps: symbol === 'XAUUSD' ? null : dossier.confidence === 'INSUFFICIENT_EVIDENCE' ? null : dossier.realPolicyRateDiffBps,
       real_yield_diff_bps: null,
@@ -316,9 +337,9 @@ export async function GET(request: Request) {
         authority: 'MT5_ACCOUNT_SIDE_ENFORCEMENT_REQUIRED',
       },
       calendar_verified: calendarVerified,
-      event_risk_status: snapshot.calendarSource === 'provider' ? 'PROVIDER_CALENDAR' : 'UNVERIFIED_CALENDAR',
+      event_risk_status: calendarVerified ? 'PROVIDER_CALENDAR' : 'UNVERIFIED_CALENDAR',
       news_lockout: newsLockoutActive,
-      next_catalyst: snapshot.calendarSource === 'provider' && dossier.nextCatalyst ? {
+      next_catalyst: calendarVerified && dossier.nextCatalyst ? {
         title: dossier.nextCatalyst.title,
         scheduled_at_utc: dossier.nextCatalyst.scheduledAt,
         region: dossier.nextCatalyst.region,
@@ -329,11 +350,13 @@ export async function GET(request: Request) {
       provenance: {
         as_of_utc: snapshot.asOf,
         source_mode: snapshot.source,
-        calendar_source: snapshot.calendarSource ?? 'unavailable',
-        calendar_provider: snapshot.calendarProvider ?? null,
+        calendar_source: calendarVerified ? snapshot.calendarSource : 'unavailable',
+        calendar_provider: calendarVerified ? snapshot.calendarProvider ?? null : null,
+        calendar_retrieved_at_utc: calendarVerified ? snapshot.calendarRetrievedAtUtc ?? null : null,
+        calendar_coverage_end_utc: calendarVerified ? snapshot.calendarCoverageEndUtc ?? null : null,
         cot_source: snapshot.cotSource ?? 'unavailable',
       },
-      disclaimer: 'Read-only macroeconomic intelligence. No technical analysis or broker order execution.',
+      disclaimer: 'Read-only macro research. Confidence denotes evidence completeness, not a win probability. No 60–65% win rate or 1:2 realised reward-to-risk result is claimed. Trade permission remains locked until owner-approved out-of-sample validation, complete point-in-time provenance, verified MT5 account governance and broker-executable market data are present.',
     };
     return NextResponse.json(payload, { status: 200, headers });
   } catch (error) {
