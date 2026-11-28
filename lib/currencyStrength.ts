@@ -42,8 +42,11 @@ export function getCurrencyStrengthIndex(snapshot: MacroSnapshot, now = Date.now
     && Number.isFinite(item.inflation)
     && validObservationDate(item.policyRateAsOf, now, MAX_POLICY_AGE_MS)
     && validObservationDate(item.inflationAsOf, now, MAX_INFLATION_AGE_MS));
-  // A G8 cross-sectional z-score is not published from a partial universe.
-  if (currencies.length !== MAJOR_CURRENCIES.length) return [];
+  // A G8 cross-sectional z-score is not published from a partial or duplicated universe.
+  const observedCodes = new Set(currencies.map((currency) => currency.code));
+  if (currencies.length !== MAJOR_CURRENCIES.length
+    || observedCodes.size !== MAJOR_CURRENCIES.length
+    || MAJOR_CURRENCIES.some((code) => !observedCodes.has(code))) return [];
 
   const policyZ = zScores(currencies.map((currency) => currency.policyRate));
   const realRateZ = zScores(currencies.map((currency) => currency.policyRate - currency.inflation));
