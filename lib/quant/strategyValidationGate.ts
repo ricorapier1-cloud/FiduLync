@@ -70,6 +70,7 @@ export async function getStrategyValidationGate(): Promise<StrategyValidationGat
 
     const blockers: string[] = [];
     if (report.reviewer_note !== 'APPROVED_FOR_LIVE_USE') blockers.push('OWNER_REVIEW_APPROVAL_MISSING');
+    if (!report.reviewed_at || !Number.isFinite(Date.parse(report.reviewed_at)) || Date.parse(report.reviewed_at) > Date.now()) blockers.push('REVIEW_TIMESTAMP_INVALID');
     const runRows = await supabaseRead<ResearchRun[]>('research_runs', new URLSearchParams({
       select: 'id,status,code_fingerprint,dataset_fingerprint,validation_start,validation_end,out_of_sample_start,out_of_sample_end,completed_at',
       id: `eq.${report.research_run_id}`,
@@ -82,8 +83,10 @@ export async function getStrategyValidationGate(): Promise<StrategyValidationGat
       || !run.out_of_sample_start || !run.out_of_sample_end) {
       blockers.push('RESEARCH_RUN_OR_UNTOUCHED_OOS_WINDOW_INCOMPLETE');
     }
-    if (!configuredCodeFingerprint || !run || run.code_fingerprint !== configuredCodeFingerprint) {
-      blockers.push('VALIDATED_STRATEGY_CODE_FINGERPRINT_MISMATCH');
+    if (!configuredCodeFingerprint || !run || run.code_fingerprint !== configuredCodeFingerprint
+      || evidence.strategyCodeFingerprint !== run?.code_fingerprint
+      || evidence.datasetFingerprint !== run?.dataset_fingerprint) {
+      blockers.push('VALIDATED_STRATEGY_OR_DATASET_FINGERPRINT_MISMATCH');
     }
     if (!Array.isArray(report.blockers) || report.blockers.length > 0) blockers.push('VALIDATION_REPORT_HAS_BLOCKERS');
 
