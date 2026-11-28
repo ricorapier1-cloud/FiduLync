@@ -1,6 +1,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/serverSupabase';
+import { recordMT5Heartbeat } from '@/lib/quant/mt5Heartbeat';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -222,6 +223,42 @@ export async function POST(request: Request) {
       if (dealsError) throw dealsError;
     }
 
+    let heartbeatStatus: 'ACCEPTED' | 'NOT_ACCEPTED' = 'NOT_ACCEPTED';
+    let heartbeatGovernanceVerified = false;
+    const dailyClosedTrades = num(payload.dailyClosedTrades, null);
+    const dailyLosses = num(payload.dailyLosses, null);
+    const dailyStatsTimeBasis = str(payload.dailyStatsTimeBasis, 32);
+    const openCurrencyLegs = Array.isArray(payload.openCurrencyLegs)
+      ? payload.openCurrencyLegs.filter((value): value is string => typeof value === 'string' && /^[A-Z0-9._-]{3,16}$/.test(value)).slice(0, 32)
+      : null;
+    const liveBrokerSpread = num(payload.liveBrokerSpread, null);
+    const spreadSymbol = str(payload.spreadSymbol, 16);
+    if (dailyClosedTrades !== null && Number.isSafeInteger(dailyClosedTrades) && dailyClosedTrades >= 0
+      && dailyLosses !== null && Number.isSafeInteger(dailyLosses) && dailyLosses >= 0
+      && dailyLosses <= dailyClosedTrades && dailyStatsTimeBasis === 'BROKER_SERVER_DAY') {
+      try {
+        const heartbeat = await recordMT5Heartbeat({
+          accountKey,
+          login: snapshot.account_login,
+          server: snapshot.server,
+          broker: snapshot.broker,
+          accountEquity: snapshot.equity,
+          accountBalance: snapshot.balance,
+          dailyClosedTrades,
+          dailyLosses,
+          dailyStatsTimeBasis: 'BROKER_SERVER_DAY',
+          openCurrencyLegs,
+          liveBrokerSpread,
+          spreadSymbol,
+          timestampUtc: observedAt,
+        });
+        heartbeatStatus = 'ACCEPTED';
+        heartbeatGovernanceVerified = heartbeat.governanceVerified;
+      } catch (error) {
+        console.error('MT5 account sync heartbeat was not accepted:', error);
+      }
+    }
+
     return NextResponse.json({
       status: 'ACCEPTED',
       accountKey,
@@ -229,6 +266,8 @@ export async function POST(request: Request) {
       dealsReceived: deals.length,
       quotesReceived: quotes.length,
       candlesReceived: candles.length,
+      heartbeatStatus,
+      heartbeatGovernanceVerified,
       observedAtUtc: observedAt,
       receivedAtUtc: snapshot.received_at,
     }, { status: 200, headers });
