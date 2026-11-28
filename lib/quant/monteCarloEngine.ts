@@ -10,6 +10,7 @@ export type TradeInput = {
   openPrice?: number;
   closePrice?: number;
   initialStopLoss?: number;
+  initialRiskAmount?: number;
   profit: number;
   commission?: number;
   swap?: number;
@@ -402,6 +403,7 @@ export function parseMt5ReportCsv(csvText: string): TradeInput[] {
   const openPriceIndex = indexOf(/open price|price open/);
   const closePriceIndex = indexOf(/close price|price close/);
   const initialStopLossIndex = indexOf(/initial stop loss|initial sl|sl at entry|stop loss at entry/);
+  const initialRiskAmountIndex = indexOf(/initial risk amount|risk amount at entry|cash risk/);
   if ([ticketIndex, symbolIndex, directionIndex, volumeIndex, profitIndex].some((index) => index < 0)) return [];
 
   const trades: TradeInput[] = [];
@@ -420,12 +422,12 @@ export function parseMt5ReportCsv(csvText: string): TradeInput[] {
     const openPrice = optionalNumber(openPriceIndex);
     const closePrice = optionalNumber(closePriceIndex);
     const initialStopLoss = optionalNumber(initialStopLossIndex);
-    const riskDistance = openPrice !== undefined && initialStopLoss !== undefined
-      ? Math.abs(openPrice - initialStopLoss) : 0;
-    const rewardDistance = openPrice !== undefined && closePrice !== undefined
-      ? (direction === 'BUY' ? closePrice - openPrice : openPrice - closePrice) : 0;
+    const initialRiskAmount = optionalNumber(initialRiskAmountIndex);
     const importedR = optionalNumber(rIndex);
-    const rMultiple = importedR ?? (riskDistance > 0 ? rewardDistance / riskDistance : undefined);
+    const netResult = profit + (optionalNumber(commissionIndex) ?? 0)
+      + (optionalNumber(swapIndex) ?? 0) + (optionalNumber(feeIndex) ?? 0);
+    const rMultiple = importedR ?? (initialRiskAmount !== undefined && initialRiskAmount > 0
+      ? netResult / initialRiskAmount : undefined);
     trades.push({
       ticket,
       symbol,
@@ -441,6 +443,7 @@ export function parseMt5ReportCsv(csvText: string): TradeInput[] {
       openPrice,
       closePrice,
       initialStopLoss,
+      initialRiskAmount,
     });
   }
   return trades.sort((a, b) => (a.closeTime ?? '').localeCompare(b.closeTime ?? ''));
