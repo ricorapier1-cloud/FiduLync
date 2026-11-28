@@ -83,10 +83,10 @@ function isNumericRecord(value: unknown): value is Record<string, number> {
 
 function isCurrency(value: unknown): value is MacroCurrency {
   return isRecord(value)
-    && typeof value.code === 'string'
-    && typeof value.centralBank === 'string'
-    && isFiniteNumber(value.policyRate)
-    && isFiniteNumber(value.inflation)
+    && typeof value.code === 'string' && /^[A-Z]{3}$/.test(value.code)
+    && typeof value.centralBank === 'string' && value.centralBank.trim().length > 0
+    && isFiniteNumber(value.policyRate) && value.policyRate >= -5 && value.policyRate <= 40
+    && isFiniteNumber(value.inflation) && value.inflation >= -20 && value.inflation <= 100
     && typeof value.inflationLabel === 'string'
     && (value.corePce === undefined || isFiniteNumber(value.corePce))
     && (value.corePceAsOf === undefined || (typeof value.corePceAsOf === 'string' && Number.isFinite(Date.parse(value.corePceAsOf))))
@@ -108,12 +108,12 @@ function isCurrency(value: unknown): value is MacroCurrency {
 
 function isCotPosition(value: unknown): value is CotPosition {
   return isRecord(value)
-    && typeof value.market === 'string'
-    && isFiniteNumber(value.netContracts)
+    && typeof value.market === 'string' && value.market.trim().length > 0
+    && Number.isSafeInteger(value.netContracts)
     && isFiniteNumber(value.percentile)
     && value.percentile >= 0
     && value.percentile <= 100
-    && isFiniteNumber(value.weeklyChange)
+    && Number.isSafeInteger(value.weeklyChange)
     && (value.asOf === undefined || (typeof value.asOf === 'string' && Number.isFinite(Date.parse(value.asOf))))
     && (value.sampleSize === undefined || (typeof value.sampleSize === 'number' && Number.isSafeInteger(value.sampleSize) && value.sampleSize >= 0))
     && (value.publishedAt === undefined || (typeof value.publishedAt === 'string'
@@ -152,6 +152,12 @@ function parseProviderSnapshot(value: unknown): Pick<MacroSnapshot, 'currencies'
   const usIndicators = value.usIndicators;
   if (!value.currencies.every(isCurrency) || !value.cot.every(isCotPosition) || !value.catalysts.every(isCatalyst)
     || (usIndicators !== undefined && !isUsIndicators(usIndicators))) return null;
+  const currencyCodes = value.currencies.map((currency) => (currency as MacroCurrency).code);
+  const cotMarkets = value.cot.map((position) => (position as CotPosition).market);
+  const catalystIds = value.catalysts.map((event) => (event as EconomicCatalyst).id);
+  if (new Set(currencyCodes).size !== currencyCodes.length
+    || new Set(cotMarkets).size !== cotMarkets.length
+    || new Set(catalystIds).size !== catalystIds.length) return null;
   return {
     currencies: value.currencies,
     cot: value.cot,
