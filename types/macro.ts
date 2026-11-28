@@ -217,7 +217,7 @@ export type MacroSnapshot = {
   source: 'fallback' | 'provider' | 'partial';
   cotSource?: 'unavailable' | 'provider';
   calendarSource?: 'unavailable' | 'reference' | 'provider';
-  calendarProvider?: 'FAIRECONOMY_PUBLIC' | 'FINNHUB' | 'FMP';
+  calendarProvider?: 'FAIRECONOMY_PUBLIC' | 'FINNHUB' | 'FMP' | 'CUSTOM_MACRO_PROVIDER';
   calendarRetrievedAtUtc?: string;
   calendarCoverageEndUtc?: string;
   ecbRates?: Record<string, number>;
