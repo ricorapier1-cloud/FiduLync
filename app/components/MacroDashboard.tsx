@@ -355,7 +355,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
             <div className="flex items-center justify-between">
               <label className="macro-select-label" htmlFor="macro-pair">INSTRUMENT / PAIR</label>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/[0.08] text-slate-300">
-                CONFIDENCE: {dossier.confidence}
+                EVIDENCE GRADE: {dossier.confidence}
               </span>
             </div>
             <div className="macro-select-wrap">
