@@ -16,3 +16,20 @@ test('MT5 macro context is installation-authenticated, read-only and fail-closed
   assert.doesNotMatch(route, /OrderSend|order_send|trade\/modify|trade\/close/i);
   assert.doesNotMatch(route, /getMacroSignal|technicalScore|atr_sl|atr_tp|approvedVolume/i);
 });
+
+test('date-only official observation dates are supported without accepting timezone-free datetimes', async () => {
+  const freshness = await read('lib/dataFreshness.ts');
+  assert.match(freshness, /\\^\\d\\{4\\}-\\d\\{2\\}-\\d\\{2\\}\\$/);
+  assert.match(freshness, /never accept timezone-free datetimes/);
+  assert.match(route, /isObservationFresh/);
+});
+
+test('XAUUSD is a supported read-only context symbol but cannot fabricate missing gold or USD evidence', async () => {
+  const route = await read('app/api/v1/macro-context/route.ts');
+  assert.match(route, /SUPPORTED_NON_FX_SYMBOLS = new Set\(\['XAUUSD'\]\)/);
+  assert.match(route, /baseCode === 'XAU' \? 'GOLD' : baseCode/);
+  assert.match(route, /base_cot_release_verified/);
+  assert.match(route, /quote_cot_release_verified/);
+  assert.match(route, /sampleSize >= 52/);
+  assert.match(route, /publishedAt/);
+});
