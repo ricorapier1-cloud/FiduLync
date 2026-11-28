@@ -161,7 +161,9 @@ export async function GET(request: Request) {
         },
         quotes: {
           provider: quoteProvider,
-          status: quotePayload.executionGrade === true ? 'BROKER_LIVE_VERIFIED' : 'REFERENCE_ONLY_OR_UNAVAILABLE',
+          status: quotePayload.executionGrade === true ? 'BROKER_LIVE_VERIFIED'
+            : quotePayload.accountMode === 'DEMO' ? 'DEMO_ACCOUNT_NOT_EXECUTION_GRADE' : 'REFERENCE_ONLY_OR_UNAVAILABLE',
+          accountMode: quotePayload.accountMode ?? null,
           executionGrade: quotePayload.executionGrade === true,
         },
         brokerMarketData: {
