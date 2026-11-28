@@ -9,6 +9,7 @@ export type TradeInput = {
   volume: number;
   openPrice?: number;
   closePrice?: number;
+  initialStopLoss?: number;
   profit: number;
   commission?: number;
   swap?: number;
@@ -25,6 +26,7 @@ export type WalkForwardMetrics = {
   profitFactor: number | null;
   averageWin: number | null;
   averageLoss: number | null;
+  averagePayoffRatio: number | null;
   realizedRewardRisk: number | null;
   netProfit: number;
   maxDrawdownPct: number;
@@ -79,6 +81,7 @@ const ZERO_METRICS: WalkForwardMetrics = {
   profitFactor: null,
   averageWin: null,
   averageLoss: null,
+  averagePayoffRatio: null,
   realizedRewardRisk: null,
   netProfit: 0,
   maxDrawdownPct: 0,
@@ -118,6 +121,10 @@ function calculateMetrics(trades: TradeInput[], initialBalance: number): WalkFor
   let maxDd = 0;
   let rTotal = 0;
   let rCount = 0;
+  let rWinsTotal = 0;
+  let rLossesTotal = 0;
+  let rWinsCount = 0;
+  let rLossesCount = 0;
 
   for (const trade of trades) {
     const net = netPnl(trade);
@@ -130,6 +137,8 @@ function calculateMetrics(trades: TradeInput[], initialBalance: number): WalkFor
     if (typeof trade.rMultiple === 'number' && Number.isFinite(trade.rMultiple)) {
       rTotal += trade.rMultiple;
       rCount++;
+      if (trade.rMultiple > 0) { rWinsTotal += trade.rMultiple; rWinsCount++; }
+      else if (trade.rMultiple < 0) { rLossesTotal += Math.abs(trade.rMultiple); rLossesCount++; }
     }
   }
 
@@ -142,8 +151,10 @@ function calculateMetrics(trades: TradeInput[], initialBalance: number): WalkFor
     profitFactor: grossLosses > 0 ? Number((grossWins / grossLosses).toFixed(3)) : null,
     averageWin: averageWin === null ? null : Number(averageWin.toFixed(4)),
     averageLoss: averageLoss === null ? null : Number(averageLoss.toFixed(4)),
-    realizedRewardRisk: averageWin !== null && averageLoss !== null && averageLoss > 0
+    averagePayoffRatio: averageWin !== null && averageLoss !== null && averageLoss > 0
       ? Number((averageWin / averageLoss).toFixed(3)) : null,
+    realizedRewardRisk: rCount === trades.length && rWinsCount > 0 && rLossesCount > 0
+      ? Number(((rWinsTotal / rWinsCount) / (rLossesTotal / rLossesCount)).toFixed(3)) : null,
     netProfit: Number((runningEquity - initialBalance).toFixed(2)),
     maxDrawdownPct: Number(maxDd.toFixed(3)),
     expectancyR: rCount === trades.length ? Number((rTotal / trades.length).toFixed(4)) : null,
@@ -240,7 +251,7 @@ export function runWalkForwardAnalysis(
       && outOfSample.profitFactor !== null && outOfSample.profitFactor >= 1.2
       && outOfSample.winRateWilson95LowerPct !== null
       && outOfSample.winRateWilson95LowerPct >= RESEARCH_OBJECTIVES.targetWinRateMin * 100
-      && targetRewardRiskMet && everyFoldPositive) status = 'ROBUST_CANDIDATE';
+      && outOfSample.expectancyR !== null && targetRewardRiskMet && everyFoldPositive) status = 'ROBUST_CANDIDATE';
     else status = 'MODERATE_DEGRADATION';
   }
 
@@ -391,6 +402,7 @@ export function parseMt5ReportCsv(csvText: string): TradeInput[] {
   const closeTimeIndex = indexOf(/close time|close date|^time$|^date$/);
   const openPriceIndex = indexOf(/open price|price open/);
   const closePriceIndex = indexOf(/close price|price close/);
+  const initialStopLossIndex = indexOf(/initial stop loss|initial sl|sl at entry|stop loss at entry/);
   if ([ticketIndex, symbolIndex, directionIndex, volumeIndex, profitIndex].some((index) => index < 0)) return [];
 
   const trades: TradeInput[] = [];
@@ -405,20 +417,31 @@ export function parseMt5ReportCsv(csvText: string): TradeInput[] {
       || (!side.includes('buy') && !side.includes('sell'))
       || volume === undefined || volume <= 0 || profit === undefined) continue;
     const optionalNumber = (index: number) => index >= 0 ? parseLocalizedNumber(cols[index]) : undefined;
+    const direction = side.includes('buy') ? 'BUY' : 'SELL';
+    const openPrice = optionalNumber(openPriceIndex);
+    const closePrice = optionalNumber(closePriceIndex);
+    const initialStopLoss = optionalNumber(initialStopLossIndex);
+    const riskDistance = openPrice !== undefined && initialStopLoss !== undefined
+      ? Math.abs(openPrice - initialStopLoss) : 0;
+    const rewardDistance = openPrice !== undefined && closePrice !== undefined
+      ? (direction === 'BUY' ? closePrice - openPrice : openPrice - closePrice) : 0;
+    const importedR = optionalNumber(rIndex);
+    const rMultiple = importedR ?? (riskDistance > 0 ? rewardDistance / riskDistance : undefined);
     trades.push({
       ticket,
       symbol,
-      direction: side.includes('buy') ? 'BUY' : 'SELL',
+      direction,
       volume,
       profit,
       commission: optionalNumber(commissionIndex),
       swap: optionalNumber(swapIndex),
       fee: optionalNumber(feeIndex),
-      rMultiple: optionalNumber(rIndex),
+      rMultiple,
       openTime: openTimeIndex >= 0 ? cols[openTimeIndex] : undefined,
       closeTime: closeTimeIndex >= 0 ? cols[closeTimeIndex] : undefined,
-      openPrice: optionalNumber(openPriceIndex),
-      closePrice: optionalNumber(closePriceIndex),
+      openPrice,
+      closePrice,
+      initialStopLoss,
     });
   }
   return trades.sort((a, b) => (a.closeTime ?? '').localeCompare(b.closeTime ?? ''));
