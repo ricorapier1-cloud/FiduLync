@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCachedData } from '@/lib/redisCache';
+import { getMt5AccountMarketIdentity, getMt5AccountQuotes, isAuthorizedMt5AccountRead } from '@/lib/mt5AccountMarketData';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -69,7 +70,8 @@ async function fetchQuote(instrument: { symbol: string; path: string }) {
       ageMs,
       freshness: ageMs > 60_000 ? 'STALE' as const : 'LIVE' as const,
       latencyMs: Math.max(0, Math.round(performance.now() - started)),
-      source: 'SWISSQUOTE' as const,
+      source: 'SWISSQUOTE_REFERENCE' as const,
+      executionGrade: false,
       error: null,
     };
   } catch (error) {
@@ -78,7 +80,8 @@ async function fetchQuote(instrument: { symbol: string; path: string }) {
       quoteTimeUtc: null, retrievedAtUtc: new Date().toISOString(), ageMs: null,
       freshness: 'UNAVAILABLE' as const,
       latencyMs: Math.max(0, Math.round(performance.now() - started)),
-      source: 'SWISSQUOTE' as const,
+      source: 'SWISSQUOTE_REFERENCE' as const,
+      executionGrade: false,
       error: error instanceof Error ? error.message : 'Quote unavailable',
     };
   }
@@ -86,6 +89,81 @@ async function fetchQuote(instrument: { symbol: string; path: string }) {
 
 export async function GET(request: Request) {
   const started = performance.now();
+  const params = new URL(request.url).searchParams;
+  const accountKey = params.get('accountKey')?.trim() ?? '';
+  if (accountKey) {
+    const headers = { 'Cache-Control': 'no-store, private', 'X-Content-Type-Options': 'nosniff', Vary: 'Authorization' };
+    if (!/^[a-f0-9]{64}$/i.test(accountKey) || !isAuthorizedMt5AccountRead(request)) {
+      return NextResponse.json({ error: 'A valid private MT5 account-read token and account key are required.' }, { status: 401, headers });
+    }
+    try {
+      const [account, rows] = await Promise.all([
+        getMt5AccountMarketIdentity(accountKey),
+        getMt5AccountQuotes(accountKey),
+      ]);
+      if (!account) return NextResponse.json({ error: 'MT5 account was not found.' }, { status: 404, headers });
+      const now = Date.now();
+      const accountAgeMs = now - Date.parse(account.received_at);
+      const accountFresh = Number.isFinite(accountAgeMs) && accountAgeMs >= -30_000 && accountAgeMs <= 60_000;
+      const quotes = rows.map((quote) => {
+        const quoteAgeMs = now - Date.parse(quote.quote_time);
+        const receivedAgeMs = now - Date.parse(quote.received_at);
+        const fresh = Number.isFinite(quoteAgeMs) && Number.isFinite(receivedAgeMs)
+          && quoteAgeMs >= -5_000 && quoteAgeMs <= 15_000
+          && receivedAgeMs >= -5_000 && receivedAgeMs <= 30_000;
+        return {
+          symbol: quote.symbol,
+          bid: fresh ? quote.bid : null,
+          ask: fresh ? quote.ask : null,
+          mid: fresh ? (quote.bid + quote.ask) / 2 : null,
+          spread: fresh ? quote.ask - quote.bid : null,
+          quoteTimeUtc: quote.quote_time,
+          retrievedAtUtc: quote.received_at,
+          ageMs: Number.isFinite(quoteAgeMs) ? Math.max(0, quoteAgeMs) : null,
+          freshness: fresh ? 'LIVE' as const : 'STALE' as const,
+          latencyMs: null,
+          source: 'MT5_BROKER' as const,
+          broker: quote.broker ?? account.broker,
+          server: quote.server,
+          digits: quote.digits,
+          point: quote.point,
+          spreadPoints: quote.spread_points,
+          executionGrade: fresh && accountFresh && account.account_mode === 'REAL',
+          error: fresh ? null : 'Broker quote or account heartbeat is stale.',
+        };
+      });
+      const required = ['EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD'];
+      const allRequiredFresh = required.every((symbol) => quotes.some((quote) =>
+        quote.symbol === symbol && quote.freshness === 'LIVE' && quote.executionGrade));
+      const executionGrade = accountFresh && account.account_mode === 'REAL' && allRequiredFresh;
+      const healthy = quotes.filter((quote) => quote.freshness === 'LIVE').length;
+      return NextResponse.json({
+        schemaVersion: '1.0.0',
+        generatedAtUtc: new Date().toISOString(),
+        source: 'Authenticated MT5 broker feed',
+        broker: account.broker,
+        server: account.server,
+        accountMode: account.account_mode,
+        accountObservedAtUtc: account.observed_at,
+        accountReceivedAtUtc: account.received_at,
+        accountAgeMs,
+        marketDataQuality: executionGrade ? 'BROKER_LIVE_VERIFIED' : 'BROKER_FEED_INCOMPLETE_OR_STALE',
+        executionGrade,
+        executionGradeReason: executionGrade ? null
+          : account.account_mode !== 'REAL' ? 'A real MT5 account is required for execution-grade market data.'
+            : !accountFresh ? 'MT5 account publisher heartbeat is stale.'
+              : 'All four core instruments require fresh broker quotes.',
+        pollIntervalSeconds: 15,
+        staleAfterSeconds: 15,
+        latencyMs: Math.max(0, Math.round(performance.now() - started)),
+        status: executionGrade ? 'HEALTHY' : healthy > 0 ? 'PARTIAL' : 'UNAVAILABLE',
+        quotes,
+      }, { headers });
+    } catch (error) {
+      console.error('Authenticated MT5 market quote read failed:', error);
+      return NextResponse.json({ error: 'Broker market data is temporarily unavailable.' }, { status: 503, headers });
+    }
+  }
   const satellite = new URL(request.url).searchParams.get('satellite')?.trim().toUpperCase() ?? '';
   const validSatellites = new Set(['AUDUSD', 'NZDUSD', 'USDCAD', 'USDCHF', 'EURJPY', 'GBPJPY', 'AUDJPY', 'CADJPY', 'CHFJPY', 'NZDJPY', 'EURGBP', 'EURAUD', 'EURCAD', 'EURCHF', 'EURNZD', 'GBPAUD', 'GBPCAD', 'GBPCHF', 'GBPNZD', 'AUDCAD', 'AUDCHF', 'AUDNZD', 'CADCHF', 'NZDCAD', 'NZDCHF']);
   const satelliteInstrument = validSatellites.has(satellite)
@@ -106,7 +184,10 @@ export async function GET(request: Request) {
   return NextResponse.json({
     schemaVersion: '1.0.0',
     generatedAtUtc: new Date().toISOString(),
-    source: 'Swissquote public BBO feed',
+    source: 'Swissquote public BBO reference feed',
+    marketDataQuality: 'REFERENCE_ONLY',
+    executionGrade: false,
+    executionGradeReason: 'Public Swissquote BBO is not the user\'s authenticated MT5 broker feed and cannot authorize execution.',
     pollIntervalSeconds: 15,
     staleAfterSeconds: 60,
     latencyMs: Math.max(0, Math.round(performance.now() - started)),
