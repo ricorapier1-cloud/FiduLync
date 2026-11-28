@@ -12,8 +12,8 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 
-type CandlePayload = { status: string; intradayBars: OhlcvBar[]; dailyBars: OhlcvBar[]; latestBarUtc: string | null };
-type QuotePayload = { quotes?: Array<{ symbol: string; bid: number | null; ask: number | null; mid: number | null; spread: number | null; quoteTimeUtc: string | null; freshness: string }> };
+type CandlePayload = { status: string; source?: string; executionGrade?: boolean; marketDataQuality?: string; intradayBars: OhlcvBar[]; dailyBars: OhlcvBar[]; latestBarUtc: string | null };
+type QuotePayload = { source?: string; executionGrade?: boolean; quotes?: Array<{ symbol: string; bid: number | null; ask: number | null; mid: number | null; spread: number | null; quoteTimeUtc: string | null; freshness: string }> };
 
 function watDate(date: Date): string {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date);
@@ -23,7 +23,7 @@ function watDate(date: Date): string {
 
 function freshCot(snapshot: Awaited<ReturnType<typeof getMacroSnapshot>>, currency: string): number | null {
   const item = snapshot.cot.find((row) => row.market === currency || (currency === 'XAU' && row.market === 'GOLD'));
-  if (!item?.reportDate) return null;
+  if (!item?.reportDate || item.sampleSize === undefined || item.sampleSize < 52 || item.percentile === null) return null;
   const reportTimestamp = Date.parse(item.reportDate);
   const ageMs = Date.now() - reportTimestamp;
   if (!Number.isFinite(reportTimestamp) || ageMs < -5 * 60_000 || ageMs > 14 * 86_400_000) return null;
@@ -36,7 +36,15 @@ export async function GET(request: Request) {
     const gold = await buildGoldMacroContext(snapshot);
     const now = new Date();
     const session = classifyWATSession(now);
-    const highImpactEvents = snapshot.catalysts.filter((event) => event.impact === 'High')
+    const calendarRetrievedAtMs = snapshot.calendarRetrievedAtUtc ? Date.parse(snapshot.calendarRetrievedAtUtc) : NaN;
+    const calendarCoverageEndMs = snapshot.calendarCoverageEndUtc ? Date.parse(snapshot.calendarCoverageEndUtc) : NaN;
+    const calendarVerified = snapshot.calendarSource === 'provider' && Boolean(snapshot.calendarProvider)
+      && Number.isFinite(calendarRetrievedAtMs)
+      && now.getTime() - calendarRetrievedAtMs <= 60 * 60_000
+      && now.getTime() - calendarRetrievedAtMs >= -30_000
+      && Number.isFinite(calendarCoverageEndMs)
+      && calendarCoverageEndMs >= now.getTime() + 24 * 60 * 60_000;
+    const highImpactEvents = (calendarVerified ? snapshot.catalysts : []).filter((event) => event.impact === 'High')
       .map((event) => ({ event, minutes: (Date.parse(event.scheduledAt) - now.getTime()) / 60_000 }))
       .filter((item) => Number.isFinite(item.minutes));
     const nearest = [...highImpactEvents].sort((a, b) => Math.abs(a.minutes) - Math.abs(b.minutes))[0];
@@ -45,7 +53,6 @@ export async function GET(request: Request) {
       .sort((a, b) => Math.abs(a.minutes) - Math.abs(b.minutes))[0];
     const rateDecision = Boolean(nearestRateDecision && Math.abs(nearestRateDecision.minutes) <= 60);
     const eventMinutesAway = rateDecision ? nearestRateDecision!.minutes : nearest?.minutes ?? null;
-    const calendarVerified = snapshot.calendarSource === 'provider' && Boolean(snapshot.calendarProvider);
     const satellite = G8_PAIRS.filter((symbol) => symbol !== 'EURUSD' && symbol !== 'USDJPY' && symbol !== 'GBPUSD' && symbol !== 'XAUUSD')
       .map((symbol) => {
         const dossier = generatePairDossier(snapshot, symbol);
@@ -108,6 +115,10 @@ export async function GET(request: Request) {
         eventMinutesAway,
         rateDecision,
         spreadMultipleOfBaseline: baseline.multiple,
+        candleSource: candles?.source ?? 'UNAVAILABLE',
+        candleSourceVerified: candles?.executionGrade === true,
+        quoteSource: quotePayload.source ?? 'UNAVAILABLE',
+        brokerQuoteVerified: quotePayload.executionGrade === true,
         marketShield,
         session,
         nowUtc: now.toISOString(),
@@ -122,10 +133,15 @@ export async function GET(request: Request) {
     return NextResponse.json({
       generatedAtUtc: now.toISOString(),
       timezone: 'Africa/Lagos',
-      source: 'Yahoo Finance OHLCV + Swissquote BBO + verified MacroLync macro snapshot',
+      source: 'Yahoo Finance OHLCV (reference only) + Swissquote public BBO (external, non-broker) + MacroLync macro research',
+      marketDataQuality: {
+        candles: { provider: 'Yahoo Finance', status: 'REFERENCE_ONLY', executionGrade: false },
+        quotes: { provider: quotePayload.source ?? 'UNAVAILABLE', status: 'EXTERNAL_REFERENCE', executionGrade: false },
+        brokerMarketData: { status: 'NOT_CONNECTED', executionGrade: false },
+      },
       satelliteSymbol: satellite,
       signals: results,
-      executionAuthority: 'MANUAL_OR_EA_CONFIRMATION_REQUIRED',
+      executionAuthority: 'RESEARCH_ONLY_NO_EXECUTION_APPROVAL',
     }, { headers: { 'Cache-Control': 'no-store, max-age=0', 'X-Content-Type-Options': 'nosniff' } });
   } catch (error) {
     console.error('Intraday signal generation failed:', error);
