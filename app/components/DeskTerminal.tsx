@@ -186,11 +186,11 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
   }, []);
   const currentManualEquity = balanceHydrated && ledgerPnlHydrated && manualDeskMode && ticketBalance !== null && manualClosedTradesPnl !== null
     ? ticketBalance + manualClosedTradesPnl : null;
-  const balanceVerified = balanceHydrated && ledgerPnlHydrated && manualDeskMode && ticketBalance !== null && Number.isFinite(ticketBalance) && ticketBalance > 0
+  const manualLedgerComplete = balanceHydrated && ledgerPnlHydrated && manualDeskMode && ticketBalance !== null && Number.isFinite(ticketBalance) && ticketBalance > 0
     && manualClosedTradesPnl !== null && currentManualEquity !== null && currentManualEquity > 0;
   const saveTicketBalance = () => {
     const value = Number(ticketBalanceInput);
-    if (!manualDeskMode) { setBalanceSaveMessage('Enable Verified Manual Desk Mode before saving a user-attested balance.'); return; }
+    if (!manualDeskMode) { setBalanceSaveMessage('Enable Manual Review Mode before saving a user-attested balance.'); return; }
     if (!Number.isFinite(value) || value <= 0) { setTicketBalance(null); setBalanceSaveMessage('Enter a valid positive real account balance.'); return; }
     try {
       window.localStorage.setItem('macrolinc-manual-account-balance-v1', JSON.stringify({ balance: value, currency: 'USD', savedAtUtc: new Date().toISOString(), source: 'USER_ATTESTED_MANUAL' }));
@@ -207,7 +207,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
     const utcHour = new Date(now).getUTCHours();
     return (utcDay === 5 && utcHour >= 22) || utcDay === 6 || (utcDay === 0 && utcHour < 22);
   })();
-  const globalDeskLockout = activeSession === 'OFF-SESSION' || !balanceVerified || (manualDeskMode && (manualLedger.trades >= 2 || manualLedger.losses >= 2));
+  const globalDeskLockout = activeSession === 'OFF-SESSION' || !manualLedgerComplete || (manualDeskMode && (manualLedger.trades >= 2 || manualLedger.losses >= 2));
   const coverageProviders = snapshot.providerStatus ?? [];
   const healthyProviderCount = coverageProviders.filter((provider) => provider.status === 'HEALTHY' || provider.status === 'STANDBY').length;
   const totalProviderCount = coverageProviders.length;
@@ -372,7 +372,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
               WAT SESSION: {activeSession === 'LONDON' ? 'LONDON 08:00–12:00 WAT' : (activeSession === 'NEW YORK' ) ? 'NEW YORK 13:00–17:00 WAT' : 'OFF-SESSION LOCKOUT'}
             </span>
             <div className="flex items-center gap-1 bg-slate-900 border border-slate-700 rounded px-2 py-0.5 text-slate-300">
-              <span>BAL: {balanceVerified && ticketBalance !== null ? ticketBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USD' : 'NOT SET (ENTER REAL BALANCE)'}</span>
+              <span>BAL: {manualLedgerComplete && ticketBalance !== null ? ticketBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USD' : 'NOT SET (ENTER REAL BALANCE)'}</span>
             </div>
           </div>
         </div>
@@ -427,10 +427,10 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
             ?? (selectedSig?.entryPrice != null && selectedSig?.stopLoss != null
               ? Math.abs(selectedSig.entryPrice - selectedSig.stopLoss) * (ticketSymbol === 'USDJPY' ? 100 : 10_000)
               : null);
-          const isSizingEvidenceComplete = balanceVerified && !globalDeskLockout && !isVixLockout
+          const isSizingEvidenceComplete = manualLedgerComplete && !globalDeskLockout && !isVixLockout
             && liveAsk !== null && liveAsk > 0 && stopDistancePips !== null && stopDistancePips > 0 && ticketSymbol !== 'XAUUSD';
           const riskCap = globalDeskLockout || isVixLockout || !isSizingEvidenceComplete ? 0.0 : isVixHigh ? 0.5 : 1.0;
-          const dollarRisk = balanceVerified && currentManualEquity !== null && riskCap > 0
+          const dollarRisk = manualLedgerComplete && currentManualEquity !== null && riskCap > 0
             ? currentManualEquity * (riskCap / 100) : 0;
           let calculatedLots = 0.00;
           if (isSizingEvidenceComplete && riskCap > 0 && stopDistancePips !== null && liveAsk !== null) {
@@ -462,9 +462,9 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
                   <span>Dollar Risk: <strong className="text-slate-200">${dollarRisk.toFixed(2)}</strong></span>
                   <span>Stop: <strong className="text-slate-200">{stopDistancePips === null ? '—' : stopDistancePips.toFixed(1) + ' pips'}</strong></span>
                   {ticketSymbol === 'USDJPY' && <span>Pip Val: <strong className="text-slate-200">{liveAsk !== null && liveAsk > 0 ? '$' + (1000 / liveAsk).toFixed(2) : 'UNAVAILABLE'}</strong></span>}
-                  {!balanceVerified && <span className="w-full text-amber-300">ENTER REAL ACCOUNT BALANCE TO COMPUTE LOTS</span>}
+                  {!manualLedgerComplete && <span className="w-full text-amber-300">ENTER REAL ACCOUNT BALANCE TO COMPUTE LOTS</span>}
                   {ticketSymbol === 'XAUUSD' && <span className="w-full text-amber-300">LOT SIZING LOCKED · BROKER CONTRACT SPECIFICATION REQUIRED</span>}
-                  {balanceVerified && !isSizingEvidenceComplete && ticketSymbol !== 'XAUUSD' && <span className="w-full text-amber-300">LOT SIZING LOCKED · LIVE PRICE / VALID STOP UNAVAILABLE</span>}
+                  {manualLedgerComplete && !isSizingEvidenceComplete && ticketSymbol !== 'XAUUSD' && <span className="w-full text-amber-300">LOT SIZING LOCKED · LIVE PRICE / VALID STOP UNAVAILABLE</span>}
                 </div>
               </div>
 
@@ -509,21 +509,21 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
     <section className={`mb-3 rounded-lg border p-3 sm:p-4 ${manualDeskMode ? 'border-amber-400/40 bg-[#17170f]' : 'border-red-500/40 bg-[#1b1114]'}`} aria-label="Desk command banner">
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div><span className="desk-kicker">EXECUTIVE DESK COMMAND · AFRICA/LAGOS</span><h3 className={`mt-1 text-sm font-semibold tracking-wide ${!globalDeskLockout ? 'text-amber-300' : 'text-red-300'}`}>{!balanceVerified ? 'STAND DOWN · BALANCE NOT VERIFIED (0.0% RISK)' : activeSession === 'OFF-SESSION' ? 'STAND DOWN · OFF-SESSION LOCKOUT (0.0% RISK)' : manualLedger.trades >= 2 || manualLedger.losses >= 2 ? 'STAND DOWN · DAILY CIRCUIT BREAKER (0.0% RISK)' : 'MANUAL DESK · REVIEW ONLY'}</h3></div>
-          <div className="flex flex-wrap items-center gap-2">{!manualDeskMode && <span className="rounded border border-red-400/40 px-2 py-1 text-[10px] font-mono text-red-200">ACCOUNT GOVERNANCE UNVERIFIED</span>}<label className="flex items-center gap-2 rounded border border-white/15 px-3 py-2 text-xs text-slate-100"><input type="checkbox" checked={manualDeskMode} onChange={(event) => toggleManualDeskMode(event.target.checked)} /> Manual Desk Mode (Browser Ledger Verified)</label></div>
+          <div><span className="desk-kicker">EXECUTIVE DESK COMMAND · AFRICA/LAGOS</span><h3 className={`mt-1 text-sm font-semibold tracking-wide ${!globalDeskLockout ? 'text-amber-300' : 'text-red-300'}`}>{!manualLedgerComplete ? 'STAND DOWN · BALANCE NOT VERIFIED (0.0% RISK)' : activeSession === 'OFF-SESSION' ? 'STAND DOWN · OFF-SESSION LOCKOUT (0.0% RISK)' : manualLedger.trades >= 2 || manualLedger.losses >= 2 ? 'STAND DOWN · DAILY CIRCUIT BREAKER (0.0% RISK)' : 'MANUAL DESK · REVIEW ONLY'}</h3></div>
+          <div className="flex flex-wrap items-center gap-2">{!manualDeskMode && <span className="rounded border border-red-400/40 px-2 py-1 text-[10px] font-mono text-red-200">ACCOUNT GOVERNANCE UNVERIFIED</span>}<label className="flex items-center gap-2 rounded border border-white/15 px-3 py-2 text-xs text-slate-100"><input type="checkbox" checked={manualDeskMode} onChange={(event) => toggleManualDeskMode(event.target.checked)} /> Manual Desk Mode (Browser-Local User-Attested)</label></div>
         </div>
         <div className="flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
           <label className="text-xs text-slate-300" htmlFor="manual-account-balance">Real starting balance (USD)</label>
           <input id="manual-account-balance" type="number" min="0.01" step="0.01" value={ticketBalanceInput} onChange={(event) => setTicketBalanceInput(event.target.value)} placeholder="Enter real $" className="w-36 rounded border border-white/15 bg-slate-950 px-3 py-2 text-xs text-white" />
-          <button type="button" onClick={saveTicketBalance} disabled={!manualDeskMode || !ticketBalanceInput.trim()} className="rounded border border-amber-400/40 px-3 py-2 text-xs text-amber-200 disabled:opacity-40">SAVE &amp; LOCK REAL BALANCE</button>
-          <span className="text-[10px] text-slate-400">{balanceVerified ? 'USER-ATTESTED · BROWSER LOCAL' : 'BALANCE NOT VERIFIED'}</span>
+          <button type="button" onClick={saveTicketBalance} disabled={!manualDeskMode || !ticketBalanceInput.trim()} className="rounded border border-amber-400/40 px-3 py-2 text-xs text-amber-200 disabled:opacity-40">SAVE USER-ATTESTED BALANCE</button>
+          <span className="text-[10px] text-slate-400">{manualLedgerComplete ? 'USER-ATTESTED · BROWSER LOCAL' : 'BALANCE NOT VERIFIED'}</span>
           {balanceSaveMessage && <span role="status" className="text-[10px] text-amber-200">{balanceSaveMessage}</span>}
         </div>
-        <p className="text-xs text-slate-300">{manualDeskMode ? 'Manual mode uses this browser’s local ledger and user-attested balance; it is not an authenticated MT5 statement and does not authorize automated EA calls.' : 'No authenticated MT5 account ledger is connected. Enable Verified Manual Desk Mode and save your actual starting balance to use manual risk calculations.'}</p>
+        <p className="text-xs text-slate-300">{manualDeskMode ? 'Manual Review Mode uses browser-local, user-attested entries; it is not an authenticated MT5 statement and cannot clear server risk controls or authorize automated EA calls.' : 'No authenticated MT5 account ledger is connected. Manual Review Mode stores self-reported values in this browser only and cannot authorize automated trading.'}</p>
         <div className="grid grid-cols-1 gap-3 border-t border-white/10 pt-3 sm:grid-cols-4">
           <div><span className="desk-kicker">ACTIVE WAT SESSION</span><strong className="mt-1 block text-sm text-slate-100">{activeSession === 'OFF-SESSION' ? 'OFF-SESSION DEAD ZONE' : activeSession + ' EXECUTION'}</strong><small className="text-slate-400">{activeSession === 'OFF-SESSION' ? 'Next session opens in ' + durationLabel(nextWATSessionOpen(now) - now) : 'Session closes in ' + durationLabel((activeSession === 'LONDON' ? 12 : 17) * 60 * 60_000 - (hourWAT * 60 * 60_000))}</small></div>
-          <div><span className="desk-kicker">TODAY’S APPROVED PLAYBOOK</span><strong className="mt-1 block text-sm text-slate-100">{manualDeskMode && activeSession !== 'OFF-SESSION' ? 'MANUAL REVIEW PERMITTED' : 'NO EXECUTION CLEARED'}</strong><small className="text-slate-400">{intradaySignals.filter((item) => item.signalState === 'ACTIVE_SETUP').length ? intradaySignals.filter((item) => item.signalState === 'ACTIVE_SETUP').map((item) => item.direction + ' ' + item.symbol).join(' · ') : 'Wait for a fully validated macro-aligned setup'}</small></div>
-          <div><span className="desk-kicker">DAILY RISK BUDGET · WAT</span><strong className="mt-1 block text-sm text-slate-100">Trades: {manualDeskMode ? manualLedger.trades + '/2' : 'UNVERIFIED'} · Losses: {manualDeskMode ? manualLedger.losses + '/2' : 'UNVERIFIED'}</strong><small className="text-slate-400">Locked currency legs: {manualDeskMode ? manualLedger.legs.join(', ') || 'None' : 'UNVERIFIED'}</small></div>
+          <div><span className="desk-kicker">TODAY’S APPROVED PLAYBOOK</span><strong className="mt-1 block text-sm text-slate-100">{manualDeskMode && activeSession !== 'OFF-SESSION' ? 'MANUAL REVIEW ONLY' : 'NO EXECUTION CLEARED'}</strong><small className="text-slate-400">{intradaySignals.filter((item) => item.signalState === 'ACTIVE_SETUP').length ? intradaySignals.filter((item) => item.signalState === 'ACTIVE_SETUP').map((item) => item.direction + ' ' + item.symbol).join(' · ') : 'Wait for a fully validated macro-aligned setup'}</small></div>
+          <div><span className="desk-kicker">MANUAL DAILY TRACKER · WAT · USER-ATTESTED</span><strong className="mt-1 block text-sm text-slate-100">Trades: {manualDeskMode ? manualLedger.trades + '/2' : 'UNVERIFIED'} · Losses: {manualDeskMode ? manualLedger.losses + '/2' : 'UNVERIFIED'}</strong><small className="text-slate-400">Locked currency legs: {manualDeskMode ? manualLedger.legs.join(', ') || 'None' : 'UNVERIFIED'}</small></div>
           <div><span className="desk-kicker">CURRENT MANUAL EQUITY</span><strong className="mt-1 block text-sm text-slate-100">{currentManualEquity === null ? 'NOT VERIFIED' : currentManualEquity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USD'}</strong><small className="text-slate-400">Starting balance + recorded closed-trade net P&amp;L</small></div>
         </div>
         {manualDeskMode && <div className="flex flex-wrap gap-2 text-xs"><button type="button" disabled={manualLedger.trades >= 2} onClick={() => saveManualLedger({ ...manualLedger, trades: manualLedger.trades + 1 })} className="rounded border border-white/20 px-3 py-2 disabled:opacity-40">LOG TRADE</button><button type="button" disabled={manualLedger.losses >= 2} onClick={() => saveManualLedger({ ...manualLedger, losses: manualLedger.losses + 1 })} className="rounded border border-white/20 px-3 py-2 disabled:opacity-40">LOG LOSS</button>{['USD','EUR','GBP','JPY','AUD','CHF','CAD'].map((leg) => <button key={leg} type="button" disabled={manualLedger.legs.includes(leg)} onClick={() => saveManualLedger({ ...manualLedger, legs: [...manualLedger.legs, leg] })} className="rounded border border-white/20 px-2 py-2 disabled:opacity-40">LOCK {leg}</button>)}</div>}
@@ -533,16 +533,16 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
       const item = quoteFor(symbol); const digits = symbol.slice(3) === 'JPY' ? 3 : symbol === 'XAUUSD' ? 2 : 5;
       return <article className="desk-quote-card" key={symbol}><span>{symbol === activeSatelliteSymbol ? 'SATELLITE #1 · ' + symbol : symbol === 'EURUSD' ? 'CORE #1 · EURUSD' : symbol === 'XAUUSD' ? 'CORE #2 · XAUUSD' : 'CORE #3 · USDJPY'}</span><strong>{display(item?.mid, digits)}</strong><small>{item?.freshness ?? 'PENDING'} · {item?.latencyMs ?? '—'} ms · {activeSession}</small><div><span>BID {display(item?.bid, digits)}</span><span>ASK {display(item?.ask, digits)}</span></div><small>SPREAD {display(item?.spread, symbol === 'XAUUSD' ? 2 : 6)} · {item?.quoteTimeUtc ?? 'NO QUOTE'}</small></article>;
     })}</div>
-    <div className="desk-syncline"><span>Swissquote public BBO · {latency ?? '—'} ms</span><span>Retrieved {quoteSync ?? '—'}</span><span>Frankfurter {fxStatus} · {fxSync ?? '—'}</span></div>
+    <div className="desk-syncline"><span>Swissquote public BBO · {latency ?? '—'} ms</span><span>Retrieved {quoteSync ?? '—'}</span><span>Frankfurter DAILY REFERENCE · NOT LIVE · {fxStatus} · {fxSync ?? '—'}</span></div>
     <article className="desk-panel mt-3" aria-label="Live execution signals">
-      <header><div><span className="desk-kicker">LIVE INTRADAY RESEARCH</span><h3>Macro-Aligned Intraday Setups</h3></div><small>5M PRICE ACTION · 1D ATR · AUTO REFRESH 60S</small></header>
+      <header><div><span className="desk-kicker">REFERENCE-ONLY INTRADAY RESEARCH</span><h3>Macro-Aligned Intraday Setups</h3></div><small>YAHOO OHLCV + SWISSQUOTE PUBLIC BBO · NOT BROKER EXECUTION DATA</small></header>
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         {intradaySignals.map((signal) => {
           const active = signal.signalState === 'ACTIVE_SETUP';
           const statusClass = active ? 'desk-good' : signal.signalState === 'SHIELD_BLOCKED' ? 'desk-warning' : 'text-slate-400';
           return <div className="rounded border border-white/10 bg-[#0b1017] p-3 min-w-0" key={signal.symbol}>
             <div className="flex items-center justify-between gap-2"><strong className="font-mono text-xs">{signal.symbol}</strong><span className={statusClass + ' text-[10px] font-mono'}>{signal.signalState.replaceAll('_', ' ')}</span></div>
-            <div className="mt-3 flex items-baseline justify-between"><b className="text-lg font-mono">{signal.direction}</b><span className="text-xs font-mono">{signal.confluenceScore}/100 confluence score</span></div>
+            <div className="mt-3 flex items-baseline justify-between"><b className="text-lg font-mono">{signal.direction}</b><span className="text-xs font-mono">{signal.confluenceScore}/100 confluence score · not a win-rate estimate</span></div>
             <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] font-mono text-slate-400">
               <span>ENTRY <b className="block text-slate-100">{display(signal.entryPrice, signal.symbol === 'XAUUSD' ? 2 : signal.symbol.endsWith('JPY') ? 3 : 5)}</b></span>
               <span>STOP <b className="block text-slate-100">{display(signal.stopLoss, signal.symbol === 'XAUUSD' ? 2 : signal.symbol.endsWith('JPY') ? 3 : 5)}</b></span>
@@ -550,6 +550,9 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
               <span>TP2 <b className="block text-slate-100">{display(signal.takeProfit2, signal.symbol === 'XAUUSD' ? 2 : signal.symbol.endsWith('JPY') ? 3 : 5)}</b></span>
             </div>
             <div className="mt-2 flex flex-wrap gap-1 text-[9px]">
+              <span className="rounded bg-white/5 px-2 py-1">CANDLES: {signal.candleDataSource}</span>
+              <span className="rounded bg-white/5 px-2 py-1">QUOTE: {signal.quoteDataSource}</span>
+              <span className="rounded bg-white/5 px-2 py-1">EXECUTION DATA: {signal.executionDataVerified ? 'BROKER VERIFIED' : 'NOT VERIFIED'}</span>
               <span className="rounded bg-white/5 px-2 py-1">Macro: {signal.direction === 'NONE' ? 'Not aligned' : 'Aligned'}</span>
               <span className="rounded bg-white/5 px-2 py-1">Z: {display(signal.zScore, 2)} · {signal.zScoreZone.replaceAll('_', ' ')}</span>
               <span className="rounded bg-white/5 px-2 py-1">H: {display(signal.hurst, 2)} · {signal.hurstRegime.replaceAll('_', ' ')}</span>
