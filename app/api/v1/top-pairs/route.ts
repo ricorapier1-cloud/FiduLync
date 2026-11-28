@@ -11,6 +11,7 @@ type Candidate = {
   direction: 'BUY' | 'SELL';
   macroScore: number;
   confidence: 'HIGH' | 'MODERATE' | 'LOW';
+  confidenceBasis: 'EVIDENCE_COMPLETENESS_NOT_WIN_PROBABILITY';
   evidenceCoveragePct: number;
   regime: string;
   supportingEvidence: string[];
@@ -90,6 +91,7 @@ export async function GET() {
           direction: dossier.fundamentalBias.includes('BULLISH') ? 'BUY' : 'SELL',
           macroScore: dossier.biasScore,
           confidence: dossier.confidence === 'HIGH' ? 'HIGH' : 'MODERATE',
+          confidenceBasis: 'EVIDENCE_COMPLETENESS_NOT_WIN_PROBABILITY',
           evidenceCoveragePct: Math.round((essential.filter(Boolean).length + optional.filter(Boolean).length) / 6 * 100),
           regime: dossier.macroRegime,
           supportingEvidence: dossier.supportingEvidence.filter((item) => !item.startsWith('No verified')).slice(0, 3),
@@ -116,6 +118,7 @@ export async function GET() {
         direction: gold.directionalVerdict === 'BULLISH' ? 'BUY' : 'SELL',
         macroScore: gold.goldBiasScore,
         confidence: gold.evidenceCoveragePct >= 80 ? 'MODERATE' : 'LOW',
+        confidenceBasis: 'EVIDENCE_COMPLETENESS_NOT_WIN_PROBABILITY',
         evidenceCoveragePct: gold.evidenceCoveragePct,
         regime: gold.liquidityRegime,
         supportingEvidence: gold.supportingEvidence.slice(0, 3),
@@ -143,6 +146,7 @@ export async function GET() {
       generatedAtUtc: new Date().toISOString(),
       snapshotAsOfUtc: snapshot.asOf,
       dataSourceState: snapshot.source,
+      confidenceBasis: 'EVIDENCE_COMPLETENESS_NOT_WIN_PROBABILITY',
       status: candidates.length ? 'CANDIDATES_AVAILABLE' : 'NO_QUALIFIED_CANDIDATES',
       candidates,
       methodology: 'Screens the supported G8 FX cross universe and independent XAU/USD macro engine. FX candidates require fresh provider policy and inflation evidence; COT and yield inputs increase evidence coverage. Gold uses official Treasury history, CBOE VIX, CFTC positioning and optional approved FRED credit-spread evidence. Scores rank relative macro evidence; they are not a calibrated win probability.',
