@@ -21,7 +21,7 @@ let fredPermissionCleanup: Promise<void> | null = null;
 export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnapshot> {
   let snapshot: MacroSnapshot;
   const fredStorageAllowed = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED?.trim().toLowerCase() !== 'false';
-  const cacheKey = fredStorageAllowed ? 'macro:snapshot:v4:fred' : 'macro:snapshot:v4:no-fred';
+  const cacheKey = fredStorageAllowed ? 'macro:snapshot:v5:fred' : 'macro:snapshot:v5:no-fred';
   try {
     snapshot = await getCachedData(cacheKey, async () => sanitizeMacroSnapshotPermissions(await loadMacroSnapshot()), 900, forceRefresh);
     if (!fredStorageAllowed) {
@@ -29,6 +29,8 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
         fredPermissionCleanup = Promise.all([
           deleteCachedData('macro:snapshot:v3'),
           deleteCachedData('macro:snapshot:v4:fred'),
+          deleteCachedData('macro:snapshot:v4:no-fred'),
+          deleteCachedData('macro:snapshot:v5:fred'),
           ...['DFII10', 'T10YIE', 'DGS2', 'DTB3', 'BAMLH0A0HYM2', 'VIXCLS'].map((seriesId) => deleteCachedData(`xau:fred:${seriesId}:v1`)),
           purgeFREDStorageArtifacts(snapshot),
         ]).then(() => undefined).catch((error) => {
