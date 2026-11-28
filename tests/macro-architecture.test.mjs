@@ -78,10 +78,10 @@ test('architecture: macro context API is read-only and contains no order executi
   assert.match(macroContextRoute, /decision_status/);
   assert.match(macroContextRoute, /UNVERIFIED_CALENDAR/);
   assert.match(macroContextRoute, /news_lockout: newsLockoutActive/);
-  assert.match(macroContextRoute, /const newsLockoutActive = snapshot\.calendarSource !== 'provider'/);
+  assert.match(macroContextRoute, /const newsLockoutActive = !calendarVerified/);
+  assert.match(macroContextRoute, /pointInTimeIntegrity\.status === 'VERIFIED'/);
   assert.match(macroContextRoute, /Retry-After/);
 });
-
 test('architecture: manual journal is retired and legacy route redirects to account intelligence', () => {
   assert.match(notebookPage, /redirect\('\/accounts'\)/);
   const shell = read('../components/PlatformShell.tsx');
