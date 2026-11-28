@@ -11,7 +11,7 @@ function inflationFreshnessDays(currencyCode: string): number {
 }
 
 function isFreshObservation(date: string | undefined, maxAgeDays: number): boolean {
-  if (!date || !/(?:Z|[+-]\\d{2}:?\\d{2})$|^\\d{4}-\\d{2}(?:-\\d{2})?$/.test(date)) return false;
+  if (!date || !/(?:Z|[+-]\d{2}:?\d{2})$|^\d{4}-\d{2}(?:-\d{2})?$/.test(date)) return false;
   const timestamp = Date.parse(date);
   const age = Date.now() - timestamp;
   return Number.isFinite(timestamp) && age >= -5 * 60_000 && age <= maxAgeDays * 86_400_000;
