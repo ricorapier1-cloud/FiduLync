@@ -109,7 +109,7 @@ export async function GET(request: Request) {
         const quoteAgeMs = now - Date.parse(quote.quote_time);
         const receivedAgeMs = now - Date.parse(quote.received_at);
         const fresh = Number.isFinite(quoteAgeMs) && Number.isFinite(receivedAgeMs)
-          && quoteAgeMs >= -5_000 && quoteAgeMs <= 15_000
+          && quoteAgeMs >= -5_000 && quoteAgeMs <= 25_000
           && receivedAgeMs >= -5_000 && receivedAgeMs <= 30_000;
         return {
           symbol: quote.symbol,
@@ -159,7 +159,7 @@ export async function GET(request: Request) {
             : !accountFresh ? 'MT5 account publisher heartbeat is stale.'
               : 'All four core instruments require fresh broker quotes.',
         pollIntervalSeconds: 15,
-        staleAfterSeconds: 15,
+        staleAfterSeconds: 25,
         latencyMs: Math.max(0, Math.round(performance.now() - started)),
         status: executionGrade ? 'HEALTHY' : healthy > 0 ? 'PARTIAL' : 'UNAVAILABLE',
         quotes,
@@ -186,9 +186,12 @@ export async function GET(request: Request) {
     return { ...quote, bid: normalize(quote.bid), ask: normalize(quote.ask), mid: normalize(quote.mid), spread: normalize(quote.spread), ageMs, freshness };
   });
   const healthy = quotes.filter((quote) => quote.freshness === 'LIVE').length;
+  const latestQuoteUtc = quotes.map((quote) => quote.quoteTimeUtc).filter((value): value is string => Boolean(value))
+    .sort((left, right) => Date.parse(right) - Date.parse(left))[0] ?? null;
   return NextResponse.json({
     schemaVersion: '1.0.0',
     generatedAtUtc: new Date().toISOString(),
+    latestQuoteUtc,
     source: 'Swissquote public BBO reference feed',
     marketDataQuality: 'REFERENCE_ONLY',
     executionGrade: false,
