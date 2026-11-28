@@ -89,13 +89,11 @@ export function evaluateSovereignShield(input: SovereignShieldInput): SovereignS
   const reasons = [...market.blockReasons];
   if (!governanceVerified) reasons.push('TRADE_GOVERNANCE_LEDGER_UNVERIFIED');
   else {
-    if (governance.tradesToday! >= 2) reasons.push('MAX_TRADES_PER_DAY');
     if (governance.lossesToday! >= 2) reasons.push('MAX_LOSSES_PER_DAY');
     if (governance.rollingSevenDayDrawdownPct! <= -4) reasons.push('ROLLING_7D_DRAWDOWN_LIMIT');
   }
 
   const governanceBlock = !governanceVerified
-    || reasons.includes('MAX_TRADES_PER_DAY')
     || reasons.includes('MAX_LOSSES_PER_DAY')
     || reasons.includes('ROLLING_7D_DRAWDOWN_LIMIT');
   const hardBlock = !market.marketConditionsClear || governanceBlock;
