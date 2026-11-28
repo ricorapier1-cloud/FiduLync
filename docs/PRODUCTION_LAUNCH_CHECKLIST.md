@@ -59,10 +59,10 @@ The service API also accepts MACROLYNC_API_SECRET or the legacy ALGO_PRIVATE_API
 2. Set separate random `MT5_ACCOUNT_INGEST_TOKEN` and `MT5_ACCOUNT_READ_TOKEN` values in Vercel Production (32+ characters each). Redeploy after setting them.
 3. In MT5, allow `https://fidulync.vercel.app` in Tools → Options → Expert Advisors → Allow WebRequest.
 4. Install `public/MacroLyncAccountPublisher.mq5` under MQL5/Experts, compile in MetaEditor, attach it to a chart, and set `InpAccountIngestToken` to the ingest token.
-5. Open `/accounts`, enter the read token, and verify that account observation time, positions and deal history update.
+5. Open `/accounts`, enter the read token, and verify that account observation time, positions, deal history, authenticated broker quotes and closed M5/D1 candle timestamps update.
 6. Verify the account mode, deposit currency, broker server and P&L against the MT5 terminal before relying on analytics.
 
-The publisher is read-only and has no order execution functions. It sends the most recent configured history window, capped at 500 deal records per synchronization. Deal times are explicitly broker-server times; only the observation timestamp is UTC. Revoke the relevant Vercel token to disable ingestion or dashboard reads.
+The publisher is read-only and has no order execution functions. It sends broker quotes every 15 seconds, closed M5/D1 bars and up to 500 deal records every five minutes. Deal times are explicitly broker-server times; only the observation timestamp is UTC. Revoke the relevant Vercel token to disable ingestion or dashboard reads.
 
 ## Release gates
 
