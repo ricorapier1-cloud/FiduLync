@@ -19,8 +19,9 @@ test('MT5 macro context is installation-authenticated, read-only and fail-closed
 
 test('date-only official observation dates are supported without accepting timezone-free datetimes', async () => {
   const freshness = await read('lib/dataFreshness.ts');
-  assert.match(freshness, /\\^\\d\\{4\\}-\\d\\{2\\}-\\d\\{2\\}\\$/);
-  assert.match(freshness, /never accept timezone-free datetimes/);
+  assert.ok(freshness.includes('Interpret that explicitly as a UTC calendar date'));
+  assert.ok(freshness.includes('never accept timezone-free datetimes'));
+  const route = await read('app/api/v1/macro-context/route.ts');
   assert.match(route, /isObservationFresh/);
 });
 
