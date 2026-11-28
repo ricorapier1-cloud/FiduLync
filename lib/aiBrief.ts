@@ -22,7 +22,8 @@ function ruleBasedBrief(snapshot: Awaited<ReturnType<typeof getMacroSnapshot>>):
   const strongest = strengths[0];
   const weakest = strengths.at(-1);
   const crowded = snapshot.cot
-    .filter((position) => position.percentile >= 90 || position.percentile <= 10)
+    .filter((position) => position.sampleSize !== undefined && position.sampleSize >= 52
+      && position.percentile !== null && (position.percentile >= 90 || position.percentile <= 10))
     .map((position) => position.market);
   const nextCatalyst = snapshot.catalysts
     .filter((item) => Date.parse(item.scheduledAt) >= Date.now() && item.impact === 'High')
