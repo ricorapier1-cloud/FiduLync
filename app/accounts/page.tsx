@@ -233,9 +233,12 @@ export default function AccountsPage() {
 
   useEffect(() => {
     if (!token || !selectedAccountKey || status !== 'CONNECTED') return;
-    void refreshMarketData(token, selectedAccountKey);
+    const initialTimer = window.setTimeout(() => void refreshMarketData(token, selectedAccountKey), 0);
     const timer = window.setInterval(() => void refreshMarketData(token, selectedAccountKey), 15_000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(timer);
+    };
   }, [token, selectedAccountKey, status, refreshMarketData]);
 
   const selected = payload?.accounts.find((account) => account.account_key === selectedAccountKey) ?? payload?.accounts[0] ?? null;
