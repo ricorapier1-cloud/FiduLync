@@ -11,8 +11,8 @@ function timestamp(value?: string) {
   return Number.isFinite(parsed) ? new Date(parsed).toISOString().replace('T', ' ').replace('.000Z', ' UTC') : 'Invalid timestamp';
 }
 function sourceStatus(snapshot: MacroSnapshot) {
-  return snapshot.source === 'provider' ? 'PROVIDER DATA'
-    : snapshot.source === 'partial' ? 'PARTIAL PROVIDER DATA' : 'UNAVAILABLE';
+  return snapshot.source === 'provider' ? 'LATEST PUBLISHED · PROVIDER VERIFIED'
+    : snapshot.source === 'partial' ? 'PARTIAL · PROVIDER VERIFIED INPUTS' : 'UNAVAILABLE';
 }
 
 export default function MacroIntelligenceDashboard({ snapshot }: { snapshot: MacroSnapshot }) {
@@ -30,11 +30,11 @@ export default function MacroIntelligenceDashboard({ snapshot }: { snapshot: Mac
           <div>
             <p className="font-mono text-[10px] tracking-[0.24em] text-emerald-300">FIDULYNC / MACROLYNC INTELLIGENCE</p>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Global macro & fundamental terminal</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">Understand the economic, monetary-policy and cross-asset forces that can drive currencies. This terminal is research context—not a technical signal, trade instruction or broker quote screen.</p>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">Understand the economic, monetary-policy and cross-asset forces that can drive currencies. This is a research terminal, not an execution or broker-quote screen. Macro statistics update on their official release schedules; they are latest published observations, not tick-real-time prices. COT is weekly.</p>
           </div>
           <div className="flex flex-wrap gap-3 text-[10px] font-mono">
             <span className="rounded-lg border border-white/10 px-3 py-2">DATA: {sourceStatus(snapshot)}</span>
-            <span className="rounded-lg border border-white/10 px-3 py-2">SNAPSHOT: {timestamp(snapshot.asOf)}</span>
+            <span className="rounded-lg border border-white/10 px-3 py-2">RETRIEVED: {timestamp(snapshot.asOf)}</span>
           </div>
         </header>
 
@@ -73,7 +73,7 @@ export default function MacroIntelligenceDashboard({ snapshot }: { snapshot: Mac
               <div className="rounded-lg bg-black/20 p-3"><p className="text-[10px] text-slate-500">Unemployment</p><p className="mt-1 font-mono text-xl">{format(us?.unemploymentRatePct, '%')}</p><p className="text-[10px] text-slate-600">{us?.unemploymentPeriod ?? 'Period unavailable'}</p></div>
               <div className="rounded-lg bg-black/20 p-3"><p className="text-[10px] text-slate-500">Nonfarm payroll change</p><p className="mt-1 font-mono text-xl">{format(us?.nonfarmPayrollMonthlyChangeThousands, 'k')}</p><p className="text-[10px] text-slate-600">{us?.payrollPeriod ?? 'Period unavailable'}</p></div>
             </div>
-            <p className="mt-4 text-[10px] text-slate-500">US data source manifest: {us?.sources.join(' · ') || 'Unavailable'}</p>
+            <p className="mt-4 text-[10px] text-slate-500">US sources: {us?.sources.join(' · ') || 'Unavailable'} · retrieved {timestamp(us?.retrievedAt)}</p>
           </article>
         </section>
 
@@ -81,9 +81,9 @@ export default function MacroIntelligenceDashboard({ snapshot }: { snapshot: Mac
           <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="font-mono text-[10px] tracking-widest text-emerald-300">MONETARY POLICY MONITOR</p><h2 className="mt-2 text-lg font-semibold">Central-bank policy & inflation matrix</h2></div><Link href="/analytics" className="text-xs text-emerald-300 hover:underline">Cross-asset observations →</Link></div>
           <div className="mt-4 overflow-x-auto">
             <table className="w-full min-w-[780px] text-left text-xs">
-              <thead className="text-slate-500"><tr><th className="p-3">Currency</th><th className="p-3">Central bank</th><th className="p-3">Policy rate</th><th className="p-3">Inflation</th><th className="p-3">Policy − inflation proxy</th><th className="p-3">Policy observation</th></tr></thead>
+              <thead className="text-slate-500"><tr><th className="p-3">Currency</th><th className="p-3">Central bank</th><th className="p-3">Policy rate</th><th className="p-3">Inflation</th><th className="p-3">Policy − inflation proxy</th><th className="p-3">Policy / inflation observations</th></tr></thead>
               <tbody>{currencies.map((item) => (
-                <tr key={item.code} className="border-t border-white/[0.06]"><td className="p-3 font-mono font-semibold">{item.code}</td><td className="p-3">{item.centralBank}</td><td className="p-3 font-mono">{format(item.policyRate, '%')}<span className="ml-1 text-[10px] text-slate-600">{item.policyRateProvider ?? item.policyRateSource}</span></td><td className="p-3 font-mono">{format(item.inflation, '%')}<span className="ml-1 text-[10px] text-slate-600">{item.inflationProvider ?? item.inflationSource}</span></td><td className="p-3 font-mono">{format(item.policyRate - item.inflation, ' pp')}</td><td className="p-3 text-slate-500">{timestamp(item.policyRateAsOf)}</td></tr>
+                <tr key={item.code} className="border-t border-white/[0.06]"><td className="p-3 font-mono font-semibold">{item.code}</td><td className="p-3">{item.centralBank}</td><td className="p-3 font-mono">{format(item.policyRate, '%')}<span className="ml-1 text-[10px] text-slate-600">{item.policyRateProvider ?? item.policyRateSource}</span></td><td className="p-3 font-mono">{format(item.inflation, '%')}<span className="ml-1 text-[10px] text-slate-600">{item.inflationProvider ?? item.inflationSource}</span></td><td className="p-3 font-mono">{format(item.policyRate - item.inflation, ' pp')}</td><td className="p-3 text-slate-500"><span>Policy: {timestamp(item.policyRateAsOf)}</span><br /><span>Inflation: {timestamp(item.inflationAsOf)}</span></td></tr>
               ))}</tbody>
             </table>
             {currencies.length === 0 && <p className="p-4 text-xs text-slate-500">No verified G8 policy and inflation profiles are available.</p>}
@@ -94,7 +94,7 @@ export default function MacroIntelligenceDashboard({ snapshot }: { snapshot: Mac
         <section className="grid gap-5 lg:grid-cols-2">
           <article className="rounded-xl border border-white/10 bg-[#0b141c] p-5">
             <p className="font-mono text-[10px] tracking-widest text-emerald-300">INSTITUTIONAL POSITIONING</p><h2 className="mt-2 text-lg font-semibold">CFTC COT</h2>
-            <div className="mt-4 space-y-2">{snapshot.cot.slice(0, 8).map((item) => <div key={item.market} className="flex items-center justify-between border-b border-white/[0.06] py-2 text-xs"><span>{item.market}</span><span className="font-mono text-slate-300">{item.netContracts.toLocaleString('en-US')} · P{item.percentile.toFixed(0)}</span></div>)}</div>
+            <div className="mt-4 space-y-2">{snapshot.cot.slice(0, 8).map((item) => <div key={item.market} className="border-b border-white/[0.06] py-2 text-xs"><div className="flex items-center justify-between gap-3"><span>{item.market}</span><span className="font-mono text-slate-300">{item.netContracts.toLocaleString('en-US')} · P{item.percentile.toFixed(0)} · n={item.sampleSize ?? '—'}</span></div><p className="mt-1 text-[10px] text-slate-500">Position date: {timestamp(item.asOf)} · Publication timestamp: {item.publishedAt ? timestamp(item.publishedAt) : 'not supplied by source'}</p></div>)}</div>
             {snapshot.cot.length === 0 && <p className="mt-3 text-xs text-slate-500">Verified COT observations unavailable.</p>}
             <p className="mt-3 text-[10px] text-slate-500">Weekly futures positioning, not live order flow. Observation date and publication date must not be conflated.</p>
           </article>
