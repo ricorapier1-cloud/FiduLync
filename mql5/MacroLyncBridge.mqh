@@ -591,7 +591,7 @@ bool MacroLyncEvaluateAccountGuardian(MacroLyncAccountGuardian &guardian, const 
       }
 
       positionNetPnl[found] += netPnl;
-      if(entry == DEAL_ENTRY_IN) positionHasEntry[found] = true;
+      if(entry == DEAL_ENTRY_IN || entry == DEAL_ENTRY_INOUT) positionHasEntry[found] = true;
       if((entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_INOUT) && dealTime >= startOfDay)
          positionClosedToday[found] = true;
    }
