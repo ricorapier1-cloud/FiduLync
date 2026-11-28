@@ -456,7 +456,10 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
                 <div className="mt-2 pt-2 border-t border-slate-800/80 text-[11px] text-slate-400 flex flex-wrap justify-between gap-1">
                   <span>Dollar Risk: <strong className="text-slate-200">${dollarRisk.toFixed(2)}</strong></span>
                   <span>Stop: <strong className="text-slate-200">{stopDistancePips === null ? '—' : stopDistancePips.toFixed(1) + ' pips'}</strong></span>
-                  {ticketSymbol === 'USDJPY' && <span>Pip Val: <strong className="text-slate-200">{liveAsk !== null && liveAsk > 0 ? '
+                  {ticketSymbol === 'USDJPY' && <span>Pip Val: <strong className="text-slate-200">{liveAsk !== null && liveAsk > 0 ? '$' + (1000 / liveAsk).toFixed(2) : 'UNAVAILABLE'}</strong></span>}
+                  {!balanceVerified && <span className="w-full text-amber-300">ENTER REAL ACCOUNT BALANCE TO COMPUTE LOTS</span>}
+                  {ticketSymbol === 'XAUUSD' && <span className="w-full text-amber-300">LOT SIZING LOCKED · BROKER CONTRACT SPECIFICATION REQUIRED</span>}
+                  {balanceVerified && !isSizingEvidenceComplete && ticketSymbol !== 'XAUUSD' && <span className="w-full text-amber-300">LOT SIZING LOCKED · LIVE PRICE / VALID STOP UNAVAILABLE</span>}
                 </div>
               </div>
 
