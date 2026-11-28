@@ -245,7 +245,7 @@ export async function POST(request: Request) {
       : null;
     const liveBrokerSpread = num(payload.liveBrokerSpread, null);
     const spreadSymbol = str(payload.spreadSymbol, 16);
-    if (dailyClosedTrades !== null && Number.isSafeInteger(dailyClosedTrades) && dailyClosedTrades >= 0
+    if (snapshot.account_mode === 'REAL' && dailyClosedTrades !== null && Number.isSafeInteger(dailyClosedTrades) && dailyClosedTrades >= 0
       && dailyLosses !== null && Number.isSafeInteger(dailyLosses) && dailyLosses >= 0
       && dailyLosses <= dailyClosedTrades && dailyStatsTimeBasis === 'BROKER_SERVER_DAY') {
       try {
