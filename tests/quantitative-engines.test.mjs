@@ -874,12 +874,12 @@ function collectProductionSourceFiles(directory) {
 test('repository-wide static audit rejects default non-zero balances, seeded trades and mock prices', () => {
   const roots = ['app', 'components', 'lib', 'hooks', 'store', 'types'];
   const files = roots.flatMap((root) => collectProductionSourceFiles(join(repositoryRoot, root)));
-  const source = files.map((file) => readFileSync(file, 'utf8')).join('\\n');
+  const source = files.map((file) => readFileSync(file, 'utf8')).join('\n');
   assert.ok(files.length > 0, 'production source directories must be scanned');
-  assert.doesNotMatch(source, /\\b(?:accountBalance|accountEquity|ticketBalance|startingBalance|initialBalance)\\s*(?::\\s*number(?:\\s*\\|\\s*null)?\\s*)?=\\s*\\d+(?:\\.\\d+)?/);
-  assert.doesNotMatch(source, /\\b(?:sample|demo|mock)(?:Trades|Positions|Journal|Portfolio)\\s*=\\s*\\[\\s*\\{/i);
-  assert.doesNotMatch(source, /\\b(?:mock|demo|fake)(?:Price|Bid|Ask|Quote)\\s*[:=]\\s*\\d/i);
+  assert.doesNotMatch(source, /\b(?:accountBalance|accountEquity|ticketBalance|startingBalance|initialBalance)\s*(?::\s*number(?:\s*\|\s*null)?\s*)?=\s*\d+(?:\.\d+)?/);
+  assert.doesNotMatch(source, /\b(?:sample|demo|mock)(?:Trades|Positions|Journal|Portfolio)\s*=\s*\[\s*\{/i);
+  assert.doesNotMatch(source, /\b(?:mock|demo|fake)(?:Price|Bid|Ask|Quote)\s*[:=]\s*\d/i);
   const desk = read('../app/components/DeskTerminal.tsx');
-  assert.match(desk, /ticketBalance \\+ manualClosedTradesPnl/);
+  assert.match(desk, /ticketBalance \+ manualClosedTradesPnl/);
   assert.match(desk, /currentManualEquity/);
 });
