@@ -202,7 +202,7 @@ export function runWalkForwardAnalysis(
   const outOfSampleFoldRatio = 0.15;
   const initialTrainingCount = Math.floor(ordered.length * initialTrainingRatio);
   const foldSize = Math.floor(ordered.length * outOfSampleFoldRatio);
-  if (foldSize < 1 || ordered.length - initialTrainingCount < minimumOutOfSampleTrades) return insufficient();
+  if (foldSize < 1 || initialTrainingCount < 1) return insufficient();
 
   const folds: WalkForwardFold[] = [];
   const outOfSampleTrades: TradeInput[] = [];
