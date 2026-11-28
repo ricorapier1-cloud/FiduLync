@@ -28,7 +28,7 @@ const faqs = [
   },
   {
     q: 'How does Portfolio & Accounts connect to MT5?',
-    a: 'The optional Portfolio & Accounts workspace uses a read-only publisher running inside your MT5 terminal. It sends account snapshots, open positions and deal history through a private ingestion token. A separate read token protects the dashboard. Broker master/investor passwords are never requested or transmitted; the connector has no order execution functions.',
+    a: 'The optional Portfolio & Accounts workspace uses a read-only publisher running inside your MT5 terminal. It sends account snapshots, open positions, deal history, broker bid/ask quotes and closed M5/D1 candles through a private ingestion token. A separate read token protects the dashboard. Broker master/investor passwords are never requested or transmitted; the connector has no order execution functions.',
   },
   {
     q: 'Does MacroLync execute trades or provide financial advice?',
