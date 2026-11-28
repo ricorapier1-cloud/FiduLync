@@ -42,11 +42,12 @@ export default async function CrossAssetMacroPage() {
         <header className="border-b border-white/10 pb-6">
           <p className="font-mono text-[10px] tracking-[0.2em] text-emerald-300">MACROLYNC / CROSS-ASSET RESEARCH</p>
           <h1 className="mt-3 text-3xl font-semibold">Cross-asset macro observations</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">Source-attributed observations for macro research. These are not executable quotes. Each value retains its publisher observation date; unavailable fields remain blank rather than being estimated.</p>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">Source-attributed observations for macro research. These are not executable quotes or tick-real-time prices. Macro statistics appear at their latest published observation; their release cadence is set by each publisher. Each value retains its observation period, and unavailable fields remain blank rather than being estimated.</p>
           <div className="mt-4 flex flex-wrap gap-4 font-mono text-[10px] text-slate-400">
             <span>SNAPSHOT: {sourceLabel}</span>
             <span>AS OF: {dateLabel(snapshot.asOf)}</span>
-            <span>RETRIEVED: {dateLabel(us?.retrievedAt)}</span>
+            <span>BLS/BEA RETRIEVED: {dateLabel(us?.retrievedAt)}</span>
+            <span>FRED RETRIEVED: {dateLabel(us?.fredRetrievedAt)}</span>
           </div>
         </header>
 
@@ -78,7 +79,7 @@ export default async function CrossAssetMacroPage() {
                     <td className="p-3 font-mono">{valueLabel(item.policyRate, '%')} <span className="text-[10px] text-slate-500">{item.policyRateProvider ?? item.policyRateSource ?? ''}</span></td>
                     <td className="p-3 font-mono">{valueLabel(item.inflation, '%')} <span className="text-[10px] text-slate-500">{item.inflationProvider ?? item.inflationSource ?? ''}</span></td>
                     <td className="p-3 font-mono">{valueLabel(item.policyRate - item.inflation, ' pp')}</td>
-                    <td className="p-3 text-slate-500">{dateLabel(item.policyRateAsOf)}</td>
+                    <td className="p-3 text-slate-500">Policy: {dateLabel(item.policyRateAsOf)}<br />Inflation: {dateLabel(item.inflationAsOf)}</td>
                   </tr>
                 ))}
                 {snapshot.currencies.filter((item) => ['USD','EUR','GBP','JPY','CHF','CAD','AUD','NZD'].includes(item.code)).length === 0 && (
@@ -94,10 +95,10 @@ export default async function CrossAssetMacroPage() {
           <h2 className="mb-3 text-lg font-semibold">CFTC positioning context</h2>
           <div className="overflow-x-auto rounded-xl border border-white/10">
             <table className="w-full min-w-[620px] text-left text-xs">
-              <thead className="bg-white/[0.04] text-slate-400"><tr><th className="p-3">Market</th><th className="p-3">Net contracts</th><th className="p-3">Historical percentile</th><th className="p-3">Weekly change</th><th className="p-3">Observation</th></tr></thead>
+              <thead className="bg-white/[0.04] text-slate-400"><tr><th className="p-3">Market</th><th className="p-3">Net contracts</th><th className="p-3">Historical percentile</th><th className="p-3">Weekly change</th><th className="p-3">Position date / publication</th></tr></thead>
               <tbody>
                 {snapshot.cot.map((item) => (
-                  <tr key={item.market} className="border-t border-white/[0.06]"><td className="p-3 font-mono">{item.market}</td><td className="p-3 font-mono">{item.netContracts.toLocaleString('en-US')}</td><td className="p-3 font-mono">{item.percentile.toFixed(1)}%</td><td className="p-3 font-mono">{item.weeklyChange.toLocaleString('en-US')}</td><td className="p-3 text-slate-500">{dateLabel(item.asOf)}</td></tr>
+                  <tr key={item.market} className="border-t border-white/[0.06]"><td className="p-3 font-mono">{item.market}</td><td className="p-3 font-mono">{item.netContracts.toLocaleString('en-US')}</td><td className="p-3 font-mono">{item.percentile.toFixed(1)}%</td><td className="p-3 font-mono">{item.weeklyChange.toLocaleString('en-US')}</td><td className="p-3 text-slate-500">Position: {dateLabel(item.asOf)}<br />Published: {item.publishedAt ? dateLabel(item.publishedAt) : 'Not supplied'}<br />Sample: {item.sampleSize ?? 'Unavailable'}</td></tr>
                 ))}
                 {snapshot.cot.length === 0 && <tr><td className="p-4 text-slate-500" colSpan={5}>COT positioning is unavailable or not verified under the current provider policy.</td></tr>}
               </tbody>
