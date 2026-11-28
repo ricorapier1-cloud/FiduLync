@@ -220,7 +220,7 @@ export async function GET(request: Request) {
     const hasFreshQuoteCot = snapshot.cotSource === 'provider' && snapshot.cot.some((position) => position.market === dossier.quote
       && position.sampleSize !== undefined && position.sampleSize >= 52 && position.percentile !== null && isFreshCotReport(position.reportDate));
     const selectedBias = symbolBiases[symbol];
-    const allowedToTrade = Boolean(validationGate.verified && sovereignShield.allowedToTrade
+    const allowedToTrade = Boolean(validationGate.verified && pointInTimeIntegrity.status === 'VERIFIED' && sovereignShield.allowedToTrade
       && selectedBias?.biasScore !== null
       && selectedBias?.directionalVerdict !== 'INSUFFICIENT_EVIDENCE'
       && Math.abs(selectedBias?.biasScore ?? 0) >= 20
@@ -231,8 +231,9 @@ export async function GET(request: Request) {
     const deskStatus: MacroContextPayload['deskStatus'] = !effectiveAllowed ? 'LOCKOUT'
       : sovereignShield.maxAllowedRiskPct <= 0.5 ? 'HALF_RISK' : 'CLEARED';
     const deskLockoutReason = effectiveAllowed ? null
-      : !validationGate.verified ? validationGate.blockers[0] ?? 'STRATEGY_VALIDATION_NOT_APPROVED'
-        : !sovereignShield.governanceVerified ? 'MT5 account governance ledger is not connected and verified'
+      : pointInTimeIntegrity.status !== 'VERIFIED' ? pointInTimeIntegrity.blockers[0] ?? 'POINT_IN_TIME_PROVENANCE_NOT_VERIFIED'
+        : !validationGate.verified ? validationGate.blockers[0] ?? 'STRATEGY_VALIDATION_NOT_APPROVED'
+          : !sovereignShield.governanceVerified ? 'MT5 account governance ledger is not connected and verified'
           : activeSession === 'CLOSED' ? 'Outside London/New York execution session'
             : newsLockoutActive ? 'Economic calendar is unavailable, stale, or inside the event-risk lockout window'
               : selectedSignal?.blockers?.[0] ?? 'No active broker-verified macro-aligned setup';
