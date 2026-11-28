@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { buildGoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
 import { getMacroSnapshot } from '@/lib/macroEngine';
 import { evaluateSovereignShield } from '@/lib/quant/sovereignShield';
+import { getStrategyValidationGate } from '@/lib/quant/strategyValidationGate';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -55,9 +56,15 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   try {
-    const snapshot = await getMacroSnapshot();
+    const [snapshot, validationGate] = await Promise.all([getMacroSnapshot(), getStrategyValidationGate()]);
     const context = await buildGoldMacroContext(snapshot);
-    const highImpactEvents = snapshot.catalysts.filter((event) => event.impact === 'High')
+    const calendarRetrievedAtMs = snapshot.calendarRetrievedAtUtc ? Date.parse(snapshot.calendarRetrievedAtUtc) : NaN;
+    const calendarCoverageEndMs = snapshot.calendarCoverageEndUtc ? Date.parse(snapshot.calendarCoverageEndUtc) : NaN;
+    const calendarVerified = snapshot.calendarSource === 'provider' && Boolean(snapshot.calendarProvider)
+      && Number.isFinite(calendarRetrievedAtMs) && Date.now() - calendarRetrievedAtMs <= 60 * 60_000
+      && Date.now() - calendarRetrievedAtMs >= -30_000
+      && Number.isFinite(calendarCoverageEndMs) && calendarCoverageEndMs >= Date.now() + 24 * 60 * 60_000;
+    const highImpactEvents = (calendarVerified ? snapshot.catalysts : []).filter((event) => event.impact === 'High')
       .map((event) => ({ event, minutes: (Date.parse(event.scheduledAt) - Date.now()) / 60_000 }))
       .filter((item) => Number.isFinite(item.minutes));
     const nearestEvent = [...highImpactEvents].sort((a, b) => Math.abs(a.minutes) - Math.abs(b.minutes))[0];
@@ -73,11 +80,22 @@ export async function GET(request: Request): Promise<NextResponse> {
       cotPercentiles: snapshot.cot
         .filter((position) => position.sampleSize !== undefined && position.sampleSize >= 52
           && position.percentile !== null && isFreshCotReport(position.reportDate))
-        .map((position) => ({ symbol: position.market, percentile: position.percentile })),
+        .map((position) => ({ symbol: position.market, percentile: position.percentile as number })),
       governance: { tradesToday: null, lossesToday: null, rollingSevenDayDrawdownPct: null, ledgerVerified: false },
     });
+    const newsLockoutActive = !calendarVerified || Boolean(eventMinutesAway !== null && Math.abs(eventMinutesAway) <= 30);
     const status = context.overallState === 'AVAILABLE' ? 200 : 503;
-    return NextResponse.json({ ...context, sovereignShield: shield }, { status, headers: responseHeaders });
+    return NextResponse.json({
+      ...context,
+      calendarVerified,
+      calendarRetrievedAtUtc: calendarVerified ? snapshot.calendarRetrievedAtUtc : null,
+      calendarCoverageEndUtc: calendarVerified ? snapshot.calendarCoverageEndUtc : null,
+      newsLockoutActive,
+      strategyValidationStatus: validationGate.status,
+      strategyValidationBlockers: validationGate.blockers,
+      allowedToTrade: false,
+      sovereignShield: shield,
+    }, { status, headers: responseHeaders });
   } catch (error) {
     console.error('XAU/USD macro context engine failed:', error);
     const generatedAtUtc = new Date().toISOString();
