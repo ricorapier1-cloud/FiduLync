@@ -178,7 +178,7 @@ export async function GET(request: Request) {
         lockout_rule: '30 minutes before through 15 minutes after scheduled high-impact events',
         active_event: activeLockout ?? null,
         upcoming_high_impact_events: highImpactEvents,
-        calendar_status: calendarVerified ? 'PROVIDER' : 'REFERENCE_OR_UNAVAILABLE',
+        calendar_status: calendarVerified ? 'PROVIDER' : 'UNAVAILABLE',
         calendar_retrieved_at_utc: snapshot.calendarRetrievedAt ?? null,
       },
       provenance: {
