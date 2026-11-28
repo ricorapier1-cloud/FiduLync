@@ -45,6 +45,11 @@ datetime ServerTimeToUtc(datetime serverTime)
    return (datetime)((long)serverTime - offsetSeconds);
 }
 
+int ServerUtcOffsetMinutes()
+{
+   return (int)MathRound(((long)TimeTradeServer() - (long)TimeGMT()) / 60.0);
+}
+
 string IsoUtc(datetime value)
 {
    MqlDateTime dt;
@@ -192,7 +197,9 @@ string BuildQuotes()
       json += "\"quoteTimeUtc\":\"" + IsoUtc(quoteUtc) + "\",";
       json += "\"spreadPoints\":" + DoubleToString(spreadPoints, 2) + ",";
       json += "\"digits\":" + IntegerToString(digits) + ",";
-      json += "\"point\":" + DoubleToString(point, 12);
+      json += "\"point\":" + DoubleToString(point, 12) + ",";
+      json += "\"serverUtcOffsetMinutes\":" + IntegerToString(ServerUtcOffsetMinutes()) + ",";
+      json += "\"timeBasis\":\"BROKER_SERVER_CURRENT_OFFSET\"";
       json += "}";
    }
    json += "]";
