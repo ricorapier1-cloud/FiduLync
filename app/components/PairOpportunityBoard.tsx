@@ -8,6 +8,7 @@ type Opportunity = {
   direction: 'BUY' | 'SELL';
   macroScore: number;
   confidence: 'HIGH' | 'MODERATE' | 'LOW';
+  confidenceBasis?: 'EVIDENCE_COMPLETENESS_NOT_WIN_PROBABILITY';
   evidenceCoveragePct: number;
   regime: string;
   supportingEvidence: string[];
@@ -76,7 +77,7 @@ export default function PairOpportunityBoard({ onSelectPair }: { onSelectPair: (
                     <div className="flex items-center gap-2"><span className="text-xs font-mono text-slate-500">#{String(item.rank).padStart(2, '0')}</span><strong className="text-xl font-mono text-white">{item.symbol}</strong><span className={item.direction === 'BUY' ? 'text-xs font-mono text-emerald-400' : 'text-xs font-mono text-rose-400'}>{item.direction}</span></div>
                     <p className="text-[10px] font-mono text-slate-400 mt-1">{item.regime.replace(/_/g, ' ')}</p>
                   </div>
-                  <div className="text-right"><strong className="block text-lg font-mono text-white">{item.macroScore > 0 ? '+' : ''}{item.macroScore}</strong><span className="text-[10px] font-mono text-slate-400">{item.confidence} · EVIDENCE CONFIDENCE</span><span className="block text-[10px] font-mono text-slate-500">{item.evidenceCoveragePct}% INPUT COVERAGE</span></div>
+                  <div className="text-right"><strong className="block text-lg font-mono text-white">{item.macroScore > 0 ? '+' : ''}{item.macroScore}</strong><span className="text-[10px] font-mono text-slate-400">{item.confidence} · EVIDENCE GRADE</span><span className="block text-[10px] font-mono text-slate-500">{item.evidenceCoveragePct}% INPUT COVERAGE</span></div>
                 </div>
                 <div className={`mt-3 rounded-md border px-3 py-2 text-[10px] font-mono ${item.tradeReadiness === 'AWAIT_TECHNICAL_CONFIRMATION' ? 'border-emerald-500/20 text-emerald-300 bg-emerald-950/20' : 'border-amber-500/20 text-amber-300 bg-amber-950/20'}`}>{readinessLabel(item)}</div>
                 {item.nextCatalyst && <p className="mt-2 text-[10px] text-slate-400">NEXT CATALYST · {item.nextCatalyst.title} · {new Date(item.nextCatalyst.scheduledAt).toISOString().replace('T', ' ').slice(0, 16)} UTC</p>}
