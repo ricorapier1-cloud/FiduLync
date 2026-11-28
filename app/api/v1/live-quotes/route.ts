@@ -134,6 +134,8 @@ export async function GET(request: Request) {
           error: fresh ? null : 'Broker quote or account heartbeat is stale.',
         };
       });
+      const latestQuoteUtc = quotes.map((quote) => quote.quoteTimeUtc).filter((value): value is string => Boolean(value))
+        .sort((left, right) => Date.parse(right) - Date.parse(left))[0] ?? null;
       const required = ['EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD'];
       const allRequiredFresh = required.every((symbol) => quotes.some((quote) =>
         quote.symbol === symbol && quote.freshness === 'LIVE' && quote.executionGrade));
@@ -142,6 +144,7 @@ export async function GET(request: Request) {
       return NextResponse.json({
         schemaVersion: '1.0.0',
         generatedAtUtc: new Date().toISOString(),
+        latestQuoteUtc,
         source: 'Authenticated MT5 broker feed',
         broker: account.broker,
         server: account.server,
