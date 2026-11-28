@@ -119,3 +119,44 @@ test('macro research gate requires PIT vintages, source rights, OOS, costs, WFA 
   assert.equal(blocked.eligible, false);
   assert.ok(blocked.blockers.includes('SOURCE_PERMISSIONS_UNVERIFIED'));
 });
+
+
+test('a fully evidenced 65 percent / 1:2 sample can pass only with approved drawdown and all independent gates', () => {
+  const trades = Array.from({ length: 1000 }, (_, i) => ({
+    netR: i < 650 ? 2 : -1,
+    closedAt: new Date(Date.UTC(2024, 0, 1) + i * 60_000).toISOString(),
+  }));
+  const result = evaluateResearchObjectives(trades, {
+    walkForwardEligible: true,
+    untouchedOutOfSample: true,
+    allTradesPassedQualityFilter: true,
+    costStressApplied: true,
+    stressedExpectancyR: 0.5,
+    maxDrawdownPct: 12,
+    approvedMaxDrawdownPct: 15,
+  });
+  assert.equal(result.status, 'VALIDATED');
+  assert.equal(result.eligible, true);
+  assert.equal(result.winRateTarget, 'CONFIRMED');
+  assert.equal(result.metrics?.realizedRewardRisk, 2);
+});
+
+test('drawdown breach, negative stressed expectancy and unfiltered setups block validation', () => {
+  const trades = Array.from({ length: 1000 }, (_, i) => ({
+    netR: i < 650 ? 2 : -1,
+    closedAt: new Date(Date.UTC(2024, 0, 1) + i * 60_000).toISOString(),
+  }));
+  const result = evaluateResearchObjectives(trades, {
+    walkForwardEligible: true,
+    untouchedOutOfSample: true,
+    allTradesPassedQualityFilter: false,
+    costStressApplied: true,
+    stressedExpectancyR: -0.1,
+    maxDrawdownPct: 20,
+    approvedMaxDrawdownPct: 15,
+  });
+  assert.equal(result.eligible, false);
+  assert.ok(result.blockers.includes('DRAWDOWN_EXCEEDS_APPROVED_LIMIT'));
+  assert.ok(result.blockers.includes('STRESSED_NET_EXPECTANCY_NOT_POSITIVE'));
+  assert.ok(result.blockers.includes('LOW_QUALITY_OR_UNFILTERED_TRADES_PRESENT'));
+});
