@@ -1,6 +1,6 @@
 #property strict
-#property version   "1.00"
-#property description "MacroLync read-only MT5 account and deal-history publisher"
+#property version   "1.10"
+#property description "MacroLync read-only MT5 account, broker quote and OHLCV publisher"
 
 input group "=== MacroLync Private Account Publisher ==="
 input string InpAccountSyncEndpoint = "https://fidulync.vercel.app/api/v1/account-sync";
