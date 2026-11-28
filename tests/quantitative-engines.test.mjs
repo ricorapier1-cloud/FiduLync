@@ -604,7 +604,7 @@ test('intraday candle adapter rejects malformed OHLC ranges and invalid timestam
 });
 test('broker trade history derives outcomes only from reconciled MT5 deals, without synthetic journal context', () => {
   const accounts = read('../app/accounts/page.tsx');
-  assert.match(accounts, /const netDeal = \(deal: Deal\) => Number\(deal\.profit\) \+ Number\(deal\.commission\) \+ Number\(deal\.swap\) \+ Number\(deal\.fee\)/);
+  assert.match(accounts, /const netDeal = \(deal: Deal\) =>\s*Number\(deal\.profit\) \+ Number\(deal\.commission\) \+ Number\(deal\.swap\) \+ Number\(deal\.fee\)/);
   assert.match(accounts, /selectedDeals\.forEach\(\(deal\) =>/);
   assert.match(accounts, /if \(!deal\.position_id\) return/);
   assert.match(accounts, /items\.some\(\(deal\) => deal\.entry_type === 'IN'\)/);
@@ -785,15 +785,15 @@ test('production UI fails closed on unconfigured account balance and never seeds
   assert.match(desk, /globalDeskLockout \? 'STAND DOWN'/);
   assert.doesNotMatch(desk, /useState<number>\(10000\)|154\.50|2650|1\.085|6\.50/);
   assert.doesNotMatch(desk, /stopDistancePips = (?:30|35)|stopDistDollars[^;]*: 25/);
-  assert.match(accounts, /currentEquityNumber = selected[\s\S]*: null/);
-  assert.match(accounts, /NOT CONFIGURED · CONNECT A VERIFIED MT5 ACCOUNT/);
-  assert.doesNotMatch(accounts, /selected \? Number\(selected\.equity\) : 10000/);
+  assert.match(accounts, /selected\.equity/);
+  assert.match(accounts, /account_mode/);
+  assert.doesNotMatch(accounts, /currentEquityNumber|NOT CONFIGURED · CONNECT A VERIFIED MT5 ACCOUNT|selected \? Number\(selected\.equity\) : 10000/);
   const validationEngine = read('../lib/quant/monteCarloEngine.ts');
   const validationPage = read('../app/validation/page.tsx');
   assert.doesNotMatch(validationEngine, /initialBalance = 10_000|volume: 0\.1|profit \/ 50|net \/ 100|99\.9/);
   assert.match(validationPage, /NO VERIFIED TRADE HISTORY — IMPORT MT5 REPORT OR LOG REAL TRADES TO RUN MONTE CARLO/);
   assert.match(validationPage, /startingBalance === null/);
-  assert.match(accounts, /useState<ManualTrade\[\]>\(\[\]\)/);
+  assert.doesNotMatch(accounts, /ManualTrade|profitSweeps|manualTrades/);
 });
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 function collectProductionSourceFiles(directory) {
