@@ -1,7 +1,7 @@
 import type { MacroSnapshot } from '@/types/macro';
 import { isObservationFresh } from '@/lib/dataFreshness';
 
-export const MAJOR_CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'SEK', 'NOK'] as const;
+export const MAJOR_CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD'] as const;
 export type MajorCurrency = (typeof MAJOR_CURRENCIES)[number];
 export type CurrencyStrength = {
   currency: MajorCurrency;
@@ -42,7 +42,8 @@ export function getCurrencyStrengthIndex(snapshot: MacroSnapshot, now = Date.now
     && Number.isFinite(item.inflation)
     && validObservationDate(item.policyRateAsOf, now, MAX_POLICY_AGE_MS)
     && validObservationDate(item.inflationAsOf, now, MAX_INFLATION_AGE_MS));
-  if (currencies.length < 3) return [];
+  // A G8 cross-sectional z-score is not published from a partial universe.
+  if (currencies.length !== MAJOR_CURRENCIES.length) return [];
 
   const policyZ = zScores(currencies.map((currency) => currency.policyRate));
   const realRateZ = zScores(currencies.map((currency) => currency.policyRate - currency.inflation));
