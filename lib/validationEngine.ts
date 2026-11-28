@@ -1,6 +1,6 @@
 /**
  * Deterministic validation analytics for actual, closed, chronological trade records.
- * Monte Carlo is a bootstrap of observed outcomes, not synthetic market history.
+ * Monte Carlo resamples observed outcomes; it is not synthetic market history.
  */
 export type NetTrade = { netR: number; closedAt?: string };
 export type CostedTrade = {
@@ -15,26 +15,65 @@ export type TradeMetrics = {
   trades: number;
   expectancyR: number;
   winRate: number;
+  winRateWilson95: { lower: number; upper: number };
+  averageWinR: number | null;
+  averageLossR: number | null;
+  realizedRewardRisk: number | null;
   profitFactor: number | null;
   maxDrawdownR: number;
   totalR: number;
 };
 
+export const QUANT_CORE_RESEARCH_OBJECTIVES = Object.freeze({
+  winRateTargetMin: 0.60,
+  winRateTargetMax: 0.65,
+  plannedRewardRisk: 2,
+  minimumOutOfSampleTrades: 300,
+  minimumWalkForwardFolds: 3,
+  minimumOutOfSampleTradesPerFold: 30,
+  growthPriority: 'BALANCED_GROWTH' as const,
+  drawdownPriority: 'CONTROLLED_DRAWDOWN' as const,
+  setupPolicy: 'HIGH_QUALITY_ONLY' as const,
+  dailyTradeQuota: null,
+});
+
+export function wilsonScoreInterval(wins: number, trades: number, z = 1.96): { lower: number; upper: number } | null {
+  if (!Number.isSafeInteger(wins) || !Number.isSafeInteger(trades) || trades < 1
+    || wins < 0 || wins > trades || !Number.isFinite(z) || z <= 0) return null;
+  const p = wins / trades;
+  const z2 = z * z;
+  const denominator = 1 + z2 / trades;
+  const center = (p + z2 / (2 * trades)) / denominator;
+  const margin = (z * Math.sqrt((p * (1 - p) / trades) + z2 / (4 * trades * trades))) / denominator;
+  return { lower: Math.max(0, center - margin), upper: Math.min(1, center + margin) };
+}
+
 export function calculateTradeMetrics(trades: NetTrade[]): TradeMetrics | null {
   if (!trades.length || trades.some((trade) => !Number.isFinite(trade.netR))) return null;
-  let equity = 0, peak = 0, maxDrawdownR = 0, grossProfit = 0, grossLoss = 0, wins = 0;
+  let equity = 0, peak = 0, maxDrawdownR = 0, grossProfit = 0, grossLoss = 0;
+  const winners: number[] = [], losers: number[] = [];
   for (const trade of trades) {
     equity += trade.netR;
     peak = Math.max(peak, equity);
     maxDrawdownR = Math.max(maxDrawdownR, peak - equity);
-    if (trade.netR > 0) { grossProfit += trade.netR; wins += 1; }
-    if (trade.netR < 0) grossLoss += Math.abs(trade.netR);
+    if (trade.netR > 0) { grossProfit += trade.netR; winners.push(trade.netR); }
+    if (trade.netR < 0) { grossLoss += Math.abs(trade.netR); losers.push(Math.abs(trade.netR)); }
   }
   const totalR = trades.reduce((sum, trade) => sum + trade.netR, 0);
+  const wins = winners.length;
+  const interval = wilsonScoreInterval(wins, trades.length);
+  if (!interval) return null;
+  const averageWinR = winners.length ? winners.reduce((sum, value) => sum + value, 0) / winners.length : null;
+  const averageLossR = losers.length ? losers.reduce((sum, value) => sum + value, 0) / losers.length : null;
   return {
     trades: trades.length,
     expectancyR: totalR / trades.length,
     winRate: wins / trades.length,
+    winRateWilson95: interval,
+    averageWinR,
+    averageLossR,
+    realizedRewardRisk: averageWinR !== null && averageLossR !== null && averageLossR > 0
+      ? averageWinR / averageLossR : null,
     profitFactor: grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? null : 0,
     maxDrawdownR,
     totalR,
@@ -72,7 +111,7 @@ export type WalkForwardFold = {
 };
 
 function timestamp(value: string): number | null {
-  if (typeof value !== 'string' || !/(Z|[+-]\d{2}:?\d{2})$/i.test(value)) return null;
+  if (typeof value !== 'string' || !/(Z|[+-]\\d{2}:?\\d{2})$/i.test(value)) return null;
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
@@ -98,7 +137,7 @@ export function evaluateWalkForward(folds: WalkForwardFold[]): {
   folds: Array<{ inSample: TradeMetrics | null; outOfSample: TradeMetrics | null; degradationR: number | null }>;
 } {
   const blockers: string[] = [];
-  if (folds.length < 3) blockers.push('WFA_REQUIRES_AT_LEAST_THREE_CHRONOLOGICAL_FOLDS');
+  if (folds.length < QUANT_CORE_RESEARCH_OBJECTIVES.minimumWalkForwardFolds) blockers.push('WFA_REQUIRES_AT_LEAST_THREE_CHRONOLOGICAL_FOLDS');
   let previousTestEnd = Number.NEGATIVE_INFINITY;
   const reports = folds.map((fold) => {
     const parsed = [fold.trainStart, fold.trainEnd, fold.testStart, fold.testEnd].map(timestamp);
@@ -111,7 +150,7 @@ export function evaluateWalkForward(folds: WalkForwardFold[]): {
     if (!tradesChronologicalWithin(fold.inSample, fold.trainStart, fold.trainEnd)) blockers.push('WFA_IN_SAMPLE_TRADES_NOT_CHRONOLOGICAL_OR_TIMESTAMPED');
     if (!tradesChronologicalWithin(fold.outOfSample, fold.testStart, fold.testEnd)) blockers.push('WFA_OOS_TRADES_NOT_CHRONOLOGICAL_OR_TIMESTAMPED');
     if (!inSample || !outOfSample) blockers.push('WFA_FOLD_HAS_INVALID_OR_EMPTY_TRADES');
-    if (outOfSample && outOfSample.trades < 30) blockers.push('WFA_FOLD_HAS_FEWER_THAN_THIRTY_OOS_TRADES');
+    if (outOfSample && outOfSample.trades < QUANT_CORE_RESEARCH_OBJECTIVES.minimumOutOfSampleTradesPerFold) blockers.push('WFA_FOLD_HAS_FEWER_THAN_THIRTY_OOS_TRADES');
     return {
       inSample, outOfSample,
       degradationR: inSample && outOfSample ? inSample.expectancyR - outOfSample.expectancyR : null,
@@ -121,6 +160,70 @@ export function evaluateWalkForward(folds: WalkForwardFold[]): {
   const aggregateOos = calculateTradeMetrics(allOos);
   if (!aggregateOos || aggregateOos.expectancyR <= 0) blockers.push('AGGREGATE_OOS_EXPECTANCY_NOT_POSITIVE');
   return { eligible: blockers.length === 0, blockers: [...new Set(blockers)], foldCount: folds.length, aggregateOos, folds: reports };
+}
+
+export type ResearchObjectiveEvidence = {
+  walkForwardEligible: boolean;
+  untouchedOutOfSample: boolean;
+  allTradesPassedQualityFilter: boolean;
+  costStressApplied: boolean;
+  stressedExpectancyR: number | null;
+  maxDrawdownPct: number | null;
+  approvedMaxDrawdownPct: number | null;
+};
+
+/**
+ * A deployment gate, not a strategy optimiser. It evaluates only supplied,
+ * actual closed-trade OOS outcomes and refuses to infer missing evidence.
+ */
+export function evaluateResearchObjectives(
+  outOfSampleTrades: NetTrade[],
+  evidence: ResearchObjectiveEvidence,
+): {
+  status: 'NOT_VALIDATED' | 'INSUFFICIENT_EVIDENCE' | 'REJECTED' | 'VALIDATED';
+  eligible: boolean;
+  blockers: string[];
+  objectives: typeof QUANT_CORE_RESEARCH_OBJECTIVES;
+  metrics: TradeMetrics | null;
+  winRateTarget: 'INSUFFICIENT_SAMPLE' | 'BELOW_TARGET' | 'PROVISIONAL' | 'CONFIRMED' | 'ABOVE_TARGET_BAND';
+} {
+  const blockers: string[] = [];
+  const metrics = calculateTradeMetrics(outOfSampleTrades);
+  if (!metrics) blockers.push('OOS_TRADE_OUTCOMES_MISSING_OR_INVALID');
+  if (outOfSampleTrades.length < QUANT_CORE_RESEARCH_OBJECTIVES.minimumOutOfSampleTrades) blockers.push('OOS_SAMPLE_BELOW_300_TRADES');
+  let previous = Number.NEGATIVE_INFINITY;
+  for (const trade of outOfSampleTrades) {
+    const closed = trade.closedAt ? timestamp(trade.closedAt) : null;
+    if (closed === null || closed < previous) { blockers.push('OOS_TRADES_MUST_HAVE_CHRONOLOGICAL_UTC_CLOSE_TIMESTAMPS'); break; }
+    previous = closed;
+  }
+  if (!evidence.walkForwardEligible) blockers.push('WALK_FORWARD_VALIDATION_NOT_PASSED');
+  if (!evidence.untouchedOutOfSample) blockers.push('OUT_OF_SAMPLE_NOT_UNTOUCHED');
+  if (!evidence.allTradesPassedQualityFilter) blockers.push('LOW_QUALITY_OR_UNFILTERED_TRADES_PRESENT');
+  if (!evidence.costStressApplied) blockers.push('EXECUTION_COST_STRESS_NOT_APPLIED');
+  if (evidence.stressedExpectancyR === null || !Number.isFinite(evidence.stressedExpectancyR) || evidence.stressedExpectancyR <= 0) blockers.push('STRESSED_NET_EXPECTANCY_NOT_POSITIVE');
+  if (evidence.maxDrawdownPct === null || !Number.isFinite(evidence.maxDrawdownPct) || evidence.maxDrawdownPct < 0) blockers.push('REALIZED_DRAWDOWN_EVIDENCE_MISSING');
+  if (evidence.approvedMaxDrawdownPct === null || !Number.isFinite(evidence.approvedMaxDrawdownPct) || evidence.approvedMaxDrawdownPct <= 0) blockers.push('OWNER_APPROVED_DRAWDOWN_LIMIT_MISSING');
+  else if (evidence.maxDrawdownPct !== null && Number.isFinite(evidence.maxDrawdownPct)
+    && evidence.maxDrawdownPct > evidence.approvedMaxDrawdownPct) blockers.push('DRAWDOWN_EXCEEDS_APPROVED_LIMIT');
+  if (metrics && metrics.expectancyR <= 0) blockers.push('OOS_NET_EXPECTANCY_NOT_POSITIVE');
+  if (metrics && metrics.winRateWilson95.lower < QUANT_CORE_RESEARCH_OBJECTIVES.winRateTargetMin) blockers.push('WIN_RATE_95_PERCENT_LOWER_BOUND_BELOW_60_PERCENT');
+  if (metrics && (metrics.realizedRewardRisk === null
+    || metrics.realizedRewardRisk < QUANT_CORE_RESEARCH_OBJECTIVES.plannedRewardRisk)) blockers.push('REALIZED_NET_REWARD_RISK_BELOW_1_TO_2');
+
+  const winRateTarget = !metrics || metrics.trades < QUANT_CORE_RESEARCH_OBJECTIVES.minimumOutOfSampleTrades
+    ? 'INSUFFICIENT_SAMPLE'
+    : metrics.winRate < QUANT_CORE_RESEARCH_OBJECTIVES.winRateTargetMin ? 'BELOW_TARGET'
+      : metrics.winRate > QUANT_CORE_RESEARCH_OBJECTIVES.winRateTargetMax ? 'ABOVE_TARGET_BAND'
+        : metrics.winRateWilson95.lower >= QUANT_CORE_RESEARCH_OBJECTIVES.winRateTargetMin ? 'CONFIRMED' : 'PROVISIONAL';
+  const eligible = blockers.length === 0;
+  const evidenceMissing = blockers.some((blocker) => blocker.includes('MISSING') || blocker.includes('NOT_PASSED')
+    || blocker.includes('NOT_UNTOUCHED') || blocker.includes('NOT_APPLIED') || blocker.includes('BELOW_300')
+    || blocker.includes('TIMESTAMPS') || blocker.includes('INVALID') || blocker.includes('UTC'));
+  const status = eligible ? 'VALIDATED' : evidenceMissing ? 'NOT_VALIDATED'
+    : blockers.some((blocker) => blocker.includes('BELOW') || blocker.includes('NOT_POSITIVE') || blocker.includes('EXCEEDS'))
+      ? 'REJECTED' : 'INSUFFICIENT_EVIDENCE';
+  return { status, eligible, blockers: [...new Set(blockers)], objectives: QUANT_CORE_RESEARCH_OBJECTIVES, metrics, winRateTarget };
 }
 
 function mulberry32(seed: number): () => number {
