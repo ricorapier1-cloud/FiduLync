@@ -237,7 +237,9 @@ string AppendCandleSeries(string symbol, ENUM_TIMEFRAMES timeframe, string timef
       json += "\"realVolume\":" + (string)rates[i].real_volume + ",";
       json += "\"isClosed\":true,";
       json += "\"digits\":" + IntegerToString(digits) + ",";
-      json += "\"point\":" + DoubleToString(point, 12);
+      json += "\"point\":" + DoubleToString(point, 12) + ",";
+      json += "\"serverUtcOffsetMinutes\":" + IntegerToString(ServerUtcOffsetMinutes()) + ",";
+      json += "\"timeBasis\":\"BROKER_SERVER_CURRENT_OFFSET\"";
       json += "}";
    }
    return json;
