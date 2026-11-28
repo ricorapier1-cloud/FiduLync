@@ -59,3 +59,13 @@ export function getActiveMarketSessionCloseUtc(now: Date, session: MarketSession
   const timeZone = session === 'LONDON' ? 'Africa/Lagos' : 'America/New_York';
   return zonedLocalTimeToUtc(zonedParts(now, timeZone), 12, 0, timeZone);
 }
+
+/** Forex is closed from Friday 17:00 New York until Sunday 17:00 New York. */
+export function isForexMarketWeekendClosed(now = new Date()): boolean {
+  const weekday = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short' }).format(now);
+  const ny = zonedParts(now, 'America/New_York');
+  const minuteOfDay = ny.hour * 60 + ny.minute;
+  return weekday === 'Sat'
+    || (weekday === 'Fri' && minuteOfDay >= 17 * 60)
+    || (weekday === 'Sun' && minuteOfDay < 17 * 60);
+}
