@@ -5,9 +5,13 @@
 input group "=== MacroLync Private Account Publisher ==="
 input string InpAccountSyncEndpoint = "https://fidulync.vercel.app/api/v1/account-sync";
 input string InpAccountIngestToken = ""; // Set to Vercel MT5_ACCOUNT_INGEST_TOKEN
-input int    InpSyncIntervalSeconds = 60;
+input int    InpSyncIntervalSeconds = 15;
+input int    InpHistorySyncIntervalSeconds = 300;
+input string InpMarketWatchSymbols = "EURUSD,GBPUSD,USDJPY,XAUUSD";
 input int    InpHistoryDays = 90;
 input int    InpMaxDealsPerSync = 500;
+
+datetime g_lastHistorySync = 0;
 input int    InpRequestTimeoutMs = 10000;
 
 string JsonEscape(string value)
@@ -31,6 +35,127 @@ string UtcIsoNow()
 string BrokerTime(datetime value)
 {
    return TimeToString(value, TIME_DATE | TIME_SECONDS);
+}
+
+datetime ServerTimeToUtc(datetime serverTime)
+{
+   datetime serverNow = TimeTradeServer();
+   datetime utcNow = TimeGMT();
+   long offsetSeconds = (long)serverNow - (long)utcNow;
+   return (datetime)((long)serverTime - offsetSeconds);
+}
+
+string IsoUtc(datetime value)
+{
+   MqlDateTime dt;
+   TimeToStruct(value, dt);
+   return StringFormat("%04d-%02d-%02dT%02d:%02d:%02dZ",
+      dt.year, dt.mon, dt.day, dt.hour, dt.min, dt.sec);
+}
+
+string CanonicalSymbol(string brokerSymbol)
+{
+   StringToUpper(brokerSymbol);
+   string known[4] = {"EURUSD", "GBPUSD", "USDJPY", "XAUUSD"};
+   for(int i = 0; i < 4; i++)
+      if(StringFind(brokerSymbol, known[i]) == 0) return known[i];
+   if(StringLen(brokerSymbol) >= 6) return StringSubstr(brokerSymbol, 0, 6);
+   return brokerSymbol;
+}
+
+string BuildQuotes()
+{
+   string json = "[";
+   bool first = true;
+   string brokerSymbols[];
+   int count = StringSplit(InpMarketWatchSymbols, ',', brokerSymbols);
+   for(int i = 0; i < count; i++)
+   {
+      string brokerSymbol = brokerSymbols[i];
+      StringTrimLeft(brokerSymbol);
+      StringTrimRight(brokerSymbol);
+      if(StringLen(brokerSymbol) < 6 || !SymbolSelect(brokerSymbol, true)) continue;
+
+      MqlTick tick;
+      if(!SymbolInfoTick(brokerSymbol, tick) || tick.time <= 0
+         || tick.bid <= 0.0 || tick.ask < tick.bid) continue;
+      double point = SymbolInfoDouble(brokerSymbol, SYMBOL_POINT);
+      int digits = (int)SymbolInfoInteger(brokerSymbol, SYMBOL_DIGITS);
+      if(point <= 0.0 || digits < 0 || digits > 12) continue;
+
+      string symbol = CanonicalSymbol(brokerSymbol);
+      datetime quoteUtc = ServerTimeToUtc(tick.time);
+      double spreadPoints = (tick.ask - tick.bid) / point;
+      if(!first) json += ",";
+      first = false;
+      json += "{";
+      json += "\"symbol\":\"" + JsonEscape(symbol) + "\",";
+      json += "\"bid\":" + DoubleToString(tick.bid, digits) + ",";
+      json += "\"ask\":" + DoubleToString(tick.ask, digits) + ",";
+      json += "\"quoteTimeUtc\":\"" + IsoUtc(quoteUtc) + "\",";
+      json += "\"spreadPoints\":" + DoubleToString(spreadPoints, 2) + ",";
+      json += "\"digits\":" + IntegerToString(digits) + ",";
+      json += "\"point\":" + DoubleToString(point, 12);
+      json += "}";
+   }
+   json += "]";
+   return json;
+}
+
+string AppendCandleSeries(string symbol, ENUM_TIMEFRAMES timeframe, string timeframeName, int barsToCopy, string json, bool &first)
+{
+   MqlRates rates[];
+   ArraySetAsSeries(rates, false);
+   int copied = CopyRates(symbol, timeframe, 1, barsToCopy, rates);
+   if(copied <= 0) return json;
+   double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+   int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
+   if(point <= 0.0 || digits < 0 || digits > 12) return json;
+
+   for(int i = 0; i < copied; i++)
+   {
+      if(rates[i].time <= 0 || rates[i].open <= 0.0 || rates[i].high < rates[i].low
+         || rates[i].open < rates[i].low || rates[i].open > rates[i].high
+         || rates[i].close < rates[i].low || rates[i].close > rates[i].high) continue;
+      datetime barUtc = ServerTimeToUtc(rates[i].time);
+      if(!first) json += ",";
+      first = false;
+      json += "{";
+      json += "\"symbol\":\"" + JsonEscape(CanonicalSymbol(symbol)) + "\",";
+      json += "\"timeframe\":\"" + timeframeName + "\",";
+      json += "\"barTimeUtc\":\"" + IsoUtc(barUtc) + "\",";
+      json += "\"open\":" + DoubleToString(rates[i].open, digits) + ",";
+      json += "\"high\":" + DoubleToString(rates[i].high, digits) + ",";
+      json += "\"low\":" + DoubleToString(rates[i].low, digits) + ",";
+      json += "\"close\":" + DoubleToString(rates[i].close, digits) + ",";
+      json += "\"tickVolume\":" + (string)rates[i].tick_volume + ",";
+      json += "\"spreadPoints\":" + (string)rates[i].spread + ",";
+      json += "\"realVolume\":" + (string)rates[i].real_volume + ",";
+      json += "\"isClosed\":true,";
+      json += "\"digits\":" + IntegerToString(digits) + ",";
+      json += "\"point\":" + DoubleToString(point, 12);
+      json += "}";
+   }
+   return json;
+}
+
+string BuildCandles()
+{
+   string json = "[";
+   bool first = true;
+   string brokerSymbols[];
+   int count = StringSplit(InpMarketWatchSymbols, ',', brokerSymbols);
+   for(int i = 0; i < count; i++)
+   {
+      string brokerSymbol = brokerSymbols[i];
+      StringTrimLeft(brokerSymbol);
+      StringTrimRight(brokerSymbol);
+      if(StringLen(brokerSymbol) < 6 || !SymbolSelect(brokerSymbol, true)) continue;
+      json = AppendCandleSeries(brokerSymbol, PERIOD_M5, "M5", 150, json, first);
+      json = AppendCandleSeries(brokerSymbol, PERIOD_D1, "D1", 30, json, first);
+   }
+   json += "]";
+   return json;
 }
 
 string AccountMode()
@@ -144,7 +269,7 @@ string BuildDeals()
    return json;
 }
 
-string BuildPayload()
+string BuildPayload(bool includeHistory)
 {
    string account = "{";
    account += "\"login\":\"" + (string)AccountInfoInteger(ACCOUNT_LOGIN) + "\",";
@@ -161,10 +286,13 @@ string BuildPayload()
    account += "\"observedAtUtc\":\"" + UtcIsoNow() + "\"";
    account += "}";
 
-   return "{\"account\":" + account + ",\"positions\":" + BuildPositions() + ",\"deals\":" + BuildDeals() + "}";
+   string deals = includeHistory ? BuildDeals() : "[]";
+   return "{\"account\":" + account + ",\"positions\":" + BuildPositions()
+      + ",\"deals\":" + deals + ",\"quotes\":" + BuildQuotes()
+      + ",\"candles\":" + BuildCandles() + "}";
 }
 
-bool PublishAccount()
+bool PublishAccount(bool includeHistory)
 {
    if(StringLen(InpAccountIngestToken) < 32)
    {
@@ -172,7 +300,7 @@ bool PublishAccount()
       return false;
    }
 
-   string body = BuildPayload();
+   string body = BuildPayload(includeHistory);
    char data[];
    int copied = StringToCharArray(body, data, 0, WHOLE_ARRAY, CP_UTF8);
    if(copied <= 1) return false;
@@ -199,8 +327,9 @@ int OnInit()
 {
    if(StringLen(InpAccountIngestToken) < 32)
       Print("MacroLync: set InpAccountIngestToken before enabling account synchronization.");
-   EventSetTimer((int)MathMax(15, InpSyncIntervalSeconds));
-   PublishAccount();
+   EventSetTimer((int)MathMax(5, InpSyncIntervalSeconds));
+   g_lastHistorySync = TimeCurrent();
+   PublishAccount(true);
    return INIT_SUCCEEDED;
 }
 
@@ -211,5 +340,9 @@ void OnDeinit(const int reason)
 
 void OnTimer()
 {
-   PublishAccount();
+   datetime now = TimeCurrent();
+   bool includeHistory = g_lastHistorySync == 0
+      || (now > g_lastHistorySync && now - g_lastHistorySync >= MathMax(60, InpHistorySyncIntervalSeconds));
+   if(includeHistory) g_lastHistorySync = now;
+   PublishAccount(includeHistory);
 }
