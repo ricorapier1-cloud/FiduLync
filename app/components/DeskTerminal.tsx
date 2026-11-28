@@ -5,6 +5,7 @@ import type { MacroSnapshot } from '@/types/macro';
 import type { GoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
 import { getCurrencyStrengthIndex } from '@/lib/currencyStrength';
 import type { IntradaySignal } from '@/lib/quant/intradaySignalEngine';
+import { getActiveMarketSession, getActiveMarketSessionCloseUtc, getNextMarketSessionOpenUtc, isForexMarketWeekendClosed } from '@/lib/marketSessions';
 
 type Quote = {
   symbol: string; bid: number | null; ask: number | null; mid: number | null;
@@ -17,20 +18,6 @@ type FxRow = { date: string; rates: Record<string, number> };
 const symbols: string[] = ['EURUSD', 'XAUUSD', 'USDJPY'];
 const currencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CHF', 'CAD'] as const;
 const FX_KEY = 'fidulync-desk-fx-v1';
-function zonedDecimalHour(date: Date, timeZone: string) {
-  const parts = new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date);
-  return Number(parts.find((p) => p.type === 'hour')?.value ?? 0) + Number(parts.find((p) => p.type === 'minute')?.value ?? 0) / 60;
-}
-function nextWATSessionOpen(nowMs: number): number {
-  const shifted = new Date(nowMs + 60 * 60_000);
-  const year = shifted.getUTCFullYear(), month = shifted.getUTCMonth(), day = shifted.getUTCDate();
-  const minuteOfDay = shifted.getUTCHours() * 60 + shifted.getUTCMinutes();
-  const targetDay = new Date(Date.UTC(year, month, day));
-  let targetHour = minuteOfDay < 8 * 60 ? 8 : minuteOfDay < 13 * 60 ? 13 : 8;
-  if (minuteOfDay >= 17 * 60) targetDay.setUTCDate(targetDay.getUTCDate() + 1);
-  while (targetDay.getUTCDay() === 0 || targetDay.getUTCDay() === 6) { targetDay.setUTCDate(targetDay.getUTCDate() + 1); targetHour = 8; }
-  return Date.UTC(targetDay.getUTCFullYear(), targetDay.getUTCMonth(), targetDay.getUTCDate(), targetHour - 1, 0, 0);
-}
 function durationLabel(ms: number): string {
   const minutes = Math.max(0, Math.ceil(ms / 60_000));
   return Math.floor(minutes / 60) + 'h ' + String(minutes % 60).padStart(2, '0') + 'm';
@@ -198,15 +185,12 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
       setBalanceSaveMessage('User-attested starting balance saved in this browser.');
     } catch { setTicketBalance(null); setBalanceSaveMessage('Browser storage unavailable. Balance remains unverified.'); }
   };
-  const hourWAT = zonedDecimalHour(new Date(now), 'Africa/Lagos');
-  const watDay = new Date(now + 60 * 60_000).getUTCDay();
-  const isWeekdayWAT = watDay >= 1 && watDay <= 5;
-  const activeSession = !isWeekdayWAT ? 'OFF-SESSION' : hourWAT >= 8 && hourWAT < 12 ? 'LONDON' : hourWAT >= 13 && hourWAT < 17 ? 'NEW YORK' : 'OFF-SESSION';
-  const isForexWeekendClosed = (() => {
-    const utcDay = new Date(now).getUTCDay();
-    const utcHour = new Date(now).getUTCHours();
-    return (utcDay === 5 && utcHour >= 22) || utcDay === 6 || (utcDay === 0 && utcHour < 22);
-  })();
+  const activeSessionValue = getActiveMarketSession(new Date(now));
+  const activeSession = activeSessionValue === 'CLOSED' ? 'OFF-SESSION'
+    : activeSessionValue === 'NEW_YORK' ? 'NEW YORK' : 'LONDON';
+  const nextSessionOpenUtc = getNextMarketSessionOpenUtc(new Date(now));
+  const activeSessionCloseUtc = getActiveMarketSessionCloseUtc(new Date(now), activeSessionValue);
+  const isForexWeekendClosed = isForexMarketWeekendClosed(new Date(now));
   const globalDeskLockout = activeSession === 'OFF-SESSION' || !manualLedgerComplete || (manualDeskMode && (manualLedger.trades >= 2 || manualLedger.losses >= 2));
   const coverageProviders = snapshot.providerStatus ?? [];
   const healthyProviderCount = coverageProviders.filter((provider) => provider.status === 'HEALTHY' || provider.status === 'STANDBY').length;
@@ -521,7 +505,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
         </div>
         <p className="text-xs text-slate-300">{manualDeskMode ? 'Manual Review Mode uses browser-local, user-attested entries; it is not an authenticated MT5 statement and cannot clear server risk controls or authorize automated EA calls.' : 'No authenticated MT5 account ledger is connected. Manual Review Mode stores self-reported values in this browser only and cannot authorize automated trading.'}</p>
         <div className="grid grid-cols-1 gap-3 border-t border-white/10 pt-3 sm:grid-cols-4">
-          <div><span className="desk-kicker">ACTIVE WAT SESSION</span><strong className="mt-1 block text-sm text-slate-100">{activeSession === 'OFF-SESSION' ? 'OFF-SESSION DEAD ZONE' : activeSession + ' EXECUTION'}</strong><small className="text-slate-400">{activeSession === 'OFF-SESSION' ? 'Next session opens in ' + durationLabel(nextWATSessionOpen(now) - now) : 'Session closes in ' + durationLabel((activeSession === 'LONDON' ? 12 : 17) * 60 * 60_000 - (hourWAT * 60 * 60_000))}</small></div>
+          <div><span className="desk-kicker">ACTIVE WAT SESSION</span><strong className="mt-1 block text-sm text-slate-100">{activeSession === 'OFF-SESSION' ? 'OFF-SESSION DEAD ZONE' : activeSession + ' EXECUTION'}</strong><small className="text-slate-400">{activeSession === 'OFF-SESSION' ? 'Next session opens in ' + durationLabel(nextSessionOpenUtc - now) : 'Session closes in ' + durationLabel(activeSessionCloseUtc - now)}</small></div>
           <div><span className="desk-kicker">TODAY’S MANUAL REVIEW STATUS</span><strong className="mt-1 block text-sm text-slate-100">{manualDeskMode && activeSession !== 'OFF-SESSION' ? 'MANUAL REVIEW ONLY' : 'NO EXECUTION CLEARED'}</strong><small className="text-slate-400">{intradaySignals.filter((item) => item.signalState === 'ACTIVE_SETUP').length ? intradaySignals.filter((item) => item.signalState === 'ACTIVE_SETUP').map((item) => item.direction + ' ' + item.symbol).join(' · ') : 'Wait for a fully validated macro-aligned setup'}</small></div>
           <div><span className="desk-kicker">MANUAL DAILY TRACKER · WAT · USER-ATTESTED</span><strong className="mt-1 block text-sm text-slate-100">Trades: {manualDeskMode ? manualLedger.trades + '/2' : 'UNVERIFIED'} · Losses: {manualDeskMode ? manualLedger.losses + '/2' : 'UNVERIFIED'}</strong><small className="text-slate-400">Locked currency legs: {manualDeskMode ? manualLedger.legs.join(', ') || 'None' : 'UNVERIFIED'}</small></div>
           <div><span className="desk-kicker">USER-ATTESTED MANUAL EQUITY ESTIMATE</span><strong className="mt-1 block text-sm text-slate-100">{currentManualEquity === null ? 'NOT VERIFIED' : currentManualEquity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USD'}</strong><small className="text-slate-400">Starting balance + user-entered closed-trade net P&amp;L; not live broker equity</small></div>
