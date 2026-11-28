@@ -839,3 +839,21 @@ test('XAUUSD Fundamental Pair Dossier routes to the dedicated Gold liquidity and
   const goldDossierBranch = dashboard.slice(dashboard.indexOf("pair === 'XAUUSD'"), dashboard.indexOf(') : (', dashboard.indexOf("pair === 'XAUUSD'")));
   assert.doesNotMatch(goldDossierBranch, /POLICY DIFF|REAL YIELD DIFF|2Y YIELD SPREAD/);
 });
+
+
+test('production UI fails closed on unconfigured account balance and never seeds mock execution prices', () => {
+  const desk = read('../app/components/DeskTerminal.tsx');
+  const accounts = read('../app/accounts/page.tsx');
+  assert.match(desk, /useState<number \\| null>\\(null\\)/);
+  assert.match(desk, /BAL:|NOT SET \\(ENTER REAL BALANCE\\)/);
+  assert.match(desk, /ENTER REAL ACCOUNT BALANCE TO COMPUTE LOTS/);
+  assert.match(desk, /SAVE &amp; LOCK REAL BALANCE/);
+  assert.match(desk, /MARKET CLOSED \\(WEEKEND\\)/);
+  assert.match(desk, /globalDeskLockout \\? 'STAND DOWN'/);
+  assert.doesNotMatch(desk, /useState<number>\\(10000\\)|154\\.50|2650|1\\.085|6\\.50/);
+  assert.doesNotMatch(desk, /stopDistancePips = (?:30|35)|stopDistDollars[^;]*: 25/);
+  assert.match(accounts, /currentEquityNumber = selected[\\s\\S]*: null/);
+  assert.match(accounts, /NOT CONFIGURED · CONNECT A VERIFIED MT5 ACCOUNT/);
+  assert.doesNotMatch(accounts, /selected \\? Number\\(selected\\.equity\\) : 10000/);
+  assert.match(accounts, /useState<ManualTrade\\[]>\\(\\[\\]\\)/);
+});
