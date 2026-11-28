@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 
 
 type CandlePayload = { status: string; source?: string; executionGrade?: boolean; marketDataQuality?: string; intradayBars: OhlcvBar[]; dailyBars: OhlcvBar[]; latestBarUtc: string | null };
-type QuotePayload = { source?: string; executionGrade?: boolean; quotes?: Array<{ symbol: string; bid: number | null; ask: number | null; mid: number | null; spread: number | null; quoteTimeUtc: string | null; freshness: string }> };
+type QuotePayload = { source?: string; executionGrade?: boolean; accountMode?: string | null; quotes?: Array<{ symbol: string; bid: number | null; ask: number | null; mid: number | null; spread: number | null; quoteTimeUtc: string | null; freshness: string }> };
 
 function watDate(date: Date): string {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date);
