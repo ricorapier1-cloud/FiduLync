@@ -62,8 +62,10 @@ export async function GET() {
           quote?.policyRateSource === 'provider' && isFresh(quote.policyRateObservationDate, 180),
           quote?.inflationSource === 'provider' && isFresh(quote.inflationObservationDate, dossier.quote === 'AUD' ? 180 : 120),
         ];
-        const baseCotPosition = snapshot.cot.find((item) => item.market === dossier.base && isFresh(item.reportDate, 14));
-        const quoteCotPosition = snapshot.cot.find((item) => item.market === dossier.quote && isFresh(item.reportDate, 14));
+        const baseCotPosition = snapshot.cot.find((item) => item.market === dossier.base && item.sampleSize !== undefined
+          && item.sampleSize >= 52 && item.percentile !== null && isFresh(item.reportDate, 14));
+        const quoteCotPosition = snapshot.cot.find((item) => item.market === dossier.quote && item.sampleSize !== undefined
+          && item.sampleSize >= 52 && item.percentile !== null && isFresh(item.reportDate, 14));
         const hasFreshBaseCot = Boolean(baseCotPosition);
         const hasFreshQuoteCot = Boolean(quoteCotPosition);
         const baseCrowdingPercentile = baseCotPosition?.percentile ?? null;
