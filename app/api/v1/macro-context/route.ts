@@ -133,10 +133,18 @@ export async function GET(request: Request) {
     const goldBias = goldContext.goldBiasScore;
     const goldVerdict = goldContext.directionalVerdict;
     const activeSession = activeMarketSession();
-    const highImpactWindow = snapshot.catalysts.some((event) => event.impact === 'High'
+    const calendarRetrievedAtMs = snapshot.calendarRetrievedAtUtc ? Date.parse(snapshot.calendarRetrievedAtUtc) : NaN;
+    const calendarCoverageEndMs = snapshot.calendarCoverageEndUtc ? Date.parse(snapshot.calendarCoverageEndUtc) : NaN;
+    const calendarVerified = snapshot.calendarSource === 'provider' && Boolean(snapshot.calendarProvider)
+      && Number.isFinite(calendarRetrievedAtMs)
+      && Date.now() - calendarRetrievedAtMs <= 60 * 60_000
+      && Date.now() - calendarRetrievedAtMs >= -30_000
+      && Number.isFinite(calendarCoverageEndMs)
+      && calendarCoverageEndMs >= Date.now() + 24 * 60 * 60_000;
+    const highImpactWindow = calendarVerified && snapshot.catalysts.some((event) => event.impact === 'High'
       && Math.abs(Date.parse(event.scheduledAt) - Date.now()) <= 30 * 60_000);
-    const newsLockoutActive = snapshot.calendarSource !== 'provider' || !snapshot.calendarProvider || highImpactWindow || dossier.eventRiskLockout;
-    const highImpactEvents = snapshot.catalysts.filter((event) => event.impact === 'High')
+    const newsLockoutActive = !calendarVerified || highImpactWindow || dossier.eventRiskLockout;
+    const highImpactEvents = (calendarVerified ? snapshot.catalysts : []).filter((event) => event.impact === 'High')
       .map((event) => ({ event, minutes: (Date.parse(event.scheduledAt) - Date.now()) / 60_000 }))
       .filter((item) => Number.isFinite(item.minutes));
     const nearestHighImpact = [...highImpactEvents].sort((a, b) => Math.abs(a.minutes) - Math.abs(b.minutes))[0];
@@ -307,7 +315,7 @@ export async function GET(request: Request) {
           || (latestHeartbeat?.dailyClosedTrades ?? 0) >= 2 || (latestHeartbeat?.dailyLosses ?? 0) >= 2,
         authority: 'MT5_ACCOUNT_SIDE_ENFORCEMENT_REQUIRED',
       },
-      calendar_verified: snapshot.calendarSource === 'provider' && Boolean(snapshot.calendarProvider),
+      calendar_verified: calendarVerified,
       event_risk_status: snapshot.calendarSource === 'provider' ? 'PROVIDER_CALENDAR' : 'UNVERIFIED_CALENDAR',
       news_lockout: newsLockoutActive,
       next_catalyst: snapshot.calendarSource === 'provider' && dossier.nextCatalyst ? {
