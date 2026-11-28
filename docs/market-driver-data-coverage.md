@@ -12,7 +12,7 @@ This register distinguishes implemented adapters from data that still requires a
 | Economic growth | BEA NIPA Table 1.1.1 real GDP | Quarterly annualized growth; requires `BEA_API_KEY` |
 | Treasury curve / real rates | FRED DGS2, DGS10, DFII10 and T10YIE | Daily observations; 10Y real yield is TIPS-derived and breakeven is nominal minus TIPS market pricing, not a pure inflation forecast |
 | Broad USD / risk / commodities | FRED DTWEXBGS, VIXCLS, SP500, DCOILWTICO, DCOILBRENTEU and BAMLH0A0HYM2 | Daily macro context; broad trade-weighted USD is not the ICE DXY index; no intraday quote claims |
-| Futures positioning | CFTC Commitments of Traders | Weekly futures positioning; not spot FX order flow and can lag |
+| Futures positioning | CFTC Commitments of Traders | Weekly futures positioning; not spot FX order flow and can lag. Current adapter carries report date and 52+ week sample size, but not the actual publication timestamp; it is display-only and excluded from composite bias until release metadata is available |
 | Economic catalysts | Configured Finnhub, FMP and FairEconomy adapters | Provider entitlement and calendar coverage vary; unavailable events must remain unavailable |
 | Executable broker prices | Private MT5 publisher | Only after the owner's Windows MT5 terminal is connected; broker-specific bid/ask, candles and execution telemetry |
 | Technical / statistical research | Existing QuantLync engine | Closed-bar, same-provider/same-broker series only; technical confirmation does not replace macro evidence |
@@ -37,6 +37,7 @@ These are high-value institutional inputs, but must not be faked or scraped from
 - Never use revised macro values in a historical replay before their vintage/release date.
 - Never merge broker candles from different brokers/providers into one indicator series.
 - Never call COT a real-time spot order book.
+- Never use COT in a point-in-time composite bias without its actual publication timestamp and a documented historical sample size; report date alone is not release time.
 - Never infer OIS, FX options, forwards or order flow from price proxies.
 - Missing, stale, delayed, contradictory or unlicensed data must reduce coverage/confidence or produce `ABSTAIN`.
 - A factor score is not a calibrated probability; calibration requires untouched out-of-sample evidence.
