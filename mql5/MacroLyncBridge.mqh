@@ -676,10 +676,24 @@ bool MacroLyncPostBrokerHeartbeat(
    const int timeout_ms = 5000
 )
 {
+   // Refresh the account snapshot if the caller has not populated it. A false
+   // guardian result may still contain valid counts; always send those counts
+   // so the server can persist the lockout state.
+   if(guardian.daily_closed_trades < 0 || guardian.daily_losses < 0
+      || guardian.account_equity <= 0.0 || guardian.account_balance <= 0.0)
+      MacroLyncEvaluateAccountGuardian(guardian);
+
+   if(guardian.daily_closed_trades < 0 || guardian.daily_losses < 0
+      || guardian.account_equity <= 0.0 || guardian.account_balance <= 0.0)
+   {
+      guardian.heartbeat_posted = false;
+      return false;
+   }
+
    string url = endpoint + "/api/v1/mt5-heartbeat";
    string headers = "Content-Type: application/json\r\nAuthorization: Bearer " + api_token + "\r\n";
 
-   string login = LongToString(AccountInfoInteger(ACCOUNT_LOGIN));
+   string login = IntegerToString((long)AccountInfoInteger(ACCOUNT_LOGIN));
    string server = MacroLyncJsonEscape(AccountInfoString(ACCOUNT_SERVER));
    string broker = MacroLyncJsonEscape(AccountInfoString(ACCOUNT_COMPANY));
    string spreadSymbol = MacroLyncJsonEscape(_Symbol);
