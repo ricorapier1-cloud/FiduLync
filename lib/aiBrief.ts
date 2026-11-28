@@ -21,13 +21,20 @@ function ruleBasedBrief(snapshot: Awaited<ReturnType<typeof getMacroSnapshot>>):
   const strengths = getCurrencyStrengthIndex(snapshot);
   const strongest = strengths[0];
   const weakest = strengths.at(-1);
-  const crowded = snapshot.cot
-    .filter((position) => position.sampleSize !== undefined && position.sampleSize >= 52
-      && position.percentile !== null && (position.percentile >= 90 || position.percentile <= 10))
+  const eligibleCot = snapshot.cot.filter((position) => position.sampleSize !== undefined
+    && position.sampleSize >= 52 && position.percentile !== null);
+  const crowded = eligibleCot
+    .filter((position) => position.percentile !== null && (position.percentile >= 90 || position.percentile <= 10))
     .map((position) => position.market);
-  const nextCatalyst = snapshot.catalysts
+  const calendarRetrievedAtMs = snapshot.calendarRetrievedAtUtc ? Date.parse(snapshot.calendarRetrievedAtUtc) : NaN;
+  const calendarCoverageEndMs = snapshot.calendarCoverageEndUtc ? Date.parse(snapshot.calendarCoverageEndUtc) : NaN;
+  const calendarVerified = snapshot.calendarSource === 'provider' && Boolean(snapshot.calendarProvider)
+    && Number.isFinite(calendarRetrievedAtMs) && Date.now() - calendarRetrievedAtMs <= 60 * 60_000
+    && Date.now() - calendarRetrievedAtMs >= -30_000
+    && Number.isFinite(calendarCoverageEndMs) && calendarCoverageEndMs >= Date.now() + 24 * 60 * 60_000;
+  const nextCatalyst = calendarVerified ? snapshot.catalysts
     .filter((item) => Date.parse(item.scheduledAt) >= Date.now() && item.impact === 'High')
-    .sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt))[0];
+    .sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt))[0] : undefined;
   return {
     source: 'rules',
     bullets: [
@@ -35,11 +42,14 @@ function ruleBasedBrief(snapshot: Awaited<ReturnType<typeof getMacroSnapshot>>):
         ? `Macro-relative strength: ${strongest.currency} leads while ${weakest.currency} lags; CSI is not a standalone execution signal.`
         : 'Currency-strength inputs are incomplete; treat relative-value rankings as provisional.',
       crowded.length
-        ? `COT crowding alert: ${crowded.slice(0, 3).join(', ')} is at a 10th/90th percentile extreme.`
-        : snapshot.cot.length === 0 ? 'COT positioning is unavailable; no crowding conclusion can be made.' : 'No COT market currently meets the 10th/90th percentile crowding threshold.',
+        ? `COT crowding alert: ${crowded.slice(0, 3).join(', ')} is at a 10th/90th percentile extreme (minimum 52 weekly observations).`
+        : snapshot.cot.length === 0 ? 'COT positioning is unavailable; no crowding conclusion can be made.'
+          : eligibleCot.length === 0 ? 'COT percentile unavailable: fewer than 52 weekly observations are verified.'
+            : 'No eligible COT market currently meets the 10th/90th percentile crowding threshold.',
       nextCatalyst
         ? `Next high-impact catalyst: ${nextCatalyst.region} ${nextCatalyst.title} at ${nextCatalyst.scheduledAt}.`
-        : snapshot.calendarSource === 'provider' ? 'No upcoming high-impact catalyst is listed in the provider calendar window.' : 'Economic calendar feed is not verified; no catalyst conclusion can be made.',
+        : calendarVerified ? 'No upcoming high-impact catalyst is listed in the verified provider calendar window.'
+          : 'Economic calendar is unavailable, stale, or lacks verified forward coverage; event risk remains locked.',
     ],
   };
 }
@@ -61,10 +71,11 @@ async function generateGeminiBrief(
       realRatePct: Number((currency.policyRate - currency.inflation).toFixed(2)),
     })),
     csi: getCurrencyStrengthIndex(snapshot),
-    dataQuality: { macroSource: snapshot.source, calendarSource: snapshot.calendarSource, cotSource: snapshot.cotSource, note: 'Only provider-sourced, fresh observations are eligible. Missing or stale data must be treated as unavailable.' },
-    cotExtremes: snapshot.cot.filter((item) => item.percentile >= 90 || item.percentile <= 10),
-    tierOneCalendar: snapshot.catalysts.filter((item) => item.impact === 'High')
-      .sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt)).slice(0, 5),
+    dataQuality: { macroSource: snapshot.source, calendarSource: calendarVerified ? snapshot.calendarSource : 'unavailable', calendarVerified, calendarRetrievedAtUtc: snapshot.calendarRetrievedAtUtc ?? null, calendarCoverageEndUtc: snapshot.calendarCoverageEndUtc ?? null, cotSource: snapshot.cotSource, note: 'Only provider-sourced, fresh observations are eligible. Missing or stale data must be treated as unavailable.' },
+    cotExtremes: snapshot.cot.filter((item) => item.sampleSize !== undefined && item.sampleSize >= 52
+      && item.percentile !== null && (item.percentile >= 90 || item.percentile <= 10)),
+    tierOneCalendar: calendarVerified ? snapshot.catalysts.filter((item) => item.impact === 'High')
+      .sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt)).slice(0, 5) : [],
   };
   if (inputs.rateDifferentials.length < 2 && inputs.csi.length < 2 && inputs.cotExtremes.length === 0 && inputs.tierOneCalendar.length === 0) {
     return fallback;
@@ -103,7 +114,7 @@ async function generateGeminiBrief(
 }
 
 export async function getMacroBrief(): Promise<MacroBrief> {
-  return getCachedData('macro:ai-brief:v3', async () => {
+  return getCachedData('macro:ai-brief:v4', async () => {
     const snapshot = await getMacroSnapshot();
     try {
       return await generateGeminiBrief(snapshot);
