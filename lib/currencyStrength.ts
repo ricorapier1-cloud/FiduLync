@@ -1,4 +1,5 @@
 import type { MacroSnapshot } from '@/types/macro';
+import { isObservationFresh } from '@/lib/dataFreshness';
 
 export const MAJOR_CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'SEK', 'NOK'] as const;
 export type MajorCurrency = (typeof MAJOR_CURRENCIES)[number];
@@ -10,13 +11,10 @@ export type CurrencyStrength = {
 };
 
 const MAX_POLICY_AGE_MS = 180 * 24 * 60 * 60_000;
-const MAX_INFLATION_AGE_MS = 900 * 24 * 60 * 60_000;
+const MAX_INFLATION_AGE_MS = 75 * 24 * 60 * 60_000;
 
 function validObservationDate(value: string | undefined, now: number, maxAgeMs: number): boolean {
-  if (!value) return false;
-  const timestamp = Date.parse(value);
-  const age = now - timestamp;
-  return Number.isFinite(timestamp) && age >= 0 && age <= maxAgeMs;
+  return isObservationFresh(value, maxAgeMs, now, 0);
 }
 
 function zScores(values: number[]): number[] {
@@ -38,6 +36,8 @@ export function getCurrencyStrengthIndex(snapshot: MacroSnapshot, now = Date.now
     MAJOR_CURRENCIES.includes(item.code as MajorCurrency)
     && item.policyRateSource === 'provider'
     && item.inflationSource === 'provider'
+    // Annual World Bank CPI is not a current monthly inflation input.
+    && item.inflationProvider !== 'world-bank'
     && Number.isFinite(item.policyRate)
     && Number.isFinite(item.inflation)
     && validObservationDate(item.policyRateAsOf, now, MAX_POLICY_AGE_MS)
