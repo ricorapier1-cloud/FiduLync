@@ -55,12 +55,6 @@ async function consumePersistentRateLimit(key: string, limit: number): Promise<{
   };
 }
 
-function hourInZone(date: Date, timeZone: string): number {
-  const parts = new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(date);
-  const hour = Number(parts.find((part) => part.type === 'hour')?.value ?? 0);
-  const minute = Number(parts.find((part) => part.type === 'minute')?.value ?? 0);
-  return hour + minute / 60;
-}
 
 function isFreshCotReport(date: string | undefined, maxAgeDays = 14): boolean {
   if (!date) return false;
