@@ -205,6 +205,7 @@ export async function GET(request: Request) {
         'An absent, stale, partial or unverified input produces INSUFFICIENT_EVIDENCE.',
         'Event lockout is contextual information; each EA must enforce its own local trading and position-protection rules.',
         'This feed does not contain technical entries, stop-losses, take-profits, lot sizes or order instructions.',
+        ...(symbol === 'XAUUSD' ? ['Gold-specific real-yield, official-sector demand and positioning model is not validated; no XAUUSD fundamental bias is emitted.'] : []),
       ],
     });
   } catch (error) {
