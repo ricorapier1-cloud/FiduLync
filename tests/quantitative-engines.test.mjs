@@ -321,7 +321,8 @@ test('dashboard exposes anchored research workspaces and keeps BBO presentation 
     assert.match(dashboard, new RegExp('href="#' + anchor + '"'));
   }
   assert.match(desk, /id="desk-terminal"/);
-  assert.match(desk, /FRESH BBO/);
+  assert.match(desk, /PUBLIC REFERENCE BBO/);
+  assert.match(desk, /BROKER-VERIFIED MT5 QUOTES/);
   assert.doesNotMatch(dashboard, /api\/macro\/quotes|macro-quote-strip|LIVE · FINNHUB/);
 });
 test('MT5 macro bridge rejects unsupported instruments and withholds stale provider prices', () => {
