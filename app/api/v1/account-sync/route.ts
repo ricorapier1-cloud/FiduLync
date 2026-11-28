@@ -128,14 +128,20 @@ export async function POST(request: Request) {
       const digits = num(quote.digits, null);
       const point = num(quote.point, null);
       const spreadPoints = num(quote.spreadPoints, null);
+      const serverUtcOffsetMinutes = num(quote.serverUtcOffsetMinutes, null);
+      const timeBasis = str(quote.timeBasis, 64);
       if (!allowedMarketSymbols.has(symbol) || bid === null || ask === null || bid <= 0 || ask < bid
         || !quoteTimeUtc || digits === null || !Number.isInteger(digits) || digits < 0 || digits > 12
-        || point === null || point <= 0 || spreadPoints === null || spreadPoints < 0) return [];
+        || point === null || point <= 0 || spreadPoints === null || spreadPoints < 0
+        || serverUtcOffsetMinutes === null || !Number.isInteger(serverUtcOffsetMinutes)
+        || serverUtcOffsetMinutes < -840 || serverUtcOffsetMinutes > 840
+        || timeBasis !== 'BROKER_SERVER_CURRENT_OFFSET') return [];
       const ageMs = nowMs - Date.parse(quoteTimeUtc);
       if (!Number.isFinite(ageMs) || ageMs < -30_000 || ageMs > 30_000) return [];
       return [{
         account_key: accountKey, symbol, bid, ask, quote_time: quoteTimeUtc, spread_points: spreadPoints,
-        digits, point, broker: snapshot.broker, server: snapshot.server, received_at: receivedAt,
+        digits, point, server_utc_offset_minutes: serverUtcOffsetMinutes, time_basis: timeBasis,
+        broker: snapshot.broker, server: snapshot.server, received_at: receivedAt,
       }];
     });
     if (quotes.length) {
@@ -157,13 +163,18 @@ export async function POST(request: Request) {
       const spreadPoints = num(candle.spreadPoints, 0) ?? 0;
       const realVolume = num(candle.realVolume, 0) ?? 0;
       const digits = num(candle.digits, null), point = num(candle.point, null);
+      const serverUtcOffsetMinutes = num(candle.serverUtcOffsetMinutes, null);
+      const timeBasis = str(candle.timeBasis, 64);
       if (!allowedMarketSymbols.has(symbol) || !['M5', 'D1'].includes(timeframe) || !barTimeUtc
         || open === null || high === null || low === null || close === null
         || open <= 0 || high <= 0 || low <= 0 || close <= 0
         || high < low || open < low || open > high || close < low || close > high
         || tickVolume < 0 || spreadPoints < 0 || realVolume < 0
         || digits === null || !Number.isInteger(digits) || digits < 0 || digits > 12
-        || point === null || point <= 0) return [];
+        || point === null || point <= 0
+        || serverUtcOffsetMinutes === null || !Number.isInteger(serverUtcOffsetMinutes)
+        || serverUtcOffsetMinutes < -840 || serverUtcOffsetMinutes > 840
+        || timeBasis !== 'BROKER_SERVER_CURRENT_OFFSET') return [];
       const ageMs = nowMs - Date.parse(barTimeUtc);
       const maxAgeMs = timeframe === 'M5' ? 48 * 60 * 60_000 : 180 * 86_400_000;
       if (!Number.isFinite(ageMs) || ageMs < -30_000 || ageMs > maxAgeMs) return [];
@@ -171,7 +182,8 @@ export async function POST(request: Request) {
         account_key: accountKey, symbol, timeframe, bar_time: barTimeUtc,
         open, high, low, close, tick_volume: Math.trunc(tickVolume),
         spread_points: spreadPoints, real_volume: Math.trunc(realVolume),
-        is_closed: true, digits, point, received_at: receivedAt,
+        is_closed: true, digits, point, server_utc_offset_minutes: serverUtcOffsetMinutes,
+        time_basis: timeBasis, received_at: receivedAt,
       }];
     });
     if (candles.length) {
