@@ -4,6 +4,7 @@ import { recordMT5Heartbeat, isFreshMT5Timestamp } from '@/lib/quant/mt5Heartbea
 import { evaluateSovereignShield } from '@/lib/quant/sovereignShield';
 import { getMacroSnapshot } from '@/lib/macroEngine';
 import { buildGoldMacroContext } from '@/lib/macro/goldAndRegimeEngine';
+import { getStrategyValidationGate } from '@/lib/quant/strategyValidationGate';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -114,7 +115,7 @@ export async function POST(request: Request) {
     }, { status: 503 });
   }
 
-  const snapshot = await getMacroSnapshot();
+  const [snapshot, validationGate] = await Promise.all([getMacroSnapshot(), getStrategyValidationGate()]);
   const goldContext = await buildGoldMacroContext(snapshot);
   const vix = goldContext.drivers.VIXCLS.state === 'HEALTHY' ? goldContext.drivers.VIXCLS.value : null;
   const calendarRetrievedAtMs = snapshot.calendarRetrievedAtUtc ? Date.parse(snapshot.calendarRetrievedAtUtc) : NaN;
@@ -143,6 +144,7 @@ export async function POST(request: Request) {
   const drawdownLimitReached = stored.rollingSevenDayDrawdownPct !== null
     && stored.rollingSevenDayDrawdownPct <= -4.0;
   const killSwitchActive = !stored.governanceVerified
+    || !validationGate.verified
     || dailyLimitReached
     || drawdownLimitReached
     || (vix !== null && vix >= 32.0)
@@ -151,7 +153,8 @@ export async function POST(request: Request) {
 
   const killSwitchReason = !stored.governanceVerified
     ? 'Seven-day MT5 equity history is not yet complete and verified'
-    : stored.dailyLosses >= 2 ? 'Daily loss limit reached (broker server day)'
+    : !validationGate.verified ? (validationGate.blockers[0] ?? 'Strategy has no owner-approved out-of-sample validation')
+      : stored.dailyLosses >= 2 ? 'Daily loss limit reached (broker server day)'
       : stored.dailyClosedTrades >= 2 ? 'Daily maximum trade count reached (broker server day)'
         : drawdownLimitReached ? 'Verified seven-day peak-to-trough equity drawdown limit breached'
           : newsLockoutActive ? 'Economic calendar is unavailable or a high-impact event is inside the lockout window'
@@ -180,7 +183,9 @@ export async function POST(request: Request) {
       drawdownSampleCount: stored.drawdownSampleCount,
       drawdownCoverageComplete: stored.drawdownCoverageComplete,
       governanceVerified: stored.governanceVerified,
-      allowedToTrade: !killSwitchActive && sovereignShield.allowedToTrade,
+      strategyValidationStatus: validationGate.status,
+      strategyValidationBlockers: validationGate.blockers,
+      allowedToTrade: !killSwitchActive && sovereignShield.allowedToTrade && validationGate.verified,
     },
   });
 }
