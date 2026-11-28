@@ -89,7 +89,8 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
     ? Math.round((base2Y - quote2Y) * 100)
     : null;
 
-  const cotPercentileDiff = baseCot && quoteCot ? Math.round(baseCot.percentile - quoteCot.percentile) : 0;
+  const cotPercentileDiff = baseCot && quoteCot && baseCot.percentile !== null && quoteCot.percentile !== null
+    ? Math.round(baseCot.percentile - quoteCot.percentile) : 0;
 
   // Directional scoring uses only sourced policy, inflation, sovereign-yield and COT observations.
   // Country-profile baseline assumptions and hardcoded cross-asset constants are excluded.
