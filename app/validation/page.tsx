@@ -1,498 +1,358 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   runWalkForwardAnalysis,
   runMonteCarloStressSimulation,
   parseMt5ReportCsv,
   type TradeInput,
-  // type WalkForwardAnalysis,
-  // type MonteCarloSimulationResult,
 } from '@/lib/quant/monteCarloEngine';
+import { RESEARCH_OBJECTIVES } from '@/lib/quant/researchObjectives';
 
-export default function ValidationPage() {
+type BrokerDeal = {
+  account_key: string;
+  position_id: string | null;
+  symbol: string;
+  side: string;
+  entry_type: string;
+  volume: number;
+  profit: number;
+  commission: number;
+  swap: number;
+  fee: number;
+  deal_time_server: string;
+};
+
+type BrokerAccount = {
+  account_key: string;
+  account_login: string;
+  broker: string | null;
+  server: string;
+  account_mode: string;
+  currency: string;
+  positions: Array<{ positionId: string | null }>;
+};
+
+type AccountResponse = {
+  accounts?: BrokerAccount[];
+  deals?: BrokerDeal[];
+  error?: string;
+};
+
+const moneyNumber = (value: number | null | undefined) =>
+  value === null || value === undefined || !Number.isFinite(value)
+    ? '—'
+    : new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
+
+const netDeal = (deal: BrokerDeal) =>
+  Number(deal.profit) + Number(deal.commission) + Number(deal.swap) + Number(deal.fee);
+
+const closesPosition = (deal: BrokerDeal) => ['OUT', 'OUT_BY', 'INOUT'].includes(deal.entry_type);
+
+const statusLabel = (status: string) => {
+  if (status === 'ROBUST_CANDIDATE') return 'ROBUST CANDIDATE · NOT APPROVED';
+  if (status === 'MODERATE_DEGRADATION') return 'EDGE DEGRADATION / REVIEW';
+  if (status === 'OVERFITTED_FAILURE') return 'OUT-OF-SAMPLE FAILURE';
+  return 'INSUFFICIENT VALIDATION SAMPLE';
+};
+
+export default function StrategyValidationPage() {
   const [trades, setTrades] = useState<TradeInput[]>([]);
-  const [dataSourceName, setDataSourceName] = useState<string | null>(null);
-  const [rawCsvText, setRawCsvText] = useState('');
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [startingBalance, setStartingBalance] = useState<number | null>(null);
+  const [dataSourceName, setDataSourceName] = useState('NO DATASET LOADED');
   const [startingBalanceInput, setStartingBalanceInput] = useState('');
+  const [startingBalance, setStartingBalance] = useState<number | null>(null);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [error, setError] = useState('');
+  const [loadingAccount, setLoadingAccount] = useState(false);
+  const [sourceType, setSourceType] = useState<'NONE' | 'MT5_LINKED_HISTORY' | 'MT5_BACKTEST_CSV'>('NONE');
+  const [currency, setCurrency] = useState<string | null>(null);
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      try {
-        const raw = window.localStorage.getItem('macrolinc-manual-account-balance-v1');
-        const modeEnabled = window.localStorage.getItem('fidulync-manual-desk-mode-v1') === 'true';
-        if (!modeEnabled || !raw) return;
-        const saved = JSON.parse(raw) as { balance?: number };
-        if (typeof saved.balance === 'number' && Number.isFinite(saved.balance) && saved.balance > 0) {
-          setStartingBalance(saved.balance);
-          setStartingBalanceInput(String(saved.balance));
-        }
-      } catch {
-        setStartingBalance(null);
-        setStartingBalanceInput('');
+      const saved = window.localStorage.getItem('fidulync-validation-starting-balance-v1');
+      if (saved && Number.isFinite(Number(saved)) && Number(saved) > 0) {
+        setStartingBalanceInput(saved);
+        setStartingBalance(Number(saved));
       }
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
+
+  const loadLinkedAccountHistory = useCallback(async () => {
+    const token = window.sessionStorage.getItem('macrolinc-account-read-token') ?? '';
+    const selectedKey = window.sessionStorage.getItem('macrolinc-selected-account-key') ?? '';
+    if (!token || !selectedKey) {
+      setError('Connect and select your MT5 account in the Accounts workspace first.');
+      return;
+    }
+    setLoadingAccount(true);
+    setError('');
+    setStatusMessage('');
+    try {
+      const response = await fetch('/api/v1/accounts', {
+        cache: 'no-store',
+        headers: { Authorization: 'Bearer ' + token },
+      });
+      const payload = await response.json() as AccountResponse;
+      if (!response.ok) throw new Error(payload.error ?? 'Private MT5 account history is unavailable.');
+      const account = payload.accounts?.find((item) => item.account_key === selectedKey);
+      if (!account) throw new Error('The selected MT5 account is not available. Re-select it in the Accounts workspace.');
+      if (account.account_mode !== 'REAL') {
+        throw new Error('Only linked REAL account history can be loaded here. DEMO and contest history are excluded from live research validation.');
+      }
+
+      const openIds = new Set(account.positions.map((position) => position.positionId).filter((value): value is string => Boolean(value)));
+      const grouped = new Map<string, BrokerDeal[]>();
+      (payload.deals ?? []).filter((deal) => deal.account_key === selectedKey).forEach((deal) => {
+        if (!deal.position_id) return;
+        const rows = grouped.get(deal.position_id) ?? [];
+        rows.push(deal);
+        grouped.set(deal.position_id, rows);
+      });
+
+      const loaded: TradeInput[] = [];
+      for (const [positionId, rows] of grouped.entries()) {
+        if (openIds.has(positionId)) continue;
+        const entry = rows.find((deal) => deal.entry_type === 'IN' && ['BUY', 'SELL'].includes(deal.side));
+        const exits = rows.filter(closesPosition).sort((a, b) => a.deal_time_server.localeCompare(b.deal_time_server));
+        if (!entry || exits.length === 0) continue;
+        const exit = exits[exits.length - 1];
+        loaded.push({
+          ticket: positionId,
+          symbol: entry.symbol,
+          direction: entry.side === 'BUY' ? 'BUY' : 'SELL',
+          volume: rows.filter((deal) => deal.entry_type === 'IN').reduce((sum, deal) => sum + Number(deal.volume), 0),
+          profit: rows.reduce((sum, deal) => sum + netDeal(deal), 0),
+          closeTime: exit.deal_time_server,
+        });
+      }
+
+      loaded.sort((a, b) => (a.closeTime ?? '').localeCompare(b.closeTime ?? ''));
+      if (!loaded.length) throw new Error('No reconciled closed positions were found in the linked account deal sample.');
+      setTrades(loaded);
+      setCurrency(account.currency);
+      setSourceType('MT5_LINKED_HISTORY');
+      setDataSourceName(`MT5 linked account · ${account.broker ?? 'Broker'} · ${account.account_login} · ${loaded.length} reconciled closed positions`);
+      setStatusMessage('Loaded a recent broker-sourced deal sample. The API retains up to 500 recent deal records; this is descriptive account history, not a full historical backtest. Initial stop-loss risk is not included in deal history, so realised R-multiple and 1:2 risk/reward validation remain unavailable until a tester report supplies initial risk data.');
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Could not load linked MT5 account history.');
+    } finally {
+      setLoadingAccount(false);
+    }
+  }, []);
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setError('');
+    setStatusMessage('');
+    try {
+      const text = await file.text();
+      const parsed = parseMt5ReportCsv(text);
+      if (!parsed.length) {
+        throw new Error('No valid MT5 closed-trade rows found. Required columns: ticket/position, symbol, type, volume, profit. Include close time for walk-forward analysis and R-multiple or initial stop-loss for 1:2 risk validation.');
+      }
+      setTrades(parsed);
+      setDataSourceName(file.name);
+      setSourceType('MT5_BACKTEST_CSV');
+      setCurrency(null);
+      setStatusMessage(`Imported ${parsed.length} rows from the supplied MT5 report. Verify that the file contains closed trades only, complete timestamps and initial stop-loss/R-multiple data before interpreting the validation output.`);
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : 'Could not parse the MT5 report.');
+    }
+    event.target.value = '';
+  };
+
   const saveStartingBalance = () => {
     const value = Number(startingBalanceInput);
-    if (window.localStorage.getItem('fidulync-manual-desk-mode-v1') !== 'true') {
-      setStatusMessage('Enable Verified Manual Desk Mode before saving a user-attested starting balance.');
-      return;
-    }
     if (!Number.isFinite(value) || value <= 0) {
-      setStartingBalance(null);
-      setStatusMessage('Enter a valid positive real starting balance.');
+      setError('Enter the actual starting balance at the beginning of this trade sample.');
       return;
     }
-    try {
-      window.localStorage.setItem('macrolinc-manual-account-balance-v1', JSON.stringify({
-        balance: value, currency: 'USD', savedAtUtc: new Date().toISOString(), source: 'USER_ATTESTED_MANUAL',
-      }));
-      setStartingBalance(value);
-      setStatusMessage(null);
-    } catch {
-      setStartingBalance(null);
-      setStatusMessage('Browser storage unavailable. Starting balance remains unverified.');
-    }
+    window.localStorage.setItem('fidulync-validation-starting-balance-v1', String(value));
+    setStartingBalance(value);
+    setError('');
+    setStatusMessage('Starting balance saved as a user-supplied analysis input. It is not broker-verified and does not approve live trading.');
   };
 
-  // Load from verified browser manual ledger if available
-  const handleLoadManualLedger = () => {
-    try {
-      const stored = localStorage.getItem('fidulync-manual-trades-history-v1');
-      if (!stored) {
-        setStatusMessage('No trades found in Verified Manual Ledger. Record trades in Portfolio & Accounts first.');
-        return;
-      }
-      const parsed = JSON.parse(stored) as Array<{
-        ticket: string | number;
-        symbol: string;
-        direction: 'BUY' | 'SELL';
-        volume?: number;
-        profit: number;
-        rUnits?: number;
-        rMultiple?: number;
-      }>;
-
-      if (!Array.isArray(parsed) || parsed.length === 0) {
-        setStatusMessage('Manual ledger is empty. Add verified trades to run simulation.');
-        return;
-      }
-
-      const formatted: TradeInput[] = parsed
-        .filter((trade) => trade.ticket !== undefined && trade.ticket !== null
-          && typeof trade.volume === 'number' && Number.isFinite(trade.volume) && trade.volume > 0
-          && Number.isFinite(trade.profit))
-        .map((trade) => ({
-          ticket: trade.ticket,
-          symbol: trade.symbol,
-          direction: trade.direction,
-          volume: trade.volume as number,
-          profit: trade.profit,
-          rMultiple: typeof trade.rUnits === 'number' && Number.isFinite(trade.rUnits)
-            ? trade.rUnits : trade.rMultiple,
-        }));
-      if (formatted.length === 0) {
-        setStatusMessage('Manual ledger has no trades with actual ticket, volume and net P&L evidence.');
-        return;
-      }
-
-      setTrades(formatted);
-      setDataSourceName(`Verified Manual Ledger (${formatted.length} trades)`);
-      setStatusMessage(null);
-    } catch {
-      setStatusMessage('Failed to parse manual ledger data from local storage.');
-    }
+  const clearDataset = () => {
+    setTrades([]);
+    setDataSourceName('NO DATASET LOADED');
+    setSourceType('NONE');
+    setCurrency(null);
+    setStatusMessage('');
+    setError('');
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      if (!text) return;
-      const parsedTrades = parseMt5ReportCsv(text);
-      if (parsedTrades.length === 0) {
-        setStatusMessage('No valid trades found in file. Ensure MT5 tester CSV contains Symbol and Profit columns.');
-        return;
-      }
-      setTrades(parsedTrades);
-      setDataSourceName(`MT5 File: ${file.name} (${parsedTrades.length} trades)`);
-      setStatusMessage(null);
-    };
-    reader.readAsText(file);
-  };
-
-  const handleParsePastedCsv = () => {
-    if (!rawCsvText.trim()) return;
-    const parsedTrades = parseMt5ReportCsv(rawCsvText);
-    if (parsedTrades.length === 0) {
-      setStatusMessage('No valid trades recognized in pasted text.');
-      return;
-    }
-    setTrades(parsedTrades);
-    setDataSourceName(`Pasted CSV / Text (${parsedTrades.length} trades)`);
-    setStatusMessage(null);
-  };
-
-  const walkForward = useMemo(() => {
-    if (trades.length === 0) return null;
-    if (trades.length < 20 || startingBalance === null) return null;
-    return runWalkForwardAnalysis(trades, startingBalance, 0.7);
-  }, [trades, startingBalance]);
+  const walkForward = useMemo(
+    () => runWalkForwardAnalysis(trades, startingBalance ?? 0),
+    [trades, startingBalance],
+  );
 
   const monteCarlo = useMemo(() => {
-    if (trades.length === 0) return null;
-    if (startingBalance === null) return null;
+    if (startingBalance === null || trades.length < 30) return null;
     return runMonteCarloStressSimulation(trades, startingBalance, 1000);
   }, [trades, startingBalance]);
 
+  const rCoverage = trades.length
+    ? trades.filter((trade) => typeof trade.rMultiple === 'number' && Number.isFinite(trade.rMultiple)).length / trades.length * 100
+    : 0;
+
+  const sourceNote = sourceType === 'MT5_LINKED_HISTORY'
+    ? 'RECENT LIVE ACCOUNT DEAL SAMPLE · MAX 500 DEALS · NOT A POINT-IN-TIME BACKTEST'
+    : sourceType === 'MT5_BACKTEST_CSV'
+      ? 'USER-IMPORTED MT5 TESTER / STATEMENT FILE · VERIFY REPORT PERIOD AND TESTER SETTINGS'
+      : 'NO VERIFIED TRADE DATASET';
+
   return (
-    <main className="min-h-screen bg-[#07090e] text-slate-100 p-4 md:p-8 font-mono">
-      <div className="max-w-6xl mx-auto space-y-6">
-        {/* Navigation & Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+    <main className="min-h-screen bg-[#070b12] px-4 py-8 text-slate-100 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-7 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="flex items-center gap-3">
-              <Link
-                href="/"
-                className="px-3 py-1 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded text-xs text-teal-400 font-semibold transition"
-              >
-                ← Terminal
-              </Link>
-              <Link
-                href="/workbench"
-                className="px-3 py-1 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded text-xs text-slate-300 font-semibold transition"
-              >
-                Workbench
-              </Link>
-              <Link
-                href="/accounts"
-                className="px-3 py-1 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded text-xs text-slate-300 font-semibold transition"
-              >
-                Accounts &amp; Ledger
-              </Link>
-            </div>
-            <h1 className="text-xl md:text-2xl font-bold mt-2 text-white">
-              Quantitative Out-of-Sample &amp; Monte Carlo Stress Engine
-            </h1>
-            <p className="text-xs text-slate-400 mt-1">
-              Bootstrap resampling of imported trade outcomes only. No synthetic spread, slippage or account-balance assumptions.
-            </p>
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-cyan-300">MacroLync · Quant Research</p>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight">Strategy Validation & Risk Lab</h1>
+            <p className="mt-1 text-sm text-slate-400">Out-of-sample performance, execution-cost sensitivity and reproducible path-risk analysis.</p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs px-2.5 py-1 rounded bg-slate-900 border border-slate-700 text-slate-300">
-              FAIL-CLOSED GOVERNANCE
-            </span>
-          </div>
+          <Link href="/accounts" className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">
+            Open linked MT5 account
+          </Link>
         </div>
 
-        {/* Data Source Selection Bar */}
-        <div className="bg-[#0b0e14] border border-slate-800 rounded-lg p-4 space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <section className="rounded-xl border border-cyan-400/20 bg-cyan-400/[0.035] p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Active Dataset Source</div>
-              <div className="text-sm font-bold text-white mt-1">
-                {dataSourceName ? (
-                  <span className="text-emerald-400 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block animate-pulse" />
-                    {dataSourceName}
-                  </span>
-                ) : (
-                  <span className="text-amber-400">AWAITING VERIFIED DATA IMPORT</span>
-                )}
-              </div>
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-cyan-300">Research objectives · targets, not results</p>
+              <h2 className="mt-1 text-lg font-semibold">Balanced growth with controlled drawdown</h2>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={handleLoadManualLedger}
-                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded text-xs font-semibold text-teal-300 transition"
-              >
-                Load From Verified Manual Ledger
-              </button>
-              <label className="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded text-xs font-semibold text-slate-200 cursor-pointer transition">
-                Import MT5 Backtest CSV
-                <input
-                  type="file"
-                  accept=".csv,.txt"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-              </label>
-              {trades.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTrades([]);
-                    setDataSourceName(null);
-                    setStatusMessage(null);
-                  }}
-                  className="px-3 py-2 bg-red-950/60 hover:bg-red-900/80 border border-red-800 rounded text-xs font-semibold text-red-300 transition"
-                >
-                  Clear Data
-                </button>
-              )}
-            </div>
+            <span className="rounded-full bg-amber-400/10 px-3 py-1 text-xs font-mono text-amber-200">NOT VALIDATED</span>
           </div>
-
-          {/* Collapsible Paste Area */}
-          {!trades.length && (
-            <div className="pt-2 border-t border-slate-800/80 space-y-2">
-              <div className="text-xs text-slate-400">Or paste raw MT5 trade report lines:</div>
-              <div className="flex gap-2">
-                <textarea
-                  value={rawCsvText}
-                  onChange={(e) => setRawCsvText(e.target.value)}
-                  placeholder="Paste MT5 backtest CSV rows (Ticket, Symbol, Type, Volume, Profit...)"
-                  className="flex-1 bg-slate-950 border border-slate-800 rounded p-2 text-xs text-slate-300 h-16 font-mono resize-none focus:outline-none focus:border-slate-600"
-                />
-                <button
-                  type="button"
-                  onClick={handleParsePastedCsv}
-                  disabled={!rawCsvText.trim()}
-                  className="px-4 bg-teal-900 hover:bg-teal-800 disabled:opacity-50 border border-teal-700 rounded text-xs font-semibold text-teal-100 transition"
-                >
-                  Parse &amp; Run
-                </button>
-              </div>
-            </div>
-          )}
-
-          {statusMessage && (
-            <div className="text-xs text-amber-400 bg-amber-950/30 border border-amber-900/50 p-2 rounded">
-              {statusMessage}
-            </div>
-          )}
-        </div>
-
-        <div className="bg-[#0b0e14] border border-slate-800 rounded-lg p-4 flex flex-wrap items-end gap-3">
-          <div className="flex-1 min-w-[220px]">
-            <label htmlFor="validation-starting-balance" className="block text-xs text-slate-400 mb-1">Verified Manual Starting Balance (USD)</label>
-            <input id="validation-starting-balance" type="number" min="0.01" step="0.01" value={startingBalanceInput}
-              onChange={(event) => setStartingBalanceInput(event.target.value)} placeholder="Enter real $" 
-              className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm text-white" />
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3"><p className="text-[10px] font-mono text-slate-500">TARGET WIN RATE</p><p className="mt-1 text-xl font-semibold">60–65%</p></div>
+            <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3"><p className="text-[10px] font-mono text-slate-500">PLANNED REWARD / RISK</p><p className="mt-1 text-xl font-semibold">1:2</p></div>
+            <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3"><p className="text-[10px] font-mono text-slate-500">SETUP POLICY</p><p className="mt-1 text-sm font-semibold">High-quality only</p></div>
+            <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3"><p className="text-[10px] font-mono text-slate-500">DAILY TRADE QUOTA</p><p className="mt-1 text-sm font-semibold">None</p></div>
           </div>
-          <button type="button" onClick={saveStartingBalance} disabled={!startingBalanceInput.trim()}
-            className="px-4 py-2 bg-amber-950 border border-amber-700 rounded text-xs font-semibold text-amber-200 disabled:opacity-40">SAVE REAL STARTING BALANCE</button>
-          <span className="text-xs text-slate-400">{startingBalance === null ? 'BALANCE NOT VERIFIED' : 'USER-ATTESTED · BROWSER LOCAL'}</span>
-        </div>
-        {trades.length > 0 && startingBalance === null && <div className="rounded-lg border border-amber-800/60 bg-amber-950/20 p-4 text-xs text-amber-200">NO VERIFIED STARTING BALANCE — SAVE YOUR REAL STARTING BALANCE IN VERIFIED MANUAL DESK MODE BEFORE CALCULATING DRAWDOWN OR MONTE CARLO.</div>}
-        {trades.length > 0 && startingBalance !== null && trades.length < 20 && <div className="rounded-lg border border-slate-700 bg-slate-900/40 p-4 text-xs text-slate-300">INSUFFICIENT VERIFIED TRADE HISTORY — 20 OR MORE RECONCILED TRADES ARE REQUIRED FOR WALK-FORWARD CLASSIFICATION. No performance grade is published.</div>}
-        {/* Zero-Mock State Notice */}
-        {trades.length === 0 ? (
-          <div className="bg-[#0b0e14] border border-dashed border-slate-800 rounded-lg p-8 text-center space-y-3">
-            <div className="text-sm font-semibold text-slate-300">
-              NO VERIFIED TRADE HISTORY — IMPORT MT5 REPORT OR LOG REAL TRADES TO RUN MONTE CARLO
+          <p className="mt-3 text-xs leading-5 text-slate-400">
+            These objectives are not achieved performance claims. Formal approval requires at least {RESEARCH_OBJECTIVES.minimumOutOfSampleTrades} chronological out-of-sample trades across {RESEARCH_OBJECTIVES.minimumWalkForwardFolds} expanding walk-forward folds, point-in-time macro integrity, real-broker execution evidence and independent report approval.
+          </p>
+        </section>
+
+        <section className="mt-6 rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">Real trade data only</h2>
+              <p className="mt-1 text-xs text-slate-400">Load reconciled closed deals from the linked real MT5 account or import an MT5 tester/report CSV. No manual trade journal or synthetic dataset is used.</p>
             </div>
-            <p className="text-xs text-slate-400 max-w-xl mx-auto leading-relaxed">
-              In accordance with the strict zero-mock data integrity rule, historical walk-forward metrics and Monte Carlo stress distributions are only computed against authenticated MT5 backtest CSV records or verified manual ledger journal trades.
-            </p>
-            <div className="pt-2 flex justify-center gap-3">
-              <button
-                type="button"
-                onClick={handleLoadManualLedger}
-                className="px-4 py-2 bg-teal-950 hover:bg-teal-900 border border-teal-700 text-teal-300 rounded text-xs font-semibold transition"
-              >
-                Load From Verified Manual Ledger
-              </button>
-              <Link
-                href="/accounts"
-                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 rounded text-xs font-semibold transition"
-              >
-                Open Portfolio &amp; Record Trades →
-              </Link>
-            </div>
+            <span className="rounded-full bg-slate-800 px-3 py-1 text-xs font-mono text-slate-300">{trades.length} TRADES LOADED</span>
           </div>
-        ) : (
-          <div className="space-y-6">
-            {/* Walk-Forward 70/30 Grid */}
-            <div className="bg-[#0b0e14] border border-slate-800 rounded-lg p-5 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
-                <div>
-                  <h2 className="text-base font-bold text-white flex items-center gap-2">
-                    <span>Walk-Forward Efficiency (70% In-Sample / 30% Out-of-Sample)</span>
-                  </h2>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Evaluates out-of-sample edge decay and overfitting without forward curve-fitting.
-                  </p>
-                </div>
-                {walkForward && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-400">EDGE STATUS:</span>
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded font-bold ${
-                        walkForward.status === 'ROBUST_EDGE'
-                          ? 'bg-emerald-950 border border-emerald-700 text-emerald-300'
-                          : walkForward.status === 'MODERATE_DEGRADATION'
-                          ? 'bg-amber-950 border border-amber-700 text-amber-300'
-                          : walkForward.status === 'OVERFITTED_FAILURE'
-                          ? 'bg-rose-950 border border-rose-700 text-rose-300'
-                          : 'bg-slate-800 text-slate-400'
-                      }`}
-                    >
-                      {walkForward.status}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {walkForward && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* In-Sample 70% Card */}
-                  <div className="bg-slate-950 border border-slate-800/80 rounded p-4 space-y-3">
-                    <div className="flex justify-between items-center text-xs border-b border-slate-800 pb-2">
-                      <span className="text-slate-400 font-bold">70% IN-SAMPLE (OPTIMIZED)</span>
-                      <span className="text-slate-300">{walkForward.inSampleTrades} trades</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <div className="text-slate-500">Win Rate:</div>
-                        <div className="text-white font-bold">{walkForward.inSample.winRatePct}%</div>
-                      </div>
-                      <div>
-                        <div className="text-slate-500">Profit Factor:</div>
-                        <div className="text-white font-bold">{walkForward.inSample.profitFactor === null ? '—' : walkForward.inSample.profitFactor}</div>
-                      </div>
-                      <div>
-                        <div className="text-slate-500">Net Profit:</div>
-                        <div className="text-emerald-400 font-bold">${walkForward.inSample.netProfit.toLocaleString()}</div>
-                      </div>
-                      <div>
-                        <div className="text-slate-500">Max Drawdown:</div>
-                        <div className="text-rose-400 font-bold">{walkForward.inSample.maxDrawdownPct}%</div>
-                      </div>
-                      <div className="col-span-2">
-                        <div className="text-slate-500">Expectancy:</div>
-                        <div className="text-teal-400 font-bold">{walkForward.inSample.expectancyR === null ? '—' : walkForward.inSample.expectancyR.toFixed(2) + 'R / trade'}</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Out-of-Sample 30% Card */}
-                  <div className="bg-slate-950 border border-teal-900/40 rounded p-4 space-y-3">
-                    <div className="flex justify-between items-center text-xs border-b border-slate-800 pb-2">
-                      <span className="text-teal-400 font-bold">30% OUT-OF-SAMPLE (BLIND TEST)</span>
-                      <span className="text-slate-300">{walkForward.outOfSampleTrades} trades</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <div className="text-slate-500">Win Rate:</div>
-                        <div className="text-white font-bold">{walkForward.outOfSample.winRatePct}%</div>
-                      </div>
-                      <div>
-                        <div className="text-slate-500">Profit Factor:</div>
-                        <div className="text-white font-bold">{walkForward.outOfSample.profitFactor === null ? '—' : walkForward.outOfSample.profitFactor}</div>
-                      </div>
-                      <div>
-                        <div className="text-slate-500">Net Profit:</div>
-                        <div className="text-emerald-400 font-bold">${walkForward.outOfSample.netProfit.toLocaleString()}</div>
-                      </div>
-                      <div>
-                        <div className="text-slate-500">Max Drawdown:</div>
-                        <div className="text-rose-400 font-bold">{walkForward.outOfSample.maxDrawdownPct}%</div>
-                      </div>
-                      <div className="col-span-2">
-                        <div className="text-slate-500">Expectancy:</div>
-                        <div className="text-teal-400 font-bold">{walkForward.outOfSample.expectancyR === null ? '—' : walkForward.outOfSample.expectancyR.toFixed(2) + 'R / trade'}</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Walk-Forward Efficiency Comparison */}
-                  <div className="bg-slate-950 border border-slate-800/80 rounded p-4 flex flex-col justify-between">
-                    <div>
-                      <div className="text-xs text-slate-400 font-bold border-b border-slate-800 pb-2">
-                        WALK-FORWARD EFFICIENCY (WFE)
-                      </div>
-                      <div className="mt-3">
-                        <div className="text-3xl font-extrabold text-white">
-                          {walkForward.walkForwardEfficiencyPct === null ? '—' : walkForward.walkForwardEfficiencyPct + '%'}
-                        </div>
-                        <p className="text-xs text-slate-400 mt-1">
-                          Ratio of blind out-of-sample expectancy to in-sample expectancy. 60%+ indicates an institutional robust edge.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-400">
-                      Total validated sample: {walkForward.totalTrades} reconciled trades
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* 1,000-Run Monte Carlo Stress Simulator */}
-            <div className="bg-[#0b0e14] border border-slate-800 rounded-lg p-5 space-y-4">
-              <div className="border-b border-slate-800 pb-3">
-                <h2 className="text-base font-bold text-white">
-                  1,000-Run Historical Trade-Sequence Bootstrap
-                </h2>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Resamples only imported, reconciled trade P&L in randomized order. This is a historical sequence sensitivity analysis, not a market forecast.
-                </p>
-              </div>
-
-              {monteCarlo ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-slate-950 border border-slate-800 rounded p-4">
-                    <div className="text-xs text-slate-500 uppercase tracking-wider">95th-Percentile Worst DD</div>
-                    <div className="text-2xl font-extrabold text-amber-400 mt-1">
-                      {monteCarlo.ninetyFifthPercentileDrawdownPct}%
-                    </div>
-                    <div className="text-[11px] text-slate-400 mt-1">
-                      95th percentile drawdown across bootstrap sequences of the imported trade outcomes.
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-950 border border-slate-800 rounded p-4">
-                    <div className="text-xs text-slate-500 uppercase tracking-wider">Probability of Ruin (≥20% DD)</div>
-                    <div className={`text-2xl font-extrabold mt-1 ${monteCarlo.probabilityOfRuinPct <= 1.0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {monteCarlo.probabilityOfRuinPct}%
-                    </div>
-                    <div className="text-[11px] text-slate-400 mt-1">
-                      Simulated runs breaching catastrophic 20% drawdown limit.
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-950 border border-slate-800 rounded p-4">
-                    <div className="text-xs text-slate-500 uppercase tracking-wider">Sovereign Shield Survival</div>
-                    <div className="text-2xl font-extrabold text-emerald-400 mt-1">
-                      {monteCarlo.sovereignShieldSurvivalRatePct}%
-                    </div>
-                    <div className="text-[11px] text-slate-400 mt-1">
-                      Percentage of paths that respected the Sovereign Shield drawdown floor.
-                    </div>
-                  </div>
-
-                  <div className="bg-slate-950 border border-slate-800 rounded p-4">
-                    <div className="text-xs text-slate-500 uppercase tracking-wider">Median Stressed DD</div>
-                    <div className="text-2xl font-extrabold text-slate-200 mt-1">
-                      {monteCarlo.medianDrawdownPct}%
-                    </div>
-                    <div className="text-[11px] text-slate-400 mt-1">
-                      Worst single run: {monteCarlo.worstCaseDrawdownPct}%
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="bg-slate-950/60 border border-slate-800/80 rounded p-3 text-xs text-slate-400 flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <span className="text-slate-300 font-semibold">Stress Conditions Applied:</span> Randomized resampling of recorded net trade outcomes only
-                </div>
-                <div>
-                  1,000 Independent Iterations
-                </div>
-              </div>
-            </div>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button onClick={() => void loadLinkedAccountHistory()} disabled={loadingAccount}
+              className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50">
+              {loadingAccount ? 'Loading MT5 history…' : 'Load linked REAL MT5 history'}
+            </button>
+            <label className="cursor-pointer rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800">
+              Import MT5 report CSV
+              <input type="file" accept=".csv,.txt" className="hidden" onChange={handleFileUpload} />
+            </label>
+            <button onClick={clearDataset} disabled={!trades.length} className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 disabled:opacity-40">
+              Clear dataset
+            </button>
           </div>
-        )}
+          <p className="mt-3 break-words font-mono text-[11px] text-slate-500">{dataSourceName}</p>
+          <p className="mt-1 text-[10px] font-mono text-slate-600">{sourceNote}</p>
+          {statusMessage && <p className="mt-3 text-xs leading-5 text-cyan-200">{statusMessage}</p>}
+          {error && <p className="mt-3 text-xs leading-5 text-rose-300">{error}</p>}
+        </section>
+
+        <section className="mt-6 rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold">Initial capital for drawdown calculations</h2>
+              <p className="mt-1 text-xs text-slate-400">Enter the balance at the beginning of the imported trade sample, in the same currency as the trade P/L.</p>
+            </div>
+            <span className="rounded-full bg-amber-400/10 px-3 py-1 text-[10px] font-mono text-amber-200">USER-SUPPLIED · NOT VERIFIED</span>
+          </div>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <input type="number" min="0" step="0.01" value={startingBalanceInput}
+              onChange={(event) => setStartingBalanceInput(event.target.value)}
+              placeholder="Enter actual initial balance"
+              className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-400" />
+            <button onClick={saveStartingBalance} className="rounded-lg border border-cyan-400/40 px-4 py-2 text-sm text-cyan-200 hover:bg-cyan-400/10">
+              Save analysis input
+            </button>
+          </div>
+          <p className="mt-2 text-[10px] text-slate-500">Linked MT5 history does not contain the starting balance at the beginning of the sample. Use the original broker statement value; the current balance is not substituted.</p>
+        </section>
+
+        <section className="mt-6 grid gap-4 xl:grid-cols-2">
+          <article className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div><p className="font-mono text-[10px] tracking-widest text-cyan-300">01 / OUT-OF-SAMPLE</p><h2 className="mt-1 text-lg font-semibold">Three-fold expanding walk-forward</h2></div>
+              <span className="rounded-full bg-slate-800 px-3 py-1 text-[10px] font-mono text-slate-300">{statusLabel(walkForward.status)}</span>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-lg bg-slate-950/70 p-3"><p className="text-[10px] font-mono text-slate-500">OOS TRADES</p><p className="mt-1 text-xl font-semibold">{walkForward.outOfSampleTrades} / {walkForward.minimumOutOfSampleTrades}</p></div>
+              <div className="rounded-lg bg-slate-950/70 p-3"><p className="text-[10px] font-mono text-slate-500">FOLDS</p><p className="mt-1 text-xl font-semibold">{walkForward.foldCount} / {walkForward.minimumWalkForwardFolds}</p></div>
+              <div className="rounded-lg bg-slate-950/70 p-3"><p className="text-[10px] font-mono text-slate-500">OOS WIN RATE</p><p className="mt-1 text-xl font-semibold">{walkForward.outOfSample.tradesCount ? moneyNumber(walkForward.outOfSample.winRatePct) + '%' : '—'}</p></div>
+              <div className="rounded-lg bg-slate-950/70 p-3"><p className="text-[10px] font-mono text-slate-500">95% WIN-RATE LOWER BOUND</p><p className="mt-1 text-xl font-semibold">{walkForward.outOfSample.winRateWilson95LowerPct === null ? '—' : moneyNumber(walkForward.outOfSample.winRateWilson95LowerPct) + '%'}</p></div>
+              <div className="rounded-lg bg-slate-950/70 p-3"><p className="text-[10px] font-mono text-slate-500">REALIZED R MULTIPLE R:R</p><p className="mt-1 text-xl font-semibold">{walkForward.outOfSample.realizedRewardRisk === null ? 'UNAVAILABLE' : '1:' + moneyNumber(walkForward.outOfSample.realizedRewardRisk)}</p></div>
+              <div className="rounded-lg bg-slate-950/70 p-3"><p className="text-[10px] font-mono text-slate-500">OOS PROFIT FACTOR</p><p className="mt-1 text-xl font-semibold">{walkForward.outOfSample.profitFactor === null ? '—' : moneyNumber(walkForward.outOfSample.profitFactor)}</p></div>
+            </div>
+            <div className="mt-4 space-y-2 text-xs text-slate-400">
+              <p>Walk-forward efficiency: <b className="text-slate-200">{walkForward.walkForwardEfficiencyPct === null ? 'Unavailable' : moneyNumber(walkForward.walkForwardEfficiencyPct) + '%'}</b></p>
+              <p>Win-rate objective: <b className="text-slate-200">{walkForward.targetWinRateBand.replaceAll('_', ' ')}</b> · 1:2 R objective: <b className="text-slate-200">{walkForward.targetRewardRiskMet ? 'MET IN THIS SAMPLE' : 'NOT VERIFIED'}</b></p>
+              <p>Chronological close timestamps: <b className="text-slate-200">{walkForward.chronologicalDataVerified ? 'PRESENT' : 'MISSING / UNVERIFIED'}</b></p>
+              <p>R-multiple coverage: <b className="text-slate-200">{moneyNumber(rCoverage)}%</b> · cash average win/loss is not substituted for risk/reward.</p>
+              <p>OOS max drawdown: <b className="text-slate-200">{moneyNumber(walkForward.outOfSample.maxDrawdownPct)}%</b> · average payoff ratio: <b className="text-slate-200">{walkForward.outOfSample.averagePayoffRatio === null ? 'Unavailable' : moneyNumber(walkForward.outOfSample.averagePayoffRatio)}</b></p>
+            </div>
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full min-w-[520px] text-left text-xs">
+                <thead className="text-[10px] uppercase tracking-wider text-slate-500"><tr><th className="py-2">Fold</th><th>Training</th><th>OOS</th><th>OOS Win%</th><th>OOS PF</th><th>WFE</th></tr></thead>
+                <tbody className="divide-y divide-slate-800">
+                  {walkForward.folds.map((fold) => (
+                    <tr key={fold.fold}><td className="py-2">{fold.fold}</td><td>{fold.trainingTrades}</td><td>{fold.outOfSampleTrades}</td><td>{moneyNumber(fold.outOfSample.winRatePct)}%</td><td>{fold.outOfSample.profitFactor === null ? '—' : moneyNumber(fold.outOfSample.profitFactor)}</td><td>{fold.efficiencyPct === null ? '—' : moneyNumber(fold.efficiencyPct) + '%'}</td></tr>
+                  ))}
+                  {!walkForward.folds.length && <tr><td colSpan={6} className="py-5 text-center text-slate-500">No qualifying chronological sample. Required: 3 folds and at least 300 out-of-sample trades.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+            <div><p className="font-mono text-[10px] tracking-widest text-cyan-300">02 / PATH RISK</p><h2 className="mt-1 text-lg font-semibold">Deterministic circular block bootstrap</h2></div>
+            {monteCarlo ? (
+              <>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="rounded-lg bg-slate-950/70 p-3"><p className="text-[10px] font-mono text-slate-500">95TH PERCENTILE MAX DD</p><p className="mt-1 text-xl font-semibold">{moneyNumber(monteCarlo.ninetyFifthPercentileDrawdownPct)}%</p></div>
+                  <div className="rounded-lg bg-slate-950/70 p-3"><p className="text-[10px] font-mono text-slate-500">MEDIAN MAX DD</p><p className="mt-1 text-xl font-semibold">{moneyNumber(monteCarlo.medianDrawdownPct)}%</p></div>
+                  <div className="rounded-lg bg-slate-950/70 p-3"><p className="text-[10px] font-mono text-slate-500">WORST RESAMPLED PATH</p><p className="mt-1 text-xl font-semibold">{moneyNumber(monteCarlo.worstCaseDrawdownPct)}%</p></div>
+                  <div className="rounded-lg bg-slate-950/70 p-3"><p className="text-[10px] font-mono text-slate-500">BOOTSTRAP RUNS</p><p className="mt-1 text-xl font-semibold">{monteCarlo.totalRuns.toLocaleString()}</p></div>
+                </div>
+                <div className="mt-4 space-y-2 text-xs text-slate-400">
+                  <p>Method: <b className="text-slate-200">{monteCarlo.stressParameters.bootstrapMethod}</b> · block length: <b className="text-slate-200">{monteCarlo.stressParameters.blockLength}</b> trades.</p>
+                  <p>Deterministic seed: <code className="text-slate-300">{monteCarlo.stressParameters.deterministicSeed}</code></p>
+                  <p>Resampling preserves short-range trade ordering within circular blocks. It is a historical path stress test, not a forecast or probability guarantee.</p>
+                </div>
+              </>
+            ) : (
+              <div className="mt-4 rounded-lg border border-dashed border-slate-700 p-8 text-center text-sm text-slate-500">
+                {trades.length < 30 ? 'At least 30 real closed trades are required for block-bootstrap analysis.' : 'Enter the initial balance at the beginning of this sample to calculate drawdown paths.'}
+              </div>
+            )}
+          </article>
+        </section>
+
+        <section className="mt-6 rounded-xl border border-amber-400/20 bg-amber-400/[0.035] p-5">
+          <p className="font-mono text-[10px] tracking-widest text-amber-200">GOVERNANCE / LIVE APPROVAL</p>
+          <h2 className="mt-1 text-lg font-semibold">This lab does not approve a strategy for live execution</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-300">
+            A candidate result is only a research screen. MacroLync remains fail-closed until the server-side validation gate receives a version-bound, independently reviewed report; at least {RESEARCH_OBJECTIVES.minimumOutOfSampleTrades} OOS trades across {RESEARCH_OBJECTIVES.minimumWalkForwardFolds} folds; a 95% Wilson win-rate lower bound meeting the target; genuine per-trade R multiples confirming the 1:2 objective; point-in-time release/vintage integrity; verified real-broker market data; realistic spread, commission, swap and slippage stress; and drawdown approval. No performance target is assumed achievable.
+          </p>
+          <p className="mt-3 text-xs text-slate-400">
+            Linked account deal history is limited to a recent sample and lacks initial stop-loss risk. Use a complete MT5 Strategy Tester report with chronological timestamps and initial SL or explicit R-multiples for formal testing.
+          </p>
+        </section>
       </div>
     </main>
   );
