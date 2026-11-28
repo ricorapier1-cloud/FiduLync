@@ -38,7 +38,7 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
       await fredPermissionCleanup;
     }
   } catch (error) {
-    console.warn('Macro providers and cached snapshots are unavailable; serving reference macro levels.', error);
+    console.warn('Macro providers and cached snapshots are unavailable; returning an unavailable state.', error);
     snapshot = getFallbackSnapshot();
   }
 
@@ -80,8 +80,10 @@ export function getFundamentalSignal(snapshot: MacroSnapshot, pair: string): Fun
   if (!verified(base) || !verified(quote)) return null;
   const baseCotRaw = snapshot.cot.find((position) => position.market === baseCode);
   const quoteCotRaw = snapshot.cot.find((position) => position.market === quoteCode);
-  const baseCot = baseCotRaw && isFreshMacroObservation(baseCotRaw.reportDate, 14) ? baseCotRaw : undefined;
-  const quoteCot = quoteCotRaw && isFreshMacroObservation(quoteCotRaw.reportDate, 14) ? quoteCotRaw : undefined;
+  const baseCot = baseCotRaw && baseCotRaw.sampleSize !== undefined && baseCotRaw.sampleSize >= 52
+    && baseCotRaw.percentile !== null && isFreshMacroObservation(baseCotRaw.reportDate, 14) ? baseCotRaw : undefined;
+  const quoteCot = quoteCotRaw && quoteCotRaw.sampleSize !== undefined && quoteCotRaw.sampleSize >= 52
+    && quoteCotRaw.percentile !== null && isFreshMacroObservation(quoteCotRaw.reportDate, 14) ? quoteCotRaw : undefined;
   const policyDiffBps = base
     ? Math.round((base.policyRate - quote.policyRate) * 100)
     : Math.round(-quote.policyRate * 100);
