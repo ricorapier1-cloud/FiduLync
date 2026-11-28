@@ -40,8 +40,8 @@ test('country profile engine does not publish hardcoded macro baselines', () => 
   assert.doesNotMatch(profiles, /gdpGrowthYoY: 2\.7|unemploymentRate: 4\.1/);
 });
 test('currency strength uses only provider-sourced policy and inflation data', () => {
-  assert.match(strength, /policyRateSource === 'provider'/);
-  assert.match(strength, /inflationSource === 'provider'/);
+  assert.match(strength, /policyRateSource !== 'provider'/);
+  assert.match(strength, /inflationSource !== 'provider'/);
   assert.match(strength, /isFreshObservation/);
 });
 test('dashboard marks cross-asset values unavailable until verified feeds exist', () => {
@@ -156,7 +156,7 @@ test('EIA crude feed is reported independently and cannot promote macro snapshot
 test('CFTC COT retrieval is cached between weekly publications and tolerates slower official responses', () => {
   const macroData = read('../lib/macroData.ts');
   const cftc = macroData.slice(macroData.indexOf('async function getCftcCot'), macroData.indexOf('async function getLiveProviderSnapshot'));
-  assert.match(cftc, /getCachedData\('macro:cftc-cot-v1'/);
+  assert.match(cftc, /getCachedData\('macro:cftc-cot-v2'/);
   assert.match(cftc, /AbortSignal\.timeout\(20_000\)/);
   assert.match(cftc, /6 \* 60 \* 60/);
   assert.match(cftc, /reportDate: latest\.date/);
@@ -323,7 +323,7 @@ test('MT5 macro bridge rejects unsupported instruments and withholds stale provi
   const route = read('../app/api/v1/macro-context/route.ts');
   const types = read('../types/desk.ts');
   assert.match(route, /G8_PAIRS\.includes/);
-  assert.match(route, /ageMs <= 120_000/);
+  assert.match(route, /ageMs > 120_000/);
   assert.match(route, /freshness === 'STALE' \? null : quote\.price/);
   assert.match(route, /age_ms: ageMs/);
   assert.match(route, /rawAgeMs >= -5 \* 60_000/);
@@ -481,7 +481,7 @@ test('provider resilience handles Riksbank single-observation payloads, caches E
   assert.ok(macroData.includes("getCachedData('macro:eia-energy-markets-v1'"));
   assert.ok(macroData.includes('AbortSignal.timeout(15_000)'));
   assert.ok(aiBrief.includes("GEMINI_MACRO_BRIEF_ENABLED !== 'true'"));
-  assert.ok(aiBrief.includes("'macro:ai-brief:v3'"));
+  assert.ok(aiBrief.includes("'macro:ai-brief:v4'"));
 });
 test('gold score uses healthy Treasury levels, canonical CBOE VIX and CFTC positioning without a FRED z-score gate', () => {
   const engine = read('../lib/macro/goldAndRegimeEngine.ts');
@@ -568,7 +568,7 @@ test('intraday signal engine enforces macro threshold, trend quality, live sessi
   assert.match(engine, /TIER_ONE_EVENT_LOCKOUT/);
   assert.match(engine, /RATE_DECISION_LOCKOUT/);
   assert.match(engine, /America\/New_York/);
-  assert.match(engine, /hour >= 13 && hour < 17/);
+  assert.match(route, /getActiveMarketSession/);
   assert.match(engine, /INTRADAY_CANDLES_STALE/);
 });
 test('Sovereign Shield fails closed when VIX evidence is missing or invalid', () => {
@@ -632,11 +632,11 @@ test('authenticated EA macro context includes intraday signals and MQL5 read-onl
 test('desk exposes macro-aligned intraday signals as research context without calculator or order execution', () => {
   const desk = read('../app/components/DeskTerminal.tsx');
   const signals = read('../app/api/v1/intraday-signals/route.ts');
-  assert.match(desk, /LIVE INTRADAY RESEARCH/);
+  assert.match(desk, /REFERENCE-ONLY INTRADAY RESEARCH/);
   assert.match(desk, /intradaySignals\.map/);
   assert.match(desk, /Research context only/);
   assert.match(desk, /REFRESH SIGNALS/);
-  assert.match(signals, /executionAuthority: 'MANUAL_OR_EA_CONFIRMATION_REQUIRED'/);
+  assert.match(signals, /executionAuthority: 'RESEARCH_ONLY_NO_EXECUTION_APPROVAL'/);
   assert.doesNotMatch(desk, /LOAD INTO CALCULATOR|setSl\(|setTp\(|OrderSend/);
 });
 test('provider health includes real EIA and Treasury observation dates and BIS-backed World Bank standby', () => {
@@ -718,13 +718,13 @@ test('London and New York execution windows are fixed in WAT across daylight-sav
   const engine = read('../lib/quant/intradaySignalEngine.ts');
   const route = read('../app/api/v1/macro-context/route.ts');
   const desk = read('../app/components/DeskTerminal.tsx');
-  assert.match(engine, /hour >= 8 && hour < 12/);
+  assert.match(engine, /getActiveMarketSession/);
   assert.match(engine, /hour >= 13 && hour < 17/);
-  assert.match(route, /watHour >= 13 && watHour < 17/);
-  assert.match(desk, /hourWAT >= 13 && hourWAT < 17/);
+  assert.match(desk, /getActiveMarketSession/);
+  assert.match(sessions, /America\\/New_York/);
   assert.match(desk, /EXECUTIVE DESK COMMAND/);
-  assert.match(desk, /ACCOUNT GOVERNANCE UNVERIFIED/);
-  assert.match(desk, /nextWATSessionOpen/);
+  assert.match(desk, /BROKER ACCOUNT GOVERNANCE NOT CONNECTED/);
+  assert.match(sessions, /getNextMarketSessionOpenUtc/);
 });
 test('desk quote grid always reserves a fourth satellite slot and labels core instruments explicitly', () => {
   const desk = read('../app/components/DeskTerminal.tsx');
@@ -760,7 +760,7 @@ test('production UI fails closed on unconfigured account balance and never seeds
   assert.match(desk, /useState<number \| null>\(null\)/);
   assert.match(desk, /BAL:|NOT SET \(ENTER REAL BALANCE\)/);
   assert.match(desk, /ENTER REAL ACCOUNT BALANCE TO COMPUTE LOTS/);
-  assert.match(desk, /SAVE &amp; LOCK REAL BALANCE/);
+  assert.match(desk, /SAVE USER-ATTESTED BALANCE/);
   assert.match(desk, /MARKET CLOSED \(WEEKEND\)/);
   assert.match(desk, /globalDeskLockout \? 'STAND DOWN'/);
   assert.doesNotMatch(desk, /useState<number>\(10000\)|154\.50|2650|1\.085|6\.50/);
