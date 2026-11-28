@@ -136,6 +136,7 @@ function isCatalyst(value: unknown): value is EconomicCatalyst {
 
 function isUsIndicators(value: unknown): value is OfficialUsMacroIndicators {
   if (!isRecord(value) || typeof value.retrievedAt !== 'string' || !Number.isFinite(Date.parse(value.retrievedAt))
+    || (value.fredRetrievedAt !== undefined && (typeof value.fredRetrievedAt !== 'string' || !Number.isFinite(Date.parse(value.fredRetrievedAt))))
     || !Array.isArray(value.sources) || !value.sources.every((source) => typeof source === 'string')) return false;
   const numericKeys = ['cpiYearOverYearPct', 'coreCpiYearOverYearPct', 'unemploymentRatePct', 'nonfarmPayrollMonthlyChangeThousands', 'realGdpAnnualizedQuarterlyPct', 'tenYearTreasuryYieldPct', 'tenYearRealYieldPct', 'tenYearBreakevenInflationPct', 'usdBroadIndex', 'vixIndex', 'sp500Index', 'wtiOilUsd', 'brentOilUsd', 'usHighYieldSpreadPct'];
   const dateKeys = ['cpiPeriod', 'coreCpiPeriod', 'unemploymentPeriod', 'payrollPeriod', 'realGdpPeriod', 'tenYearTreasuryYieldAsOf', 'tenYearRealYieldAsOf', 'tenYearBreakevenInflationAsOf', 'usdBroadIndexAsOf', 'vixIndexAsOf', 'sp500IndexAsOf', 'wtiOilAsOf', 'brentOilAsOf', 'usHighYieldSpreadAsOf'];
@@ -824,6 +825,7 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
     const fred = fredResult.value;
     snapshot.usIndicators = {
       ...snapshot.usIndicators,
+      fredRetrievedAt: new Date().toISOString(),
       tenYearTreasuryYieldPct: isFiniteNumber(fred.tenYearTreasuryYieldPct) ? fred.tenYearTreasuryYieldPct : undefined,
       tenYearTreasuryYieldAsOf: fred.tenYearTreasuryYieldAsOf,
       tenYearRealYieldPct: isFiniteNumber(fred.tenYearRealYieldPct) ? fred.tenYearRealYieldPct : undefined,
