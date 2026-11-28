@@ -251,7 +251,8 @@ export function runWalkForwardAnalysis(
       && outOfSample.profitFactor !== null && outOfSample.profitFactor >= 1.2
       && outOfSample.winRateWilson95LowerPct !== null
       && outOfSample.winRateWilson95LowerPct >= RESEARCH_OBJECTIVES.targetWinRateMin * 100
-      && outOfSample.expectancyR !== null && targetRewardRiskMet && everyFoldPositive) status = 'ROBUST_CANDIDATE';
+      && outOfSample.expectancyR !== null && outOfSample.expectancyR > 0
+      && targetRewardRiskMet && everyFoldPositive) status = 'ROBUST_CANDIDATE';
     else status = 'MODERATE_DEGRADATION';
   }
 
