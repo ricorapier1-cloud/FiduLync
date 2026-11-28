@@ -116,11 +116,11 @@ export default function AccountsPage() {
   const [profitSweeps, setProfitSweeps] = useState<ProfitSweep[]>([]);
   const [newSymbol, setNewSymbol] = useState('EURUSD');
   const [newDirection, setNewDirection] = useState<'BUY' | 'SELL'>('SELL');
-  const [newVolume, setNewVolume] = useState('0.10');
+  const [newVolume, setNewVolume] = useState('');
   const [newProfit, setNewProfit] = useState('');
   const [newRMultiple, setNewRMultiple] = useState('');
-  const [newSlippage, setNewSlippage] = useState('0.3');
-  const [newRuleAdhered, setNewRuleAdhered] = useState(true);
+  const [newSlippage, setNewSlippage] = useState('');
+  const [newRuleAdhered, setNewRuleAdhered] = useState(false);
   const [ledgerError, setLedgerError] = useState<string | null>(null);
 
   // Profit sweep form state
@@ -174,8 +174,12 @@ export default function AccountsPage() {
       return;
     }
     const rNum = newRMultiple.trim() ? parseFloat(newRMultiple) : profitNum >= 0 ? profitNum / 100 : profitNum / 100;
-    const slipNum = parseFloat(newSlippage) || 0;
-    const volNum = parseFloat(newVolume) || 0.1;
+    const slipNum = newSlippage.trim() ? parseFloat(newSlippage) : NaN;
+    const volNum = newVolume.trim() ? parseFloat(newVolume) : NaN;
+    if (!Number.isFinite(volNum) || volNum <= 0 || !Number.isFinite(slipNum) || slipNum < 0) {
+      setLedgerError('Enter the actual traded volume and observed slippage before recording this trade.');
+      return;
+    }
 
     const newTrade: ManualTrade = {
       id: 'TRD-' + Date.now(),
@@ -334,8 +338,9 @@ export default function AccountsPage() {
 
   // Capital Scaling Tier based on verified completed trades and equity
   const totalCompletedTradesCount = closedTrades.length > 0 ? closedTrades.length : manualTrades.length;
-  const currentEquityNumber = selected ? Number(selected.equity) : 10000;
+  const currentEquityNumber = selected && Number.isFinite(Number(selected.equity)) && Number(selected.equity) > 0 ? Number(selected.equity) : null;
   const activeScalingTier = useMemo(() => {
+    if (currentEquityNumber === null) return null;
     if (totalCompletedTradesCount >= 60 && currentEquityNumber >= 50000) {
       return { tier: 4, name: 'Tier 4 · $100k Institutional', riskPercent: 1.0, dollarCap: 1000, nextRequirement: 'Maximum scale unlocked.' };
     }
@@ -545,13 +550,15 @@ export default function AccountsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="rounded-lg border border-white/[0.08] bg-[#070a0f] p-4 space-y-2">
               <div className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Active Capital Scaling Tier</div>
-              <div className="text-lg font-bold text-teal-300">{activeScalingTier.name}</div>
-              <div className="text-xs text-slate-300">
-                Max Risk Allowed: <strong className="text-white">{activeScalingTier.riskPercent}% (${activeScalingTier.dollarCap}/trade)</strong>
-              </div>
-              <div className="text-xs text-slate-400 pt-2 border-t border-slate-800">
-                Next Tier Requirement: <span className="text-slate-300">{activeScalingTier.nextRequirement}</span>
-              </div>
+              {activeScalingTier ? <>
+                <div className="text-lg font-bold text-teal-300">{activeScalingTier.name}</div>
+                <div className="text-xs text-slate-300">
+                  Max Risk Allowed: <strong className="text-white">{activeScalingTier.riskPercent}% (${activeScalingTier.dollarCap}/trade)</strong>
+                </div>
+                <div className="text-xs text-slate-400 pt-2 border-t border-slate-800">
+                  Next Tier Requirement: <span className="text-slate-300">{activeScalingTier.nextRequirement}</span>
+                </div>
+              </> : <div className="text-sm font-semibold text-amber-300">NOT CONFIGURED · CONNECT A VERIFIED MT5 ACCOUNT TO CALCULATE CAPITAL TIER</div>}
             </div>
 
             <div className="rounded-lg border border-white/[0.08] bg-[#070a0f] p-4 space-y-3">
