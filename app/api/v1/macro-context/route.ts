@@ -329,7 +329,7 @@ export async function GET(request: Request) {
         heartbeat_received_at_utc: hasFreshBrokerHeartbeat ? latestHeartbeat!.receivedAtUtc : null,
         governance_verified: Boolean(hasFreshBrokerHeartbeat && latestHeartbeat?.governanceVerified),
         locked: !hasFreshBrokerHeartbeat || !latestHeartbeat?.governanceVerified
-          || (latestHeartbeat?.dailyClosedTrades ?? 0) >= 2 || (latestHeartbeat?.dailyLosses ?? 0) >= 2,
+          || (latestHeartbeat?.dailyLosses ?? 0) >= 2,
         authority: 'MT5_ACCOUNT_SIDE_ENFORCEMENT_REQUIRED',
       },
       calendar_verified: calendarVerified,
