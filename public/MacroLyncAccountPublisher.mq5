@@ -73,7 +73,7 @@ void BuildDailyClosedStats(int &closedTrades, int &losses)
 {
    closedTrades = 0;
    losses = 0;
-   datetime serverNow = TimeCurrent();
+   datetime serverNow = TimeTradeServer();
    MqlDateTime day;
    TimeToStruct(serverNow, day);
    day.hour = 0;
@@ -399,7 +399,8 @@ string BuildPayload(bool includeHistory, bool includeCandles, bool fullCandleHis
    MqlTick currentTick;
    double liveBrokerSpread = -1.0;
    string spreadSymbol = CanonicalSymbol(_Symbol);
-   if(SymbolInfoTick(_Symbol, currentTick) && currentTick.ask >= currentTick.bid && currentTick.bid > 0.0)
+   if(SymbolInfoTick(_Symbol, currentTick) && currentTick.ask >= currentTick.bid && currentTick.bid > 0.0
+      && TimeTradeServer() - currentTick.time >= 0 && TimeTradeServer() - currentTick.time <= 30)
    {
       double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
       if(point > 0.0) liveBrokerSpread = (currentTick.ask - currentTick.bid) / point;
@@ -462,8 +463,8 @@ int OnInit()
       return INIT_PARAMETERS_INCORRECT;
    }
    EventSetTimer((int)MathMax(5, InpSyncIntervalSeconds));
-   g_lastHistorySync = TimeCurrent();
-   g_lastCandleSync = TimeCurrent();
+   g_lastHistorySync = TimeTradeServer();
+   g_lastCandleSync = TimeTradeServer();
    PublishAccount(true, true, true);
    return INIT_SUCCEEDED;
 }
@@ -475,7 +476,7 @@ void OnDeinit(const int reason)
 
 void OnTimer()
 {
-   datetime now = TimeCurrent();
+   datetime now = TimeTradeServer();
    bool includeHistory = g_lastHistorySync == 0
       || (now > g_lastHistorySync && now - g_lastHistorySync >= MathMax(60, InpHistorySyncIntervalSeconds));
    bool includeCandles = g_lastCandleSync == 0
