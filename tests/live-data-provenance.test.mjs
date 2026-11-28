@@ -12,6 +12,8 @@ const aiBrief = read('../lib/aiBrief.ts');
 const envExample = read('../.env.example');
 const macroContextApi = read('../app/api/v1/macro-context/route.ts');
 const macroContextBridge = read('../MQL5/Include/FiduLync/MacroContextBridge.mqh');
+const marketFeeds = read('../lib/marketFeeds.ts');
+const currencyStrength = read('../lib/currencyStrength.ts');
 
 test('provider outage returns an empty, untimestamped macro fallback', () => {
   const fallback = macroData.match(/export function getFallbackSnapshot\(\): MacroSnapshot \{[\s\S]*?\n\}/)?.[0];
@@ -37,7 +39,7 @@ test('stale macro snapshots are rejected instead of silently reused', () => {
   assert.match(macroEngine, /return getFallbackSnapshot\(\)/);
   assert.match(macroEngine, /calendarProvider === 'finnhub'/);
   assert.match(macroEngine, /COT_DATA_PROVIDER_PERSONAL_USE_ENABLED === 'true'/);
-  assert.match(macroEngine, /SNB_DATA_SOURCE_ENABLED === 'true'/);
+  assert.match(macroEngine, /SNB_PERSONAL_USE_ENABLED === 'true'/);
 });
 
 test('weekly CFTC and daily reference feeds use bounded shared caching', () => {
@@ -135,3 +137,28 @@ test('technical EA approval, broker ingestion and legacy signal routes are retir
   }
 });
 
+
+test('COT ranks require at least 52 observations and never impute missing weekly change as zero', () => {
+  assert.match(macroData, /history.length < 52/);
+  assert.match(macroData, /sampleSize: history.length/);
+  assert.match(macroData, /changeLong === null \|\| changeShort === null/);
+  assert.doesNotMatch(macroData, /Number\.isFinite\(changeLong\) \? changeLong : 0/);
+  assert.match(macroEngine, /position\.sampleSize >= 52/);
+  assert.match(macroEngine, /position\.publishedAt/);
+  assert.doesNotMatch(macroEngine, /percentile\s*\?\?\s*50/);
+});
+
+test('annual World Bank inflation cannot enter current monthly relative-strength scores', () => {
+  assert.match(macroEngine, /case 'world-bank':[\s\S]*?default: return false/);
+  assert.match(currencyStrength, /MAX_INFLATION_AGE_MS = 75/);
+  assert.match(currencyStrength, /item\.inflationProvider !== 'world-bank'/);
+  assert.match(currencyStrength, /currencies\.length !== MAJOR_CURRENCIES\.length/);
+});
+
+test('market quote aggregation never substitutes daily reference rates or mixes installations', () => {
+  assert.doesNotMatch(marketFeeds, /getFrankfurterQuotes|getExchangeRateQuotes|getGoldQuote/);
+  assert.doesNotMatch(marketFeeds, /getCachedData|market:live-quotes/);
+  assert.match(marketFeeds, /if \(installationId\)/);
+  assert.match(marketFeeds, /installation\.status/);
+  assert.match(marketFeeds, /now - quoteTime > 30_000/);
+});
