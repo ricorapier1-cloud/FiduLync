@@ -179,6 +179,7 @@ export async function GET(request: Request) {
         active_event: activeLockout ?? null,
         upcoming_high_impact_events: highImpactEvents,
         calendar_status: calendarVerified ? 'PROVIDER' : 'REFERENCE_OR_UNAVAILABLE',
+        calendar_retrieved_at_utc: snapshot.calendarRetrievedAt ?? null,
       },
       provenance: {
         snapshot_as_of: snapshot.asOf || null,
@@ -191,6 +192,12 @@ export async function GET(request: Request) {
           policy_rate_source_url: base.policyRateSourceUrl ?? null,
           inflation_source_url: base.inflationSourceUrl ?? null,
         } : null,
+        cot_observations: snapshot.cot.map((position) => ({
+          market: position.market,
+          position_date: position.asOf ?? null,
+          publication_timestamp_utc: position.publishedAt ?? null,
+          percentile_sample_size: position.sampleSize ?? null,
+        })),
         quote_currency: quote ? {
           code: quote.code, policy_rate_source: quote.policyRateProvider ?? quote.policyRateSource ?? null,
           policy_rate_as_of: quote.policyRateAsOf ?? null,
@@ -203,6 +210,7 @@ export async function GET(request: Request) {
       limitations: [
         'Research context only; this endpoint never authorizes or executes a broker order.',
         'An absent, stale, partial or unverified input produces INSUFFICIENT_EVIDENCE.',
+        'COT position dates are not publication timestamps; no composite bias is emitted without a timezone-aware release timestamp and at least 52 observations for both sides.',
         'Event lockout is contextual information; each EA must enforce its own local trading and position-protection rules.',
         'This feed does not contain technical entries, stop-losses, take-profits, lot sizes or order instructions.',
         ...(symbol === 'XAUUSD' ? ['Gold-specific real-yield, official-sector demand and positioning model is not validated; no XAUUSD fundamental bias is emitted.'] : []),
