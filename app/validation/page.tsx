@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import Link from 'next/link';
 import {
   runWalkForwardAnalysis,
@@ -142,7 +142,7 @@ export default function StrategyValidationPage() {
     }
   }, []);
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     setError('');
@@ -228,10 +228,10 @@ export default function StrategyValidationPage() {
             <span className="rounded-full bg-amber-400/10 px-3 py-1 text-xs font-mono text-amber-200">NOT VALIDATED</span>
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3"><p className="text-[10px] font-mono text-slate-500">TARGET WIN RATE</p><p className="mt-1 text-xl font-semibold">60–65%</p></div>
-            <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3"><p className="text-[10px] font-mono text-slate-500">PLANNED REWARD / RISK</p><p className="mt-1 text-xl font-semibold">1:2</p></div>
-            <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3"><p className="text-[10px] font-mono text-slate-500">SETUP POLICY</p><p className="mt-1 text-sm font-semibold">High-quality only</p></div>
-            <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3"><p className="text-[10px] font-mono text-slate-500">DAILY TRADE QUOTA</p><p className="mt-1 text-sm font-semibold">None</p></div>
+            <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3"><p className="text-[10px] font-mono text-slate-500">TARGET WIN RATE</p><p className="mt-1 text-xl font-semibold">{(RESEARCH_OBJECTIVES.targetWinRateMin * 100).toFixed(0)}–{(RESEARCH_OBJECTIVES.targetWinRateMax * 100).toFixed(0)}%</p></div>
+            <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3"><p className="text-[10px] font-mono text-slate-500">PLANNED REWARD / RISK</p><p className="mt-1 text-xl font-semibold">1:{RESEARCH_OBJECTIVES.plannedRewardRisk}</p></div>
+            <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3"><p className="text-[10px] font-mono text-slate-500">SETUP POLICY</p><p className="mt-1 text-sm font-semibold">{RESEARCH_OBJECTIVES.setupPolicy.replaceAll('_', ' ')}</p></div>
+            <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3"><p className="text-[10px] font-mono text-slate-500">DAILY TRADE QUOTA</p><p className="mt-1 text-sm font-semibold">{RESEARCH_OBJECTIVES.dailyTradeQuota === null ? 'None' : RESEARCH_OBJECTIVES.dailyTradeQuota}</p></div>
           </div>
           <p className="mt-3 text-xs leading-5 text-slate-400">
             These objectives are not achieved performance claims. Formal approval requires at least {RESEARCH_OBJECTIVES.minimumOutOfSampleTrades} chronological out-of-sample trades across {RESEARCH_OBJECTIVES.minimumWalkForwardFolds} expanding walk-forward folds, point-in-time macro integrity, real-broker execution evidence and independent report approval.
@@ -260,6 +260,7 @@ export default function StrategyValidationPage() {
             </button>
           </div>
           <p className="mt-3 break-words font-mono text-[11px] text-slate-500">{dataSourceName}</p>
+          <p className="mt-1 text-[10px] text-slate-500">Trade currency: {currency ?? 'Not supplied by imported CSV'} · initial balance input must use the same currency.</p>
           <p className="mt-1 text-[10px] font-mono text-slate-600">{sourceNote}</p>
           {statusMessage && <p className="mt-3 text-xs leading-5 text-cyan-200">{statusMessage}</p>}
           {error && <p className="mt-3 text-xs leading-5 text-rose-300">{error}</p>}
