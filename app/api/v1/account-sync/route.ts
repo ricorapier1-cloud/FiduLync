@@ -30,7 +30,7 @@ function num(value: unknown, fallback: number | null = 0): number | null {
   return Math.abs(value) <= 1e15 ? value : null;
 }
 function iso(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
+  if (typeof value !== 'string' || !/(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(value)) return null;
   const time = Date.parse(value);
   return Number.isFinite(time) ? new Date(time).toISOString() : null;
 }
@@ -108,6 +108,83 @@ export async function POST(request: Request) {
     const { error: snapshotError } = await supabase.from('macrolinc_account_snapshots').upsert(snapshot, { onConflict: 'account_key' });
     if (snapshotError) throw snapshotError;
 
+    const allowedMarketSymbols = new Set([
+      'EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD', 'AUDUSD', 'NZDUSD', 'USDCAD', 'USDCHF',
+      'EURJPY', 'GBPJPY', 'AUDJPY', 'CADJPY', 'CHFJPY', 'NZDJPY', 'EURGBP', 'EURAUD',
+      'EURCAD', 'EURCHF', 'EURNZD', 'GBPAUD', 'GBPCAD', 'GBPCHF', 'GBPNZD', 'AUDCAD',
+      'AUDCHF', 'AUDNZD', 'CADCHF', 'NZDCAD', 'NZDCHF',
+    ]);
+    const nowMs = Date.now();
+    const receivedAt = new Date(nowMs).toISOString();
+    const incomingQuotes = Array.isArray(payload.quotes) ? payload.quotes.slice(0, 32) : [];
+    const quotes = incomingQuotes.flatMap((value) => {
+      const quote = record(value);
+      if (!quote) return [];
+      const symbol = str(quote.symbol, 12)?.toUpperCase() ?? '';
+      const bid = num(quote.bid, null);
+      const ask = num(quote.ask, null);
+      const quoteTimeUtc = iso(quote.quoteTimeUtc);
+      const digits = num(quote.digits, null);
+      const point = num(quote.point, null);
+      const spreadPoints = num(quote.spreadPoints, null);
+      if (!allowedMarketSymbols.has(symbol) || bid === null || ask === null || bid <= 0 || ask < bid
+        || !quoteTimeUtc || digits === null || !Number.isInteger(digits) || digits < 0 || digits > 12
+        || point === null || point <= 0 || spreadPoints === null || spreadPoints < 0) return [];
+      const ageMs = nowMs - Date.parse(quoteTimeUtc);
+      if (!Number.isFinite(ageMs) || ageMs < -30_000 || ageMs > 30_000) return [];
+      return [{
+        account_key: accountKey, symbol, bid, ask, quote_time: quoteTimeUtc, spread_points: spreadPoints,
+        digits, point, broker: snapshot.broker, server: snapshot.server, received_at: receivedAt,
+      }];
+    });
+    if (quotes.length) {
+      const { error: quoteError } = await supabase.from('macrolinc_market_quotes')
+        .upsert(quotes, { onConflict: 'account_key,symbol' });
+      if (quoteError) throw quoteError;
+    }
+
+    const incomingCandles = Array.isArray(payload.candles) ? payload.candles.slice(0, 2_000) : [];
+    const candles = incomingCandles.flatMap((value) => {
+      const candle = record(value);
+      if (!candle || candle.isClosed !== true) return [];
+      const symbol = str(candle.symbol, 12)?.toUpperCase() ?? '';
+      const timeframe = str(candle.timeframe, 4)?.toUpperCase() ?? '';
+      const barTimeUtc = iso(candle.barTimeUtc);
+      const open = num(candle.open, null), high = num(candle.high, null);
+      const low = num(candle.low, null), close = num(candle.close, null);
+      const tickVolume = num(candle.tickVolume, 0) ?? 0;
+      const spreadPoints = num(candle.spreadPoints, 0) ?? 0;
+      const realVolume = num(candle.realVolume, 0) ?? 0;
+      const digits = num(candle.digits, null), point = num(candle.point, null);
+      if (!allowedMarketSymbols.has(symbol) || !['M5', 'D1'].includes(timeframe) || !barTimeUtc
+        || open === null || high === null || low === null || close === null
+        || open <= 0 || high <= 0 || low <= 0 || close <= 0
+        || high < low || open < low || open > high || close < low || close > high
+        || tickVolume < 0 || spreadPoints < 0 || realVolume < 0
+        || digits === null || !Number.isInteger(digits) || digits < 0 || digits > 12
+        || point === null || point <= 0) return [];
+      const ageMs = nowMs - Date.parse(barTimeUtc);
+      const maxAgeMs = timeframe === 'M5' ? 48 * 60 * 60_000 : 180 * 86_400_000;
+      if (!Number.isFinite(ageMs) || ageMs < -30_000 || ageMs > maxAgeMs) return [];
+      return [{
+        account_key: accountKey, symbol, timeframe, bar_time: barTimeUtc,
+        open, high, low, close, tick_volume: Math.trunc(tickVolume),
+        spread_points: spreadPoints, real_volume: Math.trunc(realVolume),
+        is_closed: true, digits, point, received_at: receivedAt,
+      }];
+    });
+    if (candles.length) {
+      const { error: candleError } = await supabase.from('macrolinc_market_candles')
+        .upsert(candles, { onConflict: 'account_key,symbol,timeframe,bar_time' });
+      if (candleError) throw candleError;
+      await Promise.all([
+        supabase.from('macrolinc_market_candles').delete().eq('account_key', accountKey)
+          .eq('timeframe', 'M5').lt('bar_time', new Date(nowMs - 7 * 86_400_000).toISOString()),
+        supabase.from('macrolinc_market_candles').delete().eq('account_key', accountKey)
+          .eq('timeframe', 'D1').lt('bar_time', new Date(nowMs - 180 * 86_400_000).toISOString()),
+      ]);
+    }
+
     const incomingDeals = Array.isArray(payload.deals) ? payload.deals.slice(0, 500) : [];
     const deals = incomingDeals.flatMap((value) => {
       const deal = record(value);
@@ -150,6 +227,8 @@ export async function POST(request: Request) {
       accountKey,
       positionsReceived: snapshot.positions.length,
       dealsReceived: deals.length,
+      quotesReceived: quotes.length,
+      candlesReceived: candles.length,
       observedAtUtc: observedAt,
       receivedAtUtc: snapshot.received_at,
     }, { status: 200, headers });
