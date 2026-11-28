@@ -38,7 +38,7 @@ test('MT5 publisher is read-only and account dashboard uses session-scoped read 
   assert.match(page, /sessionStorage/);
   assert.match(page, /MT5_ACCOUNT_READ_TOKEN/);
   assert.match(page, /Never paste your IC Markets master or investor password/);
-  assert.match(page, /Recent closed trades/);
+  assert.match(page, /Closed broker trade history/);
 });
 
 
@@ -47,6 +47,6 @@ test('MT5 account currency is normalized and validated before Intl currency form
   const dashboard = read('../app/accounts/page.tsx');
   assert.match(ingest, /currencyValue = str\(account\.currency, 12\)\?\.toUpperCase\(\)/);
   assert.match(ingest, /\^\[A-Z\]\{3\}\$/);
-  assert.match(dashboard, /const normalizedCurrency = currency\.toUpperCase\(\)/);
-  assert.match(dashboard, /if \(\/\^\[A-Z\]\{3\}\$\/\.test\(normalizedCurrency\)\)/);
+  assert.match(dashboard, /const normalized = currency\.trim\(\)\.toUpperCase\(\)/);
+  assert.match(dashboard, /if \(\/\^\[A-Z\]\{3\}\$\/\.test\(normalized\)\)/);
 });
