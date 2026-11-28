@@ -57,8 +57,9 @@ type StoredMt5Quote = {
 async function getMt5Quotes(installationId: string): Promise<MarketQuote[]> {
   // Never aggregate quotes across installations or accounts.
   const query = new URLSearchParams({
-    select: 'symbol,bid,ask,quote_time,received_at,spread_points,point,broker,server',
+    select: 'symbol,bid,ask,quote_time,received_at,spread_points,point,broker,server,installation:mt5_installations!inner(status)',
     installation_id: `eq.${installationId}`,
+    'installation.status': 'eq.active',
     order: 'quote_time.desc',
     limit: '100',
   });
