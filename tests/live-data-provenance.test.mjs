@@ -42,9 +42,9 @@ test('stale macro snapshots are rejected instead of silently reused', () => {
   assert.match(macroEngine, /SNB_PERSONAL_USE_ENABLED === 'true'/);
 });
 
-test('weekly CFTC and daily reference feeds use bounded shared caching', () => {
+test('CFTC positioning is bounded-cached while daily reference FX rates are excluded', () => {
   assert.match(macroData, /getCachedData\('macro:cftc-cot', getCftcCot, 6 \* 60 \* 60\)/);
-  assert.match(macroData, /getCachedData\('macro:frankfurter-reference', getFrankfurterRates, 6 \* 60 \* 60\)/);
+  assert.doesNotMatch(macroData, /Frankfurter|getFrankfurterRates|ecbRates/);
 });
 
 test('active terminal is macro-only and does not depend on technical signals or broker quotes', () => {
