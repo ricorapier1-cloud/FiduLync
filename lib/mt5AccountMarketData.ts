@@ -20,6 +20,8 @@ export type Mt5MarketQuoteRow = {
   spread_points: number;
   digits: number;
   point: number;
+  server_utc_offset_minutes: number;
+  time_basis: 'BROKER_SERVER_CURRENT_OFFSET';
   broker: string | null;
   server: string;
   received_at: string;
@@ -39,6 +41,8 @@ export type Mt5MarketCandleRow = {
   is_closed: boolean;
   digits: number;
   point: number;
+  server_utc_offset_minutes: number;
+  time_basis: 'BROKER_SERVER_CURRENT_OFFSET';
   received_at: string;
 };
 
@@ -63,7 +67,7 @@ export async function getMt5AccountMarketIdentity(accountKey: string): Promise<M
 export async function getMt5AccountQuotes(accountKey: string): Promise<Mt5MarketQuoteRow[]> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase.from('macrolinc_market_quotes')
-    .select('symbol,bid,ask,quote_time,spread_points,digits,point,broker,server,received_at')
+    .select('symbol,bid,ask,quote_time,spread_points,digits,point,server_utc_offset_minutes,time_basis,broker,server,received_at')
     .eq('account_key', accountKey).order('quote_time', { ascending: false }).limit(32);
   if (error) throw error;
   return (data ?? []) as Mt5MarketQuoteRow[];
@@ -76,7 +80,7 @@ export async function getMt5AccountCandles(
 ): Promise<Mt5MarketCandleRow[]> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase.from('macrolinc_market_candles')
-    .select('symbol,timeframe,bar_time,open,high,low,close,tick_volume,spread_points,real_volume,is_closed,digits,point,received_at')
+    .select('symbol,timeframe,bar_time,open,high,low,close,tick_volume,spread_points,real_volume,is_closed,digits,point,server_utc_offset_minutes,time_basis,received_at')
     .eq('account_key', accountKey).eq('symbol', symbol).eq('timeframe', timeframe)
     .eq('is_closed', true).order('bar_time', { ascending: true }).limit(timeframe === 'M5' ? 300 : 60);
   if (error) throw error;
