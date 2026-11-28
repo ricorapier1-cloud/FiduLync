@@ -11,9 +11,9 @@ export type FundamentalSignal = {
   score: number;
   policyDiffBps: number;
   realYieldDiffBps: number;
-  cotPositionDiff: number;
+  cotPositionDiff: number | null;
   twoYearDiffBps: number | null;
-  roroScore: number;
+  roroScore: number | null;
 };
 
 let fredPermissionCleanup: Promise<void> | null = null;
@@ -88,21 +88,21 @@ export function getFundamentalSignal(snapshot: MacroSnapshot, pair: string): Fun
   const realYieldDiffBps = base
     ? Math.round(((base.policyRate - base.inflation) - (quote.policyRate - quote.inflation)) * 100)
     : Math.round(-(quote.policyRate - quote.inflation) * 100);
-  const cotPositionDiff = baseCot && quoteCot ? Math.round(baseCot.percentile - quoteCot.percentile) : 0;
+  const cotPositionDiff = baseCot && quoteCot ? Math.round(baseCot.percentile - quoteCot.percentile) : null;
   const twoYearDiffBps = base.twoYearYieldSource === 'provider' && quote.twoYearYieldSource === 'provider'
     && isFreshMacroObservation(base.twoYearYieldObservationDate, 60)
     && isFreshMacroObservation(quote.twoYearYieldObservationDate, 60)
     && base.twoYearYield !== undefined && quote.twoYearYield !== undefined
       ? Math.round((base.twoYearYield - quote.twoYearYield) * 100) : null;
-  // Cross-asset risk appetite is unavailable until synchronized market feeds exist.
-  const roroScore = 0;
+  // Cross-asset risk appetite remains unavailable until synchronized market feeds exist.
+  const roroScore = null;
   const rawScore = (base.policyRate - quote.policyRate) * 12
     + ((base.policyRate - base.inflation) - (quote.policyRate - quote.inflation)) * 9
     + (twoYearDiffBps ?? 0) * 0.05
-    + (baseCot && quoteCot ? cotPositionDiff * 0.18 : 0);
+    + (cotPositionDiff !== null ? cotPositionDiff * 0.18 : 0);
 
   return {
-    score: Math.max(-100, Math.min(100, Math.round(rawScore + roroScore * 0.1))),
+    score: Math.max(-100, Math.min(100, Math.round(rawScore))),
     policyDiffBps,
     realYieldDiffBps,
     cotPositionDiff,

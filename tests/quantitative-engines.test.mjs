@@ -161,12 +161,20 @@ test('CFTC COT retrieval is cached between weekly publications and tolerates slo
   assert.match(cftc, /6 \* 60 \* 60/);
   assert.match(cftc, /reportDate: latest\.date/);
 });
-test('fallback snapshot does not embed fabricated policy rates or inflation levels', () => {
+test('macro fallback is empty and never synthesizes zero policy or inflation observations', () => {
   const macroData = read('../lib/macroData.ts');
   const fallbackFn = macroData.slice(macroData.indexOf('export function getFallbackSnapshot()'), macroData.indexOf('function mergeWithFallback'));
-  assert.doesNotMatch(fallbackFn, /policyRate: 3\.75|policyRate: 2\.15|policyRate: 4|policyRate: 0\.5|policyRate: 3\.6/);
-  assert.doesNotMatch(fallbackFn, /inflation: 2\.8|inflation: 2\.1|inflation: 3|inflation: 3\.4/);
-  assert.match(fallbackFn, /Awaiting Provider Feed/);
+  const mergeFn = macroData.slice(macroData.indexOf('function mergeWithFallback'), macroData.indexOf('function isRecord'));
+  assert.match(fallbackFn, /EMPTY_SNAPSHOT/);
+  assert.doesNotMatch(fallbackFn, /policyRate:|inflation:|Awaiting Provider Feed/);
+  assert.match(mergeFn, /currencies: snapshot\.currencies/);
+  assert.doesNotMatch(mergeFn, /new Map\(fallback\.currencies/);
+  assert.match(macroData, /return getFallbackSnapshot\(\);/);
+  const macroEngine = read('../lib/macroEngine.ts');
+  assert.match(macroEngine, /cotPositionDiff: number \| null/);
+  assert.match(macroEngine, /roroScore: number \| null/);
+  assert.match(macroEngine, /const roroScore = null/);
+  assert.doesNotMatch(macroEngine, /const roroScore = 0/);
 });
 test('pair dossier does not fabricate fallback policy or inflation rates when missing', () => {
   const dossier = read('../lib/macro/dossierEngine.ts');

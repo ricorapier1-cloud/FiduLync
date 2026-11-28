@@ -27,59 +27,43 @@ export const EMPTY_SNAPSHOT: MacroSnapshot = {
 export function sanitizeMacroSnapshotPermissions(snapshot: MacroSnapshot): MacroSnapshot {
   if (process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED?.trim().toLowerCase() !== 'false') return snapshot;
   let removed = false;
-  const currencies = snapshot.currencies.map((currency) => {
+  const currencies = snapshot.currencies.flatMap((currency) => {
+    // Do not replace disallowed observations with zero-valued placeholders.
+    if (currency.policyRateProvider === 'FRED' || currency.inflationProvider === 'FRED') {
+      removed = true;
+      return [];
+    }
     const next = { ...currency };
-    if (next.policyRateProvider === 'FRED') {
-      next.policyRate = 0; next.policyRateSource = 'reference';
-      delete next.policyRateProvider; delete next.policyRateObservationDate; removed = true;
+    if (next.code === 'USD' && next.twoYearYieldSource === 'provider'
+      && (next.twoYearYieldProvider === 'FRED' || !next.twoYearYieldProvider)) {
+      delete next.twoYearYield;
+      delete next.twoYearYieldSource;
+      delete next.twoYearYieldObservationDate;
+      delete next.twoYearYieldProvider;
+      removed = true;
     }
-    if (next.inflationProvider === 'FRED') {
-      next.inflation = 0; next.inflationLabel = 'CPI'; next.inflationSource = 'reference';
-      delete next.inflationProvider; delete next.inflationObservationDate; delete next.corePce; delete next.cpi; removed = true;
-    }
-    if (next.code === 'USD' && next.twoYearYieldSource === 'provider' && (next.twoYearYieldProvider === 'FRED' || !next.twoYearYieldProvider)) {
-      next.twoYearYield = undefined; next.twoYearYieldSource = 'reference'; delete next.twoYearYieldObservationDate; delete next.twoYearYieldProvider; removed = true;
-    }
-    return next;
+    return [next];
   });
   return removed ? { ...snapshot, currencies, source: snapshot.source === 'provider' ? 'partial' : snapshot.source } : snapshot;
 }
 
 export function getFallbackSnapshot(): MacroSnapshot {
   return {
-    asOf: new Date().toISOString(),
-    source: 'fallback',
-    cotSource: 'unavailable',
-    calendarSource: 'unavailable',
-    currencies: [
-      { code: 'USD', centralBank: 'Federal Reserve', policyRate: 0, inflation: 0, twoYearYield: 0, twoYearYieldSource: 'reference', inflationLabel: 'Core PCE', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Awaiting Provider Feed' },
-      { code: 'EUR', centralBank: 'European Central Bank', policyRate: 0, inflation: 0, inflationLabel: 'HICP', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Awaiting Provider Feed' },
-      { code: 'GBP', centralBank: 'Bank of England', policyRate: 0, inflation: 0, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Awaiting Provider Feed' },
-      { code: 'JPY', centralBank: 'Bank of Japan', policyRate: 0, inflation: 0, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Awaiting Provider Feed' },
-      { code: 'AUD', centralBank: 'Reserve Bank of Australia', policyRate: 0, inflation: 0, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Awaiting Provider Feed' },
-      { code: 'CHF', centralBank: 'Swiss National Bank', policyRate: 0, inflation: 0, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Awaiting Provider Feed' },
-      { code: 'CAD', centralBank: 'Bank of Canada', policyRate: 0, inflation: 0, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Awaiting Provider Feed' },
-      { code: 'NZD', centralBank: 'Reserve Bank of New Zealand', policyRate: 0, inflation: 0, inflationLabel: 'CPI', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Awaiting Provider Feed' },
-      { code: 'SEK', centralBank: 'Sveriges Riksbank', policyRate: 0, inflation: 0, inflationLabel: 'CPIF', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Awaiting Provider Feed' },
-      { code: 'NOK', centralBank: 'Norges Bank', policyRate: 0, inflation: 0, inflationLabel: 'CPI-ATE', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Awaiting Provider Feed' },
-      { code: 'XAU', centralBank: 'Global Reserve Asset', policyRate: 0, inflation: 0, twoYearYield: 0, twoYearYieldSource: 'reference', inflationLabel: 'Real Yield Proxy', policyRateSource: 'reference', inflationSource: 'reference', stance: 'Sovereign Hedge' },
-    ],
+    ...EMPTY_SNAPSHOT,
+    currencies: [],
     cot: [],
-    // No fabricated or stale economic events in reference/offline mode.
     catalysts: [],
   };
 }
 
 function mergeWithFallback(snapshot: MacroSnapshot): MacroSnapshot {
-  const fallback = getFallbackSnapshot();
-  const currencies = new Map(fallback.currencies.map((currency) => [currency.code, currency]));
-  for (const currency of snapshot.currencies) currencies.set(currency.code, currency);
+  // Preserve only the actual payload; never add placeholder currencies or metrics.
   return {
-    ...fallback,
+    ...EMPTY_SNAPSHOT,
     ...snapshot,
-    currencies: [...currencies.values()],
+    currencies: snapshot.currencies,
     cot: snapshot.cot,
-    catalysts: snapshot.catalysts.length > 0 ? snapshot.catalysts : fallback.catalysts,
+    catalysts: snapshot.catalysts,
   };
 }
 
@@ -1121,6 +1105,8 @@ async function getLiveProviderSnapshot(cachedSnapshot: MacroSnapshot = getFallba
     // A live calendar, COT report or reference FX rate cannot make a partial
     // macro snapshot look fully provider-verified.
     snapshot.source = completeG10MacroCoverage ? 'provider' : 'partial';
+  } else if (hasAnyProviderData) {
+    snapshot.source = 'partial';
   }
   return hasAnyProviderData ? snapshot : null;
 }
