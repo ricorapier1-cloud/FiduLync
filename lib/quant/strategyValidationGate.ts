@@ -69,6 +69,8 @@ export async function getStrategyValidationGate(): Promise<StrategyValidationGat
     if (!report) return notValidated(['APPROVED_VALIDATION_REPORT_NOT_FOUND']);
 
     const blockers: string[] = [];
+    const evidence = report.evidence ?? {};
+    const metrics = report.metrics ?? {};
     if (report.reviewer_note !== 'APPROVED_FOR_LIVE_USE') blockers.push('OWNER_REVIEW_APPROVAL_MISSING');
     if (!report.reviewed_at || !Number.isFinite(Date.parse(report.reviewed_at)) || Date.parse(report.reviewed_at) > Date.now()) blockers.push('REVIEW_TIMESTAMP_INVALID');
     const runRows = await supabaseRead<ResearchRun[]>('research_runs', new URLSearchParams({
@@ -90,8 +92,6 @@ export async function getStrategyValidationGate(): Promise<StrategyValidationGat
     }
     if (!Array.isArray(report.blockers) || report.blockers.length > 0) blockers.push('VALIDATION_REPORT_HAS_BLOCKERS');
 
-    const evidence = report.evidence ?? {};
-    const metrics = report.metrics ?? {};
     const requiredEvidence: Array<[string, unknown]> = [
       ['POINT_IN_TIME_VINTAGES_NOT_VERIFIED', evidence.pointInTimeVintagesVerified],
       ['SOURCE_MANIFEST_NOT_VERIFIED', evidence.sourceManifestVerified],
