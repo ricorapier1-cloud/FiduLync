@@ -7,7 +7,7 @@ This register distinguishes implemented adapters from data that still requires a
 | Market driver | Current source / adapter | Frequency and limitation |
 |---|---|---|
 | Policy rates | Federal Reserve / FRED, ECB, Bank of Canada, Bank of England, Bank of Japan, RBA, RBNZ, SNB | Official policy releases; update only when the authority publishes or the source updates |
-| Headline and core inflation | BLS CPI; FRED PCE/CPI; ECB HICP; Bank of Canada; World Bank G10 CPI | Monthly/quarterly statistical observations; release timestamps/vintages are not yet fully joined |
+| Headline and core inflation | BLS CPI; FRED PCE/CPI; ECB HICP; Bank of Canada | Monthly statistical observations. Other G8 monthly CPI adapters are not yet implemented; World Bank annual CPI is excluded from current relative-strength and bias calculations. Release timestamps/vintages are not yet fully joined |
 | Employment | BLS unemployment and nonfarm payroll series | Monthly; observation period is not the exact publication timestamp |
 | Economic growth | BEA NIPA Table 1.1.1 real GDP | Quarterly annualized growth; requires `BEA_API_KEY` |
 | Treasury curve / real rates | FRED DGS2, DGS10, DFII10 and T10YIE | Daily observations; 10Y real yield is TIPS-derived and breakeven is nominal minus TIPS market pricing, not a pure inflation forecast |
