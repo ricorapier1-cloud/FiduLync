@@ -33,6 +33,9 @@ export type IntradaySignal = {
   sovereignShieldStatus?: MarketRiskShieldResult['status'] | null;
   marketRiskCeilingPct?: number;
   marketShieldFlags?: string[];
+  executionDataVerified: boolean;
+  candleDataSource: string;
+  quoteDataSource: string;
   zScore: number | null;
   zScoreZone: 'DISCOUNT_PULLBACK' | 'PREMIUM_PULLBACK' | 'EXTENDED' | 'NEUTRAL' | 'UNAVAILABLE';
   hurstRegime: 'TREND_CONTINUATION' | 'MEAN_REVERSION_ONLY' | 'RANDOM_WALK_NOISE' | 'UNAVAILABLE';
@@ -194,7 +197,7 @@ export function buildIntradaySignal(input: IntradaySignalInput): IntradaySignal 
     pdh: priorDay?.high ?? null, pdl: priorDay?.low ?? null, asianRangeHigh, asianRangeLow,
   });
   if (input.marketShield && !input.marketShield.marketConditionsClear) return empty('SHIELD_BLOCKED', 'Sovereign market-risk shield is blocking this setup.');
-  if (blockers.some((item) => ['VIX_UNAVAILABLE', 'VIX_BLACK_SWAN_LOCKOUT', 'CALENDAR_UNVERIFIED', 'RATE_DECISION_LOCKOUT', 'TIER_ONE_EVENT_LOCKOUT', 'OUTSIDE_LONDON_NEW_YORK_WAT_WINDOWS', 'SPREAD_BASELINE_UNAVAILABLE', 'SPREAD_BLOWOUT_BLOCK', 'LIVE_BBO_UNAVAILABLE_OR_STALE', 'INTRADAY_CANDLES_STALE'].includes(item))) {
+  if (blockers.some((item) => ['VIX_UNAVAILABLE', 'VIX_BLACK_SWAN_LOCKOUT', 'CALENDAR_UNVERIFIED', 'RATE_DECISION_LOCKOUT', 'TIER_ONE_EVENT_LOCKOUT', 'OUTSIDE_LONDON_NEW_YORK_WAT_WINDOWS', 'SPREAD_BASELINE_UNAVAILABLE', 'SPREAD_BLOWOUT_BLOCK', 'LIVE_BBO_UNAVAILABLE_OR_STALE', 'INTRADAY_CANDLES_STALE', 'BROKER_CANDLE_SOURCE_NOT_VERIFIED', 'BROKER_EXECUTION_QUOTE_NOT_VERIFIED'].includes(item))) {
     return empty('SHIELD_BLOCKED', 'Sovereign Shield or live market-data gate is not clear.');
   }
   if (blockers.length) return empty('WAIT_NO_SETUP', 'Macro, OHLCV history or trend-quality confirmation is insufficient.');
