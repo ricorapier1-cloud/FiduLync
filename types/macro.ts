@@ -74,6 +74,7 @@ export type OfficialUsMacroIndicators = {
   usHighYieldSpreadPct?: number;
   usHighYieldSpreadAsOf?: string;
   retrievedAt: string;
+  fredRetrievedAt?: string;
   sources: string[];
 };
 
