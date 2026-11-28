@@ -45,3 +45,77 @@ test('Monte Carlo bootstrap is reproducible and uses actual trade R outcomes', (
   assert.ok(a.maxDrawdownPct.p99 >= a.maxDrawdownPct.p50);
   assert.equal(monteCarloBootstrap([], {}), null);
 });
+
+
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  QUANT_CORE_RESEARCH_OBJECTIVES,
+  wilsonScoreInterval,
+  calculateTradeMetrics,
+  evaluateResearchObjectives,
+} from '../.quant-test/validationEngine.js';
+import { assessMacroResearchEvidence } from '../.quant-test/quantPipeline.js';
+
+test('research mandate is explicit and never creates a daily trade quota', () => {
+  assert.equal(QUANT_CORE_RESEARCH_OBJECTIVES.winRateTargetMin, 0.60);
+  assert.equal(QUANT_CORE_RESEARCH_OBJECTIVES.winRateTargetMax, 0.65);
+  assert.equal(QUANT_CORE_RESEARCH_OBJECTIVES.plannedRewardRisk, 2);
+  assert.equal(QUANT_CORE_RESEARCH_OBJECTIVES.dailyTradeQuota, null);
+  assert.equal(QUANT_CORE_RESEARCH_OBJECTIVES.setupPolicy, 'HIGH_QUALITY_ONLY');
+});
+
+test('Wilson interval is bounded and rejects invalid samples', () => {
+  const interval = wilsonScoreInterval(60, 100);
+  assert.ok(interval && interval.lower < 0.60 && interval.upper > 0.60);
+  assert.equal(wilsonScoreInterval(101, 100), null);
+});
+
+test('trade metrics disclose net realized reward-to-risk and win-rate uncertainty', () => {
+  const sample = [
+    ...Array.from({ length: 60 }, (_, i) => ({ netR: 2, closedAt: new Date(Date.UTC(2025, 0, 1, 0, i)).toISOString() })),
+    ...Array.from({ length: 40 }, (_, i) => ({ netR: -1, closedAt: new Date(Date.UTC(2025, 0, 2, 0, i)).toISOString() })),
+  ];
+  const metrics = calculateTradeMetrics(sample);
+  assert.equal(metrics?.winRate, 0.6);
+  assert.equal(metrics?.realizedRewardRisk, 2);
+  assert.ok(metrics?.winRateWilson95.lower < metrics.winRate);
+});
+
+test('research objective gate refuses small samples and missing risk approval', () => {
+  const trades = Array.from({ length: 100 }, (_, i) => ({
+    netR: i < 65 ? 2 : -1,
+    closedAt: new Date(Date.UTC(2025, 0, 1, 0, i)).toISOString(),
+  }));
+  const result = evaluateResearchObjectives(trades, {
+    walkForwardEligible: true,
+    untouchedOutOfSample: true,
+    allTradesPassedQualityFilter: true,
+    costStressApplied: true,
+    stressedExpectancyR: 0.4,
+    maxDrawdownPct: 5,
+    approvedMaxDrawdownPct: null,
+  });
+  assert.equal(result.eligible, false);
+  assert.equal(result.status, 'NOT_VALIDATED');
+  assert.ok(result.blockers.includes('OOS_SAMPLE_BELOW_300_TRADES'));
+  assert.ok(result.blockers.includes('OWNER_APPROVED_DRAWDOWN_LIMIT_MISSING'));
+});
+
+test('macro research gate requires PIT vintages, source rights, OOS, costs, WFA and regime coverage', () => {
+  const blocked = assessMacroResearchEvidence({
+    pointInTimeReleaseVintagesVerified: true,
+    synchronizedHistoricalObservationsVerified: true,
+    sourcePermissionsVerified: false,
+    untouchedOutOfSampleVerified: true,
+    walkForwardFolds: 3,
+    spreadStressApplied: true,
+    slippageStressApplied: true,
+    commissionStressApplied: true,
+    swapStressApplied: true,
+    parameterSensitivityCompleted: true,
+    multiRegimeCoverageVerified: true,
+  });
+  assert.equal(blocked.eligible, false);
+  assert.ok(blocked.blockers.includes('SOURCE_PERMISSIONS_UNVERIFIED'));
+});
