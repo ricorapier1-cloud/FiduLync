@@ -61,6 +61,13 @@ async function generateGeminiBrief(
   const fallback = ruleBasedBrief(snapshot);
   if (!apiKey || process.env.GEMINI_MACRO_BRIEF_ENABLED !== 'true') return fallback;
 
+  const calendarRetrievedAtMs = snapshot.calendarRetrievedAtUtc ? Date.parse(snapshot.calendarRetrievedAtUtc) : NaN;
+  const calendarCoverageEndMs = snapshot.calendarCoverageEndUtc ? Date.parse(snapshot.calendarCoverageEndUtc) : NaN;
+  const calendarVerified = snapshot.calendarSource === 'provider' && Boolean(snapshot.calendarProvider)
+    && Number.isFinite(calendarRetrievedAtMs) && Date.now() - calendarRetrievedAtMs <= 60 * 60_000
+    && Date.now() - calendarRetrievedAtMs >= -30_000
+    && Number.isFinite(calendarCoverageEndMs) && calendarCoverageEndMs >= Date.now() + 24 * 60 * 60_000;
+
   const inputs = {
     rateDifferentials: snapshot.currencies.filter((currency) => currency.policyRateSource === 'provider' && currency.inflationSource === 'provider'
       && isFreshObservation(currency.policyRateObservationDate, 180)
