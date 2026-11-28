@@ -89,7 +89,7 @@ type ClosedTrade = {
 };
 
 const money = (value: number, currency: string) => {
-  const normalized = currency.toUpperCase();
+  const normalized = currency.trim().toUpperCase();
   if (/^[A-Z]{3}$/.test(normalized)) {
     return new Intl.NumberFormat(undefined, {
       style: 'currency', currency: normalized, maximumFractionDigits: 2,
