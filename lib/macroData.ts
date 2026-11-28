@@ -1212,6 +1212,7 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
     const calendarCoverageEndMs = parsed.calendarCoverageEndUtc ? Date.parse(parsed.calendarCoverageEndUtc) : NaN;
     const calendarVerified = data.payload.calendarSource === 'provider'
       && Number.isFinite(calendarRetrievedAtMs) && Date.now() - calendarRetrievedAtMs <= 60 * 60_000
+      && Date.now() - calendarRetrievedAtMs >= -30_000
       && Number.isFinite(calendarCoverageEndMs) && calendarCoverageEndMs >= Date.now() + 24 * 60 * 60_000;
     const persistedCatalysts = calendarVerified ? filterCurrentCatalysts(parsed.catalysts) : [];
     const ecbRates = isRecord(data.payload.ecbRates)
@@ -1231,7 +1232,8 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
       calendarSource: calendarVerified ? 'provider' : 'unavailable',
       calendarProvider: calendarVerified ? (data.payload.calendarProvider === 'FAIRECONOMY_PUBLIC' ? 'FAIRECONOMY_PUBLIC'
         : data.payload.calendarProvider === 'FINNHUB' ? 'FINNHUB'
-          : data.payload.calendarProvider === 'FMP' ? 'FMP' : undefined) : undefined,
+          : data.payload.calendarProvider === 'FMP' ? 'FMP'
+            : data.payload.calendarProvider === 'CUSTOM_MACRO_PROVIDER' ? 'CUSTOM_MACRO_PROVIDER' : undefined) : undefined,
       calendarRetrievedAtUtc: calendarVerified ? parsed.calendarRetrievedAtUtc : undefined,
       calendarCoverageEndUtc: calendarVerified ? parsed.calendarCoverageEndUtc : undefined,
       ...(parsed.energyMarkets ? { energyMarkets: parsed.energyMarkets } : {}),
@@ -1315,6 +1317,7 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
         cot: parsed.cot.length > 0 ? parsed.cot : baseline.cot,
         catalysts: parsed.calendarRetrievedAtUtc && parsed.calendarCoverageEndUtc
           && Date.parse(parsed.calendarRetrievedAtUtc) >= Date.now() - 60 * 60_000
+          && Date.parse(parsed.calendarRetrievedAtUtc) <= Date.now() + 30_000
           && Date.parse(parsed.calendarCoverageEndUtc) >= Date.now() + 24 * 60 * 60_000
           ? providerCatalysts : [],
         source: 'provider',
@@ -1323,7 +1326,7 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
           && Date.parse(parsed.calendarRetrievedAtUtc) >= Date.now() - 60 * 60_000
           && Date.parse(parsed.calendarCoverageEndUtc) >= Date.now() + 24 * 60 * 60_000
           ? 'provider' : 'unavailable',
-        calendarProvider: parsed.calendarRetrievedAtUtc && parsed.calendarCoverageEndUtc ? 'FAIRECONOMY_PUBLIC' : undefined,
+        calendarProvider: parsed.calendarRetrievedAtUtc && parsed.calendarCoverageEndUtc ? 'CUSTOM_MACRO_PROVIDER' : undefined,
         calendarRetrievedAtUtc: parsed.calendarRetrievedAtUtc,
         calendarCoverageEndUtc: parsed.calendarCoverageEndUtc,
         asOf: new Date().toISOString(),
