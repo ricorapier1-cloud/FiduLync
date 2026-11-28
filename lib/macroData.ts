@@ -127,6 +127,7 @@ function isCatalyst(value: unknown): value is EconomicCatalyst {
     && typeof value.region === 'string'
     && typeof value.title === 'string'
     && typeof value.scheduledAt === 'string'
+    && /(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(value.scheduledAt)
     && Number.isFinite(Date.parse(value.scheduledAt))
     && (value.impact === 'High' || value.impact === 'Medium')
     && typeof value.consensus === 'string'
@@ -266,41 +267,40 @@ async function getFrankfurterRates(): Promise<Record<string, number>> {
   return rates;
 }
 
-function getFairEconomyCatalysts(): Promise<EconomicCatalyst[]> {
-  return getCachedData('macro:fair-economy-calendar', async () => {
-    const response = await fetch('https://nfs.faireconomy.media/ff_calendar_thisweek.json', {
-      cache: 'no-store',
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': 'Mozilla/5.0 (compatible; MacroLync/1.0)',
-      },
-      signal: AbortSignal.timeout(8_000),
-    });
-    if (!response.ok) throw new Error(`FairEconomy calendar returned ${response.status}.`);
-    const payload: unknown = await response.json();
-    if (!Array.isArray(payload)) throw new Error('FairEconomy calendar payload is invalid.');
-    const regionMap: Record<string, string> = {
-      USD: 'US', EUR: 'EU', GBP: 'UK', JPY: 'JP', CHF: 'CH',
-      CAD: 'CA', AUD: 'AU', NZD: 'NZ', SEK: 'SE', NOK: 'NO',
-    };
-    const events = payload.flatMap((item, index): EconomicCatalyst[] => {
-      if (!isRecord(item) || typeof item.currency !== 'string'
-        || typeof item.title !== 'string' || typeof item.date !== 'string') return [];
-      const impact = item.impact === 'High' ? 'High' : item.impact === 'Medium' ? 'Medium' : null;
-      const scheduledAt = new Date(item.date);
-      if (!impact || !regionMap[item.currency] || !Number.isFinite(scheduledAt.getTime())) return [];
-      return [{
-        id: `fair-economy-${scheduledAt.toISOString()}-${index}`,
-        region: regionMap[item.currency],
-        title: item.title,
-        scheduledAt: scheduledAt.toISOString(),
-        impact,
-        consensus: typeof item.forecast === 'string' ? item.forecast : 'Pending',
-        actual: typeof item.actual === 'string' && item.actual ? item.actual : null,
-      }];
-    });
-    return events;
-  }, 900);
+async function getFairEconomyCatalysts(): Promise<EconomicCatalyst[]> {
+  // Do not serve stale calendars on refresh failure: a missing event feed must lock out.
+  const response = await fetch('https://nfs.faireconomy.media/ff_calendar_thisweek.json', {
+    cache: 'no-store',
+    headers: {
+      Accept: 'application/json',
+      'User-Agent': 'Mozilla/5.0 (compatible; MacroLync/1.0)',
+    },
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!response.ok) throw new Error(`FairEconomy calendar returned ${response.status}.`);
+  const payload: unknown = await response.json();
+  if (!Array.isArray(payload)) throw new Error('FairEconomy calendar payload is invalid.');
+  const regionMap: Record<string, string> = {
+    USD: 'US', EUR: 'EU', GBP: 'UK', JPY: 'JP', CHF: 'CH',
+    CAD: 'CA', AUD: 'AU', NZD: 'NZ', SEK: 'SE', NOK: 'NO',
+  };
+  return payload.flatMap((item, index): EconomicCatalyst[] => {
+    if (!isRecord(item) || typeof item.currency !== 'string'
+      || typeof item.title !== 'string' || typeof item.date !== 'string'
+      || !/(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(item.date)) return [];
+    const impact = item.impact === 'High' ? 'High' : item.impact === 'Medium' ? 'Medium' : null;
+    const scheduledAt = new Date(item.date);
+    if (!impact || !regionMap[item.currency] || !Number.isFinite(scheduledAt.getTime())) return [];
+    return [{
+      id: `fair-economy-${scheduledAt.toISOString()}-${index}`,
+      region: regionMap[item.currency],
+      title: item.title,
+      scheduledAt: scheduledAt.toISOString(),
+      impact,
+      consensus: typeof item.forecast === 'string' ? item.forecast : 'Pending',
+      actual: typeof item.actual === 'string' && item.actual ? item.actual : null,
+    }];
+  });
 }
 
 async function getFinnhubCatalysts(apiKey: string): Promise<EconomicCatalyst[]> {
@@ -321,7 +321,8 @@ async function getFinnhubCatalysts(apiKey: string): Promise<EconomicCatalyst[]> 
   };
   return payload.economicCalendar.flatMap((item, index): EconomicCatalyst[] => {
     if (!isRecord(item) || typeof item.time !== 'string' || typeof item.country !== 'string'
-      || typeof item.event !== 'string') return [];
+      || typeof item.event !== 'string'
+      || !/(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(item.time)) return [];
     const impactText = typeof item.impact === 'string' ? item.impact.toLowerCase() : '';
     const impact = impactText.includes('high') ? 'High' : impactText.includes('medium') ? 'Medium' : null;
     const scheduledAt = new Date(item.time);
@@ -397,7 +398,7 @@ async function getFmpCatalysts(apiKey: string): Promise<EconomicCatalyst[]> {
   };
   return payload.flatMap((item, index): EconomicCatalyst[] => {
     if (!isRecord(item)) return [];
-    const scheduledAt = typeof item.date === 'string' ? new Date(item.date) : null;
+    const scheduledAt = typeof item.date === 'string' && /(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(item.date) ? new Date(item.date) : null;
     const impactText = typeof item.impact === 'string' ? item.impact.toLowerCase() : '';
     const impact = impactText.includes('high') ? 'High' : impactText.includes('medium') ? 'Medium' : null;
     const country = typeof item.country === 'string' ? item.country : '';
@@ -649,6 +650,7 @@ async function getLiveProviderSnapshot(): Promise<MacroSnapshot | null> {
     snapshot.catalysts = selectedCalendar.events;
     snapshot.calendarSource = 'provider';
     snapshot.calendarProvider = selectedCalendar.provider;
+    snapshot.calendarRetrievedAt = new Date().toISOString();
     hasLiveData = true;
   } else {
     snapshot.catalysts = [];
@@ -901,6 +903,9 @@ async function getPersistedSnapshot(): Promise<MacroSnapshot | null> {
       cotProvider: data.payload.cotProvider === 'cftc' || data.payload.cotProvider === 'custom' ? data.payload.cotProvider : undefined,
       calendarSource: data.payload.calendarSource === 'provider' ? 'provider' : 'reference',
       calendarProvider: ['fair-economy', 'finnhub', 'fmp', 'macro-provider'].includes(String(data.payload.calendarProvider)) ? data.payload.calendarProvider as MacroSnapshot['calendarProvider'] : undefined,
+      calendarRetrievedAt: typeof data.payload.calendarRetrievedAt === 'string'
+        && /(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(data.payload.calendarRetrievedAt)
+        && Number.isFinite(Date.parse(data.payload.calendarRetrievedAt)) ? data.payload.calendarRetrievedAt : undefined,
       asOf: data.refreshed_at,
       ...(ecbRates && Object.keys(ecbRates).length > 0 ? { ecbRates } : {}),
     };
@@ -969,6 +974,7 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
         cotProvider: parsed.cot.length > 0 ? 'custom' : undefined,
         calendarSource: parsed.catalysts.length > 0 ? 'provider' : 'reference',
         calendarProvider: parsed.catalysts.length > 0 ? 'macro-provider' : undefined,
+        calendarRetrievedAt: parsed.catalysts.length > 0 ? new Date().toISOString() : undefined,
         asOf: new Date().toISOString(),
         ...(ecbRates ? { ecbRates } : {}),
       });
@@ -996,6 +1002,6 @@ export async function loadMacroSnapshot(): Promise<MacroSnapshot> {
     console.error('Live macro APIs unavailable; checking the persisted snapshot:', error);
   }
   if (persisted) return mergeWithFallback(persisted);
-  console.warn('No live macro source or persisted snapshot is available; serving reference macro levels.');
+  console.warn('No live macro source or sufficiently fresh persisted snapshot is available; returning an empty unavailable state.');
   return getFallbackSnapshot();
 }
