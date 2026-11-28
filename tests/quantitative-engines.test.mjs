@@ -895,3 +895,30 @@ test('MT5 accounts page is a read-only broker ledger with no manual trade journa
   assert.match(accountSync, /snapshot\.account_mode === 'REAL'/);
   assert.match(heartbeat, /linkedAccount\.account_mode !== 'REAL'/);
 });
+
+
+test('validation engine requires chronological three-fold out-of-sample evidence and genuine R multiples', () => {
+  const engine = read('../lib/quant/monteCarloEngine.ts');
+  assert.match(engine, /minimumOutOfSampleTrades = RESEARCH_OBJECTIVES\.minimumOutOfSampleTrades/);
+  assert.match(engine, /minimumWalkForwardFolds = RESEARCH_OBJECTIVES\.minimumWalkForwardFolds/);
+  assert.match(engine, /chronologicalDataVerified/);
+  assert.match(engine, /winRateWilson95LowerPct/);
+  assert.match(engine, /realizedRewardRisk/);
+  assert.match(engine, /averagePayoffRatio/);
+  assert.match(engine, /outOfSample\.expectancyR !== null/);
+  assert.doesNotMatch(engine, /trades\.length >= 20/);
+  assert.doesNotMatch(engine, /Math\.random/);
+  assert.match(engine, /CIRCULAR_BLOCK/);
+  assert.match(engine, /deterministicSeed/);
+  assert.match(engine, /initialStopLoss/);
+});
+
+test('validation workspace uses linked real MT5 history or imported reports, never the retired manual ledger', () => {
+  const page = read('../app/validation/page.tsx');
+  assert.match(page, /Load linked REAL MT5 history/);
+  assert.match(page, /MT5_BACKTEST_CSV/);
+  assert.match(page, /account_mode !== 'REAL'/);
+  assert.match(page, /initial stop-loss risk is not included in deal history/);
+  assert.match(page, /ROBUST CANDIDATE · NOT APPROVED/);
+  assert.doesNotMatch(page, /fidulync-manual-trades-history-v1|Load From Verified Manual Ledger|manualLedger|profitSweeps/);
+});
