@@ -96,7 +96,9 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
     const catalysts = calendarAllowed ? snapshot.catalysts : [];
     const ecbRates = snapshot.ecbRates;
     const fredMacroAllowed = Boolean(process.env.FRED_API_KEY?.trim());
-    const officialStatisticsAvailable = Boolean(snapshot.usIndicators?.sources.some((source) =>
+    const officialStatisticsFresh = observationFresh(snapshot.usIndicators?.retrievedAt, 1);
+    const fredRetrievalFresh = observationFresh(snapshot.usIndicators?.fredRetrievedAt, 1);
+    const officialStatisticsAvailable = officialStatisticsFresh && Boolean(snapshot.usIndicators?.sources.some((source) =>
       source.includes('(BLS)') || source.includes('(BEA)')));
     const fredDailyPairs = [
       ['tenYearTreasuryYieldPct', 'tenYearTreasuryYieldAsOf'],
@@ -111,22 +113,33 @@ export async function getMacroSnapshot(forceRefresh = false): Promise<MacroSnaps
     ] as const;
     const fredDailyFields = Object.fromEntries(fredDailyPairs.flatMap(([valueKey, dateKey]) => {
       const observedAt = snapshot.usIndicators?.[dateKey];
-      const fresh = fredMacroAllowed && observationFresh(observedAt, 7);
+      const fresh = fredMacroAllowed && fredRetrievalFresh && observationFresh(observedAt, 7);
       return fresh
         ? []
         : [[valueKey, undefined], [dateKey, undefined]];
     }));
     const filteredUsIndicators = snapshot.usIndicators ? {
       ...snapshot.usIndicators,
-      sources: snapshot.usIndicators.sources.filter((source) => fredMacroAllowed || !source.includes('(FRED)')),
+      sources: snapshot.usIndicators.sources.filter((source) =>
+        source.includes('(FRED)') ? fredMacroAllowed && fredRetrievalFresh : officialStatisticsFresh),
+      cpiYearOverYearPct: officialStatisticsFresh ? snapshot.usIndicators.cpiYearOverYearPct : undefined,
+      cpiPeriod: officialStatisticsFresh ? snapshot.usIndicators.cpiPeriod : undefined,
+      coreCpiYearOverYearPct: officialStatisticsFresh ? snapshot.usIndicators.coreCpiYearOverYearPct : undefined,
+      coreCpiPeriod: officialStatisticsFresh ? snapshot.usIndicators.coreCpiPeriod : undefined,
+      unemploymentRatePct: officialStatisticsFresh ? snapshot.usIndicators.unemploymentRatePct : undefined,
+      unemploymentPeriod: officialStatisticsFresh ? snapshot.usIndicators.unemploymentPeriod : undefined,
+      nonfarmPayrollMonthlyChangeThousands: officialStatisticsFresh ? snapshot.usIndicators.nonfarmPayrollMonthlyChangeThousands : undefined,
+      payrollPeriod: officialStatisticsFresh ? snapshot.usIndicators.payrollPeriod : undefined,
+      realGdpAnnualizedQuarterlyPct: officialStatisticsFresh ? snapshot.usIndicators.realGdpAnnualizedQuarterlyPct : undefined,
+      realGdpPeriod: officialStatisticsFresh ? snapshot.usIndicators.realGdpPeriod : undefined,
       ...fredDailyFields,
     } : undefined;
     const hasOfficialStatisticsValues = officialStatisticsAvailable && [
-      snapshot.usIndicators?.cpiYearOverYearPct,
-      snapshot.usIndicators?.coreCpiYearOverYearPct,
-      snapshot.usIndicators?.unemploymentRatePct,
-      snapshot.usIndicators?.nonfarmPayrollMonthlyChangeThousands,
-      snapshot.usIndicators?.realGdpAnnualizedQuarterlyPct,
+      filteredUsIndicators?.cpiYearOverYearPct,
+      filteredUsIndicators?.coreCpiYearOverYearPct,
+      filteredUsIndicators?.unemploymentRatePct,
+      filteredUsIndicators?.nonfarmPayrollMonthlyChangeThousands,
+      filteredUsIndicators?.realGdpAnnualizedQuarterlyPct,
     ].some(isFiniteNumber);
     const hasFreshFredDailyValues = fredDailyPairs.some(([valueKey]) =>
       isFiniteNumber(filteredUsIndicators?.[valueKey]));
