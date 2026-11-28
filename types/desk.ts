@@ -4,9 +4,9 @@ export type DeskQuoteContext = {
   mid: number | null;
   observation_time_utc: string;
   age_ms: number | null;
-  freshness: 'FRESH' | 'STALE' | 'REFERENCE';
+  freshness: 'FRESH' | 'STALE';
   source: string;
-  quote_type: 'PROVIDER_QUOTE' | 'REFERENCE_RATE';
+  quote_type: 'PROVIDER_QUOTE';
 };
 
 export type MacroSymbolBias = {
@@ -69,10 +69,15 @@ export type MacroContextPayload = {
     governanceVerified: boolean;
   };
   daily_governance: {
-    state: 'NOT_CONNECTED_TO_SERVER';
-    trades_taken: null;
-    losses: null;
-    locked: null;
+    state: 'NOT_CONNECTED_TO_SERVER' | 'CONNECTED_GOVERNANCE_UNVERIFIED' | 'VERIFIED_FROM_MT5_HEARTBEAT';
+    trades_taken: number | null;
+    losses: number | null;
+    rolling_7d_drawdown_pct: number | null;
+    drawdown_sample_count: number;
+    daily_stats_time_basis: 'BROKER_SERVER_DAY' | null;
+    heartbeat_received_at_utc: string | null;
+    governance_verified: boolean;
+    locked: boolean;
     authority: 'MT5_ACCOUNT_SIDE_ENFORCEMENT_REQUIRED';
   };
   calendar_verified: boolean;
