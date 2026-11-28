@@ -32,8 +32,9 @@ function isFresh(date: string | undefined, maxAgeDays: number): boolean {
 }
 
 function readiness(calendarVerified: boolean, eventLockout: boolean): Candidate['tradeReadiness'] {
+  if (!calendarVerified) return 'BLOCKED_CALENDAR_UNAVAILABLE';
   if (eventLockout) return 'BLOCKED_EVENT_LOCKOUT';
-  return calendarVerified ? 'AWAIT_TECHNICAL_CONFIRMATION' : 'BLOCKED_CALENDAR_UNAVAILABLE';
+  return 'AWAIT_TECHNICAL_CONFIRMATION';
 }
 
 export async function GET() {
