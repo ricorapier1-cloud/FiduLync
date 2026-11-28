@@ -162,3 +162,11 @@ test('market quote aggregation never substitutes daily reference rates or mixes 
   assert.match(marketFeeds, /installation\.status/);
   assert.match(marketFeeds, /now - quoteTime > 30_000/);
 });
+
+test('calendar feed freshness is mandatory for event-risk clearance', () => {
+  assert.match(macroEngine, /calendarRetrievedAt/);
+  assert.match(macroEngine, /isObservationFresh\(snapshot\.calendarRetrievedAt, 60 \* 60_000\)/);
+  assert.doesNotMatch(macroData, /getCachedData\('macro:fair-economy-calendar'/);
+  assert.match(macroData, /snapshot\.calendarRetrievedAt = new Date\(\)\.toISOString\(\)/);
+  assert.match(macroContextApi, /high_impact_lockout: !calendarVerified/);
+});
