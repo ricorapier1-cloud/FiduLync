@@ -12,6 +12,7 @@ input int    InpHistoryDays = 90;
 input int    InpMaxDealsPerSync = 500;
 
 datetime g_lastHistorySync = 0;
+datetime g_lastCandleSync = 0;
 input int    InpRequestTimeoutMs = 10000;
 
 string JsonEscape(string value)
@@ -245,7 +246,7 @@ string AppendCandleSeries(string symbol, ENUM_TIMEFRAMES timeframe, string timef
    return json;
 }
 
-string BuildCandles()
+string BuildCandles(bool fullHistory)
 {
    string json = "[";
    bool first = true;
@@ -257,8 +258,8 @@ string BuildCandles()
       StringTrimLeft(brokerSymbol);
       StringTrimRight(brokerSymbol);
       if(StringLen(brokerSymbol) < 6 || !SymbolSelect(brokerSymbol, true)) continue;
-      json = AppendCandleSeries(brokerSymbol, PERIOD_M5, "M5", 150, json, first);
-      json = AppendCandleSeries(brokerSymbol, PERIOD_D1, "D1", 30, json, first);
+      json = AppendCandleSeries(brokerSymbol, PERIOD_M5, "M5", fullHistory ? 150 : 3, json, first);
+      json = AppendCandleSeries(brokerSymbol, PERIOD_D1, "D1", fullHistory ? 30 : 1, json, first);
    }
    json += "]";
    return json;
@@ -375,7 +376,7 @@ string BuildDeals()
    return json;
 }
 
-string BuildPayload(bool includeHistory)
+string BuildPayload(bool includeHistory, bool includeCandles, bool fullCandleHistory)
 {
    string account = "{";
    account += "\"login\":\"" + (string)AccountInfoInteger(ACCOUNT_LOGIN) + "\",";
@@ -406,7 +407,7 @@ string BuildPayload(bool includeHistory)
    string deals = includeHistory ? BuildDeals() : "[]";
    return "{\"account\":" + account + ",\"positions\":" + BuildPositions()
       + ",\"deals\":" + deals + ",\"quotes\":" + BuildQuotes()
-      + ",\"candles\":" + BuildCandles()
+      + ",\"candles\":" + (includeCandles ? BuildCandles(fullCandleHistory) : "[]")
       + ",\"dailyClosedTrades\":" + IntegerToString(dailyClosedTrades)
       + ",\"dailyLosses\":" + IntegerToString(dailyLosses)
       + ",\"dailyStatsTimeBasis\":\"BROKER_SERVER_DAY\""
@@ -415,7 +416,7 @@ string BuildPayload(bool includeHistory)
       + ",\"openCurrencyLegs\":" + BuildOpenCurrencyLegs() + "}";
 }
 
-bool PublishAccount(bool includeHistory)
+bool PublishAccount(bool includeHistory, bool includeCandles, bool fullCandleHistory)
 {
    if(StringLen(InpAccountIngestToken) < 32)
    {
@@ -423,7 +424,7 @@ bool PublishAccount(bool includeHistory)
       return false;
    }
 
-   string body = BuildPayload(includeHistory);
+   string body = BuildPayload(includeHistory, includeCandles, fullCandleHistory);
    char data[];
    int copied = StringToCharArray(body, data, 0, WHOLE_ARRAY, CP_UTF8);
    if(copied <= 1) return false;
@@ -462,7 +463,8 @@ int OnInit()
    }
    EventSetTimer((int)MathMax(5, InpSyncIntervalSeconds));
    g_lastHistorySync = TimeCurrent();
-   PublishAccount(true);
+   g_lastCandleSync = TimeCurrent();
+   PublishAccount(true, true, true);
    return INIT_SUCCEEDED;
 }
 
@@ -476,6 +478,9 @@ void OnTimer()
    datetime now = TimeCurrent();
    bool includeHistory = g_lastHistorySync == 0
       || (now > g_lastHistorySync && now - g_lastHistorySync >= MathMax(60, InpHistorySyncIntervalSeconds));
+   bool includeCandles = g_lastCandleSync == 0
+      || (now > g_lastCandleSync && now - g_lastCandleSync >= MathMax(60, InpHistorySyncIntervalSeconds));
    if(includeHistory) g_lastHistorySync = now;
-   PublishAccount(includeHistory);
+   if(includeCandles) g_lastCandleSync = now;
+   PublishAccount(includeHistory, includeCandles, false);
 }
