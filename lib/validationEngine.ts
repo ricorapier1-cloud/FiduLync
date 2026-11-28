@@ -198,7 +198,8 @@ export function evaluateResearchObjectives(
   else if (evidence.maxDrawdownPct !== null && Number.isFinite(evidence.maxDrawdownPct)
     && evidence.maxDrawdownPct > evidence.approvedMaxDrawdownPct) blockers.push('DRAWDOWN_EXCEEDS_APPROVED_LIMIT');
   if (metrics && metrics.expectancyR <= 0) blockers.push('OOS_NET_EXPECTANCY_NOT_POSITIVE');
-  if (metrics && metrics.winRateWilson95.lower < QUANT_CORE_RESEARCH_OBJECTIVES.winRateTargetMin) blockers.push('WIN_RATE_95_PERCENT_LOWER_BOUND_BELOW_60_PERCENT');
+  if (metrics && metrics.winRate < QUANT_CORE_RESEARCH_OBJECTIVES.winRateTargetMin) blockers.push('OBSERVED_WIN_RATE_BELOW_60_PERCENT');
+  else if (metrics && metrics.winRateWilson95.lower < QUANT_CORE_RESEARCH_OBJECTIVES.winRateTargetMin) blockers.push('WIN_RATE_TARGET_NOT_STATISTICALLY_CONFIRMED');
   if (metrics && (metrics.realizedRewardRisk === null
     || metrics.realizedRewardRisk < QUANT_CORE_RESEARCH_OBJECTIVES.plannedRewardRisk)) blockers.push('REALIZED_NET_REWARD_RISK_BELOW_1_TO_2');
 
@@ -210,7 +211,8 @@ export function evaluateResearchObjectives(
   const eligible = blockers.length === 0;
   const evidenceMissing = blockers.some((blocker) => blocker.includes('MISSING') || blocker.includes('NOT_PASSED')
     || blocker.includes('NOT_UNTOUCHED') || blocker.includes('NOT_APPLIED') || blocker.includes('BELOW_300')
-    || blocker.includes('TIMESTAMPS') || blocker.includes('INVALID') || blocker.includes('UTC'));
+    || blocker.includes('TIMESTAMPS') || blocker.includes('INVALID') || blocker.includes('UTC')
+    || blocker.includes('NOT_STATISTICALLY_CONFIRMED'));
   const status = eligible ? 'VALIDATED' : evidenceMissing ? 'NOT_VALIDATED'
     : blockers.some((blocker) => blocker.includes('BELOW') || blocker.includes('NOT_POSITIVE') || blocker.includes('EXCEEDS'))
       ? 'REJECTED' : 'INSUFFICIENT_EVIDENCE';
