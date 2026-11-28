@@ -235,7 +235,7 @@ export type MarketQuote = {
   price: number;
   changePercent: number | null;
   timestamp: string;
-  source: 'mt5' | 'finnhub' | 'frankfurter' | 'exchangerate-api' | 'gold-api';
+  source: 'mt5' | 'finnhub';
 };
 
 export type ResearchHypothesis = {
