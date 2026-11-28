@@ -173,11 +173,11 @@ export default function AccountsPage() {
       setLedgerError('Enter a valid numeric profit amount.');
       return;
     }
-    const rNum = newRMultiple.trim() ? parseFloat(newRMultiple) : profitNum >= 0 ? profitNum / 100 : profitNum / 100;
+    const rNum = newRMultiple.trim() ? parseFloat(newRMultiple) : NaN;
     const slipNum = newSlippage.trim() ? parseFloat(newSlippage) : NaN;
     const volNum = newVolume.trim() ? parseFloat(newVolume) : NaN;
-    if (!Number.isFinite(volNum) || volNum <= 0 || !Number.isFinite(slipNum) || slipNum < 0) {
-      setLedgerError('Enter the actual traded volume and observed slippage before recording this trade.');
+    if (!Number.isFinite(rNum) || !Number.isFinite(volNum) || volNum <= 0 || !Number.isFinite(slipNum) || slipNum < 0) {
+      setLedgerError('Enter the actual traded volume, realized R-multiple and observed slippage before recording this trade.');
       return;
     }
 
@@ -189,7 +189,7 @@ export default function AccountsPage() {
       direction: newDirection,
       volume: volNum,
       profit: profitNum,
-      rUnits: Number.isFinite(rNum) ? rNum : profitNum >= 0 ? 1.0 : -1.0,
+      rUnits: rNum,
       slippagePips: slipNum,
       ruleAdhered: newRuleAdhered,
     };
@@ -699,7 +699,7 @@ export default function AccountsPage() {
                 value={newVolume}
                 onChange={(e) => setNewVolume(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white"
-                placeholder="0.10"
+                placeholder="Enter actual lots"
               />
             </div>
 
@@ -724,7 +724,8 @@ export default function AccountsPage() {
                 value={newRMultiple}
                 onChange={(e) => setNewRMultiple(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white"
-                placeholder="+2.0 or -1.0"
+                placeholder="Enter observed R"
+                required
               />
             </div>
 
@@ -736,7 +737,8 @@ export default function AccountsPage() {
                 value={newSlippage}
                 onChange={(e) => setNewSlippage(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white"
-                placeholder="0.3"
+                placeholder="Enter observed pips"
+                required
               />
             </div>
 

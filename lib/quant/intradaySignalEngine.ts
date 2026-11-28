@@ -27,7 +27,7 @@ export type IntradaySignal = {
   session: 'LONDON' | 'NEW_YORK' | 'CLOSED';
   dataAsOfUtc: string | null;
   blockers: string[];
-  spreadBaselineStatus?: 'CONFIGURED_REFERENCE' | 'AVAILABLE' | 'UNAVAILABLE';
+  spreadBaselineStatus?: 'AVAILABLE' | 'UNAVAILABLE';
   spreadBaselineObservations?: number;
   spreadMultipleOfBaseline?: number | null;
   sovereignShieldStatus?: MarketRiskShieldResult['status'] | null;

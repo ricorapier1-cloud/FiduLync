@@ -10,6 +10,7 @@ export type TradeInput = {
   profit: number;
   commission?: number;
   swap?: number;
+  fee?: number;
   slippagePips?: number;
   rMultiple?: number;
   ruleAdhered?: boolean;
@@ -21,7 +22,7 @@ export type WalkForwardMetrics = {
   profitFactor: number;
   netProfit: number;
   maxDrawdownPct: number;
-  expectancyR: number;
+  expectancyR: number | null;
 };
 
 export type WalkForwardAnalysis = {
@@ -41,86 +42,64 @@ export type MonteCarloSimulationResult = {
   worstCaseDrawdownPct: number;
   probabilityOfRuinPct: number;
   sovereignShieldSurvivalRatePct: number;
-  stressParameters: {
-    randomOrderShuffling: true;
-    spreadWideningPct: 50;
-    slippageShockRangePips: [0.5, 2.0];
-  };
+  stressParameters: { randomOrderShuffling: true };
 };
 
-function calculateMetrics(trades: TradeInput[], initialBalance = 10_000): WalkForwardMetrics {
-  if (trades.length === 0) {
-    return {
-      tradesCount: 0,
-      winRatePct: 0,
-      profitFactor: 0,
-      netProfit: 0,
-      maxDrawdownPct: 0,
-      expectancyR: 0,
-    };
-  }
+const netPnl = (trade: TradeInput) =>
+  trade.profit + (trade.commission ?? 0) + (trade.swap ?? 0) + (trade.fee ?? 0);
 
+function calculateMetrics(trades: TradeInput[], initialBalance: number): WalkForwardMetrics {
+  if (!Number.isFinite(initialBalance) || initialBalance <= 0) {
+    throw new Error('A verified positive starting balance is required for drawdown calculations.');
+  }
+  if (trades.length === 0) {
+    return { tradesCount: 0, winRatePct: 0, profitFactor: 0, netProfit: 0, maxDrawdownPct: 0, expectancyR: null };
+  }
   let grossWins = 0;
   let grossLosses = 0;
   let winsCount = 0;
   let runningEquity = initialBalance;
   let peakEquity = initialBalance;
   let maxDd = 0;
-  let sumR = 0;
+  let rTotal = 0;
+  let rCount = 0;
 
   for (const trade of trades) {
-    const net = trade.profit + (trade.commission ?? 0) + (trade.swap ?? 0);
-    if (net > 0) {
-      grossWins += net;
-      winsCount++;
-    } else {
-      grossLosses += Math.abs(net);
-    }
-
+    const net = netPnl(trade);
+    if (net > 0) { grossWins += net; winsCount++; }
+    else if (net < 0) grossLosses += Math.abs(net);
     runningEquity += net;
     if (runningEquity > peakEquity) peakEquity = runningEquity;
-    const dd = peakEquity > 0 ? ((peakEquity - runningEquity) / peakEquity) * 100 : 0;
-    if (dd > maxDd) maxDd = dd;
-
-    const r = typeof trade.rMultiple === 'number' && Number.isFinite(trade.rMultiple)
-      ? trade.rMultiple
-      : net >= 0 ? net / 100 : net / 100;
-    sumR += r;
+    const drawdown = peakEquity > 0 ? ((peakEquity - runningEquity) / peakEquity) * 100 : 0;
+    maxDd = Math.max(maxDd, drawdown);
+    if (typeof trade.rMultiple === 'number' && Number.isFinite(trade.rMultiple)) {
+      rTotal += trade.rMultiple;
+      rCount++;
+    }
   }
-
-  const profitFactor = grossLosses > 0 ? Number((grossWins / grossLosses).toFixed(2)) : grossWins > 0 ? 99.9 : 0;
-  const winRatePct = Number(((winsCount / trades.length) * 100).toFixed(1));
-  const netProfit = Number((runningEquity - initialBalance).toFixed(2));
-  const maxDrawdownPct = Number(maxDd.toFixed(2));
-  const expectancyR = Number((sumR / trades.length).toFixed(2));
 
   return {
     tradesCount: trades.length,
-    winRatePct,
-    profitFactor,
-    netProfit,
-    maxDrawdownPct,
-    expectancyR,
+    winRatePct: Number(((winsCount / trades.length) * 100).toFixed(1)),
+    profitFactor: grossLosses > 0 ? Number((grossWins / grossLosses).toFixed(2)) : grossWins > 0 ? 99.9 : 0,
+    netProfit: Number((runningEquity - initialBalance).toFixed(2)),
+    maxDrawdownPct: Number(maxDd.toFixed(2)),
+    expectancyR: rCount === trades.length ? Number((rTotal / trades.length).toFixed(2)) : null,
   };
 }
 
-export function runWalkForwardAnalysis(trades: TradeInput[], inSampleRatio = 0.7): WalkForwardAnalysis {
-  if (trades.length < 5) {
-    const zeroMetrics: WalkForwardMetrics = {
-      tradesCount: 0,
-      winRatePct: 0,
-      profitFactor: 0,
-      netProfit: 0,
-      maxDrawdownPct: 0,
-      expectancyR: 0,
-    };
+export function runWalkForwardAnalysis(
+  trades: TradeInput[],
+  initialBalance: number,
+  inSampleRatio = 0.7,
+): WalkForwardAnalysis {
+  const zeroMetrics: WalkForwardMetrics = {
+    tradesCount: 0, winRatePct: 0, profitFactor: 0, netProfit: 0, maxDrawdownPct: 0, expectancyR: null,
+  };
+  if (!Number.isFinite(initialBalance) || initialBalance <= 0 || trades.length < 5) {
     return {
-      totalTrades: trades.length,
-      inSampleTrades: 0,
-      outOfSampleTrades: 0,
-      inSample: zeroMetrics,
-      outOfSample: zeroMetrics,
-      walkForwardEfficiencyPct: 0,
+      totalTrades: trades.length, inSampleTrades: 0, outOfSampleTrades: 0,
+      inSample: zeroMetrics, outOfSample: zeroMetrics, walkForwardEfficiencyPct: 0,
       status: 'INSUFFICIENT_SAMPLE',
     };
   }
@@ -128,12 +107,10 @@ export function runWalkForwardAnalysis(trades: TradeInput[], inSampleRatio = 0.7
   const splitIndex = Math.floor(trades.length * inSampleRatio);
   const inSampleTrades = trades.slice(0, splitIndex);
   const outOfSampleTrades = trades.slice(splitIndex);
-
-  const inSample = calculateMetrics(inSampleTrades);
-  const outOfSample = calculateMetrics(outOfSampleTrades);
-
+  const inSample = calculateMetrics(inSampleTrades, initialBalance);
+  const outOfSample = calculateMetrics(outOfSampleTrades, initialBalance);
   let wfe = 0;
-  if (inSample.expectancyR > 0) {
+  if (inSample.expectancyR !== null && inSample.expectancyR > 0 && outOfSample.expectancyR !== null) {
     wfe = Number(((outOfSample.expectancyR / inSample.expectancyR) * 100).toFixed(1));
   } else if (inSample.profitFactor > 1.0) {
     wfe = Number(((outOfSample.profitFactor / inSample.profitFactor) * 100).toFixed(1));
@@ -141,152 +118,104 @@ export function runWalkForwardAnalysis(trades: TradeInput[], inSampleRatio = 0.7
 
   let status: WalkForwardAnalysis['status'] = 'INSUFFICIENT_SAMPLE';
   if (trades.length >= 20) {
-    if (wfe >= 60 && outOfSample.profitFactor >= 1.2) {
-      status = 'ROBUST_EDGE';
-    } else if (wfe >= 30 && outOfSample.profitFactor >= 1.0) {
-      status = 'MODERATE_DEGRADATION';
-    } else {
-      status = 'OVERFITTED_FAILURE';
-    }
+    status = wfe >= 60 && outOfSample.profitFactor >= 1.2
+      ? 'ROBUST_EDGE'
+      : wfe >= 30 && outOfSample.profitFactor >= 1.0
+        ? 'MODERATE_DEGRADATION'
+        : 'OVERFITTED_FAILURE';
   }
-
   return {
-    totalTrades: trades.length,
-    inSampleTrades: inSampleTrades.length,
-    outOfSampleTrades: outOfSampleTrades.length,
-    inSample,
-    outOfSample,
-    walkForwardEfficiencyPct: Math.max(0, wfe),
-    status,
+    totalTrades: trades.length, inSampleTrades: inSampleTrades.length, outOfSampleTrades: outOfSampleTrades.length,
+    inSample, outOfSample, walkForwardEfficiencyPct: Math.max(0, wfe), status,
   };
 }
 
 export function runMonteCarloStressSimulation(
   trades: TradeInput[],
+  initialBalance: number,
   iterations = 1000,
-  initialBalance = 10_000,
 ): MonteCarloSimulationResult {
+  if (!Number.isFinite(initialBalance) || initialBalance <= 0) {
+    throw new Error('A verified positive starting balance is required for Monte Carlo drawdown calculations.');
+  }
+  if (!Number.isInteger(iterations) || iterations < 1) throw new Error('Iterations must be a positive integer.');
   if (trades.length === 0) {
     return {
-      totalRuns: 0,
-      ninetyFifthPercentileDrawdownPct: 0,
-      medianDrawdownPct: 0,
-      worstCaseDrawdownPct: 0,
-      probabilityOfRuinPct: 0,
-      sovereignShieldSurvivalRatePct: 0,
-      stressParameters: {
-        randomOrderShuffling: true,
-        spreadWideningPct: 50,
-        slippageShockRangePips: [0.5, 2.0],
-      },
+      totalRuns: 0, ninetyFifthPercentileDrawdownPct: 0, medianDrawdownPct: 0,
+      worstCaseDrawdownPct: 0, probabilityOfRuinPct: 0, sovereignShieldSurvivalRatePct: 0,
+      stressParameters: { randomOrderShuffling: true },
     };
   }
 
-  const n = trades.length;
   const drawdowns: number[] = [];
   let ruinCount = 0;
   let survivalCount = 0;
-
   for (let run = 0; run < iterations; run++) {
-    let runningEquity = initialBalance;
-    let peakEquity = initialBalance;
-    let maxDdThisRun = 0;
-    let hitSovereignFloor = false;
-
-    for (let i = 0; i < n; i++) {
-      // Bootstrap with replacement (randomized trade order)
-      const randomIndex = Math.floor(Math.random() * n);
-      const baseTrade = trades[randomIndex];
-
-      // Stress factor 1: +50% spread widening
-      const spreadPenalty = baseTrade.volume > 0 ? (baseTrade.volume * 10.0 * 0.5) : 1.5;
-
-      // Stress factor 2: slippage shock (0.5 to 2.0 pips adverse)
-      const slippagePips = 0.5 + Math.random() * 1.5;
-      const slippagePenalty = baseTrade.volume > 0 ? (slippagePips * baseTrade.volume * 10.0) : (slippagePips * 1.0);
-
-      const netProfitStressed = baseTrade.profit - spreadPenalty - slippagePenalty;
-
-      runningEquity += netProfitStressed;
-      if (runningEquity > peakEquity) peakEquity = runningEquity;
-
-      const currentDd = peakEquity > 0 ? ((peakEquity - runningEquity) / peakEquity) * 100 : 0;
-      if (currentDd > maxDdThisRun) maxDdThisRun = currentDd;
-
-      // Sovereign Shield drawdown floor check (10% total balance breach or -4% single sequence)
-      if (currentDd >= 10.0) {
-        hitSovereignFloor = true;
-      }
+    let equity = initialBalance;
+    let peak = initialBalance;
+    let maxDrawdown = 0;
+    let breachedShieldFloor = false;
+    for (let i = 0; i < trades.length; i++) {
+      const trade = trades[Math.floor(Math.random() * trades.length)];
+      equity += netPnl(trade);
+      peak = Math.max(peak, equity);
+      const drawdown = peak > 0 ? ((peak - equity) / peak) * 100 : 100;
+      maxDrawdown = Math.max(maxDrawdown, drawdown);
+      if (drawdown >= 10) breachedShieldFloor = true;
     }
-
-    drawdowns.push(maxDdThisRun);
-
-    // Probability of Ruin threshold: drawdown >= 20%
-    if (maxDdThisRun >= 20.0) {
-      ruinCount++;
-    }
-
-    if (!hitSovereignFloor) {
-      survivalCount++;
-    }
+    drawdowns.push(maxDrawdown);
+    if (maxDrawdown >= 20) ruinCount++;
+    if (!breachedShieldFloor) survivalCount++;
   }
-
   drawdowns.sort((a, b) => a - b);
-  const p95Index = Math.min(drawdowns.length - 1, Math.floor(iterations * 0.95));
-  const p50Index = Math.floor(iterations * 0.5);
-
-  const ninetyFifthPercentileDrawdownPct = Number((drawdowns[p95Index] ?? 0).toFixed(2));
-  const medianDrawdownPct = Number((drawdowns[p50Index] ?? 0).toFixed(2));
-  const worstCaseDrawdownPct = Number((drawdowns[drawdowns.length - 1] ?? 0).toFixed(2));
-  const probabilityOfRuinPct = Number(((ruinCount / iterations) * 100).toFixed(1));
-  const sovereignShieldSurvivalRatePct = Number(((survivalCount / iterations) * 100).toFixed(1));
-
+  const p95 = drawdowns[Math.min(drawdowns.length - 1, Math.floor(iterations * 0.95))] ?? 0;
+  const median = drawdowns[Math.floor(drawdowns.length * 0.5)] ?? 0;
   return {
     totalRuns: iterations,
-    ninetyFifthPercentileDrawdownPct,
-    medianDrawdownPct,
-    worstCaseDrawdownPct,
-    probabilityOfRuinPct,
-    sovereignShieldSurvivalRatePct,
-    stressParameters: {
-      randomOrderShuffling: true,
-      spreadWideningPct: 50,
-      slippageShockRangePips: [0.5, 2.0],
-    },
+    ninetyFifthPercentileDrawdownPct: Number(p95.toFixed(2)),
+    medianDrawdownPct: Number(median.toFixed(2)),
+    worstCaseDrawdownPct: Number((drawdowns[drawdowns.length - 1] ?? 0).toFixed(2)),
+    probabilityOfRuinPct: Number(((ruinCount / iterations) * 100).toFixed(1)),
+    sovereignShieldSurvivalRatePct: Number(((survivalCount / iterations) * 100).toFixed(1)),
+    stressParameters: { randomOrderShuffling: true },
   };
 }
 
 export function parseMt5ReportCsv(csvText: string): TradeInput[] {
-  const lines = csvText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const lines = csvText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (lines.length < 2) return [];
+  const delimiter = lines[0].includes('\t') ? '\t' : lines[0].includes(';') ? ';' : ',';
+  const parseRow = (line: string) => line.split(delimiter).map((cell) => cell.replace(/^["']|["']$/g, '').trim());
+  const headers = parseRow(lines[0]).map((header) => header.toLowerCase().replace(/[_-]+/g, ' '));
+  const indexOf = (pattern: RegExp) => headers.findIndex((header) => pattern.test(header));
+  const ticketIndex = indexOf(/ticket|deal|order/);
+  const symbolIndex = indexOf(/symbol|instrument/);
+  const directionIndex = indexOf(/type|direction|side/);
+  const volumeIndex = indexOf(/volume|lots?|size/);
+  const profitIndex = indexOf(/^profit$|net profit|p\/l|profit/);
+  const commissionIndex = indexOf(/commission/);
+  const swapIndex = indexOf(/swap/);
+  const feeIndex = indexOf(/^fee$|fees/);
+  const rIndex = indexOf(/^r$|r multiple|rmultiple|r units/);
+  if ([ticketIndex, symbolIndex, directionIndex, volumeIndex, profitIndex].some((index) => index < 0)) return [];
+
   const trades: TradeInput[] = [];
-
-  for (const line of lines) {
-    // Look for CSV rows with profit, volume, symbol
-    const cols = line.split(/[;,\t]/).map((c) => c.replace(/["']/g, '').trim());
-    if (cols.length < 5) continue;
-
-    // Check if row has numeric profit and volume
-    const numericCols = cols.map((c) => parseFloat(c)).filter((n) => Number.isFinite(n));
-    if (numericCols.length < 2) continue;
-
-    // Search for ticket, symbol, type, profit
-    const symbolIndex = cols.findIndex((c) => /^(EURUSD|USDJPY|XAUUSD|GBPUSD|AUDUSD|USDCAD|USDCHF|NZDUSD)$/i.test(c));
-    const profitCol = cols.find((c, idx) => idx > 3 && Number.isFinite(parseFloat(c)) && !isNaN(Number(c)));
-
-    if (symbolIndex !== -1 && profitCol !== undefined) {
-      const profit = parseFloat(profitCol);
-      const symbol = cols[symbolIndex].toUpperCase();
-      const type = cols.some((c) => /buy/i.test(c)) ? 'BUY' : 'SELL';
-      trades.push({
-        ticket: trades.length + 1,
-        symbol,
-        direction: type,
-        volume: 0.1,
-        profit,
-        rMultiple: profit > 0 ? Number((profit / 50).toFixed(2)) : -1.0,
-      });
-    }
+  for (const line of lines.slice(1)) {
+    const cols = parseRow(line);
+    const ticket = cols[ticketIndex];
+    const symbol = (cols[symbolIndex] ?? '').toUpperCase();
+    const side = (cols[directionIndex] ?? '').toLowerCase();
+    const volume = Number(cols[volumeIndex]);
+    const profit = Number(cols[profitIndex]);
+    if (!ticket || !/^(EURUSD|USDJPY|XAUUSD|GBPUSD|AUDUSD|USDCAD|USDCHF|NZDUSD)$/i.test(symbol)
+      || (!side.includes('buy') && !side.includes('sell'))
+      || !Number.isFinite(volume) || volume <= 0 || !Number.isFinite(profit)) continue;
+    const optionalNumber = (index: number) => index >= 0 && Number.isFinite(Number(cols[index])) ? Number(cols[index]) : undefined;
+    trades.push({
+      ticket, symbol, direction: side.includes('buy') ? 'BUY' : 'SELL', volume, profit,
+      commission: optionalNumber(commissionIndex), swap: optionalNumber(swapIndex), fee: optionalNumber(feeIndex),
+      rMultiple: optionalNumber(rIndex),
+    });
   }
-
   return trades;
 }

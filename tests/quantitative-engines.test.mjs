@@ -722,19 +722,15 @@ test('provider health includes real EIA and Treasury observation dates and BIS-b
 });
 
 
-test('spread blowout protection uses a disclosed configured reference until a measured same-session Redis median is available', () => {
+test('spread blowout protection requires measured same-session Redis history and never substitutes configured references', () => {
   const baseline = read('../lib/quant/spreadBaseline.ts');
   const route = read('../app/api/v1/intraday-signals/route.ts');
   const desk = read('../app/components/DeskTerminal.tsx');
   assert.match(baseline, /redis\.lpush/);
   assert.match(baseline, /redis\.lrange/);
   assert.match(baseline, /values\.length >= 20/);
-  assert.match(baseline, /EURUSD: 0\.00018/);
-  assert.match(baseline, /GBPUSD: 0\.00022/);
-  assert.match(baseline, /USDJPY: 0\.020/);
-  assert.match(baseline, /XAUUSD: 0\.85/);
-  assert.match(baseline, /GBPJPY: 0\.030/);
-  assert.match(baseline, /CONFIGURED_REFERENCE/);
+  assert.doesNotMatch(baseline, /REFERENCE_SPREADS|CONFIGURED_REFERENCE|0\.00018|0\.00022|0\.020|0\.85/);
+  assert.match(baseline, /values\.length < 20/);
   assert.match(baseline, /spread \/ medianSpread/);
   assert.match(route, /recordAndEvaluateSpreadBaseline/);
   assert.match(route, /quote\?\.freshness === 'LIVE' \? quote\.spread : null/);
@@ -855,5 +851,10 @@ test('production UI fails closed on unconfigured account balance and never seeds
   assert.match(accounts, /currentEquityNumber = selected[\\s\\S]*: null/);
   assert.match(accounts, /NOT CONFIGURED · CONNECT A VERIFIED MT5 ACCOUNT/);
   assert.doesNotMatch(accounts, /selected \\? Number\\(selected\\.equity\\) : 10000/);
+  const validationEngine = read('../lib/quant/monteCarloEngine.ts');
+  const validationPage = read('../app/validation/page.tsx');
+  assert.doesNotMatch(validationEngine, /initialBalance = 10_000|volume: 0\.1|profit \/ 50|net \/ 100/);
+  assert.match(validationPage, /NO VERIFIED TRADE HISTORY — IMPORT MT5 REPORT OR LOG REAL TRADES TO RUN MONTE CARLO/);
+  assert.match(validationPage, /startingBalance === null/);
   assert.match(accounts, /useState<ManualTrade\\[]>\\(\\[\\]\\)/);
 });

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import {
   runWalkForwardAnalysis,
@@ -16,6 +16,45 @@ export default function ValidationPage() {
   const [dataSourceName, setDataSourceName] = useState<string | null>(null);
   const [rawCsvText, setRawCsvText] = useState('');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [startingBalance, setStartingBalance] = useState<number | null>(null);
+  const [startingBalanceInput, setStartingBalanceInput] = useState('');
+  useEffect(() => {
+    const raw = window.localStorage.getItem('macrolinc-manual-account-balance-v1');
+    const modeEnabled = window.localStorage.getItem('fidulync-manual-desk-mode-v1') === 'true';
+    if (!modeEnabled || !raw) return;
+    try {
+      const saved = JSON.parse(raw) as { balance?: number };
+      if (typeof saved.balance === 'number' && Number.isFinite(saved.balance) && saved.balance > 0) {
+        setStartingBalance(saved.balance);
+        setStartingBalanceInput(String(saved.balance));
+      }
+    } catch {
+      setStartingBalance(null);
+      setStartingBalanceInput('');
+    }
+  }, []);
+  const saveStartingBalance = () => {
+    const value = Number(startingBalanceInput);
+    if (window.localStorage.getItem('fidulync-manual-desk-mode-v1') !== 'true') {
+      setStatusMessage('Enable Verified Manual Desk Mode before saving a user-attested starting balance.');
+      return;
+    }
+    if (!Number.isFinite(value) || value <= 0) {
+      setStartingBalance(null);
+      setStatusMessage('Enter a valid positive real starting balance.');
+      return;
+    }
+    try {
+      window.localStorage.setItem('macrolinc-manual-account-balance-v1', JSON.stringify({
+        balance: value, currency: 'USD', savedAtUtc: new Date().toISOString(), source: 'USER_ATTESTED_MANUAL',
+      }));
+      setStartingBalance(value);
+      setStatusMessage(null);
+    } catch {
+      setStartingBalance(null);
+      setStatusMessage('Browser storage unavailable. Starting balance remains unverified.');
+    }
+  };
 
   // Load from verified browser manual ledger if available
   const handleLoadManualLedger = () => {
@@ -29,8 +68,9 @@ export default function ValidationPage() {
         ticket: string | number;
         symbol: string;
         direction: 'BUY' | 'SELL';
-        volume: number;
+        volume?: number;
         profit: number;
+        rUnits?: number;
         rMultiple?: number;
       }>;
 
@@ -39,14 +79,23 @@ export default function ValidationPage() {
         return;
       }
 
-      const formatted: TradeInput[] = parsed.map((t, idx) => ({
-        ticket: t.ticket || idx + 1,
-        symbol: t.symbol,
-        direction: t.direction,
-        volume: t.volume || 0.1,
-        profit: t.profit,
-        rMultiple: t.rMultiple,
-      }));
+      const formatted: TradeInput[] = parsed
+        .filter((trade) => trade.ticket !== undefined && trade.ticket !== null
+          && typeof trade.volume === 'number' && Number.isFinite(trade.volume) && trade.volume > 0
+          && Number.isFinite(trade.profit))
+        .map((trade) => ({
+          ticket: trade.ticket,
+          symbol: trade.symbol,
+          direction: trade.direction,
+          volume: trade.volume as number,
+          profit: trade.profit,
+          rMultiple: typeof trade.rUnits === 'number' && Number.isFinite(trade.rUnits)
+            ? trade.rUnits : trade.rMultiple,
+        }));
+      if (formatted.length === 0) {
+        setStatusMessage('Manual ledger has no trades with actual ticket, volume and net P&L evidence.');
+        return;
+      }
 
       setTrades(formatted);
       setDataSourceName(`Verified Manual Ledger (${formatted.length} trades)`);
@@ -90,13 +139,15 @@ export default function ValidationPage() {
 
   const walkForward = useMemo(() => {
     if (trades.length === 0) return null;
-    return runWalkForwardAnalysis(trades, 0.7);
-  }, [trades]);
+    if (trades.length < 20 || startingBalance === null) return null;
+    return runWalkForwardAnalysis(trades, startingBalance, 0.7);
+  }, [trades, startingBalance]);
 
   const monteCarlo = useMemo(() => {
     if (trades.length === 0) return null;
-    return runMonteCarloStressSimulation(trades, 1000);
-  }, [trades]);
+    if (startingBalance === null) return null;
+    return runMonteCarloStressSimulation(trades, startingBalance, 1000);
+  }, [trades, startingBalance]);
 
   return (
     <main className="min-h-screen bg-[#07090e] text-slate-100 p-4 md:p-8 font-mono">
@@ -128,7 +179,7 @@ export default function ValidationPage() {
               Quantitative Out-of-Sample &amp; Monte Carlo Stress Engine
             </h1>
             <p className="text-xs text-slate-400 mt-1">
-              Strict Zero-Mock Data Integrity: 1,000-iteration bootstrap resampling + 50% spread shock + randomized slippage shock.
+              Bootstrap resampling of imported trade outcomes only. No synthetic spread, slippage or account-balance assumptions.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -217,11 +268,24 @@ export default function ValidationPage() {
           )}
         </div>
 
+        <div className="bg-[#0b0e14] border border-slate-800 rounded-lg p-4 flex flex-wrap items-end gap-3">
+          <div className="flex-1 min-w-[220px]">
+            <label htmlFor="validation-starting-balance" className="block text-xs text-slate-400 mb-1">Verified Manual Starting Balance (USD)</label>
+            <input id="validation-starting-balance" type="number" min="0.01" step="0.01" value={startingBalanceInput}
+              onChange={(event) => setStartingBalanceInput(event.target.value)} placeholder="Enter real $" 
+              className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm text-white" />
+          </div>
+          <button type="button" onClick={saveStartingBalance} disabled={!startingBalanceInput.trim()}
+            className="px-4 py-2 bg-amber-950 border border-amber-700 rounded text-xs font-semibold text-amber-200 disabled:opacity-40">SAVE REAL STARTING BALANCE</button>
+          <span className="text-xs text-slate-400">{startingBalance === null ? 'BALANCE NOT VERIFIED' : 'USER-ATTESTED · BROWSER LOCAL'}</span>
+        </div>
+        {trades.length > 0 && startingBalance === null && <div className="rounded-lg border border-amber-800/60 bg-amber-950/20 p-4 text-xs text-amber-200">NO VERIFIED STARTING BALANCE — SAVE YOUR REAL STARTING BALANCE IN VERIFIED MANUAL DESK MODE BEFORE CALCULATING DRAWDOWN OR MONTE CARLO.</div>}
+        {trades.length > 0 && startingBalance !== null && trades.length < 20 && <div className="rounded-lg border border-slate-700 bg-slate-900/40 p-4 text-xs text-slate-300">INSUFFICIENT VERIFIED TRADE HISTORY — 20 OR MORE RECONCILED TRADES ARE REQUIRED FOR WALK-FORWARD CLASSIFICATION. No performance grade is published.</div>}
         {/* Zero-Mock State Notice */}
         {trades.length === 0 ? (
           <div className="bg-[#0b0e14] border border-dashed border-slate-800 rounded-lg p-8 text-center space-y-3">
             <div className="text-sm font-semibold text-slate-300">
-              No Simulated, Demo or Hardcoded Validation Numbers Published
+              NO VERIFIED TRADE HISTORY — IMPORT MT5 REPORT OR LOG REAL TRADES TO RUN MONTE CARLO
             </div>
             <p className="text-xs text-slate-400 max-w-xl mx-auto leading-relaxed">
               In accordance with the strict zero-mock data integrity rule, historical walk-forward metrics and Monte Carlo stress distributions are only computed against authenticated MT5 backtest CSV records or verified manual ledger journal trades.
@@ -364,10 +428,10 @@ export default function ValidationPage() {
             <div className="bg-[#0b0e14] border border-slate-800 rounded-lg p-5 space-y-4">
               <div className="border-b border-slate-800 pb-3">
                 <h2 className="text-base font-bold text-white">
-                  1,000-Run Monte Carlo Tail-Risk Stress Simulation
+                  1,000-Run Historical Trade-Sequence Bootstrap
                 </h2>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Simulates randomized order sequence shuffling, +50% spread widening shocks, and 0.5–2.0 pip slippage friction.
+                  Resamples only imported, reconciled trade P&L in randomized order. This is a historical sequence sensitivity analysis, not a market forecast.
                 </p>
               </div>
 
@@ -379,7 +443,7 @@ export default function ValidationPage() {
                       {monteCarlo.ninetyFifthPercentileDrawdownPct}%
                     </div>
                     <div className="text-[11px] text-slate-400 mt-1">
-                      Under 1,000 stressed permutations, 95% of runs experienced DD below this value.
+                      95th percentile drawdown across bootstrap sequences of the imported trade outcomes.
                     </div>
                   </div>
 
@@ -417,7 +481,7 @@ export default function ValidationPage() {
 
               <div className="bg-slate-950/60 border border-slate-800/80 rounded p-3 text-xs text-slate-400 flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <span className="text-slate-300 font-semibold">Stress Conditions Applied:</span> Randomized Sequence Shuffling • +50% Spread Widening • 0.5–2.0 Pips Adverse Slippage Shock
+                  <span className="text-slate-300 font-semibold">Stress Conditions Applied:</span> Randomized resampling of recorded net trade outcomes only
                 </div>
                 <div>
                   1,000 Independent Iterations

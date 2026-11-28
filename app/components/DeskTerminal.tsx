@@ -560,7 +560,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
              <p className="mt-1 text-[9px] font-mono text-slate-500">SOVEREIGN SHIELD {signal.sovereignShieldStatus ?? 'UNAVAILABLE'} · MARKET RISK CEILING {signal.marketRiskCeilingPct?.toFixed(2) ?? '—'}%</p>
              {signal.marketShieldFlags && signal.marketShieldFlags.length > 0 && <p className="mt-1 text-[9px] text-amber-300">SHIELD FLAGS {signal.marketShieldFlags.map(explainBlocker).join(' · ')}</p>}
             {signal.blockers.length > 0 && <p className="mt-2 text-[10px] text-amber-300">{signal.blockers.map(explainBlocker).join(' · ')}</p>}
-            <p className="mt-1 text-[9px] text-slate-500">Spread guard: {signal.spreadBaselineStatus === 'CONFIGURED_REFERENCE' ? 'CONFIGURED REFERENCE' : signal.spreadBaselineStatus ?? 'UNAVAILABLE'} · {signal.spreadBaselineObservations ?? 0} observed samples</p>
+            <p className="mt-1 text-[9px] text-slate-500">Spread guard: {signal.spreadBaselineStatus === 'AVAILABLE' ? 'OBSERVED SESSION MEDIAN' : 'LIVE BASELINE UNAVAILABLE'} · {signal.spreadBaselineObservations ?? 0} observed samples</p>
             <p className="mt-3 text-[10px] text-slate-500">Research context only. Your MT5 EA independently validates technical structure and execution.</p>
             {signal.dataAsOfUtc && <small className="mt-2 block text-[9px] text-slate-500">OHLCV {signal.dataAsOfUtc} · {signal.session}</small>}
           </div>;
