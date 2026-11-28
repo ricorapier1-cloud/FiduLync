@@ -1,3 +1,5 @@
+import { RESEARCH_OBJECTIVES } from './researchObjectives';
+
 /**
  * FiduLync seven-stage research pipeline primitives.
  * These functions validate and classify supplied observations; they never invent missing market data.
@@ -194,6 +196,7 @@ export function assessMacroResearchEvidence(evidence: MacroResearchEvidence): {
   eligible: boolean;
   status: 'NOT_VALIDATED' | 'INSUFFICIENT_EVIDENCE' | 'READY_FOR_INDEPENDENT_TRADE_VALIDATION';
   blockers: string[];
+  objectives: typeof RESEARCH_OBJECTIVES;
 } {
   const blockers: string[] = [];
   if (!evidence.pointInTimeReleaseVintagesVerified) blockers.push('POINT_IN_TIME_RELEASE_VINTAGES_UNVERIFIED');
@@ -214,5 +217,6 @@ export function assessMacroResearchEvidence(evidence: MacroResearchEvidence): {
       : blockers.some((blocker) => blocker.includes('UNVERIFIED') || blocker.includes('NOT_UNTOUCHED'))
         ? 'NOT_VALIDATED' : 'INSUFFICIENT_EVIDENCE',
     blockers,
+    objectives: RESEARCH_OBJECTIVES,
   };
 }
