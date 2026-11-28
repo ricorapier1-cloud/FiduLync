@@ -177,7 +177,7 @@ export function getFundamentalSignal(snapshot: MacroSnapshot, pair: string): Fun
     && Number.isSafeInteger(position.sampleSize)
     && Number(position.sampleSize) >= 52
     && typeof position.publishedAt === 'string'
-    && /(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(position.publishedAt)
+    && /(?:Z|[+-]\d{2}:?\d{2})$/i.test(position.publishedAt)
     && isObservationFresh(position.publishedAt, 14 * 24 * 60 * 60_000),
   );
   if (!qualifiedCot(baseCot) || !qualifiedCot(quoteCot)) return null;
