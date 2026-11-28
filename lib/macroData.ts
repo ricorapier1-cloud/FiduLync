@@ -115,9 +115,9 @@ function isCotPosition(value: unknown): value is CotPosition {
     && value.percentile <= 100
     && isFiniteNumber(value.weeklyChange)
     && (value.asOf === undefined || (typeof value.asOf === 'string' && Number.isFinite(Date.parse(value.asOf))))
-    && (value.sampleSize === undefined || (Number.isSafeInteger(value.sampleSize) && Number(value.sampleSize) >= 0))
+    && (value.sampleSize === undefined || (typeof value.sampleSize === 'number' && Number.isSafeInteger(value.sampleSize) && value.sampleSize >= 0))
     && (value.publishedAt === undefined || (typeof value.publishedAt === 'string'
-      && /(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(value.publishedAt)
+      && /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value.publishedAt)
       && Number.isFinite(Date.parse(value.publishedAt))));
 }
 
