@@ -422,7 +422,7 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
                   <p className="text-slate-300 mt-1">
                     {goldContext?.cot.nonCommercialNet === null || goldContext?.cot.nonCommercialNet === undefined
                       ? 'Current CFTC COMEX Gold non-commercial net positioning is unavailable.'
-                      : `COMEX Gold non-commercial net long at ${snapshot.cot.find((item) => item.market === 'GOLD')?.percentile ?? 'unavailable'}th percentile of 3-year range (light speculative crowding).`}
+                      : `COMEX Gold non-commercial net long at ${snapshot.cot.find((item) => item.market === 'GOLD' && item.sampleSize !== undefined && item.sampleSize >= 52 && item.percentile !== null)?.percentile ?? 'unavailable'}th percentile; sample size ${snapshot.cot.find((item) => item.market === 'GOLD')?.sampleSize ?? 0} weekly observations.`}
                   </p>
                   <small className="text-slate-500">CFTC report: {goldContext?.cot.reportDate ?? 'UNAVAILABLE'} · Feed: {goldContext?.cot.state ?? 'UNAVAILABLE'}</small>
                 </div>
@@ -687,18 +687,24 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
                 <span className={`mono ${position.netContracts >= 0 ? 'macro-positive' : 'macro-negative'}`}>
                   {formatContracts(position.netContracts)}
                 </span>
-                <span className={`mono ${position.weeklyChange >= 0 ? 'macro-positive' : 'macro-negative'}`}>
-                  {formatContracts(position.weeklyChange)}
+                <span className={`mono ${position.weeklyChange === null ? 'text-slate-500' : position.weeklyChange >= 0 ? 'macro-positive' : 'macro-negative'}`}>
+                  {position.weeklyChange === null ? 'UNAVAILABLE' : formatContracts(position.weeklyChange)}
                 </span>
                 <div className="macro-extreme">
-                  <div className="macro-extreme-track"><span style={{ width: `${position.percentile}%` }} /></div>
-                  <span className="mono">{position.percentile}%ile</span>
-                  {(position.percentile >= 90 || position.percentile <= 10) && <span className="macro-crowded">CROWDED</span>}
+                  {position.sampleSize !== undefined && position.sampleSize >= 52 && position.percentile !== null ? (
+                    <>
+                      <div className="macro-extreme-track"><span style={{ width: `${position.percentile}%` }} /></div>
+                      <span className="mono">{position.percentile}%ile · n={position.sampleSize}</span>
+                      {(position.percentile >= 90 || position.percentile <= 10) && <span className="macro-crowded">CROWDED</span>}
+                    </>
+                  ) : (
+                    <span className="mono text-slate-500">INSUFFICIENT SAMPLE · n={position.sampleSize ?? 0}/52</span>
+                  )}
                 </div>
               </div>
             ))}
             <div className="macro-panel-foot">
-              <span>CFTC observations are published weekly; verify report date and vintage for each record.</span>
+              <span>Percentiles require at least 52 weekly observations. Historical release/vintage timestamps are not yet verified.</span>
               <span className="mono">POSITIONING ≠ EXECUTION TRIGGER</span>
             </div>
           </div>
@@ -712,9 +718,13 @@ export default function MacroDashboard({ initialSnapshot, initialGoldContext }: 
             <div className="macro-callout-stat">
               <span>MOST CROWDED CONTRACT</span>
               <strong className="mono">
-                {snapshot.cot.length > 0
-                  ? `${snapshot.cot.reduce((highest, current) => current.percentile > highest.percentile ? current : highest, snapshot.cot[0]).market} ${Math.max(...snapshot.cot.map((position) => position.percentile))}%ile`
-                  : 'Unavailable'}
+                {(() => {
+                  const valid = snapshot.cot.filter((position) => position.sampleSize !== undefined
+                    && position.sampleSize >= 52 && position.percentile !== null);
+                  if (!valid.length) return 'Unavailable';
+                  const highest = valid.reduce((best, current) => current.percentile! > best.percentile! ? current : best, valid[0]);
+                  return `${highest.market} ${highest.percentile}%ile`;
+                })()}
               </strong>
             </div>
           </aside>
