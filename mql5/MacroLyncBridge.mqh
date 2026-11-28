@@ -468,62 +468,173 @@ struct MacroLyncAccountGuardian
    bool     news_lockout_active;
 };
 
-// Institutional Account Guardian: Reads true broker metrics and evaluates killswitch
+// Terminal-local weekly high-water mark. Server governance uses the independently persisted rolling 7-day equity history.
+double MacroLyncUpdateWeeklyHighWaterMark(const double equity)
+{
+   datetime weekStart = iTime(_Symbol, PERIOD_W1, 0);
+   if(weekStart <= 0) weekStart = TimeCurrent();
+   string key = StringFormat("MLHWM_%I64d_%I64d", (long)AccountInfoInteger(ACCOUNT_LOGIN), (long)weekStart);
+   if(StringLen(key) > 63) key = StringSubstr(key, 0, 63);
+
+   if(!GlobalVariableCheck(key))
+   {
+      GlobalVariableSet(key, equity);
+      return equity;
+   }
+
+   double peak = GlobalVariableGet(key);
+   if(equity > peak)
+   {
+      peak = equity;
+      GlobalVariableSet(key, peak);
+   }
+   return peak;
+}
+
+string MacroLyncUtcIsoNow()
+{
+   MqlDateTime utc;
+   TimeToStruct(TimeGMT(), utc);
+   return StringFormat("%04d-%02d-%02dT%02d:%02d:%02dZ",
+                       utc.year, utc.mon, utc.day, utc.hour, utc.min, utc.sec);
+}
+
+string MacroLyncJsonEscape(const string value)
+{
+   string escaped = value;
+   StringReplace(escaped, "\\", "\\\\");
+   StringReplace(escaped, "\"", "\\\"");
+   StringReplace(escaped, "\r", "");
+   StringReplace(escaped, "\n", " ");
+   return escaped;
+}
+
+string MacroLyncOpenCurrencyLegsJson()
+{
+   string json = "[";
+   bool first = true;
+   for(int i = 0; i < PositionsTotal(); i++)
+   {
+      ulong ticket = PositionGetTicket(i);
+      if(ticket == 0) continue;
+      string symbol = MacroLyncJsonEscape(PositionGetString(POSITION_SYMBOL));
+      if(!first) json += ",";
+      json += "\"" + symbol + "\"";
+      first = false;
+   }
+   json += "]";
+   return json;
+}
+
+// Institutional Account Guardian: counts closed positions, not individual partial-close deals.
 bool MacroLyncEvaluateAccountGuardian(MacroLyncAccountGuardian &guardian, const double drawdown_floor_pct = 4.0, const double current_vix = 0.0)
 {
    guardian.account_equity = AccountInfoDouble(ACCOUNT_EQUITY);
    guardian.account_balance = AccountInfoDouble(ACCOUNT_BALANCE);
-   guardian.live_broker_spread = SymbolInfoDouble(_Symbol, SYMBOL_ASK) - SymbolInfoDouble(_Symbol, SYMBOL_BID);
 
+   double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+   guardian.live_broker_spread = (bid > 0.0 && ask >= bid) ? ask - bid : -1.0;
+
+   guardian.daily_closed_trades = -1;
+   guardian.daily_losses = -1;
    datetime startOfDay = iTime(_Symbol, PERIOD_D1, 0);
-   if(HistorySelect(startOfDay, TimeCurrent()))
+   if(startOfDay <= 0 || !HistorySelect(startOfDay, TimeCurrent()))
    {
-      int deals_count = HistoryDealsTotal();
-      int trades_today = 0;
-      int losses_today = 0;
-      for(int i = 0; i < deals_count; i++)
+      guardian.kill_switch_active = true;
+      guardian.kill_switch_reason = "Broker daily deal history is unavailable";
+      return false;
+   }
+
+   long positionIds[];
+   double positionNetPnl[];
+   ArrayResize(positionIds, 0);
+   ArrayResize(positionNetPnl, 0);
+
+   int deals_count = HistoryDealsTotal();
+   for(int i = 0; i < deals_count; i++)
+   {
+      ulong ticket = HistoryDealGetTicket(i);
+      if(ticket == 0) continue;
+
+      long entry = HistoryDealGetInteger(ticket, DEAL_ENTRY);
+      if(entry != DEAL_ENTRY_OUT && entry != DEAL_ENTRY_INOUT) continue;
+
+      long positionId = HistoryDealGetInteger(ticket, DEAL_POSITION_ID);
+      if(positionId <= 0) continue;
+
+      double netPnl = HistoryDealGetDouble(ticket, DEAL_PROFIT)
+                    + HistoryDealGetDouble(ticket, DEAL_COMMISSION)
+                    + HistoryDealGetDouble(ticket, DEAL_SWAP)
+                    + HistoryDealGetDouble(ticket, DEAL_FEE);
+
+      int found = -1;
+      for(int j = 0; j < ArraySize(positionIds); j++)
       {
-         ulong ticket = HistoryDealGetTicket(i);
-         if(ticket > 0)
+         if(positionIds[j] == positionId) { found = j; break; }
+      }
+      if(found < 0)
+      {
+         found = ArraySize(positionIds);
+         ArrayResize(positionIds, found + 1);
+         ArrayResize(positionNetPnl, found + 1);
+         positionIds[found] = positionId;
+         positionNetPnl[found] = 0.0;
+      }
+      positionNetPnl[found] += netPnl;
+   }
+
+   int tradesToday = 0;
+   int lossesToday = 0;
+   for(int i = 0; i < ArraySize(positionIds); i++)
+   {
+      bool stillOpen = false;
+      for(int p = 0; p < PositionsTotal(); p++)
+      {
+         ulong positionTicket = PositionGetTicket(p);
+         if(positionTicket == 0) continue;
+         if(PositionGetInteger(POSITION_IDENTIFIER) == positionIds[i])
          {
-            long entry = HistoryDealGetInteger(ticket, DEAL_ENTRY);
-            if(entry == DEAL_ENTRY_OUT || entry == DEAL_ENTRY_INOUT)
-            {
-               trades_today++;
-               double profit = HistoryDealGetDouble(ticket, DEAL_PROFIT);
-               if(profit < 0) losses_today++;
-            }
+            stillOpen = true;
+            break;
          }
       }
-      guardian.daily_closed_trades = trades_today;
-      guardian.daily_losses = losses_today;
+      if(stillOpen) continue;
+      tradesToday++;
+      if(positionNetPnl[i] < 0.0) lossesToday++;
    }
 
+   guardian.daily_closed_trades = tradesToday;
+   guardian.daily_losses = lossesToday;
    guardian.open_currency_legs_count = PositionsTotal();
 
-   double drawdown_pct = 0.0;
-   if(guardian.account_balance > 0)
-   {
-      drawdown_pct = ((guardian.account_balance - guardian.account_equity) / guardian.account_balance) * 100.0;
-   }
+   double weeklyPeakEquity = MacroLyncUpdateWeeklyHighWaterMark(guardian.account_equity);
+   double drawdown_pct = weeklyPeakEquity > 0.0
+      ? MathMax(0.0, ((weeklyPeakEquity - guardian.account_equity) / weeklyPeakEquity) * 100.0)
+      : 0.0;
 
    guardian.kill_switch_active = false;
    guardian.kill_switch_reason = "";
 
-   if(guardian.daily_losses >= 2)
+   if(guardian.account_equity <= 0.0 || guardian.account_balance <= 0.0)
    {
       guardian.kill_switch_active = true;
-      guardian.kill_switch_reason = "Daily loss limit reached (2 losses today)";
+      guardian.kill_switch_reason = "Broker equity or balance is unavailable";
+   }
+   else if(guardian.daily_losses >= 2)
+   {
+      guardian.kill_switch_active = true;
+      guardian.kill_switch_reason = "Daily loss limit reached (broker server day)";
    }
    else if(guardian.daily_closed_trades >= 2)
    {
       guardian.kill_switch_active = true;
-      guardian.kill_switch_reason = "Daily maximum trade count reached (2 trades today)";
+      guardian.kill_switch_reason = "Daily maximum trade count reached (broker server day)";
    }
    else if(drawdown_pct >= drawdown_floor_pct)
    {
       guardian.kill_switch_active = true;
-      guardian.kill_switch_reason = "Sovereign Shield drawdown floor breached";
+      guardian.kill_switch_reason = "Weekly broker-session high-water drawdown floor breached";
    }
    else if(current_vix >= 32.0)
    {
@@ -534,7 +645,7 @@ bool MacroLyncEvaluateAccountGuardian(MacroLyncAccountGuardian &guardian, const 
    return !guardian.kill_switch_active;
 }
 
-// Posts authenticated broker state heartbeat to MacroLync
+// Posts authenticated broker state heartbeat to MacroLync. The server derives account identity and persists every observation.
 bool MacroLyncPostBrokerHeartbeat(
    const string endpoint,
    const string api_token,
@@ -544,15 +655,29 @@ bool MacroLyncPostBrokerHeartbeat(
 {
    string url = endpoint + "/api/v1/mt5-heartbeat";
    string headers = "Content-Type: application/json\r\nAuthorization: Bearer " + api_token + "\r\n";
-   
+
+   string login = LongToString(AccountInfoInteger(ACCOUNT_LOGIN));
+   string server = MacroLyncJsonEscape(AccountInfoString(ACCOUNT_SERVER));
+   string broker = MacroLyncJsonEscape(AccountInfoString(ACCOUNT_COMPANY));
+   string spreadSymbol = MacroLyncJsonEscape(_Symbol);
+   string spreadJson = guardian.live_broker_spread >= 0.0
+      ? DoubleToString(guardian.live_broker_spread, 10) : "null";
+   string openLegsJson = MacroLyncOpenCurrencyLegsJson();
+   string timestampUtc = MacroLyncUtcIsoNow();
+
    string payload = StringFormat(
-      "{\"accountEquity\":%.2f,\"accountBalance\":%.2f,\"dailyClosedTrades\":%d,\"dailyLosses\":%d,\"liveBrokerSpread\":%.5f,\"timestampUtc\":\"%s\"}",
-      guardian.account_equity,
-      guardian.account_balance,
+      "{\"login\":\"%s\",\"server\":\"%s\",\"broker\":\"%s\",\"accountEquity\":%s,\"accountBalance\":%s,\"dailyClosedTrades\":%d,\"dailyLosses\":%d,\"dailyStatsTimeBasis\":\"BROKER_SERVER_DAY\",\"liveBrokerSpread\":%s,\"spreadSymbol\":\"%s\",\"openCurrencyLegs\":%s,\"timestampUtc\":\"%s\"}",
+      login,
+      server,
+      broker,
+      DoubleToString(guardian.account_equity, 8),
+      DoubleToString(guardian.account_balance, 8),
       guardian.daily_closed_trades,
       guardian.daily_losses,
-      guardian.live_broker_spread,
-      TimeToString(TimeGMT(), TIME_DATE|TIME_SECONDS)
+      spreadJson,
+      spreadSymbol,
+      openLegsJson,
+      timestampUtc
    );
 
    char post_data[];
@@ -568,6 +693,7 @@ bool MacroLyncPostBrokerHeartbeat(
       guardian.heartbeat_posted = true;
       return true;
    }
+   guardian.heartbeat_posted = false;
    return false;
 }
 
