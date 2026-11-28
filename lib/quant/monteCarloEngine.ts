@@ -19,7 +19,7 @@ export type TradeInput = {
 export type WalkForwardMetrics = {
   tradesCount: number;
   winRatePct: number;
-  profitFactor: number;
+  profitFactor: number | null;
   netProfit: number;
   maxDrawdownPct: number;
   expectancyR: number | null;
@@ -31,7 +31,7 @@ export type WalkForwardAnalysis = {
   outOfSampleTrades: number;
   inSample: WalkForwardMetrics;
   outOfSample: WalkForwardMetrics;
-  walkForwardEfficiencyPct: number;
+  walkForwardEfficiencyPct: number | null;
   status: 'ROBUST_EDGE' | 'MODERATE_DEGRADATION' | 'OVERFITTED_FAILURE' | 'INSUFFICIENT_SAMPLE';
 };
 
@@ -81,7 +81,7 @@ function calculateMetrics(trades: TradeInput[], initialBalance: number): WalkFor
   return {
     tradesCount: trades.length,
     winRatePct: Number(((winsCount / trades.length) * 100).toFixed(1)),
-    profitFactor: grossLosses > 0 ? Number((grossWins / grossLosses).toFixed(2)) : grossWins > 0 ? 99.9 : 0,
+    profitFactor: grossLosses > 0 ? Number((grossWins / grossLosses).toFixed(2)) : null,
     netProfit: Number((runningEquity - initialBalance).toFixed(2)),
     maxDrawdownPct: Number(maxDd.toFixed(2)),
     expectancyR: rCount === trades.length ? Number((rTotal / trades.length).toFixed(2)) : null,
@@ -109,15 +109,15 @@ export function runWalkForwardAnalysis(
   const outOfSampleTrades = trades.slice(splitIndex);
   const inSample = calculateMetrics(inSampleTrades, initialBalance);
   const outOfSample = calculateMetrics(outOfSampleTrades, initialBalance);
-  let wfe = 0;
+  let wfe: number | null = null;
   if (inSample.expectancyR !== null && inSample.expectancyR > 0 && outOfSample.expectancyR !== null) {
     wfe = Number(((outOfSample.expectancyR / inSample.expectancyR) * 100).toFixed(1));
-  } else if (inSample.profitFactor > 1.0) {
+  } else if (inSample.profitFactor !== null && outOfSample.profitFactor !== null && inSample.profitFactor > 1.0) {
     wfe = Number(((outOfSample.profitFactor / inSample.profitFactor) * 100).toFixed(1));
   }
 
   let status: WalkForwardAnalysis['status'] = 'INSUFFICIENT_SAMPLE';
-  if (trades.length >= 20) {
+  if (trades.length >= 20 && wfe !== null && outOfSample.profitFactor !== null) {
     status = wfe >= 60 && outOfSample.profitFactor >= 1.2
       ? 'ROBUST_EDGE'
       : wfe >= 30 && outOfSample.profitFactor >= 1.0
@@ -126,7 +126,7 @@ export function runWalkForwardAnalysis(
   }
   return {
     totalTrades: trades.length, inSampleTrades: inSampleTrades.length, outOfSampleTrades: outOfSampleTrades.length,
-    inSample, outOfSample, walkForwardEfficiencyPct: Math.max(0, wfe), status,
+    inSample, outOfSample, walkForwardEfficiencyPct: wfe === null ? null : Math.max(0, wfe), status,
   };
 }
 

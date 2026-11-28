@@ -357,7 +357,7 @@ export default function ValidationPage() {
                       </div>
                       <div>
                         <div className="text-slate-500">Profit Factor:</div>
-                        <div className="text-white font-bold">{walkForward.inSample.profitFactor}</div>
+                        <div className="text-white font-bold">{walkForward.inSample.profitFactor === null ? '—' : walkForward.inSample.profitFactor}</div>
                       </div>
                       <div>
                         <div className="text-slate-500">Net Profit:</div>
@@ -369,7 +369,7 @@ export default function ValidationPage() {
                       </div>
                       <div className="col-span-2">
                         <div className="text-slate-500">Expectancy:</div>
-                        <div className="text-teal-400 font-bold">+{walkForward.inSample.expectancyR}R / trade</div>
+                        <div className="text-teal-400 font-bold">{walkForward.inSample.expectancyR === null ? '—' : walkForward.inSample.expectancyR.toFixed(2) + 'R / trade'}</div>
                       </div>
                     </div>
                   </div>
@@ -387,7 +387,7 @@ export default function ValidationPage() {
                       </div>
                       <div>
                         <div className="text-slate-500">Profit Factor:</div>
-                        <div className="text-white font-bold">{walkForward.outOfSample.profitFactor}</div>
+                        <div className="text-white font-bold">{walkForward.outOfSample.profitFactor === null ? '—' : walkForward.outOfSample.profitFactor}</div>
                       </div>
                       <div>
                         <div className="text-slate-500">Net Profit:</div>
@@ -399,7 +399,7 @@ export default function ValidationPage() {
                       </div>
                       <div className="col-span-2">
                         <div className="text-slate-500">Expectancy:</div>
-                        <div className="text-teal-400 font-bold">+{walkForward.outOfSample.expectancyR}R / trade</div>
+                        <div className="text-teal-400 font-bold">{walkForward.outOfSample.expectancyR === null ? '—' : walkForward.outOfSample.expectancyR.toFixed(2) + 'R / trade'}</div>
                       </div>
                     </div>
                   </div>
@@ -412,7 +412,7 @@ export default function ValidationPage() {
                       </div>
                       <div className="mt-3">
                         <div className="text-3xl font-extrabold text-white">
-                          {walkForward.walkForwardEfficiencyPct}%
+                          {walkForward.walkForwardEfficiencyPct === null ? '—' : walkForward.walkForwardEfficiencyPct + '%'}
                         </div>
                         <p className="text-xs text-slate-400 mt-1">
                           Ratio of blind out-of-sample expectancy to in-sample expectancy. 60%+ indicates an institutional robust edge.

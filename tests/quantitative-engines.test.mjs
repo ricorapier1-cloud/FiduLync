@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const validation = read('../lib/macro/validationEngine.ts');
 const dossier = read('../lib/macro/dossierEngine.ts');
@@ -11,7 +10,6 @@ const crossAsset = read('../lib/macro/crossAssetEngine.ts');
 const profiles = read('../lib/macro/countryProfiles.ts');
 const strength = read('../lib/currencyStrength.ts');
 const dashboard = read('../app/components/MacroDashboard.tsx');
-
 test('validation engine withholds unsupported historical performance claims', () => {
   assert.match(validation, /NOT_VALIDATED/);
   assert.match(validation, /HISTORICAL_REGIME_CYCLES: RegimeBacktestCycle\[\] = \[\]/);
@@ -19,7 +17,6 @@ test('validation engine withholds unsupported historical performance claims', ()
   assert.match(validation, /avgReturnPct: null/);
   assert.match(validation, /avgDrawdownPct: null/);
 });
-
 test('pair dossier requires provider-sourced policy and inflation observations', () => {
   assert.match(dossier, /policyRateSource === 'provider'/);
   assert.match(dossier, /inflationSource === 'provider'/);
@@ -32,25 +29,21 @@ test('pair dossier requires provider-sourced policy and inflation observations',
   assert.match(dossier, /INSUFFICIENT EVIDENCE — NO RELIABLE CONCLUSION/);
   assert.doesNotMatch(dossier, /gdpGrowthYoY \?\? 1\.0|unemploymentRate \?\? 4\.0/);
 });
-
 test('cross-asset engine does not embed fabricated market levels', () => {
   for (const value of ['4.45', '1.95', '124.8', '14.6', '2680.0', '71.4', '75.2', '4.12', '312']) {
     assert.doesNotMatch(crossAsset, new RegExp(value.replace('.', '\\.'), 'g'));
   }
   assert.ok(crossAsset.includes("freshness: treasury || vixObservation || wti !== null || brent !== null ? 'LATEST PUBLISHED' : 'UNAVAILABLE'"));
 });
-
 test('country profile engine does not publish hardcoded macro baselines', () => {
   assert.match(profiles, /return \[\]/);
   assert.doesNotMatch(profiles, /gdpGrowthYoY: 2\.7|unemploymentRate: 4\.1/);
 });
-
 test('currency strength uses only provider-sourced policy and inflation data', () => {
   assert.match(strength, /policyRateSource === 'provider'/);
   assert.match(strength, /inflationSource === 'provider'/);
   assert.match(strength, /isFreshObservation/);
 });
-
 test('dashboard marks cross-asset values unavailable until verified feeds exist', () => {
   assert.ok(dashboard.includes('CBOE daily close'));
   assert.ok(dashboard.includes('US 10Y benchmark'));
@@ -59,7 +52,6 @@ test('dashboard marks cross-asset values unavailable until verified feeds exist'
   assert.doesNotMatch(dashboard, /FRED \(St\. Louis Fed\)[\s\S]{0,200}HEALTHY/);
   assert.doesNotMatch(dashboard, /4\.35%|2\.05%|14\.80|\$76\.40|\$2,740/);
 });
-
 test('US BLS and BEA adapters preserve observation dates and do not synthesize values', () => {
   const macroData = read('../lib/macroData.ts');
   const types = read('../types/macro.ts');
@@ -69,7 +61,6 @@ test('US BLS and BEA adapters preserve observation dates and do not synthesize v
   assert.match(macroData, /gdpObservationDate/);
   assert.match(types, /wageGrowthYoY\?: number/);
 });
-
 test('macro snapshot persistence uses the protected payload table and preserves source snapshots', () => {
   const macroData = read('../lib/macroData.ts');
   assert.match(macroData, /from\('macro_snapshot_payloads'\)/);
@@ -77,7 +68,6 @@ test('macro snapshot persistence uses the protected payload table and preserves 
   assert.match(macroData, /snapshot_key: 'global'/);
   assert.doesNotMatch(macroData, /from\('macro_snapshots'\)\s*\.select\('payload,refreshed_at'\)/);
 });
-
 test('BIS policy rates and CPI are connected for G8 with source provenance', () => {
   const macroData = read('../lib/macroData.ts');
   const macroTypes = read('../types/macro.ts');
@@ -88,7 +78,6 @@ test('BIS policy rates and CPI are connected for G8 with source provenance', () 
   assert.match(macroTypes, /policyRateProvider\?: string/);
   assert.match(macroTypes, /inflationProvider\?: string/);
 });
-
 test('dossier distinguishes real policy-rate proxies from market real yields', () => {
   const types = read('../types/macro.ts');
   const dossier = read('../lib/macro/dossierEngine.ts');
@@ -98,7 +87,6 @@ test('dossier distinguishes real policy-rate proxies from market real yields', (
   assert.match(contextRoute, /real_policy_rate_diff_bps/);
   assert.match(contextRoute, /real_yield_diff_bps: null/);
 });
-
 test('provider health is attributed to the actual source, not any provider flag', () => {
   const telemetry = read('../lib/macro/providerTelemetry.ts');
   assert.match(telemetry, /policyRateProvider === 'ECB'/);
@@ -106,8 +94,6 @@ test('provider health is attributed to the actual source, not any provider flag'
   assert.match(telemetry, /policyRateProvider === 'Bank of Canada'/);
   assert.match(telemetry, /BIS Statistics \/ G8 policy rates & CPI/);
 });
-
-
 test('normalized macro observations retain source, period, provenance and honest unknown release dates', () => {
   const persistence = read('../lib/macro/observationPersistence.ts');
   const macroData = read('../lib/macroData.ts');
@@ -118,7 +104,6 @@ test('normalized macro observations retain source, period, provenance and honest
   assert.match(persistence, /observation_period/);
   assert.match(macroData, /persistMacroObservations\(safeSnapshot\)/);
 });
-
 test('G10 Nordic policy rates use official no-key central-bank sources', () => {
   const international = read('../lib/internationalMacro.ts');
   const macroData = read('../lib/macroData.ts');
@@ -130,22 +115,16 @@ test('G10 Nordic policy rates use official no-key central-bank sources', () => {
   assert.match(telemetry, /Sveriges Riksbank policy rate/);
   assert.match(telemetry, /Norges Bank policy rate/);
 });
-
-
 test('complete G10 status requires fresh provider observations, not annual historical fallbacks', () => {
   const macroData = read('../lib/macroData.ts');
   assert.match(macroData, /isFreshProviderObservation\(currency\.policyRateObservationDate, 180\)/);
   assert.match(macroData, /isFreshProviderObservation\(currency\.inflationObservationDate, currency\.code === 'AUD' \? 180 : 120\)/);
 });
-
-
 test('BIS monthly CPI adapter maps Sweden and Norway when official observations exist', () => {
   const macroData = read('../lib/macroData.ts');
   assert.match(macroData, /SE: 'SEK', NO: 'NOK'/);
   assert.match(macroData, /WS_LONG_CPI/);
 });
-
-
 test('cron provenance distinguishes live macro data from a reference-only economic calendar', () => {
   const cron = read('../app/api/cron/sync-macro/route.ts');
   assert.match(cron, /LIVE_MACRO_CALENDAR_UNAVAILABLE/);
@@ -154,7 +133,6 @@ test('cron provenance distinguishes live macro data from a reference-only econom
   assert.match(cron, /status === 'partial'/);
   assert.doesNotMatch(cron, /snapshot\.source === 'partial'\s*\?\s*'PARTIAL_LIVE'/);
 });
-
 test('EIA adapter validates daily WTI and Brent observations and preserves published dates', () => {
   const macroData = read('../lib/macroData.ts');
   const macroTypes = read('../types/macro.ts');
@@ -168,7 +146,6 @@ test('EIA adapter validates daily WTI and Brent observations and preserves publi
   assert.match(dashboard, /EIA Brent–WTI spot spread/);
   assert.match(dashboard, /not intraday futures or live ticks/);
 });
-
 test('EIA crude feed is reported independently and cannot promote macro snapshot provenance', () => {
   const macroData = read('../lib/macroData.ts');
   const telemetry = read('../lib/macro/providerTelemetry.ts');
@@ -176,7 +153,6 @@ test('EIA crude feed is reported independently and cannot promote macro snapshot
   assert.doesNotMatch(macroData, /snapshot\.energyMarkets = eiaResult\.value;\s*hasMacroData = true/);
   assert.match(telemetry, /U\.S\. Energy Information Administration \(WTI \/ Brent\)/);
 });
-
 test('CFTC COT retrieval is cached between weekly publications and tolerates slower official responses', () => {
   const macroData = read('../lib/macroData.ts');
   const cftc = macroData.slice(macroData.indexOf('async function getCftcCot'), macroData.indexOf('async function getLiveProviderSnapshot'));
@@ -185,7 +161,6 @@ test('CFTC COT retrieval is cached between weekly publications and tolerates slo
   assert.match(cftc, /6 \* 60 \* 60/);
   assert.match(cftc, /reportDate: latest\.date/);
 });
-
 test('fallback snapshot does not embed fabricated policy rates or inflation levels', () => {
   const macroData = read('../lib/macroData.ts');
   const fallbackFn = macroData.slice(macroData.indexOf('export function getFallbackSnapshot()'), macroData.indexOf('function mergeWithFallback'));
@@ -193,25 +168,21 @@ test('fallback snapshot does not embed fabricated policy rates or inflation leve
   assert.doesNotMatch(fallbackFn, /inflation: 2\.8|inflation: 2\.1|inflation: 3|inflation: 3\.4/);
   assert.match(fallbackFn, /Awaiting Provider Feed/);
 });
-
 test('pair dossier does not fabricate fallback policy or inflation rates when missing', () => {
   const dossier = read('../lib/macro/dossierEngine.ts');
   assert.doesNotMatch(dossier, /\?\? 3\.5|\?\? 4\.75|\?\? 2\.5|\?\? 2\.8/);
 });
-
 test('market quote feeds include G8 currency pairs for Finnhub and Frankfurter', () => {
   const marketFeeds = read('../lib/marketFeeds.ts');
   for (const symbol of ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF', 'NZDUSD', 'XAUUSD']) {
     assert.match(marketFeeds, new RegExp(symbol));
   }
 });
-
 test('Frankfurter date-only reference rates retain their observation date without a fabricated future intraday timestamp', () => {
   const feeds = read('../lib/marketFeeds.ts');
   assert.match(feeds, /payload\.date\}T00:00:00\.000Z/);
   assert.doesNotMatch(feeds, /payload\.date\}T16:00:00\.000Z/);
 });
-
 test('provider quotes reject stale, future, crossed and malformed MT5 observations before macro use', () => {
   const feeds = read('../lib/marketFeeds.ts');
   const macroContext = read('../app/api/v1/macro-context/route.ts');
@@ -222,14 +193,11 @@ test('provider quotes reject stale, future, crossed and malformed MT5 observatio
   assert.match(macroContext, /timestampValid \? Math\.max\(0, rawAgeMs\) : null/);
   assert.match(macroContext, /mid: freshness === 'STALE' \? null : quote\.price/);
 });
-
 test('FRED and Finnhub API keys are used only behind explicit provider approval', () => {
   const macroData = read('../lib/macroData.ts');
   assert.match(macroData, /FRED_DATA_STORAGE_PERMISSION_APPROVED\?\.trim\(\)\.toLowerCase\(\) !== 'false'/);
   assert.match(macroData, /FINNHUB_PERSONAL_PLAN_ACTIVE === 'true'/);
 });
-
-
 test('official Treasury TIPS series joins using the real-yield field and powers the no-key gold fallback', () => {
   const treasury = read('../lib/treasuryData.ts');
   const gold = read('../lib/macro/goldAndRegimeEngine.ts');
@@ -239,13 +207,11 @@ test('official Treasury TIPS series joins using the real-yield field and powers 
   assert.match(gold, /snapshotVix/);
   assert.match(gold, /cot\.nonCommercialNet/);
 });
-
 test('gold refresh route reuses the synchronized macro snapshot and CBOE observation', () => {
   const route = read('../app/api/macro/gold-context/route.ts');
   assert.match(route, /getMacroSnapshot\(\)/);
   assert.match(route, /buildGoldMacroContext\(snapshot\)/);
 });
-
 test('public FairEconomy calendar is no-key, Tier-1-only, and records source provenance', () => {
   const macroData = read('../lib/macroData.ts');
   const types = read('../types/macro.ts');
@@ -260,26 +226,22 @@ test('public FairEconomy calendar is no-key, Tier-1-only, and records source pro
   assert.match(macroContext, /const newsLockoutActive = snapshot\.calendarSource !== 'provider'/);
   assert.match(signals, /const calendarVerified = snapshot\.calendarSource === 'provider' && Boolean\(snapshot\.calendarProvider\)/);
 });
-
 test('Swissquote quote caching is per instrument so satellite selection cannot refetch every core pair', () => {
   const route = read('../app/api/v1/live-quotes/route.ts');
   assert.match(route, /macro:swissquote-bbo-v1:' \+ instrument\.symbol/);
   assert.doesNotMatch(route, /macro:swissquote-bbo-v1' \+ ':' \+ \(satelliteInstrument/);
 });
-
 test('Supabase REST helper is strictly read-only and contains no legacy commerce writes', () => {
   const adapter = read('../lib/supabaseAdmin.ts');
   assert.match(adapter, /method: 'GET'/);
   assert.match(adapter, /export async function supabaseRead/);
   assert.doesNotMatch(adapter, /persistLicense|recordTransaction|upsertHeartbeat|supabaseInsert|method: 'POST'|method: 'PATCH'|method: 'DELETE'/);
 });
-
 test('live quote API rounds each instrument to its display precision before JSON serialization', () => {
   const route = read('../app/api/v1/live-quotes/route.ts');
   assert.match(route, /quote\.symbol === 'XAUUSD' \? 2 : quote\.symbol === 'USDJPY' \? 3 : 5/);
   assert.match(route, /Number\(value\.toFixed\(digits\)\)/);
 });
-
 test('gold research cards wrap long values and desk execution workflow is placed once before research detail', () => {
   const dashboard = read('../app/components/MacroDashboard.tsx');
   assert.equal((dashboard.match(/07 \/ XAUUSD DEDICATED RESEARCH/g) ?? []).length, 1);
@@ -289,7 +251,6 @@ test('gold research cards wrap long values and desk execution workflow is placed
   assert.match(dashboard, /text-sm sm:text-lg/);
   assert.match(dashboard, /3M CMT · TREASURY PROXY/);
 });
-
 test('XAUUSD macro context engine requires verified spot, official macro series, and weekly CFTC evidence', () => {
   const engine = read('../lib/macro/goldAndRegimeEngine.ts');
   const route = read('../app/api/v1/xauusd-context/route.ts');
@@ -312,14 +273,12 @@ test('XAUUSD macro context engine requires verified spot, official macro series,
   assert.match(route, /status: 401/);
   assert.match(route, /timingSafeEqual/);
 });
-
 test('XAUUSD fallback spot never fabricates bid, ask, or spread from a mid-only feed', () => {
   const engine = read('../lib/macro/goldAndRegimeEngine.ts');
   assert.match(engine, /source: 'XAUS'/);
   assert.match(engine, /bid: null, ask: null, mid/);
   assert.match(engine, /spreadUsd: null/);
 });
-
 test('authenticated macro bridge accepts the configured MACRO_API_TOKEN through constant-time comparison', () => {
   const route = read('../app/api/v1/macro-context/route.ts');
   assert.match(route, /process\.env\.MACRO_API_TOKEN\?\.trim\(\)/);
@@ -327,7 +286,6 @@ test('authenticated macro bridge accepts the configured MACRO_API_TOKEN through 
   assert.match(route, /candidate, secret/);
   assert.match(route, /consumePersistentRateLimit/);
 });
-
 test('intraday signal engine blocks stale quotes, weak macro bias and missing shield evidence while leaving lot sizing to the EA', () => {
   const desk = read('../app/components/DeskTerminal.tsx');
   const engine = read('../lib/quant/intradaySignalEngine.ts');
@@ -343,7 +301,6 @@ test('intraday signal engine blocks stale quotes, weak macro bias and missing sh
   assert.match(engine, /SHIELD_BLOCKED/);
   assert.doesNotMatch(desk, /lots >= 0\.01|setSl\(|setTp\(/);
 });
-
 test('dashboard exposes anchored research workspaces and keeps BBO presentation in the desk terminal', () => {
   const dashboard = read('../app/components/MacroDashboard.tsx');
   const desk = read('../app/components/DeskTerminal.tsx');
@@ -379,7 +336,6 @@ test('XAUUSD dashboard, intraday signals and MT5 context use the dedicated gold 
   assert.match(goldRoute, /buildGoldMacroContext\(snapshot\)/);
   assert.match(goldRoute, /evaluateSovereignShield/);
 });
-
 test('keyed providers remain approval-gated while the public economic calendar works without a key', () => {
   const macroData = read('../lib/macroData.ts');
   const marketFeeds = read('../lib/marketFeeds.ts');
@@ -391,14 +347,12 @@ test('keyed providers remain approval-gated while the public economic calendar w
   assert.match(marketFeeds, /FINNHUB_PERSONAL_PLAN_ACTIVE === 'true' \? process\.env\.FINNHUB_API_KEY/);
   assert.match(goldEngine, /FRED_DATA_STORAGE_PERMISSION_APPROVED\?\.trim\(\)\.toLowerCase\(\) !== 'false'/);
 });
-
 test('Swissquote BBO future timestamps are bounded by the same 30-second clock-skew tolerance as intraday signals', () => {
   const quotes = read('../app/api/v1/live-quotes/route.ts');
   const engine = read('../lib/quant/intradaySignalEngine.ts');
   assert.match(quotes, /quoteTimestamp <= Date\.now\(\) \+ 30_000/);
   assert.match(engine, /quoteAge < -30_000/);
 });
-
 test('Swissquote BBO timestamp parsing accepts parent-level item timestamps and numeric Unix timestamps', () => {
   const quotes = read('../app/api/v1/live-quotes/route.ts');
   assert.ok(quotes.includes('raw.ts ?? item.ts'));
@@ -406,12 +360,10 @@ test('Swissquote BBO timestamp parsing accepts parent-level item timestamps and 
   assert.match(quotes, /getCachedData\('macro:swissquote-bbo-v1:' \+ instrument\.symbol/);
   assert.ok(quotes.includes("ageMs > 60_000 ? 'STALE'"));
 });
-
 test('GDP quarter parsing uses a real digit matcher', () => {
   const dashboard = read('../app/components/MacroDashboard.tsx');
   assert.ok(dashboard.includes('period?.match(/^(\\d{4})Q([1-4])$/)'));
 });
-
 test('cached FRED observations are excluded when storage permission is not approved', () => {
   const macroData = read('../lib/macroData.ts');
   const engine = read('../lib/macroEngine.ts');
@@ -432,7 +384,6 @@ test('cached FRED observations are excluded when storage permission is not appro
   assert.match(read('../types/macro.ts'), /twoYearYieldProvider\?: string/);
   assert.match(engine, /xau:fred:\$\{seriesId\}:v1/);
 });
-
 test('gold quote parser uses parent-level Swissquote timestamps and Treasury daily history when FRED storage is disabled', () => {
   const gold = read('../lib/macro/goldAndRegimeEngine.ts');
   const treasury = read('../lib/treasuryData.ts');
@@ -445,7 +396,6 @@ test('gold quote parser uses parent-level Swissquote timestamps and Treasury dai
   assert.ok(treasury.includes('history: history.slice(0, 260)'));
   assert.ok(treasury.includes("fetchTreasuryRows('daily_treasury_real_yield_curve', ['TC_10YEAR'])"));
 });
-
 test('economic calendar never falls back to hardcoded central-bank dates or stale persisted fixtures', () => {
   const macroData = read('../lib/macroData.ts');
   assert.doesNotMatch(macroData, /getCentralBankDecisionsSchedule/);
@@ -453,7 +403,6 @@ test('economic calendar never falls back to hardcoded central-bank dates or stal
   assert.match(macroData, /calendarSource = 'unavailable'/);
   assert.ok(macroData.includes("catalysts: data.payload.calendarSource === 'provider' ? persistedCatalysts : []"));
 });
-
 test('pair scenario probabilities remain uncalibrated until point-in-time backtests exist', () => {
   const dossier = read('../lib/macro/dossierEngine.ts');
   const types = read('../types/macro.ts');
@@ -462,7 +411,6 @@ test('pair scenario probabilities remain uncalibrated until point-in-time backte
   assert.match(types, /probabilityPct: number \| null/);
   assert.match(dashboard, /PROBABILITY NOT CALIBRATED/);
 });
-
 test('pair ranking only publishes provider-evidenced candidates and never labels scores as win probabilities', () => {
   const route = read('../app/api/v1/top-pairs/route.ts');
   const board = read('../app/components/PairOpportunityBoard.tsx');
@@ -475,7 +423,6 @@ test('pair ranking only publishes provider-evidenced candidates and never labels
   assert.match(board, /NO QUALIFIED MACRO OPPORTUNITIES/);
   assert.match(board, /No historical win probability is claimed/);
 });
-
 test('official Treasury daily nominal and TIPS yields work without a paid API key', () => {
   const adapter = read('../lib/treasuryData.ts');
   const macroData = read('../lib/macroData.ts');
@@ -490,14 +437,11 @@ test('official Treasury daily nominal and TIPS yields work without a paid API ke
   assert.match(dashboard, /10Y TIPS real yield/);
   assert.ok(dashboard.includes('Daily published closing-market estimates'));
 });
-
 test('provider telemetry does not treat FRED key presence as data-use approval', () => {
   const telemetry = read('../lib/macro/providerTelemetry.ts');
   assert.ok(telemetry.includes("const fredStorageAllowed = process.env.FRED_DATA_STORAGE_PERMISSION_APPROVED?.trim().toLowerCase() !== 'false'"));
   assert.ok(!telemetry.includes("FRED_DATA_STORAGE_PERMISSION_APPROVED !== 'false' || fredKeyPresent"));
 });
-
-
 test('BLS USD inflation and labour data can use the public no-registration API with a safe cache window', () => {
   const macroData = read('../lib/macroData.ts');
   assert.match(macroData, /const version = apiKey \? 'v2' : 'v1'/);
@@ -505,7 +449,6 @@ test('BLS USD inflation and labour data can use the public no-registration API w
   assert.match(macroData, /macro:bls-usd-updates-v1/);
   assert.match(macroData, /getBlsUsdUpdates\(process\.env\.BLS_API_KEY\?\.trim\(\)\)/);
 });
-
 test('Cboe daily VIX closes populate cross-asset risk telemetry without claiming intraday data', () => {
   const adapter = read('../lib/cboeVix.ts');
   const macroData = read('../lib/macroData.ts');
@@ -521,8 +464,6 @@ test('Cboe daily VIX closes populate cross-asset risk telemetry without claiming
   assert.ok(dashboard.includes('Not an intraday volatility quote'));
   assert.ok(goldEngine.includes('getCboeVixHistory'));
 });
-
-
 test('provider resilience handles Riksbank single-observation payloads, caches EIA and gates Gemini by default', () => {
   const international = read('../lib/internationalMacro.ts');
   const macroData = read('../lib/macroData.ts');
@@ -534,7 +475,6 @@ test('provider resilience handles Riksbank single-observation payloads, caches E
   assert.ok(aiBrief.includes("GEMINI_MACRO_BRIEF_ENABLED !== 'true'"));
   assert.ok(aiBrief.includes("'macro:ai-brief:v3'"));
 });
-
 test('gold score uses healthy Treasury levels, canonical CBOE VIX and CFTC positioning without a FRED z-score gate', () => {
   const engine = read('../lib/macro/goldAndRegimeEngine.ts');
   assert.match(engine, /const realYield = drivers\.DFII10\.value/);
@@ -544,7 +484,6 @@ test('gold score uses healthy Treasury levels, canonical CBOE VIX and CFTC posit
   assert.match(engine, /drivers\.twoYearMinusThreeMonthPct !== null/);
   assert.doesNotMatch(engine, /drivers\.DFII10\.zScore65 !== null && drivers\.twoYearMinusThreeMonthPct/);
 });
-
 test('EA macro context exposes flat deterministic session, lockout, regime and per-symbol bias fields', () => {
   const route = read('../app/api/v1/macro-context/route.ts');
   const types = read('../types/desk.ts');
@@ -557,7 +496,6 @@ test('EA macro context exposes flat deterministic session, lockout, regime and p
   assert.match(types, /symbols: Record<string, MacroSymbolBias>/);
   assert.match(types, /decisionScope: 'MACRO_GATE_ONLY'/);
 });
-
 test('private desk layout removes duplicated page footer and floating retail support widget', () => {
   const dashboard = read('../app/components/MacroDashboard.tsx');
   const shell = read('../components/PlatformShell.tsx');
@@ -568,7 +506,6 @@ test('private desk layout removes duplicated page footer and floating retail sup
   assert.doesNotMatch(footer, /wa\.me|WhatsApp Desk/);
   assert.ok(dashboard.indexOf('<EABridgeDiagnostics />') < dashboard.indexOf('id="health"'));
 });
-
 test('public FairEconomy calendar is represented as healthy telemetry without Finnhub plan approval', () => {
   const telemetry = read('../lib/macro/providerTelemetry.ts');
   assert.match(telemetry, /snapshot\.calendarProvider === 'FAIRECONOMY_PUBLIC'/);
@@ -576,7 +513,6 @@ test('public FairEconomy calendar is represented as healthy telemetry without Fi
   assert.match(telemetry, /Economic Calendar' \+ \(snapshot\.calendarProvider/);
   assert.doesNotMatch(telemetry, /const calendar = finnhubKeyPresent && !finnhubPlanActive/);
 });
-
 test('manual journal and calculator workflows are retired while the macro currency matrix remains', () => {
   const desk = read('../app/components/DeskTerminal.tsx');
   assert.doesNotMatch(desk, /exportJournal|calculatorInputsValid|LIVE RISK CALCULATOR|desk-position-sizing/);
@@ -585,7 +521,6 @@ test('manual journal and calculator workflows are retired while the macro curren
   assert.match(diagnostics, /ZONE 4/);
   assert.match(diagnostics, /MacroLyncBridge\.mqh/);
 });
-
 test('Force Sync refreshes the macro snapshot, gold context, BBO and spot reference inputs', () => {
   const snapshotRoute = read('../app/api/macro/snapshot/route.ts');
   const desk = read('../app/components/DeskTerminal.tsx');
@@ -597,8 +532,6 @@ test('Force Sync refreshes the macro snapshot, gold context, BBO and spot refere
   assert.match(desk, /goldResult\.value\.ok/);
   assert.match(desk, /onGoldContextChange\(freshGold as GoldMacroContext\)/);
 });
-
-
 test('intraday signal engine enforces macro threshold, trend quality, live sessions, shield gates and ATR-calibrated levels', () => {
   const engine = read('../lib/quant/intradaySignalEngine.ts');
   const route = read('../app/api/v1/intraday-signals/route.ts');
@@ -630,7 +563,6 @@ test('intraday signal engine enforces macro threshold, trend quality, live sessi
   assert.match(engine, /hour >= 13 && hour < 17/);
   assert.match(engine, /INTRADAY_CANDLES_STALE/);
 });
-
 test('Sovereign Shield fails closed when VIX evidence is missing or invalid', () => {
   const shield = read('../lib/quant/sovereignShield.ts');
   const deskTypes = read('../types/desk.ts');
@@ -644,7 +576,6 @@ test('Sovereign Shield fails closed when VIX evidence is missing or invalid', ()
   assert.match(macroContext, /drivers\.VIXCLS\.state === 'HEALTHY' \? goldContext\.drivers\.VIXCLS\.value : null/);
   assert.match(xauContext, /drivers\.VIXCLS\.state === 'HEALTHY' \? context\.drivers\.VIXCLS\.value : null/);
 });
-
 test('intraday candle adapter rejects malformed OHLC ranges and invalid timestamps', () => {
   const route = read('../app/api/v1/intraday-candles/route.ts');
   assert.match(route, /high! < Math\.max\(open!, close!\)/);
@@ -652,7 +583,6 @@ test('intraday candle adapter rejects malformed OHLC ranges and invalid timestam
   assert.match(route, /Number\.isFinite\(epochSeconds\)/);
   assert.match(route, /bars\.sort\(\(left, right\)/);
 });
-
 test('broker trade history derives outcomes only from reconciled MT5 deals, without synthetic journal context', () => {
   const accounts = read('../app/accounts/page.tsx');
   assert.match(accounts, /const netDeal = \(deal: Deal\) => Number\(deal\.profit\) \+ Number\(deal\.commission\) \+ Number\(deal\.swap\) \+ Number\(deal\.fee\)/);
@@ -663,7 +593,6 @@ test('broker trade history derives outcomes only from reconciled MT5 deals, with
   assert.match(accounts, /net: items\.reduce\(\(sum, deal\) => sum \+ netDeal\(deal\), 0\)/);
   assert.doesNotMatch(accounts, /riskPct|rMultiple|macroBiasScore|hurstRegime|vixLevel/);
 });
-
 test('account history attribution uses the broker-recorded position instrument and direction', () => {
   const accounts = read('../app/accounts/page.tsx');
   assert.match(accounts, /symbol: entry\.symbol/);
@@ -671,7 +600,6 @@ test('account history attribution uses the broker-recorded position instrument a
   assert.match(accounts, /positionId/);
   assert.doesNotMatch(accounts, /generatePairDossier|journalSymbol|calculator/i);
 });
-
 test('intraday candle adapter exposes real OHLCV with explicit freshness and no synthetic fallback', () => {
   const route = read('../app/api/v1/intraday-candles/route.ts');
   assert.match(route, /query1\.finance\.yahoo\.com\/v8\/finance\/chart/);
@@ -681,7 +609,6 @@ test('intraday candle adapter exposes real OHLCV with explicit freshness and no 
   assert.match(route, /intradayBars: \[\], dailyBars: \[\]/);
   assert.doesNotMatch(route, /Math\.random|synthetic|fallbackBars/);
 });
-
 test('authenticated EA macro context includes intraday signals and MQL5 read-only getters', () => {
   const route = read('../app/api/v1/macro-context/route.ts');
   const types = read('../types/desk.ts');
@@ -694,7 +621,6 @@ test('authenticated EA macro context includes intraday signals and MQL5 read-onl
   assert.match(bridge, /GetRecommendedSL/);
   assert.match(bridge, /safe_to_trade = false/);
 });
-
 test('desk exposes macro-aligned intraday signals as research context without calculator or order execution', () => {
   const desk = read('../app/components/DeskTerminal.tsx');
   const signals = read('../app/api/v1/intraday-signals/route.ts');
@@ -705,7 +631,6 @@ test('desk exposes macro-aligned intraday signals as research context without ca
   assert.match(signals, /executionAuthority: 'MANUAL_OR_EA_CONFIRMATION_REQUIRED'/);
   assert.doesNotMatch(desk, /LOAD INTO CALCULATOR|setSl\(|setTp\(|OrderSend/);
 });
-
 test('provider health includes real EIA and Treasury observation dates and BIS-backed World Bank standby', () => {
   const telemetry = read('../lib/macro/providerTelemetry.ts');
   const types = read('../types/macro.ts');
@@ -722,15 +647,12 @@ test('provider health includes real EIA and Treasury observation dates and BIS-b
   assert.match(dashboard, /stale: Boolean\(snapshot\.energyMarkets && !eiaFresh\)/);
   assert.match(dashboard, /snapshot\.usTreasury\?\.freshness === 'STALE'/);
 });
-
-
 test('spread blowout protection requires measured same-session Redis history and never substitutes configured references', () => {
   const baseline = read('../lib/quant/spreadBaseline.ts');
   const route = read('../app/api/v1/intraday-signals/route.ts');
   const desk = read('../app/components/DeskTerminal.tsx');
   assert.match(baseline, /redis\.lpush/);
   assert.match(baseline, /redis\.lrange/);
-  assert.match(baseline, /values\.length >= 20/);
   assert.doesNotMatch(baseline, /REFERENCE_SPREADS|CONFIGURED_REFERENCE|0\.00018|0\.00022|0\.020|0\.85/);
   assert.match(baseline, /values\.length < 20/);
   assert.match(baseline, /spread \/ medianSpread/);
@@ -745,8 +667,6 @@ test('spread blowout protection requires measured same-session Redis history and
   assert.match(desk, /goldResult\.value\.ok/);
   assert.match(desk, /activeSatelliteSymbol/);
 });
-
-
 test('all distributable MacroLync MT5 bridge copies share one authenticated read-only contract', () => {
   const canonicalBridge = read('../public/MacroLyncBridge.mqh');
   assert.equal(read('../mql5/MacroLyncBridge.mqh'), canonicalBridge);
@@ -755,8 +675,6 @@ test('all distributable MacroLync MT5 bridge copies share one authenticated read
   assert.match(canonicalBridge, /safe_to_trade = false/);
   assert.doesNotMatch(canonicalBridge, /OrderSend|PositionModify|PositionClose/);
 });
-
-
 test('institutional technical confluence exposes Hurst, Gaussian Z-score and ADR/liquidity metrics with fail-closed gates', () => {
   const engine = read('../lib/quant/intradaySignalEngine.ts');
   const confluence = read('../lib/quant/technicalConfluence.ts');
@@ -771,8 +689,6 @@ test('institutional technical confluence exposes Hurst, Gaussian Z-score and ADR
   assert.match(confluence, /zScore20/);
   assert.match(confluence, /value > 0\.52/);
 });
-
-
 test('macro context exposes zero-ambiguity executive desk fields and bridge parses them fail-closed', () => {
   const route = read('../app/api/v1/macro-context/route.ts');
   const types = read('../types/desk.ts');
@@ -790,8 +706,6 @@ test('macro context exposes zero-ambiguity executive desk fields and bridge pars
   assert.match(bridge, /context\.desk_status == "LOCKOUT" && context\.max_risk_pct != 0\.0/);
   assert.match(bridge, /context\.allowed_to_trade = false/);
 });
-
-
 test('London and New York execution windows are fixed in WAT across daylight-saving changes', () => {
   const engine = read('../lib/quant/intradaySignalEngine.ts');
   const route = read('../app/api/v1/macro-context/route.ts');
@@ -804,7 +718,6 @@ test('London and New York execution windows are fixed in WAT across daylight-sav
   assert.match(desk, /ACCOUNT GOVERNANCE UNVERIFIED/);
   assert.match(desk, /nextWATSessionOpen/);
 });
-
 test('desk quote grid always reserves a fourth satellite slot and labels core instruments explicitly', () => {
   const desk = read('../app/components/DeskTerminal.tsx');
   assert.match(desk, /const activeSatelliteSymbol = satelliteSymbol \?\? 'GBPUSD'/);
@@ -814,8 +727,6 @@ test('desk quote grid always reserves a fourth satellite slot and labels core in
   assert.match(desk, /SATELLITE #1 · /);
   assert.match(desk, /const displaySymbols = \[\.\.\.symbols, activeSatelliteSymbol\]/);
 });
-
-
 test('Gold real-yield driver prefers the same canonical Treasury snapshot vintage as cross-asset telemetry', () => {
   const gold = read('../lib/macro/goldAndRegimeEngine.ts');
   const telemetry = read('../lib/macro/providerTelemetry.ts');
@@ -823,8 +734,6 @@ test('Gold real-yield driver prefers the same canonical Treasury snapshot vintag
   assert.match(gold, /const treasuryRetrievedAtUtc = snapshotTreasury\?\.retrievedAtUtc/);
   assert.match(telemetry, /calendarActive && snapshot\.calendarProvider === 'FAIRECONOMY_PUBLIC' \? utcWeekWindow\(\)/);
 });
-
-
 test('XAUUSD Fundamental Pair Dossier routes to the dedicated Gold liquidity and real-yield engine', () => {
   const dashboard = read('../app/components/MacroDashboard.tsx');
   assert.match(dashboard, /pair === 'XAUUSD' \? \(/);
@@ -837,12 +746,10 @@ test('XAUUSD Fundamental Pair Dossier routes to the dedicated Gold liquidity and
   const goldDossierBranch = dashboard.slice(dashboard.indexOf("pair === 'XAUUSD'"), dashboard.indexOf(') : (', dashboard.indexOf("pair === 'XAUUSD'")));
   assert.doesNotMatch(goldDossierBranch, /POLICY DIFF|REAL YIELD DIFF|2Y YIELD SPREAD/);
 });
-
-
 test('production UI fails closed on unconfigured account balance and never seeds mock execution prices', () => {
   const desk = read('../app/components/DeskTerminal.tsx');
   const accounts = read('../app/accounts/page.tsx');
-  assert.match(desk, /useState<number \\| null>\\(null\\)/);
+  assert.match(desk, /useState<number \| null>\(null\)/);
   assert.match(desk, /BAL:|NOT SET \\(ENTER REAL BALANCE\\)/);
   assert.match(desk, /ENTER REAL ACCOUNT BALANCE TO COMPUTE LOTS/);
   assert.match(desk, /SAVE &amp; LOCK REAL BALANCE/);
@@ -855,22 +762,20 @@ test('production UI fails closed on unconfigured account balance and never seeds
   assert.doesNotMatch(accounts, /selected \\? Number\\(selected\\.equity\\) : 10000/);
   const validationEngine = read('../lib/quant/monteCarloEngine.ts');
   const validationPage = read('../app/validation/page.tsx');
-  assert.doesNotMatch(validationEngine, /initialBalance = 10_000|volume: 0\.1|profit \/ 50|net \/ 100/);
+  assert.doesNotMatch(validationEngine, /initialBalance = 10_000|volume: 0\.1|profit \/ 50|net \/ 100|99\.9/);
   assert.match(validationPage, /NO VERIFIED TRADE HISTORY — IMPORT MT5 REPORT OR LOG REAL TRADES TO RUN MONTE CARLO/);
   assert.match(validationPage, /startingBalance === null/);
   assert.match(accounts, /useState<ManualTrade\\[]>\\(\\[\\]\\)/);
 });
-
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 function collectProductionSourceFiles(directory) {
   if (!existsSync(directory)) return [];
   return readdirSync(directory).flatMap((entry) => {
     const fullPath = join(directory, entry);
     if (statSync(fullPath).isDirectory()) return collectProductionSourceFiles(fullPath);
-    return /\\.(?:ts|tsx|js|jsx)$/.test(entry) ? [fullPath] : [];
+    return /\.(?:ts|tsx|js|jsx)$/.test(entry) ? [fullPath] : [];
   });
 }
-
 test('repository-wide static audit rejects default non-zero balances, seeded trades and mock prices', () => {
   const roots = ['app', 'components', 'lib', 'hooks', 'store', 'types'];
   const files = roots.flatMap((root) => collectProductionSourceFiles(join(repositoryRoot, root)));
