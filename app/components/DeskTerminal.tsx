@@ -411,7 +411,6 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
           const selectedSig = intradaySignals.find((s) => s.symbol === ticketSymbol);
           const digits = ticketSymbol === 'USDJPY' ? 3 : ticketSymbol === 'XAUUSD' ? 2 : 5;
           const liveAsk = quoteFor(ticketSymbol)?.ask ?? null;
-          const isOffSession = activeSession === 'OFF-SESSION';
           const isVixHigh = goldContext?.drivers.VIXCLS.state === 'HEALTHY' && (goldContext.drivers.VIXCLS.value ?? 0) >= 25;
           const isVixLockout = goldContext?.drivers.VIXCLS.state === 'HEALTHY' && (goldContext.drivers.VIXCLS.value ?? 0) >= 32;
           const isCircuitBreaker = manualDeskMode && (manualLedger.trades >= 2 || manualLedger.losses >= 2);
@@ -425,7 +424,7 @@ export default function DeskTerminal({ initialSnapshot, initialGoldContext, onSn
 
           let riskCap = globalDeskLockout || isVixLockout ? 0.0 : isVixHigh ? 0.5 : 1.0;
           if (ticketSymbol === 'XAUUSD') riskCap = Math.min(riskCap, 0.5);
-          if (!balanceVerified) riskCap = 0;
+          if (!isSizingEvidenceComplete) riskCap = 0;
 
           const dollarRisk = balanceVerified && riskCap > 0 ? (ticketBalance as number) * (riskCap / 100) : 0;
           let calculatedLots = 0.00;
