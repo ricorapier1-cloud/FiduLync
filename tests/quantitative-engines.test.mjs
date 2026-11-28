@@ -911,6 +911,9 @@ test('validation engine requires chronological three-fold out-of-sample evidence
   assert.match(engine, /CIRCULAR_BLOCK/);
   assert.match(engine, /deterministicSeed/);
   assert.match(engine, /initialStopLoss/);
+  assert.match(engine, /initialRiskAmountIndex/);
+  assert.match(engine, /netResult \/ initialRiskAmount/);
+  assert.doesNotMatch(engine, /rewardDistance \/ riskDistance/);
 });
 
 test('validation workspace uses linked real MT5 history or imported reports, never the retired manual ledger', () => {
