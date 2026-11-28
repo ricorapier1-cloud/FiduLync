@@ -152,3 +152,42 @@ test('drawdown breach, negative stressed expectancy and unfiltered setups block 
   assert.ok(result.blockers.includes('STRESSED_NET_EXPECTANCY_NOT_POSITIVE'));
   assert.ok(result.blockers.includes('LOW_QUALITY_OR_UNFILTERED_TRADES_PRESENT'));
 });
+
+
+test('a 60 percent point estimate remains provisional when its confidence interval does not establish the 60 percent floor', () => {
+  const trades = Array.from({ length: 300 }, (_, i) => ({
+    netR: i < 180 ? 2 : -1,
+    closedAt: new Date(Date.UTC(2023, 0, 1) + i * 60_000).toISOString(),
+  }));
+  const result = evaluateResearchObjectives(trades, {
+    walkForwardEligible: true,
+    untouchedOutOfSample: true,
+    allTradesPassedQualityFilter: true,
+    costStressApplied: true,
+    stressedExpectancyR: 0.2,
+    maxDrawdownPct: 8,
+    approvedMaxDrawdownPct: 15,
+  });
+  assert.equal(result.winRateTarget, 'PROVISIONAL');
+  assert.equal(result.status, 'NOT_VALIDATED');
+  assert.ok(result.blockers.includes('WIN_RATE_TARGET_NOT_STATISTICALLY_CONFIRMED'));
+});
+
+test('MacroLync can only clear its own research-evidence gate, not grant trading approval', () => {
+  const result = assessMacroResearchEvidence({
+    pointInTimeReleaseVintagesVerified: true,
+    synchronizedHistoricalObservationsVerified: true,
+    sourcePermissionsVerified: true,
+    untouchedOutOfSampleVerified: true,
+    walkForwardFolds: 4,
+    spreadStressApplied: true,
+    slippageStressApplied: true,
+    commissionStressApplied: true,
+    swapStressApplied: true,
+    parameterSensitivityCompleted: true,
+    multiRegimeCoverageVerified: true,
+  });
+  assert.equal(result.eligible, true);
+  assert.equal(result.status, 'READY_FOR_INDEPENDENT_TRADE_VALIDATION');
+  assert.equal(result.objectives.dailyTradeQuota, null);
+});
