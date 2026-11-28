@@ -170,3 +170,16 @@ test('calendar feed freshness is mandatory for event-risk clearance', () => {
   assert.match(macroData, /snapshot\.calendarRetrievedAt = new Date\(\)\.toISOString\(\)/);
   assert.match(macroContextApi, /high_impact_lockout: !calendarVerified/);
 });
+
+test('cached official statistics and FRED series are freshness-checked independently', () => {
+  assert.match(macroData, /fredRetrievedAt: new Date\(\)\.toISOString\(\)/);
+  assert.match(macroEngine, /officialStatisticsFresh/);
+  assert.match(macroEngine, /fredRetrievalFresh/);
+  assert.match(macroEngine, /observationFresh\(snapshot\.usIndicators\?\.retrievedAt, 1\)/);
+  assert.match(macroEngine, /observationFresh\(snapshot\.usIndicators\?\.fredRetrievedAt, 1\)/);
+});
+
+test('gold receives no currency-style heuristic score', () => {
+  assert.match(macroEngine, /if \(baseCode === 'XAU'\) return null/);
+  assert.match(macroContextApi, /Gold-specific real-yield, official-sector demand and positioning model is not validated/);
+});
