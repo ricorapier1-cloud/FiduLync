@@ -39,6 +39,13 @@ function readiness(calendarVerified: boolean, eventLockout: boolean): Candidate[
 export async function GET() {
   try {
     const snapshot = await getMacroSnapshot();
+    const calendarRetrievedAtMs = snapshot.calendarRetrievedAtUtc ? Date.parse(snapshot.calendarRetrievedAtUtc) : NaN;
+    const calendarCoverageEndMs = snapshot.calendarCoverageEndUtc ? Date.parse(snapshot.calendarCoverageEndUtc) : NaN;
+    const calendarVerified = snapshot.calendarSource === 'provider' && Boolean(snapshot.calendarProvider)
+      && Number.isFinite(calendarRetrievedAtMs) && Date.now() - calendarRetrievedAtMs <= 60 * 60_000
+      && Date.now() - calendarRetrievedAtMs >= -30_000
+      && Number.isFinite(calendarCoverageEndMs) && calendarCoverageEndMs >= Date.now() + 24 * 60 * 60_000;
+    const highImpactEvents = calendarVerified ? snapshot.catalysts.filter((event) => event.impact === 'High') : [];
     const gold = await buildGoldMacroContext(snapshot).catch((error) => {
       console.warn('Gold opportunity input unavailable; continuing with FX candidates:', error);
       return null;
@@ -88,14 +95,14 @@ export async function GET() {
           contradictingEvidence: dossier.contradictingEvidence.filter((item) => !item.startsWith('No verified')).slice(0, 2),
           nextCatalyst: dossier.nextCatalyst,
           eventRiskLockout: dossier.eventRiskLockout,
-          eventRiskVerified: snapshot.calendarSource === 'provider',
-          tradeReadiness: readiness(snapshot.calendarSource === 'provider', dossier.eventRiskLockout),
+          eventRiskVerified: calendarVerified,
+          tradeReadiness: readiness(calendarVerified, dossier.eventRiskLockout),
         };
       });
 
-    const goldEventLockout = snapshot.catalysts.some((event) => event.impact === 'High'
-      && Math.abs(Date.parse(event.scheduledAt) - Date.now()) <= 30 * 60 * 1000);
-    const nextGoldEvent = snapshot.catalysts.filter((event) => event.impact === 'High' && Date.parse(event.scheduledAt) >= Date.now())
+    const goldEventLockout = !calendarVerified || highImpactEvents.some((event) =>
+      Math.abs(Date.parse(event.scheduledAt) - Date.now()) <= 30 * 60 * 1000);
+    const nextGoldEvent = highImpactEvents.filter((event) => Date.parse(event.scheduledAt) >= Date.now())
       .sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt))[0];
     const goldCandidate: Omit<Candidate, 'rank'> | null = gold && gold.overallState === 'AVAILABLE'
       && gold.goldBiasScore !== null && Math.abs(gold.goldBiasScore) >= 20
@@ -114,8 +121,8 @@ export async function GET() {
         contradictingEvidence: gold.contradictingEvidence.slice(0, 2),
         nextCatalyst: nextGoldEvent ? { title: nextGoldEvent.title, scheduledAt: nextGoldEvent.scheduledAt, impact: nextGoldEvent.impact } : null,
         eventRiskLockout: goldEventLockout,
-        eventRiskVerified: snapshot.calendarSource === 'provider',
-        tradeReadiness: readiness(snapshot.calendarSource === 'provider', goldEventLockout),
+        eventRiskVerified: calendarVerified,
+        tradeReadiness: readiness(calendarVerified, goldEventLockout),
       } : null;
 
     // Reserve one slot for independently evidenced XAU/USD whenever its
