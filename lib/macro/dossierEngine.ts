@@ -162,16 +162,25 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
   // Upcoming catalysts
   const now = Date.now();
   const relevantRegions = new Set([base, quote, 'US', 'EU', 'UK', 'JP', 'CH', 'CA', 'AU', 'NZ']);
-  const relevantEvents = snapshot.catalysts.filter((event) => relevantRegions.has(event.region));
-  const activeHighImpactLockout = relevantEvents.some((event) => event.impact === 'High'
+  const calendarRetrievedAtMs = snapshot.calendarRetrievedAtUtc ? Date.parse(snapshot.calendarRetrievedAtUtc) : NaN;
+  const calendarCoverageEndMs = snapshot.calendarCoverageEndUtc ? Date.parse(snapshot.calendarCoverageEndUtc) : NaN;
+  const calendarVerified = snapshot.calendarSource === 'provider' && Boolean(snapshot.calendarProvider)
+    && Number.isFinite(calendarRetrievedAtMs)
+    && now - calendarRetrievedAtMs <= 60 * 60_000
+    && now - calendarRetrievedAtMs >= -30_000
+    && Number.isFinite(calendarCoverageEndMs)
+    && calendarCoverageEndMs >= now + 24 * 60 * 60_000;
+  const relevantEvents = calendarVerified
+    ? snapshot.catalysts.filter((event) => relevantRegions.has(event.region)) : [];
+  const activeHighImpactLockout = !calendarVerified || relevantEvents.some((event) => event.impact === 'High'
     && Math.abs(Date.parse(event.scheduledAt) - now) <= 30 * 60 * 1000);
   const upcoming = relevantEvents.filter((event) => Date.parse(event.scheduledAt) >= now)
     .sort((left, right) => Date.parse(left.scheduledAt) - Date.parse(right.scheduledAt));
-  const nextCatalyst = upcoming[0] ? {
+  const nextCatalyst = calendarVerified && upcoming[0] ? {
     title: upcoming[0].title, scheduledAt: upcoming[0].scheduledAt, region: upcoming[0].region,
     impact: upcoming[0].impact, lockoutActive: activeHighImpactLockout,
   } : null;
-  // Includes both the 30-minute pre-release and post-release windows.
+  // Calendar uncertainty itself is a lockout; absence of events is not proof of no event risk.
   const eventRiskLockout = activeHighImpactLockout;
 
   // Invalidation triggers
@@ -179,6 +188,7 @@ export function generatePairDossier(snapshot: MacroSnapshot, symbol: string): Pa
     ? 'Cross-asset risk-regime invalidation cannot be assessed until a verified risk feed is connected.'
     : `Global risk sentiment regime flipping to ${crossAsset.globalRiskAppetite === 'RISK_ON' ? 'STRESS / RISK-OFF' : 'RISK-ON'}.`;
   const invalidationTriggers: string[] = [
+    ...(!calendarVerified ? ['Economic calendar is unavailable, stale, or lacks verified forward coverage.'] : []),
     `Unexpected central bank policy rate change or forward guidance shift by ${baseProfile?.centralBank ?? base}.`,
     `Tier-1 inflation print diverging more than 40 bps from consensus for ${quoteProfile?.country ?? quote}.`,
     `Rapid expansion of sovereign yield curve spread violating the ${policyDiffBps} bps nominal threshold.`,
