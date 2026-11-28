@@ -1,3 +1,5 @@
+import { RESEARCH_OBJECTIVES } from './researchObjectives';
+
 /**
  * Deterministic validation analytics for actual, closed, chronological trade records.
  * Monte Carlo resamples observed outcomes; it is not synthetic market history.
@@ -24,18 +26,7 @@ export type TradeMetrics = {
   totalR: number;
 };
 
-export const QUANT_CORE_RESEARCH_OBJECTIVES = Object.freeze({
-  winRateTargetMin: 0.60,
-  winRateTargetMax: 0.65,
-  plannedRewardRisk: 2,
-  minimumOutOfSampleTrades: 300,
-  minimumWalkForwardFolds: 3,
-  minimumOutOfSampleTradesPerFold: 30,
-  growthPriority: 'BALANCED_GROWTH' as const,
-  drawdownPriority: 'CONTROLLED_DRAWDOWN' as const,
-  setupPolicy: 'HIGH_QUALITY_ONLY' as const,
-  dailyTradeQuota: null,
-});
+export const QUANT_CORE_RESEARCH_OBJECTIVES = RESEARCH_OBJECTIVES;
 
 export function wilsonScoreInterval(wins: number, trades: number, z = 1.96): { lower: number; upper: number } | null {
   if (!Number.isSafeInteger(wins) || !Number.isSafeInteger(trades) || trades < 1
